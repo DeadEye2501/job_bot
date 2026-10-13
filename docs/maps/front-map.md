@@ -80,14 +80,14 @@
 - —
 - принимает: ask
 
-### app/ProfileExperience.svelte (145)
+### app/ProfileRecords.svelte (132)
 - —
-- принимает: ask
+- принимает: ask, kind, Card
 
-### app/ProfileScreen.svelte (30)
+### app/ProfileScreen.svelte (35)
 - —
 - принимает: ask
-- берёт: ./ProfileCv.svelte, ./ProfileExperience.svelte, ./ProfileSkills.svelte
+- берёт: ./ProfileCv.svelte, ./ProfileRecords.svelte, ./ProfileSkills.svelte
 
 ### app/ProfileSkills.svelte (176)
 - —
@@ -150,7 +150,7 @@
 - принимает: ask, say, onback, onnext
 - берёт: ./TelegramLogin.svelte
 
-## components — 103 файлов
+## components — 106 файлов
 
 ### components/ActionsMenu.svelte (30)
 - —
@@ -300,10 +300,10 @@
 - принимает: options, value, placeholder, onpick
 - берёт: ./DropPanel.svelte
 
-### components/ExperienceCard.svelte (148)
-- Нажимается вся шапка, а не одна стрелка: свёрнутых карточек столбик, и целиться в значок ради раскрытия человеку не за что.
-- принимает: exp, known, open, ontoggle, onedit, onremove
-- берёт: ./BulletList.svelte, ./DatePicker.svelte, ./SkillPicker.svelte
+### components/ExperienceCard.svelte (107)
+- —
+- принимает: record, known, open, ontoggle, onedit, onremove
+- берёт: ./BulletList.svelte, ./DatePicker.svelte, ./RecordCard.svelte, ./StackField.svelte
 
 ### components/FilterGroup.svelte (12)
 - —
@@ -467,10 +467,19 @@
 - —
 - принимает: channels, messages, text
 
+### components/ProjectCard.svelte (43)
+- —
+- принимает: record, known, open, ontoggle, onedit, onremove
+- берёт: ./BulletList.svelte, ./RecordCard.svelte, ./StackField.svelte
+
 ### components/RawTextDialog.svelte (36)
 - Кнопка стоит поверх текста и полупрозрачна: окно узкое, и вынесенная в подвал она отняла бы у текста строку ради того, что нажимают раз в десять открытий.
 - принимает: id, chips, text, oncopy, onclose
 - берёт: ./ModalHead.svelte, ./ModalShell.svelte
+
+### components/RecordCard.svelte (42)
+- Нажимается вся шапка, а не одна стрелка: свёрнутых карточек столбик, и целиться в значок ради раскрытия человеку не за что.
+- принимает: title, open, ontoggle, onremove, removeLabel, children
 
 ### components/RowMarks.svelte (15)
 - —
@@ -520,6 +529,11 @@
 ### components/SourceStats.svelte (61)
 - Легенда под полосой: одиннадцать цветов без подписей не читаются, а подписать отрезки внутри полосы негде.
 - принимает: stats, empty
+
+### components/StackField.svelte (16)
+- —
+- принимает: chosen, known, onedit
+- берёт: ./SkillPicker.svelte
 
 ### components/StatsCard.svelte (15)
 - —
@@ -612,7 +626,7 @@
 - —
 - принимает: marks, dimmed
 
-## state — 67 файлов
+## state — 69 файлов
 
 ### state/aggregators.js (70)
 - * Где агрегатор ищет — подпись под именем. * * У «Поиска по сети» адреса нет — его место занимает то, где он ищет: пустое * место под именем читалось бы как недозаведённый агрегатор.
@@ -702,9 +716,9 @@
 - * Дата для тесной колонки: день, сокращённый месяц и год чужого года. * * Год этого года не пишется: он и так известен, а колонка узка. Негодное и * пустое дают пустоту — прочерк в такой колонке читался бы как значение.
 - отдаёт: asIso, clock, dayIso, dayOf, isoDay, padded, shortDate, showDate, showStamp, validDate
 
-### state/experience.js (83)
+### state/experience.js (84)
 - * Период работы для шапки карточки. * * Месяц и год без дня: места работы различают по месяцам, а день удлиняет * строку вдвое. Открытый конец назван словами — по нему и читают, работает * человек здесь сейчас или нет.
-- отдаёт: cardTitle, experienceGoing, experienceReady, period
+- отдаёт: EXPERIENCE, cardTitle, experienceGoing, experienceReady, period
 
 ### state/flash.js (24)
 - * Заводит отметку, которая гаснет сама. * * Второе зажигание подряд отсчёт продлевает, а не гасит: быстрая правка двух * полей иначе тушила бы рамку по времени первого, и вторая запись выглядела бы * незаписанной.
@@ -782,6 +796,10 @@
 - * Чем заперто то, что занимает место прогона, пока он идёт: мост второй прогон * не пустит.
 - отдаёт: COUNTLESS_STAGES, RUNNING, STARTING, applyNote, bar, caption, countlessNote, humanText, updateNote
 
+### state/projects.js (39)
+- * Готов ли проект к записи: обязательно одно название, как требует мост.
+- отдаёт: PROJECTS, projectReady, projectTitle, projectsGoing
+
 ### state/provider.js (64)
 - * Спросить у поставщика имена его моделей. * * Отказ и пустой перечень — разные ответы, и путать их нельзя: первое значит * «сервер не отозвался», второе — «сервер поднят, но модели в нём нет», и * чинятся они по-разному. Отказ приходит фразой, а не пустотой. * * Имя модели в вопрос не идёт: перечень читается с адреса и ключа, а имя — как * раз то, что в нём ищут.
 - отдаёт: askModels, pickModelFile, probeModel
@@ -789,6 +807,10 @@
 ### state/provider_form.svelte.js (162)
 - * Заводит поля поставщика. * * `kind` — чат или эмбеддинги: с ним спрашивают поставщика. `alive` — признак * жизни экрана (`alive.js`): ответ, пришедший после ухода, класть некуда.
 - отдаёт: providerForm
+
+### state/records.js (35)
+- * Лежит ли запись уже в базе. * * Номера мало: его даёт мост, а вкладка себя после записи не перечитывает — * заведённая в этот заход запись живёт с пустым номером до конца визита, уже * будучи записанной. Отметку об уехавшей записи ставит сама вкладка, и без неё * опустошённое обязательное поле вычёркивало такую строку из посылки, а мост * стирал её молча вместе со всем, что в ней было.
+- отдаёт: recordsGoing
 
 ### state/round.svelte.js (79)
 - * Что известно о прогоне сейчас.
@@ -798,7 +820,7 @@
 - * Что из списка остаётся видно под набранное. * * Пустое набранное оставляет список целым: поле поиска стоит над уже открытым * списком, и до первого знака резать нечего. Одни пробелы — то же самое: их * набирают между словами и стирают последними, и схлопнутый на них список * мигал бы под руками. * * Регистр не различается — человек набирает как придётся, а значения приходят * как записаны. Вхождением, а не началом строки: имена приходят с приставками * («qwen/qwen3-4b», «@ник · компания»), и отбор по началу прятал бы строку от * того, кто набирает её собственное имя. * * `text` называет, где искать: у строки списка полей несколько, и по какому из * них её вспоминают, знает не этот файл, а тот, кто её показывает.
 - отдаёт: matching
 
-### state/sections.js (34)
+### state/sections.js (35)
 - * Разделы в том порядке, в каком они стоят в меню. Значок — лигатура шрифта * `Material Symbols Outlined`.
 - отдаёт: CONTACTS_TABS, PROFILE_TABS, SECTIONS, SYSTEM_TABS
 
@@ -1645,7 +1667,7 @@ body, html, button, body, .material-symbols-outlined
 .wiz-body > .warning-card, .wiz-fields, .wiz-modes, .wiz-fields .help
 - берёт: --accent, --accent-chip-selected, --bg-secondary, --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
 
-## tests — 95 файлов
+## tests — 97 файлов
 
 ### tests/aggregators.test.js (118)
 - —
@@ -1826,8 +1848,14 @@ body, html, button, body, .material-symbols-outlined
 ### tests/profile_cv_live.test.js (38)
 - * Анкета, у которой мост отдаёт этот файл резюме.
 
-### tests/profile_experience_live.test.js (72)
+### tests/profile_experience_live.test.js (76)
 - * Вкладка с записанными за ней посылками на мост.
+
+### tests/profile_projects_live.test.js (64)
+- * Вкладка с записанными за ней посылками на мост.
+
+### tests/projects.test.js (40)
+- —
 
 ### tests/provider.test.js (123)
 - * Отказ моста в том виде, в каком его поднимает обёртка зова.

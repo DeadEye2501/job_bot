@@ -22,6 +22,7 @@ export const PROFILE_TABS = [
   { key: 'cv', label: 'CV' },
   { key: 'skills', label: 'Skills' },
   { key: 'experience', label: 'Experience' },
+  { key: 'projects', label: 'Projects' },
 ];
 
 /** Вкладки раздела «Контакты». Источники первыми — с них начинается сбор. */

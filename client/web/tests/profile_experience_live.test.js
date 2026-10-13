@@ -14,7 +14,9 @@
 import { cleanup, render, within } from '@testing-library/svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import ProfileExperience from '../app/ProfileExperience.svelte';
+import ProfileRecords from '../app/ProfileRecords.svelte';
+import ExperienceCard from '../components/ExperienceCard.svelte';
+import { EXPERIENCE } from '../state/experience.js';
 import { settled } from './settled.js';
 
 afterEach(cleanup);
@@ -30,7 +32,9 @@ function tab() {
     }
     return {};
   };
-  const shown = render(ProfileExperience, { props: { ask } });
+  const shown = render(ProfileRecords, {
+    props: { ask, kind: EXPERIENCE, Card: ExperienceCard },
+  });
   return { sent, q: within(shown.container) };
 }
 

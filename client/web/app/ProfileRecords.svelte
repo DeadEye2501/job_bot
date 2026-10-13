@@ -1,25 +1,24 @@
 <script>
-  // Вкладка «Experience»: места работы карточками.
+  // Вкладка записей анкеты — мест работы или проектов: карточки одного вида.
   //
-  // Перечень уезжает на мост целиком и заменяет прежний — как и навыки.
+  // Вид записи (`kind`) говорит, чем спрашивать и чем писать, как назвать и
+  // какой пустой завести; карточка (`Card`) — её поля. Перечень уезжает на мост
+  // целиком и заменяет прежний — как и навыки.
 
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
-  import ExperienceCard from '$components/ExperienceCard.svelte';
   import { living } from '$state/alive.js';
   import { toggled, without } from '$state/chosen.js';
-  import { experienceGoing } from '$state/experience.js';
   import { oneWrite } from '$state/one_write.js';
-  import { counted } from '$state/words.js';
 
-  let { ask } = $props();
+  let { ask, kind, Card } = $props();
 
   let leaving = $state(null);
   let trouble = $state('');
 
   let loaded = $state(false);
   let rows = $state([]);
-  // Навыки анкеты: мост шлёт их вместе с опытом именно для стека — связать
-  // место работы он умеет только с заведённым навыком. Держим строки целиком:
+  // Навыки анкеты: мост шлёт их вместе с записями именно для стека — связать
+  // запись он умеет только с заведённым навыком. Держим строки целиком:
   // подборщик раскладывает их по категориям и показывает уровень.
   let known = $state([]);
   let open = $state(new Set());
@@ -32,18 +31,18 @@
   let born = 0;
 
   async function refresh() {
-    const now = await ask('profile.experience');
+    const now = await ask(kind.load);
     if (now === null || !alive.now) return;
-    rows = now.experience.map((one) => ({ ...one, key: `id-${one.id}` }));
+    rows = now[kind.key].map((one) => ({ ...one, key: `id-${one.id}` }));
     known = now.skills_index;
     loaded = true;
   }
 
-  const write = oneWrite((going) => ask('profile.save_experience', { experience: going }));
+  const write = oneWrite((going) => ask(kind.save, { [kind.key]: going }));
 
   /** Отправить перечень целиком.
    *
-   * Что уедет и что сказать, если не уедет ничего, решает `experienceGoing`.
+   * Что уедет и что сказать, если не уедет ничего, решает `kind.going`.
    * Свой ключ и отметка об уехавшей записи на мост не уезжают: они про показ,
    * не про запись.
    *
@@ -54,7 +53,7 @@
    * она молча.
    */
   async function save() {
-    const now = experienceGoing(rows);
+    const now = kind.going(rows);
     trouble = now.trouble;
     if (now.trouble) return;
     const went = new Set(now.going.map((one) => one.key));
@@ -71,7 +70,7 @@
   function remove(key) {
     // Окно подтверждения гасится здесь, а не нажатием: держится оно на самой
     // уносимой записи, и не сбрось её — окно осталось бы висеть поверх списка,
-    // спрашивая про место работы, которого в нём уже нет.
+    // спрашивая про запись, которой в нём уже нет.
     leaving = null;
     rows = rows.filter((one) => one.key !== key);
     open = without(open, key);
@@ -80,20 +79,10 @@
 
   function add() {
     born += 1;
-    const fresh = {
-      key: `new-${born}`,
-      id: null,
-      company: '',
-      company_url: '',
-      role: '',
-      start_date: null,
-      end_date: null,
-      achievements: [],
-      responsibilities: [],
-      skill_names: [],
-    };
-    // Первой в списке: места работы идут от свежего к давнему, и добавляют
-    // почти всегда последнее — внизу человек искал бы его глазами.
+    const fresh = { ...kind.blank(), key: `new-${born}` };
+    // Первой в списке: места работы идут от свежего к давнему, проекты — как
+    // человек их расставил, и добавляют почти всегда последнее — внизу человек
+    // искал бы его глазами.
     rows = [fresh, ...rows];
     // Свежая карточка раскрыта сразу: свёрнутая пустая выглядит как пустая
     // строка списка, и человек жал бы «добавить» второй раз.
@@ -110,25 +99,23 @@
 {:else}
   <div class="page-head">
     <div class="page-title">
-      Профиль / Experience
-      <span class="page-title-meta">
-        {counted(rows.length, 'место', 'места', 'мест')} работы
-      </span>
+      {kind.heading}
+      <span class="page-title-meta">{kind.count(rows.length)}</span>
     </div>
   </div>
 
-  {#each rows as exp (exp.key)}
-    <ExperienceCard
-      {exp}
+  {#each rows as one (one.key)}
+    <Card
+      record={one}
       {known}
-      open={open.has(exp.key)}
-      ontoggle={() => (open = toggled(open, exp.key))}
-      onedit={(part) => edit(exp.key, part)}
-      onremove={() => (leaving = exp)}
+      open={open.has(one.key)}
+      ontoggle={() => (open = toggled(open, one.key))}
+      onedit={(part) => edit(one.key, part)}
+      onremove={() => (leaving = one)}
     />
   {/each}
 
-  <button class="new-box" type="button" onclick={add}>+ Добавить место работы</button>
+  <button class="new-box" type="button" onclick={add}>{kind.addLabel}</button>
 
   {#if trouble}
     <div class="autosave-error">{trouble}</div>
@@ -137,7 +124,7 @@
 
 {#if leaving}
   <ConfirmDialog
-    message={`Удалить место работы «${leaving.company || 'без названия'}»?`}
+    message={kind.leaving(leaving)}
     confirmLabel="Удалить"
     onconfirm={() => remove(leaving.key)}
     oncancel={() => (leaving = null)}

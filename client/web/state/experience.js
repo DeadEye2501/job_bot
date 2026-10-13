@@ -3,6 +3,9 @@
 // Чистые функции: строка опыта приходит доводом, наружу уходят строки.
 // Ни моста, ни разметки этот файл не знает.
 
+import { recordsGoing } from './records.js';
+import { counted } from './words.js';
+
 /** Период работы для шапки карточки.
  *
  * Месяц и год без дня: места работы различают по месяцам, а день удлиняет
@@ -16,18 +19,6 @@ export function period(startIso, endIso) {
     return `${month}.${year}`;
   };
   return `${short(startIso)} — ${endIso ? short(endIso) : 'настоящее время'}`;
-}
-
-/** Лежит ли карточка уже в базе.
- *
- * Номера мало: его даёт мост, а вкладка себя после записи не перечитывает —
- * заведённая в этот заход карточка живёт с пустым номером до конца визита, уже
- * будучи записанной. Отметку об уехавшей записи ставит сама вкладка, и без неё
- * опустошённое обязательное поле вычёркивало такую строку из посылки, а мост
- * стирал её молча вместе с достижениями и стеком.
- */
-function stored(exp) {
-  return exp.id !== null || Boolean(exp.saved);
 }
 
 /** Готово ли место работы к записи.
@@ -45,28 +36,15 @@ export function experienceReady(exp) {
   );
 }
 
-/** Что из перечня уедет на мост — и почему не уедет ничего.
- *
- * Отсеиваются только свежие недозаполненные карточки: они ещё не в базе, и
- * пропустить их значит ничего не потерять, — а без отсева одна пустая карточка
- * отменяла бы правки всех соседних, заполненных.
- *
- * Уже записанная карточка не отсеивается никогда, чем бы её ни опустошили: мост
- * заменяет перечень целиком, и вычеркнутая из посылки была бы стёрта из базы
- * молча. Про такую говорим сами и не отправляем ничего — так номер в жалобе
- * считается по тому списку, который человек видит, а не по укороченной посылке.
- */
+/** Что из перечня мест работы уедет на мост — и почему не уедет ничего. */
 export function experienceGoing(rows) {
-  const going = rows.filter((one) => stored(one) || experienceReady(one));
-  const at = going.findIndex((one) => !experienceReady(one));
-  if (at === -1) return { going, trouble: '' };
-  const shown = rows.indexOf(going[at]) + 1;
-  return {
-    going: [],
-    trouble:
+  return recordsGoing(
+    rows,
+    experienceReady,
+    (shown) =>
       `Место работы #${shown}: заполните компанию, должность и дату начала — `
       + 'пока они пусты, перечень не записывается.',
-  };
+  );
 }
 
 /** Чем подписана свёрнутая карточка.
@@ -76,8 +54,31 @@ export function experienceGoing(rows) {
  */
 export function cardTitle(exp) {
   return {
-    company: exp.company || 'Без названия',
+    name: exp.company || 'Без названия',
     role: exp.role || '',
     period: period(exp.start_date, exp.end_date),
   };
 }
+
+/** Места работы как вид записи вкладки профиля. */
+export const EXPERIENCE = {
+  load: 'profile.experience',
+  save: 'profile.save_experience',
+  key: 'experience',
+  heading: 'Профиль / Experience',
+  count: (n) => `${counted(n, 'место', 'места', 'мест')} работы`,
+  addLabel: '+ Добавить место работы',
+  blank: () => ({
+    id: null,
+    company: '',
+    company_url: '',
+    role: '',
+    start_date: null,
+    end_date: null,
+    achievements: [],
+    responsibilities: [],
+    skill_names: [],
+  }),
+  going: experienceGoing,
+  leaving: (one) => `Удалить место работы «${one.company || 'без названия'}»?`,
+};

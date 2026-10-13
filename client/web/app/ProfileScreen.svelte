@@ -1,15 +1,18 @@
 <script>
-  // Раздел «Профиль»: три вкладки одного домена.
+  // Раздел «Профиль»: четыре вкладки одного домена.
   //
   // Вкладка сама читает своё при появлении и сама же гасит своё при уходе:
-  // держать всё три разом значило бы спрашивать мост о том, чего никто не
-  // видит.
+  // держать все разом значило бы спрашивать мост о том, чего никто не видит.
 
+  import ExperienceCard from '$components/ExperienceCard.svelte';
+  import ProjectCard from '$components/ProjectCard.svelte';
   import TopTabs from '$components/TopTabs.svelte';
+  import { EXPERIENCE } from '$state/experience.js';
+  import { PROJECTS } from '$state/projects.js';
   import { PROFILE_TABS } from '$state/sections.js';
 
   import ProfileCv from './ProfileCv.svelte';
-  import ProfileExperience from './ProfileExperience.svelte';
+  import ProfileRecords from './ProfileRecords.svelte';
   import ProfileSkills from './ProfileSkills.svelte';
 
   let { ask } = $props();
@@ -24,7 +27,9 @@
     <ProfileCv {ask} />
   {:else if tab === 'skills'}
     <ProfileSkills {ask} />
+  {:else if tab === 'experience'}
+    <ProfileRecords {ask} kind={EXPERIENCE} Card={ExperienceCard} />
   {:else}
-    <ProfileExperience {ask} />
+    <ProfileRecords {ask} kind={PROJECTS} Card={ProjectCard} />
   {/if}
 </div>
