@@ -22,6 +22,20 @@ profile_experience_skills = Table(
     Column("skill_id", ForeignKey("profile_skills.id"), primary_key=True),
 )
 
+profile_project_skills = Table(
+    "profile_project_skills",
+    Base.metadata,
+    Column("project_id", ForeignKey("profile_project.id"), primary_key=True),
+    Column("skill_id", ForeignKey("profile_skills.id"), primary_key=True),
+)
+
+STACK_LINKS = (profile_experience_skills, profile_project_skills)
+"""Связки «запись анкеты — навык»: стек места работы и стек проекта.
+
+Удаляя навык, его снимают с каждой: внешний ключ у SQLite без каскада, и
+забытая связка уронила бы удаление навыка, на который она ещё смотрит.
+"""
+
 
 class Profile(IdMixin, UpdatedAtMixin, Base):
     __tablename__ = "profile"
@@ -104,4 +118,21 @@ class ProfileExperience(IdMixin, Base):
     )
     skills: Mapped[list["ProfileSkill"]] = relationship(
         secondary=profile_experience_skills
+    )
+
+
+class ProfileProject(IdMixin, Base):
+    """Проект кандидата: место работы без должности и дат, с одним перечнем
+    «О проекте» вместо достижений и обязанностей."""
+
+    __tablename__ = "profile_project"
+
+    profile_id: Mapped[int] = mapped_column(ForeignKey("profile.id"))
+    name: Mapped[str]
+    url: Mapped[str | None]
+    about: Mapped[list[str]] = mapped_column(
+        JSON, server_default=text("'[]'")
+    )
+    skills: Mapped[list["ProfileSkill"]] = relationship(
+        secondary=profile_project_skills
     )

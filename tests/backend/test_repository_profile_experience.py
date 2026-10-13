@@ -12,11 +12,8 @@ import pytest
 from sqlalchemy import select
 
 from backend.models import ProfileExperience
-from backend.repository.profile_experience import (
-    SaveExperienceError,
-    list_experience,
-    save_experience,
-)
+from backend.repository.profile_experience import list_experience, save_experience
+from backend.repository.profile_records import RowError
 from tests.dbio import put
 from tests.factories import experience_row, profile_row, profile_skill_row
 
@@ -73,7 +70,7 @@ async def test_an_invalid_row_is_named_by_its_number(
     profile = profile_row()
     await put(session_factory, profile)
 
-    with pytest.raises(SaveExperienceError, match=problem) as failed:
+    with pytest.raises(RowError, match=problem) as failed:
         await save_experience(
             session, [_row(), _row(**{field: value})], profile.id
         )
@@ -93,7 +90,7 @@ async def test_nothing_is_written_when_a_later_row_is_invalid(
     await put(session_factory, profile)
     await put(session_factory, experience_row(profile.id, company="Была раньше"))
 
-    with pytest.raises(SaveExperienceError):
+    with pytest.raises(RowError):
         await save_experience(
             session,
             [_row(company="Первая новая"), _row(company="")],

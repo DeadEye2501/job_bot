@@ -21,20 +21,20 @@ from backend.models import (
     ProfileSkill,
     SalaryPeriod,
     profile_experience_skills,
+    profile_project_skills,
 )
 from backend.repository.profile import get_profile
 from backend.repository.profile_cv import save_parsed_cv
 from backend.repository.profile_experience import list_experience
+from backend.repository.profile_projects import list_projects
 from backend.repository.profile_skills import list_skills
 from tests.dbio import put
-from tests.factories import (
-    experience_row,
+from tests.factories import experience_row, profile_row, profile_skill_row, project_row
+from tests.factories_cv import (
     parsed_cv,
     parsed_cv_place,
     parsed_cv_profile,
     parsed_cv_skill,
-    profile_row,
-    profile_skill_row,
 )
 
 
@@ -74,6 +74,26 @@ async def test_the_previous_profile_is_wiped_not_merged(session, session_factory
     assert (await session.scalars(select(ProfileLanguage))).all() == []
     assert (
         await session.execute(select(profile_experience_skills.c.skill_id))
+    ).scalars().all() == []
+
+
+async def test_a_new_resume_wipes_the_previous_projects(session, session_factory):
+    """Проекты стираются вместе с прежней анкетой, со связками стека: иначе
+    навык и анкета, на которые они смотрят, не стёрлись бы вовсе."""
+    old = profile_row()
+    await put(session_factory, old)
+    skill = profile_skill_row(old.id, "Delphi")
+    project = project_row(old.id, name="Прошлый проект")
+    await put(session_factory, skill, project)
+    await session.execute(
+        profile_project_skills.insert().values(project_id=project.id, skill_id=skill.id)
+    )
+
+    await save_parsed_cv(session, parsed_cv())
+
+    assert await list_projects(session) == []
+    assert (
+        await session.execute(select(profile_project_skills.c.skill_id))
     ).scalars().all() == []
 
 
@@ -144,6 +164,21 @@ async def test_a_place_is_linked_to_the_skills_it_names(session):
 
     places = await list_experience(session)
     assert sorted(s.name for s in places[0].skills) == ["PostgreSQL", "Python"]
+
+
+async def test_a_skill_named_twice_in_a_stack_is_linked_once(session):
+    """Название и прозвище одного навыка в стеке — одна связь, а не две: вторая
+    упала бы на первичном ключе связки и унесла весь разбор."""
+    await save_parsed_cv(
+        session,
+        parsed_cv(
+            skills=[parsed_cv_skill("PostgreSQL", aliases=["Postgres"])],
+            experience=[parsed_cv_place(stack=["PostgreSQL", "Postgres"])],
+        ),
+    )
+
+    places = await list_experience(session)
+    assert [s.name for s in places[0].skills] == ["PostgreSQL"]
 
 
 @pytest.mark.parametrize(

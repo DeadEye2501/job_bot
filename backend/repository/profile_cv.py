@@ -5,7 +5,6 @@ import logging
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.domain.skill_names import skill_key
 from backend.repository.app_settings import CV_PATH_KEY, put_app_setting
 from backend.models import (
     Profile,
@@ -17,6 +16,8 @@ from backend.payloads import ParsedCv
 from backend.repository.profile import get_profile
 from backend.repository.profile_experience import wipe_experience
 from backend.repository.profile_languages import replace_profile_languages
+from backend.repository.profile_projects import wipe_projects
+from backend.repository.profile_records import link_stack
 from backend.repository.profile_skills import index_skill_keys
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,7 @@ async def _wipe_profile(session: AsyncSession) -> None:
     резюме, и человек об этом не узнал бы.
     """
     await wipe_experience(session)
+    await wipe_projects(session)
     await session.execute(delete(ProfileSkill))
     await session.execute(delete(ProfileLanguage))
     await session.execute(delete(Profile))
@@ -78,16 +80,11 @@ async def _add_parsed_experience(
             achievements=list(e.achievements),
             responsibilities=list(e.responsibilities),
         )
-        for tech in e.stack:
-            key = skill_key(tech)
-            row = skill_lookup.get(key) if key else None
-            if row is not None:
-                exp.skills.append(row)
-            else:
-                logger.warning(
-                    "save_parsed_cv: experience %r stack item %r not matched to any ProfileSkill",
-                    e.company, tech,
-                )
+        for tech in link_stack(exp, e.stack, skill_lookup):
+            logger.warning(
+                "save_parsed_cv: experience %r stack item %r not matched to any ProfileSkill",
+                e.company, tech,
+            )
         session.add(exp)
     await session.flush()
 

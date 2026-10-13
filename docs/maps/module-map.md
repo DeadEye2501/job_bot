@@ -328,7 +328,7 @@ Claude через установленный Claude Code по подписке: 
 
 - `def page_client(timeout_sec: float, user_agent: str) -> httpx.AsyncClient` (7)
 
-## alembic — 4 модулей
+## alembic — 5 модулей
 
 ### `alembic/env.py` — 77 строк
 
@@ -340,6 +340,15 @@ Claude через установленный Claude Code по подписке: 
 - `def do_run_migrations(connection: Connection) -> None` (4)
 - `async def run_async_migrations() -> None` (14)
 - `def run_migrations_online() -> None` (2)
+
+### `alembic/versions/6cc10045aeb6_projects.py` — 43 строк
+
+projects
+
+Зависит от: `alembic`
+
+- `def upgrade() -> None` (19)
+- `def downgrade() -> None` (3)
 
 ### `alembic/versions/a9c3e1f07b42_aggregators.py` — 144 строк
 
@@ -369,7 +378,7 @@ init
 - `def upgrade() -> None` (221)
 - `def downgrade() -> None` (28)
 
-## backend — 192 модулей
+## backend — 194 модулей
 
 ### `backend/agent/__init__.py` — 1 строк
 
@@ -1918,13 +1927,13 @@ First-run bootstrap: ensure DB schema exists.
 - `def _media_placeholder(msg) -> str` (18)
 - `def extract_dm_text(msg) -> str` (23)
 
-### `backend/models/__init__.py` — 82 строк
+### `backend/models/__init__.py` — 88 строк
 
 Объявления таблиц базы, собранные из всех предметов.
 
 Зависит от: `backend.models.application`, `backend.models.base`, `backend.models.contacts`, `backend.models.enums`, `backend.models.message`, `backend.models.profile`, `backend.models.settings`, `backend.models.vacancy`
 
-Отдаёт наружу: `HR`, `Aggregator`, `AppSetting`, `Application`, `ApplicationVia`, `Base`, `BLACKLIST_KINDS`, `Blacklist`, `BotMode`, `BotState`, `Company`, `ContactAddedBy`, `Gender`, `LlmConfig`, `LlmConfigKind`, `MailAccount`, `Message`, `Profile`, `ProfileExperience`, `ProfileLanguage`, `ProfileSkill`, `SalaryPeriod`, `Screening`, `StatusHistorySource`, `status_code`, `TelegramChannel`, `TgAccount`, `TrashEvent`, `Vacancy`, `VacancyContact`, `VacancyEvent`, `VacancyStatus`, `VacancyStatusHistory`, `profile_experience_skills`
+Отдаёт наружу: `HR`, `Aggregator`, `AppSetting`, `Application`, `ApplicationVia`, `Base`, `BLACKLIST_KINDS`, `Blacklist`, `BotMode`, `BotState`, `Company`, `ContactAddedBy`, `Gender`, `LlmConfig`, `LlmConfigKind`, `MailAccount`, `Message`, `Profile`, `ProfileExperience`, `ProfileLanguage`, `ProfileProject`, `ProfileSkill`, `STACK_LINKS`, `SalaryPeriod`, `Screening`, `StatusHistorySource`, `status_code`, `TelegramChannel`, `TgAccount`, `TrashEvent`, `Vacancy`, `VacancyContact`, `VacancyEvent`, `VacancyStatus`, `VacancyStatusHistory`, `profile_experience_skills`, `profile_project_skills`
 
 
 ### `backend/models/application.py` — 46 строк
@@ -1983,7 +1992,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `class Message(IdMixin, Base)` (46)
 
-### `backend/models/profile.py` — 107 строк
+### `backend/models/profile.py` — 138 строк
 
 Таблицы анкеты кандидата.
 
@@ -1993,6 +2002,7 @@ First-run bootstrap: ensure DB schema exists.
 - `class ProfileLanguage(IdMixin, Base)` (19)
 - `class ProfileSkill(IdMixin, Base)` (10)
 - `class ProfileExperience(IdMixin, Base)` (18)
+- `class ProfileProject(IdMixin, Base)` (15)
 
 ### `backend/models/settings.py` — 125 строк
 
@@ -2400,33 +2410,31 @@ First-run bootstrap: ensure DB schema exists.
 - `def _experience_lines(experiences: list) -> list[str]` (11)
 - `async def build_profile_block(session: AsyncSession) -> str` (28)
 
-### `backend/repository/profile_cv.py` — 186 строк
+### `backend/repository/profile_cv.py` — 183 строк
 
 Запись анкеты, разобранной моделью из резюме.
 
-Зависит от: `backend.domain.skill_names`, `backend.models`, `backend.payloads`, `backend.repository.app_settings`, `backend.repository.profile`, `backend.repository.profile_experience`, `backend.repository.profile_languages`, `backend.repository.profile_skills`
+Зависит от: `backend.models`, `backend.payloads`, `backend.repository.app_settings`, `backend.repository.profile`, `backend.repository.profile_experience`, `backend.repository.profile_languages`, `backend.repository.profile_projects`, `backend.repository.profile_records`, `backend.repository.profile_skills`
 
-- `async def _wipe_profile(session: AsyncSession) -> None` (11)
+- `async def _wipe_profile(session: AsyncSession) -> None` (12)
 - `async def _add_parsed_skills(session: AsyncSession, profile_id: int, skills) -> dict[str, ProfileSkill]` (21)
-- `async def _add_parsed_experience(session: AsyncSession, profile_id: int, experience, skill_lookup: dict[str, ProfileSkill]) -> None` (32)
+- `async def _add_parsed_experience(session: AsyncSession, profile_id: int, experience, skill_lookup: dict[str, ProfileSkill]) -> None` (27)
 - `async def _answers_to_keep(session: AsyncSession) -> dict` (5)
 - `def _answers(p, kept: dict) -> dict` (11)
 - `def _new_profile(p, kept: dict) -> Profile` (21)
 - `async def save_parsed_cv(session: AsyncSession, parsed: ParsedCv, *, cv_path: str | None=None) -> None` (40)
 
-### `backend/repository/profile_experience.py` — 162 строк
+### `backend/repository/profile_experience.py` — 71 строк
 
 Места работы, названные в анкете кандидата.
 
-Зависит от: `backend.domain.skill_names`, `backend.domain.spellings`, `backend.incoming`, `backend.models`, `backend.repository.profile_skills`
+Зависит от: `backend.incoming`, `backend.models`, `backend.repository.profile_records`
 
-- `async def wipe_experience(session: AsyncSession) -> None` (10)
-- `def _skills_by_key(rows: list[ProfileSkill]) -> dict[str, ProfileSkill]` (11)
-- `async def list_experience(session: AsyncSession) -> list[ProfileExperience]` (13)
-- `class SaveExperienceError(ValueError)` (11)
-- `def _checked_experience_rows(rows: list[dict]) -> list[tuple[dict, date, date | None]]` (33)
-- `def _add_experience_rows(session: AsyncSession, checked: list, profile_id: int, skills_by_name: dict) -> None` (29)
-- `async def save_experience(session: AsyncSession, rows: list[dict], profile_id: int) -> None` (22)
+- `async def wipe_experience(session: AsyncSession) -> None` (3)
+- `async def list_experience(session: AsyncSession) -> list[ProfileExperience]` (11)
+- `def _date_of(row: dict, key: str, label: str) -> date | None` (9)
+- `def _experience_fields(row: dict) -> dict` (21)
+- `async def save_experience(session: AsyncSession, rows: list[dict], profile_id: int) -> None` (3)
 
 ### `backend/repository/profile_languages.py` — 47 строк
 
@@ -2437,7 +2445,32 @@ First-run bootstrap: ensure DB schema exists.
 - `async def list_profile_languages(session: AsyncSession) -> list[ProfileLanguage]` (8)
 - `async def replace_profile_languages(session: AsyncSession, profile_id: int, items: list[tuple[str, str]]) -> None` (25)
 
-### `backend/repository/profile_skills.py` — 136 строк
+### `backend/repository/profile_projects.py` — 51 строк
+
+Проекты из анкеты кандидата.
+
+Зависит от: `backend.incoming`, `backend.models`, `backend.repository.profile_records`
+
+- `async def wipe_projects(session: AsyncSession) -> None` (3)
+- `async def list_projects(session: AsyncSession) -> list[ProfileProject]` (15)
+- `def _project_fields(row: dict) -> dict` (10)
+- `async def save_projects(session: AsyncSession, rows: list[dict], profile_id: int) -> None` (3)
+
+### `backend/repository/profile_records.py` — 117 строк
+
+Запись перечня записей анкеты со стеком — мест работы и проектов.
+
+Зависит от: `backend.domain.skill_names`, `backend.models`, `backend.repository.profile_skills`
+
+- `class RowError(ValueError)` (12)
+- `class RecordKind(NamedTuple)` (7)
+- `async def wipe_records(session: AsyncSession, kind: RecordKind) -> None` (10)
+- `def _stack_by_key(rows: list[ProfileSkill]) -> dict[str, ProfileSkill]` (11)
+- `def link_stack(record, names, by_key: dict[str, ProfileSkill]) -> list[str]` (17)
+- `def _parsed_rows(rows: list[dict], fields_of: Callable[[dict], dict]) -> list[tuple[dict, dict]]` (14)
+- `async def replace_records(session: AsyncSession, rows: list[dict], profile_id: int, kind: RecordKind) -> None` (18)
+
+### `backend/repository/profile_skills.py` — 129 строк
 
 Навыки, названные в анкете кандидата.
 
@@ -2447,8 +2480,8 @@ First-run bootstrap: ensure DB schema exists.
 - `async def list_skills(session: AsyncSession) -> list[ProfileSkill]` (10)
 - `def _skill_columns(row: dict) -> dict | None` (19)
 - `def _upsert_skills(session: AsyncSession, rows: list[dict], existing: dict, profile_id: int) -> set[int]` (26)
-- `async def _drop_skills(session: AsyncSession, existing: dict, drop_ids: set[int]) -> None` (15)
-- `async def save_skills(session: AsyncSession, rows: list[dict], profile_id: int) -> None` (23)
+- `async def _drop_skills(session: AsyncSession, existing: dict, drop_ids: set[int]) -> None` (9)
+- `async def save_skills(session: AsyncSession, rows: list[dict], profile_id: int) -> None` (22)
 
 ### `backend/repository/search.py` — 31 строк
 
@@ -3296,13 +3329,13 @@ Runtime settings layer.
 - `async def merge_picker(session, subject: PickerSubject, absorbed_id: int, search: str | None) -> dict` (21)
 - `async def link_picker(session, subject: PickerSubject, vacancy, search: str | None) -> dict` (18)
 
-### `client/bridge/profile.py` — 178 строк
+### `client/bridge/profile.py` — 197 строк
 
-Анкета соискателя: сведения о себе, навыки и места работы.
+Анкета соискателя: сведения о себе, навыки, места работы и проекты.
 
-Зависит от: `backend.domain.salary`, `backend.domain.taxonomy`, `backend.incoming`, `backend.models`, `backend.payloads`, `backend.repository`, `client.bridge.answer`, `client.bridge.choices`, `client.bridge.cv`, `client.bridge.cv_file`, `client.bridge.hub`, `client.bridge.refusals`, `client.bridge.wire`
+Зависит от: `backend.domain.salary`, `backend.domain.taxonomy`, `backend.incoming`, `backend.models`, `backend.payloads`, `backend.repository`, `backend.repository.profile_records`, `client.bridge.answer`, `client.bridge.choices`, `client.bridge.cv`, `client.bridge.cv_file`, `client.bridge.hub`, `client.bridge.refusals`, `client.bridge.wire`
 
-- `class Profile(Cv)` (123)
+- `class Profile(Cv)` (135)
   - `def get(self) -> dict` (19)
     - `async def run() -> dict` (14)
   - `def save(self, payload: dict) -> dict` (22)
@@ -3310,9 +3343,12 @@ Runtime settings layer.
   - `def skills(self) -> dict` (9)
     - `async def run() -> dict` (4)
   - `def save_skills(self, payload: dict) -> dict` (3)
-  - `def experience(self) -> dict` (17)
-    - `async def run() -> dict` (8)
+  - `def experience(self) -> dict` (3)
   - `def save_experience(self, payload: dict) -> dict` (3)
+  - `def projects(self) -> dict` (3)
+  - `def save_projects(self, payload: dict) -> dict` (3)
+  - `def _records(self, key: str, listing, to_dict) -> dict` (17)
+    - `async def run() -> dict` (8)
   - `def _save_rows(self, payload: dict, key: str, saving) -> dict` (29)
     - `async def run() -> dict` (11)
 - `def _read_profile_fields(payload: dict) -> dict` (26)
@@ -3530,7 +3566,7 @@ Runtime settings layer.
 - `def _leave_later() -> None` (9)
 - `def _leave() -> None` (9)
 
-### `client/bridge/wire.py` — 480 строк ⚠ подошёл к 300
+### `client/bridge/wire.py` — 490 строк ⚠ подошёл к 300
 
 Перевод внутренних значений в словари, которые читает окно.
 
@@ -3544,6 +3580,7 @@ Runtime settings layer.
 - `def _profile_to_dict(p, languages=None) -> dict | None` (28)
 - `def _skill_to_dict(s) -> dict` (8)
 - `def _exp_to_dict(e) -> dict` (12)
+- `def _project_to_dict(p) -> dict` (8)
 - `def _stack_items(stack, matched_set: set[str]) -> list[dict]` (8)
 - `def _company_name(v) -> str | None` (12)
 - `def _hr_face(hr) -> dict` (13)
@@ -3649,7 +3686,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 320 модулей
+## tests — 322 модулей
 
 ### `tests/adapters/test_agent_mcp.py` — 71 строк
 
@@ -5069,7 +5106,7 @@ Runtime settings layer.
 
 Следствия сверки разобранного резюме с его же текстом.
 
-Зависит от: `backend.llm.cv_grounding`, `backend.payloads`, `tests.factories`
+Зависит от: `backend.llm.cv_grounding`, `backend.payloads`, `tests.factories_cv`
 
 Тестов: 27
 
@@ -5078,7 +5115,7 @@ Runtime settings layer.
 
 Что в разобранном опыте работы не подтверждается текстом резюме.
 
-Зависит от: `backend.llm.cv_grounding`, `tests.factories`
+Зависит от: `backend.llm.cv_grounding`, `tests.factories_cv`
 
 Тестов: 9
 
@@ -5099,7 +5136,7 @@ Runtime settings layer.
 
 Следствия правила «родной язык у разобранной анкеты есть всегда».
 
-Зависит от: `backend.llm.cv_native`, `backend.payloads`, `tests.factories`
+Зависит от: `backend.llm.cv_native`, `backend.payloads`, `tests.factories_cv`
 
 Тестов: 9
 
@@ -5783,20 +5820,20 @@ Runtime settings layer.
 Тестов: 11
 
 
-### `tests/backend/test_repository_profile_cv_saving.py` — 285 строк
+### `tests/backend/test_repository_profile_cv_saving.py` — 320 строк ⚠ подошёл к 300
 
 Следствия записи разобранного резюме в профиль.
 
-Зависит от: `backend.models`, `backend.payloads`, `backend.repository.profile`, `backend.repository.profile_cv`, `backend.repository.profile_experience`, `backend.repository.profile_skills`, `tests.dbio`, `tests.factories`
+Зависит от: `backend.models`, `backend.payloads`, `backend.repository.profile`, `backend.repository.profile_cv`, `backend.repository.profile_experience`, `backend.repository.profile_projects`, `backend.repository.profile_skills`, `tests.dbio`, `tests.factories`, `tests.factories_cv`
 
-Тестов: 13
+Тестов: 15
 
 
-### `tests/backend/test_repository_profile_experience.py` — 286 строк
+### `tests/backend/test_repository_profile_experience.py` — 283 строк
 
 Следствия сохранения мест работы профиля.
 
-Зависит от: `backend.models`, `backend.repository.profile_experience`, `tests.dbio`, `tests.factories`
+Зависит от: `backend.models`, `backend.repository.profile_experience`, `backend.repository.profile_records`, `tests.dbio`, `tests.factories`
 
 Тестов: 14
 
@@ -5820,13 +5857,22 @@ Runtime settings layer.
 Тестов: 4
 
 
-### `tests/backend/test_repository_profile_skills.py` — 286 строк
+### `tests/backend/test_repository_profile_projects.py` — 74 строк
+
+Следствия сохранения проектов профиля.
+
+Зависит от: `backend.repository.profile_experience`, `backend.repository.profile_projects`, `backend.repository.profile_records`, `tests.dbio`, `tests.factories`
+
+Тестов: 4
+
+
+### `tests/backend/test_repository_profile_skills.py` — 306 строк ⚠ подошёл к 300
 
 Следствия сохранения списка навыков профиля.
 
 Зависит от: `backend.models`, `backend.repository.profile_skills`, `tests.dbio`, `tests.factories`
 
-Тестов: 13
+Тестов: 14
 
 - `async def names_and_levels(session) -> list[tuple[str, int]]` (3)
 
@@ -6452,13 +6498,13 @@ Runtime settings layer.
 Тестов: 4
 
 
-### `tests/client/test_bridge_profile.py` — 272 строк
+### `tests/client/test_bridge_profile.py` — 307 строк ⚠ подошёл к 300
 
 Следствия слотов анкеты — того, что человек рассказывает о себе.
 
 Зависит от: —
 
-Тестов: 14
+Тестов: 17
 
 - `async def _saved_person(api, ask, **extra) -> None` (4)
 
@@ -6733,7 +6779,7 @@ Runtime settings layer.
 - `def sqlite_write(db_file, *statements: str) -> None` (10)
 - `def sqlite_tables(db_file) -> set[str]` (3)
 
-### `tests/factories.py` — 491 строк ⚠ подошёл к 300
+### `tests/factories.py` — 442 строк ⚠ подошёл к 300
 
 Построение объектов, которые тесты подают на вход коду.
 
@@ -6746,10 +6792,6 @@ Runtime settings layer.
 - `def _empty_vacancy() -> dict` (23)
 - `def parsed_vacancy(**overrides) -> ParsedVacancy` (7)
 - `def skill_fields(**overrides) -> dict` (7)
-- `def parsed_cv_profile(**overrides) -> ParsedCvProfile` (24)
-- `def parsed_cv_skill(name: str, **overrides) -> ParsedCvSkill` (3)
-- `def parsed_cv_place(**overrides) -> ParsedCvExperience` (9)
-- `def parsed_cv(**overrides) -> ParsedCv` (10)
 - `def profile_skill(name: str, level: int | None=None, aliases: list | None=None, **overrides) -> ProfileSkill` (10)
 - `def tg_account_row(**overrides) -> TgAccount` (18)
 - `def llm_config_row(kind: LlmConfigKind, **overrides) -> LlmConfig` (9)
@@ -6764,6 +6806,8 @@ Runtime settings layer.
 - `def profile_skill_row(profile_id: int, name: str, **overrides) -> ProfileSkill` (3)
 - `def experience_fields(**overrides) -> dict` (14)
 - `def experience_row(profile_id: int, **overrides) -> ProfileExperience` (3)
+- `def project_fields(**overrides) -> dict` (3)
+- `def project_row(profile_id: int, **overrides) -> ProfileProject` (3)
 - `def blacklist_row(kind: str, value: str, **overrides) -> Blacklist` (5)
 - `def message_row(**overrides) -> Message` (11)
 - `def unread_probe(hr_id: int) -> list[Message]` (20)
@@ -6789,6 +6833,17 @@ Runtime settings layer.
 - `def screening_row(application_id: int, position: int, **overrides) -> Screening` (5)
 - `def mail_account_row() -> MailAccount` (4)
 - `def world_of(**overrides) -> World` (6)
+
+### `tests/factories_cv.py` — 68 строк
+
+Разобранное резюме — то, что разбор отдаёт записи анкеты и сверке с текстом.
+
+Зависит от: `backend.payloads`, `tests.factories`
+
+- `def parsed_cv_profile(**overrides) -> ParsedCvProfile` (24)
+- `def parsed_cv_skill(name: str, **overrides) -> ParsedCvSkill` (3)
+- `def parsed_cv_place(**overrides) -> ParsedCvExperience` (9)
+- `def parsed_cv(**overrides) -> ParsedCv` (10)
 
 ### `tests/fakes/agent.py` — 108 строк
 

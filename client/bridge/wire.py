@@ -153,6 +153,16 @@ def _exp_to_dict(e) -> dict:
     }
 
 
+def _project_to_dict(p) -> dict:
+    return {
+        "id": p.id,
+        "name": p.name,
+        "url": p.url,
+        "about": list(p.about),
+        "skill_names": [s.name for s in p.skills],
+    }
+
+
 def _stack_items(stack, matched_set: set[str]) -> list[dict]:
     out: list[dict] = []
     for item in (stack or []):

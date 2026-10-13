@@ -8,10 +8,10 @@
 
 from sqlalchemy import select
 
-from backend.models import ProfileSkill, profile_experience_skills
+from backend.models import ProfileSkill, profile_experience_skills, profile_project_skills
 from backend.repository.profile_skills import list_skills, save_skills
 from tests.dbio import put
-from tests.factories import experience_row, profile_row, profile_skill_row
+from tests.factories import experience_row, profile_row, profile_skill_row, project_row
 
 
 async def names_and_levels(session) -> list[tuple[str, int]]:
@@ -133,6 +133,26 @@ async def test_removing_a_skill_takes_its_links_with_it(session, session_factory
     links = (
         await session.execute(select(profile_experience_skills.c.skill_id))
     ).scalars().all()
+    assert list(links) == [kept.id]
+
+
+async def test_removing_a_skill_takes_its_links_to_projects_too(session, session_factory):
+    """Стек проекта связан с навыком так же, как стек места работы, и снимается так же."""
+    profile = profile_row()
+    await put(session_factory, profile)
+    kept = profile_skill_row(profile.id, "Python")
+    dropped = profile_skill_row(profile.id, "Delphi")
+    await put(session_factory, kept, dropped)
+    project = project_row(profile.id)
+    await put(session_factory, project)
+    await session.execute(profile_project_skills.insert().values([
+        {"project_id": project.id, "skill_id": kept.id},
+        {"project_id": project.id, "skill_id": dropped.id},
+    ]))
+
+    await save_skills(session, [{"id": kept.id, "name": "Python"}], profile.id)
+
+    links = (await session.execute(select(profile_project_skills.c.skill_id))).scalars().all()
     assert list(links) == [kept.id]
 
 
