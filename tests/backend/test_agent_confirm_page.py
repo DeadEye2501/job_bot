@@ -158,6 +158,6 @@ async def test_a_failure_before_finishing_still_counts(make_pipeline, session_fa
     """Окончательны только отклик и «Закончить»: обычная неудача по-прежнему записывается."""
     job, tools, _ = await _applier(make_pipeline, session_factory, edited({}))
 
-    await tool(tools, "report_failure")(reason="форма требует отчество")
+    await tool(tools, "report_failure")(reason="нужного файла нет")
 
-    assert job.outcome == Failed("форма требует отчество")
+    assert job.outcome == Failed("нужного файла нет")

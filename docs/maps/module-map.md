@@ -482,7 +482,7 @@ resume autofill
 Зависит от: —
 
 
-### `backend/agent/prompts/applier.py` — 86 строк
+### `backend/agent/prompts/applier.py` — 90 строк
 
 Откликатель: отклик на одну вакансию одним способом.
 
@@ -506,7 +506,7 @@ resume autofill
 
 - `def login_task(host: str) -> str` (3)
 
-### `backend/agent/prompts/screening.py` — 33 строк
+### `backend/agent/prompts/screening.py` — 34 строк
 
 Скрининг: ответы работодателю от имени человека.
 
@@ -567,21 +567,23 @@ resume autofill
 - `async def record_and_announce(kit: AgentKit, entry: ApplicationEntry) -> int` (5)
 - `async def _append(kit: AgentKit, application_id: int, lines: list[tuple[bool, str]]) -> str` (5)
 
-### `backend/agent/tools_browser.py` — 217 строк
+### `backend/agent/tools_browser.py` — 231 строк
 
-Инструменты браузера для агента: открыть, снять, нажать, ввести, выбрать, приложить резюме.
+Инструменты браузера для агента: открыть, снять, нажать, ввести, выбрать, приложить резюме и фото.
 
 Зависит от: `backend.agent.confirm`, `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.page_fields`
 
 - `class _Refused(Exception)` (2)
-- `def browser_tools(kit: AgentKit, resume: Path | None, confirming: ApplyJob | None=None) -> list[Callable]` (40)
+- `def browser_tools(kit: AgentKit, resume: Path | None, photo: Path | None, confirming: ApplyJob | None=None) -> list[Callable]` (36)
   - `async def browser_open(url: str) -> str` (3)
   - `async def browser_snapshot() -> str` (3)
   - `async def browser_click(selector: str) -> str` (3)
   - `async def browser_type(selector: str, text: str) -> str` (3)
   - `async def browser_select(selector: str, value: str) -> str` (3)
-  - `async def browser_attach_resume(selector: str) -> str` (5)
   - `async def browser_back() -> str` (3)
+- `def _attach_tools(act: Callable, resume: Path | None, photo: Path | None) -> list[Callable]` (16)
+  - `async def browser_attach_resume(selector: str) -> str` (5)
+  - `async def browser_attach_photo(selector: str) -> str` (5)
 - `def _actions(kit: AgentKit, job: ApplyJob | None) -> tuple[Callable, Callable, Callable, Callable]` (13)
   - `async def act(action: Callable[..., Awaitable]) -> str` (2)
 - `async def _act(kit: AgentKit, action: Callable[..., Awaitable], held: Callable[[], None]) -> str` (16)
@@ -599,17 +601,17 @@ resume autofill
 - `def _not_finished(job: ApplyJob) -> None` (3)
 - `def _confirmed_field(job: ApplyJob, page, selector: str) -> dict` (6)
 - `async def _snapshot(kit: AgentKit) -> str` (12)
-- `async def _attach(page, selector: str, resume: Path) -> None` (12)
+- `async def _attach(page, selector: str, file: Path) -> None` (12)
 - `def _first_line(error: Exception) -> str` (2)
 
-### `backend/agent/tools_common.py` — 170 строк
+### `backend/agent/tools_common.py` — 171 строк
 
 Общие инструменты агента: анкета, итог сессии, зов человека, отметка входа, неудача способа.
 
 Зависит от: `backend.agent.confirm`, `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.page_fields`, `backend.domain.apply_order`, `backend.domain.hosts`, `backend.repository.agent_profile`, `backend.repository.aggregators`
 
-- `def common_tools(kit: AgentKit, job) -> list[Callable]` (27)
-  - `async def profile() -> str` (4)
+- `def common_tools(kit: AgentKit, job) -> list[Callable]` (28)
+  - `async def profile() -> str` (5)
   - `async def finish(result: str, reason: str='') -> str` (8)
 - `def _login_target(job) -> int | None` (4)
 - `def _human_call(kit: AgentKit, job) -> list[Callable]` (13)
@@ -674,7 +676,7 @@ resume autofill
 Зависит от: —
 
 
-### `backend/applying/browser.py` — 83 строк
+### `backend/applying/browser.py` — 84 строк
 
 Браузерный способ: сессия агента на кнопку агрегатора или форму работодателя.
 
@@ -682,7 +684,7 @@ resume autofill
 
 - `async def via_browser(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome` (19)
 - `async def _mark_unfit(kit: AgentKit, vacancy_id: int, reason: str) -> None` (5)
-- `async def _apply_plan(kit: AgentKit, job: ApplyJob) -> SessionPlan | None` (14)
+- `async def _apply_plan(kit: AgentKit, job: ApplyJob) -> SessionPlan | None` (15)
 - `def _settle(job: ApplyJob, way: Way) -> Outcome` (16)
 
 ### `backend/applying/email.py` — 66 строк
@@ -902,7 +904,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def run(bot, *, once: bool=False) -> None` (39)
 - `async def persist_session_if_changed(bot) -> None` (25)
 
-### `backend/bot/media.py` — 163 строк
+### `backend/bot/media.py` — 170 строк
 
 Вложения: распознание, кэш и скачивание.
 
@@ -915,6 +917,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _cache_ext(as_photo: bool, name: str | None) -> str` (12)
 - `def cache_sent_file(src: Path, hr_id: int, tg_message_id: int, *, as_photo: bool) -> str | None` (24)
 - `def media_path_for_db(path) -> str` (11)
+- `def stored_media(relative: str) -> Path | None` (5)
 - `async def download_media(client, msg, hr_id: int) -> str | None` (25)
 
 ### `backend/bot/pasted.py` — 38 строк
@@ -1595,17 +1598,17 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _still_there(pipeline, vacancy_id: int) -> bool` (8)
 - `async def _save_pasted_vacancy(pipeline, text: str, embedding: list[float], posted_at: datetime | None) -> int` (15)
 
-### `backend/flows/pipeline.py` — 359 строк ⚠ подошёл к 300
+### `backend/flows/pipeline.py` — 364 строк ⚠ подошёл к 300
 
 Сборка конвейера: его состояние, общие ресурсы и поверхность для зовущих.
 
-Зависит от: `backend.domain.dedup`, `backend.flows`, `backend.flows.dm`, `backend.flows.dm_backfill`, `backend.flows.dm_debounce`, `backend.llm`, `backend.llm.candidate`, `backend.models`, `backend.notify`, `backend.repository.blacklist_marks`, `backend.repository.profile`, `backend.repository.profile_block`, `backend.repository.profile_languages`, `backend.repository.profile_skills`
+Зависит от: `backend.bot.media`, `backend.domain.dedup`, `backend.flows`, `backend.flows.dm`, `backend.flows.dm_backfill`, `backend.flows.dm_debounce`, `backend.llm`, `backend.llm.candidate`, `backend.models`, `backend.notify`, `backend.repository.blacklist_marks`, `backend.repository.profile`, `backend.repository.profile_block`, `backend.repository.profile_languages`, `backend.repository.profile_skills`
 
 - `def _declare_caches(pipeline) -> None` (16)
 - `def _declare_window_hooks(pipeline) -> None` (32)
 - `def _declare_dm_debounce(pipeline) -> None` (19)
 - `class LmProviders` (14)
-- `class IngestionPipeline` (225)
+- `class IngestionPipeline` (229)
   - `def mark_shutting_down(self) -> None` (5)
   - `def spawn_backfill(self, work, what: str, *, extra: dict | None=None) -> None` (26)
     - `async def _run() -> None` (7)
@@ -1615,6 +1618,7 @@ First-run bootstrap: ensure DB schema exists.
   - `async def reload_resources(self) -> None` (28)
   - `def cv_path(self)` (10)
   - `def cv_file(self) -> Path | None` (8)
+  - `def photo_file(self) -> Path | None` (3)
   - `async def check_ghosting_timeouts(self) -> int` (2)
   - `async def rerun_pipeline_for_vacancy(self, vacancy_id) -> rerun.RerunPipelineOutcome` (4)
   - `async def recover_orphan_vacancies(self) -> int` (2)
@@ -2176,14 +2180,15 @@ First-run bootstrap: ensure DB schema exists.
 - `class LlmProviderConfig` (9)
   - `def names_model_file(self) -> bool` (2)
 
-### `backend/repository/agent_profile.py` — 114 строк
+### `backend/repository/agent_profile.py` — 132 строк
 
 Анкета человека целиком, как её видит агент: со стажем общим и по навыкам.
 
 Зависит от: `backend.domain.salary`, `backend.domain.tenure`, `backend.llm.candidate`, `backend.models`, `backend.repository.profile`, `backend.repository.profile_experience`, `backend.repository.profile_languages`, `backend.repository.profile_projects`, `backend.repository.profile_skills`
 
-- `async def build_agent_profile(session: AsyncSession, today: date) -> str` (17)
-- `def _person_lines(p, languages) -> list[str]` (20)
+- `async def build_agent_profile(session: AsyncSession, today: date, photo: bool) -> str` (23)
+- `def _person_lines(p, languages, today: date) -> list[str]` (25)
+- `def _birth_lines(born: date | None, today: date) -> list[str]` (5)
 - `def _salary(p) -> str` (7)
 - `def _skill_lines(skills, places, projects, today: date) -> list[str]` (5)
 - `def _skill_term(skill, places, projects, today: date) -> str` (10)
@@ -2216,7 +2221,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def deletion_block(session: AsyncSession, aggregator_id: int) -> str | None` (6)
 - `async def round_sources(session: AsyncSession) -> list[Aggregator]` (13)
 
-### `backend/repository/app_settings.py` — 33 строк
+### `backend/repository/app_settings.py` — 37 строк
 
 Строка общего словаря настроек: записать значение по ключу.
 
@@ -2831,14 +2836,14 @@ First-run bootstrap: ensure DB schema exists.
 - `def apply_silence(session: AsyncSession, vacancy: Vacancy, timeout_days: int) -> None` (23)
 - `def apply_parse_outcome(vacancy: Vacancy, new_status: VacancyStatus) -> None` (18)
 
-### `backend/runtime_settings.py` — 450 строк ⚠ подошёл к 300
+### `backend/runtime_settings.py` — 455 строк ⚠ подошёл к 300
 
 Runtime settings layer.
 
 Зависит от: `adapters`, `backend.crypto`, `backend.incoming`, `backend.models`, `backend.provider_config`, `backend.repository.app_settings`, `backend.tg_credentials`
 
 - `async def _llm_row(session: AsyncSession, kind: LlmConfigKind) -> LlmConfig | None` (5)
-- `class RuntimeSettings` (334)
+- `class RuntimeSettings` (338)
   - `async def load(cls, session_factory: async_sessionmaker[AsyncSession]) -> 'RuntimeSettings'` (6)
   - `async def reload(self) -> None` (22)
   - `def tg(self) -> TgAccountConfig | None` (2)
@@ -2856,6 +2861,7 @@ Runtime settings layer.
   - `def dedup_cosine_threshold(self) -> float` (8)
   - `def dm_backfill_limit(self) -> int` (6)
   - `def cv_path(self) -> str` (2)
+  - `def photo_path(self) -> str` (2)
   - `def wizard_completed(self) -> bool` (2)
   - `def send_locked(self) -> bool` (7)
   - `def auto_apply(self) -> str` (7)
@@ -4241,15 +4247,15 @@ Runtime settings layer.
 
 - `def _job(vacancy_id, **over) -> ApplyJob` (3)
 
-### `tests/backend/test_agent_tools_browser.py` — 245 строк
+### `tests/backend/test_agent_tools_browser.py` — 266 строк
 
 Инструменты браузера: что агент видит и что доходит до страницы.
 
 Зависит от: `backend.agent.jobs`, `backend.agent.tools_browser`, `tests.fakes.agent`, `tests.fakes.browser`
 
-Тестов: 23
+Тестов: 25
 
-- `def _tools(page, resume=None)` (2)
+- `def _tools(page, resume=None, photo=None)` (2)
 - `def _item(selector, value, kind='text', url=VACANCY)` (3)
 - `async def _strict(confirmed, outcome=None, fields=None)` (9)
 
@@ -5519,13 +5525,13 @@ Runtime settings layer.
 Тестов: 4
 
 
-### `tests/backend/test_repository_agent_profile.py` — 166 строк
+### `tests/backend/test_repository_agent_profile.py` — 205 строк
 
 Анкета для агента: всё, на что опираются промпты, со стажем от кода.
 
 Зависит от: `backend.llm.rules`, `backend.models`, `backend.repository.agent_profile`, `tests.dbio`, `tests.factories`, `tests.fakes.agent`
 
-Тестов: 11
+Тестов: 14
 
 - `async def _person(session_factory, **fields)` (4)
 

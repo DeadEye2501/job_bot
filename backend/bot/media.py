@@ -136,6 +136,13 @@ def media_path_for_db(path) -> str:
         return p.as_posix()
 
 
+def stored_media(relative: str) -> Path | None:
+    """Файл по пути внутри каталога медиа, если он там есть; иначе пусто.
+    Пустой путь указывает на сам каталог и файлом не считается."""
+    path = MEDIA_DIR / relative
+    return path if path.is_file() else None
+
+
 async def download_media(client, msg, hr_id: int) -> str | None:
     """Download a photo or document to ``media/{hr_id}/{tg_message_id}{ext}``.
     Returns the project-relative posix path or ``None`` if there's no

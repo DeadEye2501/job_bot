@@ -17,7 +17,7 @@ async def test_the_profile_tool_gives_the_whole_profile(make_pipeline, session_f
     tools = common_tools(kit_for(await make_pipeline()), LoginJob(Source.of(site)))
 
     async with session_factory() as session:
-        whole = await build_agent_profile(session, TODAY)
+        whole = await build_agent_profile(session, TODAY, photo=False)
 
     assert "Имя: Иван" in whole and await tool(tools, "profile")() == whole
 

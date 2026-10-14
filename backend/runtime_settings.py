@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from backend.crypto import decrypt_or_none, encrypt_str
 from backend.incoming import normalize_enum
 from backend.provider_config import LlmProviderConfig, provider_complete
-from backend.repository.app_settings import CV_PATH_KEY, put_app_setting
+from backend.repository.app_settings import CV_PATH_KEY, PHOTO_PATH_KEY, put_app_setting
 from backend.models import (
     AppSetting,
     LlmConfig,
@@ -51,6 +51,7 @@ _APP_DEFAULTS: dict[str, str] = {
     "backfill_limit": "15",
     "dm_backfill_limit": "50",
     CV_PATH_KEY: "",
+    PHOTO_PATH_KEY: "",
     "wizard_completed": "false",
     # send_locked: симуляция отправки — всё, кроме самого вызова Telegram.
     # По умолчанию выключена: включённая молча, она показывает «отклик
@@ -229,6 +230,10 @@ class RuntimeSettings:
     @property
     def cv_path(self) -> str:
         return self._app_value(CV_PATH_KEY)
+
+    @property
+    def photo_path(self) -> str:
+        return self._app_value(PHOTO_PATH_KEY)
 
     @property
     def wizard_completed(self) -> bool:

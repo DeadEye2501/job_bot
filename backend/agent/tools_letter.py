@@ -37,7 +37,7 @@ async def letter_ask(kit: AgentKit, vacancy_id: int, language: str, limit: int |
         vacancy = await session.get(Vacancy, vacancy_id)
         if vacancy is None:
             return None
-        profile = await build_agent_profile(session, kit.today)
+        profile = await build_agent_profile(session, kit.today, kit.pipeline.photo_file() is not None)
     return LetterAsk(profile_text=profile, title=vacancy.title or "", vacancy_text=vacancy.raw_text or "",
                      language=language, limit=limit)
 

@@ -33,7 +33,8 @@ def common_tools(kit: AgentKit, job) -> list[Callable]:
     async def profile() -> str:
         """Анкета человека целиком, со стажем общим и по навыкам."""
         async with kit.pipeline.session_factory() as session:
-            return await build_agent_profile(session, kit.today) or "Анкета не заполнена."
+            text = await build_agent_profile(session, kit.today, kit.pipeline.photo_file() is not None)
+            return text or "Анкета не заполнена."
 
     async def finish(result: str, reason: str = "") -> str:
         """Итог сессии. Искатель: done или failed. Откликатель: vacancy_closed, platform_closed или not_fit. Проверка входа: done."""
