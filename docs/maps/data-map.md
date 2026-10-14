@@ -985,7 +985,6 @@
 ### `backend/llm/cv.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `PARSE_CV_PROMPT` = `'Ты парсишь CV специалиста и извлекаешь структур…`
 - `_YEAR_MONTH_RE` = `re.compile('^(\\d{4})-(\\d{1,2})$')`
 - `_YEAR_RE` = `re.compile('^(\\d{4})$')`
 - `_NOT_A_SKILL_SECTION_RE` = `re.compile('\\b(' + '|'.join(('[\\s-]+'.join((re…`
@@ -1000,6 +999,10 @@
 ### `backend/llm/cv_native.py`
 
 - `logger` = `logging.getLogger(__name__)`
+
+### `backend/llm/cv_prompt.py`
+
+- `PARSE_CV_PROMPT` = `'Ты парсишь CV специалиста и извлекаешь структур…`
 
 ### `backend/llm/external.py`
 
@@ -1502,12 +1505,12 @@
   - `first_name_latin: str | None`
   - `last_name_latin: str | None`
   - `gender: Gender | None`
-  - `patronymic: str | None` = `None`
-  - `patronymic_latin: str | None` = `None`
-  - `birth_date: date | None` = `None`
-  - `citizenship: str | None` = `None`
-  - `about_me: str | None` = `None`
-  - `resume_url: str | None` = `None`
+  - `patronymic: str | None`
+  - `patronymic_latin: str | None`
+  - `birth_date: date | None`
+  - `citizenship: str | None`
+  - `about_me: str | None`
+  - `resume_url: str | None`
 - `class ParsedCvLanguage`
   - `language: str`
   - `level: str`

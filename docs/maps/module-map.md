@@ -387,7 +387,7 @@ resume autofill
 - `def upgrade() -> None` (22)
 - `def downgrade() -> None` (14)
 
-## backend — 197 модулей
+## backend — 198 модулей
 
 ### `backend/agent/__init__.py` — 1 строк
 
@@ -1758,17 +1758,18 @@ First-run bootstrap: ensure DB schema exists.
 - `def _letter_refusal(text: str, finish_reason) -> str | None` (23)
 - `async def generate_cover_letter(profile_block: str, parsed: ParsedVacancy, client: httpx.AsyncClient, model: str, *, channel_ref: str | None=None) -> tuple[str | None, str | None]` (50)
 
-### `backend/llm/cv.py` — 498 строк ⚠ подошёл к 300
+### `backend/llm/cv.py` — 376 строк ⚠ подошёл к 300
 
 Разбор резюме моделью: из текста файла — заполненная анкета.
 
-Зависит от: `adapters.lm_chat`, `backend.domain.salary`, `backend.domain.sentence`, `backend.domain.skill_names`, `backend.domain.spellings`, `backend.domain.taxonomy`, `backend.domain.wording`, `backend.incoming`, `backend.llm.answers`, `backend.llm.cv_grounding`, `backend.llm.cv_native`, `backend.llm.external`, `backend.llm.rules`, `backend.models`, `backend.payloads`
+Зависит от: `adapters.lm_chat`, `backend.domain.salary`, `backend.domain.sentence`, `backend.domain.skill_names`, `backend.domain.spellings`, `backend.domain.taxonomy`, `backend.domain.wording`, `backend.incoming`, `backend.llm.answers`, `backend.llm.cv_grounding`, `backend.llm.cv_native`, `backend.llm.cv_prompt`, `backend.llm.external`, `backend.llm.rules`, `backend.models`, `backend.payloads`
 
 - `def _normalize_lang_level(value: object) -> str | None` (25)
 - `def _parse_language_item(item) -> tuple[str, str | None] | None` (13)
 - `def _parse_languages(raw: object) -> list[ParsedCvLanguage]` (23)
-- `def _parse_date(value) -> date | None` (21)
-- `def _parse_profile(data: dict) -> ParsedCvProfile | None` (27)
+- `def _parse_date(value) -> date | None` (22)
+- `def _full_date(value) -> date | None` (13)
+- `def _parse_profile(data: dict) -> ParsedCvProfile | None` (33)
 - `def _parse_skill(item) -> ParsedCvSkill | None` (35)
 - `def _points(value) -> list[str]` (10)
 - `def _parse_experience(item) -> ParsedCvExperience | None` (18)
@@ -1808,6 +1809,13 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def _resume_language(text: str) -> str` (10)
 - `def with_native_language(parsed: ParsedCv, text: str) -> ParsedCv` (40)
+
+### `backend/llm/cv_prompt.py` — 165 строк
+
+Наставление модели для разбора резюме.
+
+Зависит от: `backend.domain.taxonomy`, `backend.llm.answers`, `backend.llm.rules`
+
 
 ### `backend/llm/external.py` — 47 строк
 
@@ -5289,13 +5297,13 @@ Runtime settings layer.
 Тестов: 9
 
 
-### `tests/backend/test_llm_cv_profile.py` — 362 строк ⚠ подошёл к 300
+### `tests/backend/test_llm_cv_profile.py` — 401 строк ⚠ подошёл к 300
 
 Следствия разбора профиля и языков в `backend/llm/cv.py`.
 
 Зависит от: `backend.llm.cv`, `backend.models`, `tests.factories`, `tests.fakes.llm`
 
-Тестов: 29
+Тестов: 33
 
 - `async def parse_answer(answer: str, text: str='резюме')` (8)
 - `async def parse_profile(text: str='резюме', **fields)` (9)
