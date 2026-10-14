@@ -79,7 +79,7 @@ def applier_task(job, vacancy_text: str, profile_text: str, today: date) -> str:
     lines = [
         f"Способ отклика: {_METHODS[job.way.method]}",
         f"Адрес способа: {job.way.target}",
-        *([f"Резюме на сайте: «{job.resume[0]}» — {job.resume[1]}"] if job.resume else []),
+        *([f"Резюме на сайте: «{job.resume.title}» — {job.resume.url}"] if job.resume else []),
         _WRITERS[job.letter_writer],
         f"Сегодня: {today.isoformat()}",
         vacancy_text,

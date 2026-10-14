@@ -5,6 +5,7 @@ from datetime import datetime
 
 from backend.domain.apply_order import Way
 from backend.models import Aggregator
+from backend.payloads import SeenResume
 
 
 @dataclass(frozen=True)
@@ -121,7 +122,7 @@ class ApplyJob:
     profile_id: int
     simulated: bool
     letter_writer: str
-    resume: tuple[str, str] | None = None
+    resume: SeenResume | None = None
     confirming: bool = False
     letter_checks: int = 0
     outcome: Outcome | None = None

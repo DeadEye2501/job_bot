@@ -1,0 +1,21 @@
+/* Строка резюме в карточке агрегатора: кружок выбора и название-ссылка.
+
+   Кружок — родной, в цвет акцента по общему правилу (`base.css`); подсветка
+   названия под курсором — общая со ссылками шапки (`link-hover.css`). */
+
+.resume-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+  font-size: 0.78rem;
+}
+
+.resume-row input {
+  margin: 0;
+}
+
+.resume-title {
+  color: var(--text-primary);
+  text-align: left;
+}

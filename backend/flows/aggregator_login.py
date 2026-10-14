@@ -6,14 +6,10 @@
 
 from backend.agent.human_gate import LIMIT_SEC
 from backend.agent.jobs import LoginJob, Source
-from backend.agent.kit import AgentKit, SessionPlan
-from backend.agent.prompts.frame import system_prompt
+from backend.agent.kit import AgentKit
 from backend.agent.prompts.login import LOGIN_PROMPT, login_task
-from backend.agent.sessions import run_to_limit
-from backend.agent.tools_browser import browser_tools
-from backend.agent.tools_common import common_tools
-from backend.flows.aggregator_scan import scan
-from backend.models import Aggregator
+from backend.flows.aggregator_scan import run_on_site, scan
+from backend.repository.aggregators import is_logged_in
 
 
 async def log_in(kit: AgentKit, source: Source) -> str:
@@ -30,15 +26,10 @@ async def log_in(kit: AgentKit, source: Source) -> str:
     # Вход — то же ожидание человека, что капча: срок у них один.
     if not await kit.browser.wait_closed(LIMIT_SEC):
         return "login_timeout"
-    job = LoginJob(source)
-    tools = [*common_tools(kit, job), *browser_tools(kit, None, None)]
-    plan = SessionPlan(system_prompt(LOGIN_PROMPT, tools), login_task(source.host), tools,
-                       web_search=False)
-    await run_to_limit(kit, plan)
+    await run_on_site(kit, LoginJob(source), LOGIN_PROMPT, login_task(source.host))
     async with kit.pipeline.session_factory() as session:
-        row = await session.get(Aggregator, source.id)
-    if row is None or not row.is_logged_in:
-        return "not_logged_in"
+        if not await is_logged_in(session, source.id):
+            return "not_logged_in"
     # Вход подтверждён — ответ входа уже `ok`: неудачный перечень резюме пишет
     # свою причину в журнал, а вход от неё не становится несостоявшимся.
     # Остановки работы — истёкшее ожидание человека, лимит — идут насквозь,

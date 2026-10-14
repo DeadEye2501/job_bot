@@ -17,6 +17,7 @@ import ChannelCard from '../app/ChannelCard.svelte';
 import { hearRound } from '../state/round.svelte.js';
 import { answering, roundGoes } from './bridge_stub.js';
 import { settled } from './settled.js';
+import { EMPTY_STATS } from './stats_stub.js';
 
 afterEach(cleanup);
 
@@ -26,14 +27,7 @@ const CARD = {
   title: 'Python Cool',
   avatar: null,
   blacklist_value: null,
-  stats: {
-    total: 0,
-    vacancies_per_day: 0,
-    fit_percent: null,
-    apply_percent: null,
-    response_percent: null,
-    status_counts: {},
-  },
+  stats: EMPTY_STATS,
 };
 
 function screen() {

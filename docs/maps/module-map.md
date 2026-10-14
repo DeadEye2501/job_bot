@@ -439,11 +439,11 @@ resume autofill
   - `def reset(self) -> None` (6)
   - `async def _take(self, browser) -> str | dict` (13)
 
-### `backend/agent/jobs.py` — 141 строк
+### `backend/agent/jobs.py` — 142 строк
 
 Задачи сессий агента и их итоги.
 
-Зависит от: `backend.domain.apply_order`, `backend.models`
+Зависит от: `backend.domain.apply_order`, `backend.models`, `backend.payloads`
 
 - `class Source` (12)
   - `def of(cls, row: Aggregator) -> 'Source'` (3)
@@ -616,15 +616,16 @@ resume autofill
 - `async def _attach(page, selector: str, file: Path) -> None` (12)
 - `def _first_line(error: Exception) -> str` (2)
 
-### `backend/agent/tools_common.py` — 170 строк
+### `backend/agent/tools_common.py` — 180 строк
 
 Общие инструменты агента: анкета, итог сессии, зов человека, отметка входа, неудача способа.
 
 Зависит от: `backend.agent.confirm`, `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.page_fields`, `backend.domain.apply_order`, `backend.domain.hosts`, `backend.repository.aggregators`
 
-- `def common_tools(kit: AgentKit, job) -> list[Callable]` (27)
+- `def common_tools(kit: AgentKit, job) -> list[Callable]` (28)
   - `async def profile() -> str` (4)
-  - `async def finish(result: str, reason: str='') -> str` (8)
+  - `async def finish(result: str, reason: str='') -> str` (9)
+- `def _results(job) -> frozenset[str]` (7)
 - `def _login_target(job) -> int | None` (4)
 - `def _human_call(kit: AgentKit, job) -> list[Callable]` (13)
 - `def _need_human(kit: AgentKit, job) -> Callable` (6)
@@ -697,11 +698,11 @@ resume autofill
 Зависит от: —
 
 
-### `backend/applying/browser.py` — 93 строк
+### `backend/applying/browser.py` — 94 строк
 
 Браузерный способ: сессия агента на кнопку агрегатора или форму работодателя.
 
-Зависит от: `backend.agent.confirm`, `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.prompts.applier`, `backend.agent.prompts.frame`, `backend.agent.sessions`, `backend.agent.stops`, `backend.agent.tools_applier`, `backend.agent.tools_browser`, `backend.agent.tools_common`, `backend.agent.tools_letter`, `backend.applying.result`, `backend.domain.apply_order`, `backend.domain.hosts`, `backend.repository.aggregator_resumes`, `backend.repository.aggregators`, `backend.repository.vacancy_brief`, `backend.repository.vacancy_status`
+Зависит от: `backend.agent.confirm`, `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.prompts.applier`, `backend.agent.prompts.frame`, `backend.agent.sessions`, `backend.agent.stops`, `backend.agent.tools_applier`, `backend.agent.tools_browser`, `backend.agent.tools_common`, `backend.agent.tools_letter`, `backend.applying.result`, `backend.domain.apply_order`, `backend.domain.hosts`, `backend.payloads`, `backend.repository.aggregator_resumes`, `backend.repository.aggregators`, `backend.repository.vacancy_brief`, `backend.repository.vacancy_status`
 
 - `async def via_browser(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome` (27)
 - `async def _mark_unfit(kit: AgentKit, vacancy_id: int, reason: str) -> None` (5)
@@ -1316,13 +1317,13 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def spelled_alone(text: str, word: str) -> bool` (11)
 
-### `backend/flows/aggregator_login.py` — 47 строк
+### `backend/flows/aggregator_login.py` — 38 строк
 
 Вход на сайт агрегатора: человек входит в видимом браузере, агент проверяет вход.
 
-Зависит от: `backend.agent.human_gate`, `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.prompts.frame`, `backend.agent.prompts.login`, `backend.agent.sessions`, `backend.agent.tools_browser`, `backend.agent.tools_common`, `backend.flows.aggregator_scan`, `backend.models`
+Зависит от: `backend.agent.human_gate`, `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.prompts.login`, `backend.flows.aggregator_scan`, `backend.repository.aggregators`
 
-- `async def log_in(kit: AgentKit, source: Source) -> str` (29)
+- `async def log_in(kit: AgentKit, source: Source) -> str` (24)
 
 ### `backend/flows/aggregator_name.py` — 89 строк
 
@@ -1348,13 +1349,14 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _seek_plan(kit: AgentKit, job: SeekJob, queue: ParseQueue) -> SessionPlan` (12)
 - `async def _settle(kit: AgentKit, job: SeekJob, end: AgentEnd, started: datetime) -> None` (9)
 
-### `backend/flows/aggregator_scan.py` — 40 строк
+### `backend/flows/aggregator_scan.py` — 46 строк
 
 Перечень резюме на сайте агрегатора: агент перечисляет резюме человека, база приводится к увиденному.
 
-Зависит от: `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.prompts.frame`, `backend.agent.prompts.scan`, `backend.agent.sessions`, `backend.agent.tools_browser`, `backend.agent.tools_common`, `backend.agent.tools_scan`, `backend.models`
+Зависит от: `adapters.claude_code_agent`, `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.prompts.frame`, `backend.agent.prompts.scan`, `backend.agent.sessions`, `backend.agent.tools_browser`, `backend.agent.tools_common`, `backend.agent.tools_scan`, `backend.repository.aggregators`
 
-- `async def scan(kit: AgentKit, source: Source) -> str` (18)
+- `async def run_on_site(kit: AgentKit, job, prompt: str, task: str, *own_tools) -> AgentEnd` (6)
+- `async def scan(kit: AgentKit, source: Source) -> str` (15)
 
 ### `backend/flows/auto_gate.py` — 48 строк
 
@@ -2242,7 +2244,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _project_lines(projects) -> list[str]` (7)
 - `def _years(years: int) -> str` (2)
 
-### `backend/repository/aggregator_resumes.py` — 86 строк
+### `backend/repository/aggregator_resumes.py` — 85 строк
 
 Резюме человека на сайте агрегатора — зеркало того, что сейчас на сайте.
 
@@ -2251,10 +2253,10 @@ First-run bootstrap: ensure DB schema exists.
 - `async def resumes_of(session: AsyncSession, aggregator_id: int) -> list[AggregatorResume]` (7)
 - `async def sync_resumes(session: AsyncSession, aggregator_id: int, seen: list[SeenResume], can_add: bool) -> None` (24)
 - `async def choose_resume(session: AsyncSession, aggregator_id: int, resume_id: int) -> None` (14)
-- `async def drop_chosen_resume(session: AsyncSession, aggregator_id: int | None) -> None` (11)
+- `async def drop_resume(session: AsyncSession, aggregator_id: int, url: str) -> None` (10)
 - `async def chosen_resume(session: AsyncSession, aggregator_id: int) -> AggregatorResume | None` (6)
 
-### `backend/repository/aggregators.py` — 233 строк
+### `backend/repository/aggregators.py` — 239 строк
 
 Ведение записей об агрегаторах.
 
@@ -2272,6 +2274,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def get_aggregator_detail(session: AsyncSession, aggregator_id: int) -> tuple[Aggregator, SourceStats, str | None] | None` (9)
 - `async def set_aggregator_active(session: AsyncSession, aggregator_id: int, active: bool) -> str` (15)
 - `async def set_logged_in(session: AsyncSession, aggregator_id: int, logged_in: bool) -> None` (5)
+- `async def is_logged_in(session: AsyncSession, aggregator_id: int) -> bool` (4)
 - `async def mark_run(session: AsyncSession, aggregator_id: int, started_at: datetime) -> None` (4)
 - `async def applications_of(session: AsyncSession, aggregator_id: int) -> int` (12)
 - `async def delete_aggregator(session: AsyncSession, aggregator_id: int) -> str` (31)
@@ -3064,17 +3067,17 @@ Runtime settings layer.
 Отдаёт наружу: `Api`, `AsyncRunner`
 
 
-### `client/bridge/aggregators.py` — 194 строк
+### `client/bridge/aggregators.py` — 229 строк
 
 Экран «Агрегаторы»: перечень, заведение, удаление, включение, вход и обход.
 
-Зависит от: `backend.agent.availability`, `backend.flows.aggregator_name`, `backend.repository`, `client.bridge.answer`, `client.bridge.hub`, `client.bridge.mark`, `client.bridge.page`, `client.bridge.refusals`, `client.bridge.source_page`, `client.bridge.source_switch`, `client.bridge.wire`
+Зависит от: `backend.agent.availability`, `backend.flows.aggregator_name`, `backend.repository`, `backend.repository.aggregator_resumes`, `client.bridge.answer`, `client.bridge.hub`, `client.bridge.mark`, `client.bridge.page`, `client.bridge.refusals`, `client.bridge.source_page`, `client.bridge.source_switch`, `client.bridge.wire`
 
-- `class Aggregators` (151)
+- `class Aggregators` (172)
   - `def list(self, payload: dict | None=None) -> dict` (17)
     - `async def run() -> dict` (7)
-  - `def detail(self, aggregator_id: int) -> dict` (15)
-    - `async def run() -> dict` (10)
+  - `def detail(self, aggregator_id: int) -> dict` (19)
+    - `async def run() -> dict` (13)
   - `def vacancies(self, payload: dict) -> dict` (3)
   - `def set_all_active(self, payload: dict) -> dict` (3)
   - `def block(self, aggregator_id: int) -> dict` (7)
@@ -3085,10 +3088,13 @@ Runtime settings layer.
     - `async def run() -> dict` (11)
   - `def set_active(self, payload: dict | None=None) -> dict` (22)
     - `async def run() -> dict` (11)
+  - `def choose_resume(self, payload: dict | None=None) -> dict` (16)
+    - `async def run() -> dict` (5)
   - `def login(self, aggregator_id: int) -> dict` (4)
   - `def run_now(self, aggregator_id: int) -> dict` (4)
   - `def scan(self, aggregator_id: int) -> dict` (4)
   - `def _launch(self, aggregator_id: int, action: str, start, done: str, refusals: dict) -> dict` (11)
+- `def _resume_to_dict(row) -> dict` (3)
 - `def _refuse_deletion(block: str | None) -> None` (4)
 
 ### `client/bridge/answer.py` — 251 строк
@@ -4332,13 +4338,13 @@ Runtime settings layer.
 - `def _item(selector, value, kind='text', url=VACANCY)` (3)
 - `async def _strict(confirmed, outcome=None, fields=None)` (9)
 
-### `tests/backend/test_agent_tools_common.py` — 136 строк
+### `tests/backend/test_agent_tools_common.py` — 152 строк
 
 Общие инструменты агента: анкета, вход, итог, неудача.
 
-Зависит от: `backend.agent.jobs`, `backend.agent.tools_common`, `backend.models`, `backend.repository.agent_profile`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.agent`
+Зависит от: `backend.agent.jobs`, `backend.agent.tools_common`, `backend.models`, `backend.payloads`, `backend.repository.agent_profile`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.agent`
 
-Тестов: 10
+Тестов: 11
 
 - `class _Gate` (7)
   - `async def wait(self, kind, host, _browser)` (3)
@@ -5636,7 +5642,7 @@ Runtime settings layer.
 Тестов: 10
 
 
-### `tests/backend/test_repository_aggregator_resumes.py` — 151 строк
+### `tests/backend/test_repository_aggregator_resumes.py` — 153 строк
 
 Резюме агрегатора в базе: сверка со сканом, отметка «откликаться этим», удаление.
 
@@ -6560,13 +6566,13 @@ Runtime settings layer.
 - `def _rerun_outcomes() -> set[str]` (3)
 - `def _pasted_outcomes() -> set[str]` (3)
 
-### `tests/client/test_bridge_aggregators.py` — 325 строк ⚠ подошёл к 300
+### `tests/client/test_bridge_aggregators.py` — 360 строк ⚠ подошёл к 300
 
 Домен «Агрегаторы»: перечень, заведение, удаление, включение, вход и обход.
 
 Зависит от: `backend.agent.availability`, `backend.bot.work`, `backend.models`, `backend.repository.aggregators`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.site_home`
 
-Тестов: 27
+Тестов: 29
 
 
 ### `tests/client/test_bridge_answer.py` — 132 строк
