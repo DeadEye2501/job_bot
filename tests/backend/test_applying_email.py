@@ -49,7 +49,7 @@ async def test_without_mail_settings_the_way_is_missed(mail_case):
 async def test_without_a_resume_file_or_link_the_way_is_missed(mail_case):
     kit, vacancy, outbox = await mail_case(resume=False)
     outcome = await via_email(kit, vacancy.id, MAIL)
-    assert outcome == Missed("нет файла резюме") and outbox == []
+    assert outcome == Missed("нет ни файла резюме, ни ссылки на него") and outbox == []
 
 
 async def test_without_a_file_the_letter_goes_with_the_resume_link(mail_case):

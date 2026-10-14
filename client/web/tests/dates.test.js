@@ -6,6 +6,7 @@ import {
   asIso,
   dayOf,
   isoDay,
+  maskedDate,
   shortDate,
   showDate,
   showStamp,
@@ -29,6 +30,24 @@ describe('дата в тесной колонке', () => {
     // Прочерк в узкой колонке читался бы как значение.
     expect(shortDate(null, NOW)).toBe('');
     expect(shortDate('не дата', NOW)).toBe('');
+  });
+});
+
+describe('набор даты цифрами', () => {
+  it('точки встают сами: после дня и после месяца', () => {
+    // Набирают подряд, не нажимая точку: «1503» — это день и месяц.
+    expect(maskedDate('15')).toBe('15');
+    expect(maskedDate('150')).toBe('15.0');
+    expect(maskedDate('15031990')).toBe('15.03.1990');
+  });
+
+  it('после восьми цифр дальше не набирается', () => {
+    expect(maskedDate('150319901')).toBe('15.03.1990');
+  });
+
+  it('набранные точки и прочее не мешают', () => {
+    expect(maskedDate('15.03.1990')).toBe('15.03.1990');
+    expect(maskedDate('15.0')).toBe('15.0');
   });
 });
 

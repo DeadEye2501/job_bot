@@ -6,7 +6,6 @@ from backend.agent.jobs import ApplyJob
 from backend.agent.kit import AgentKit
 from backend.llm.agent_letter import Letter, LetterAsk, check_letter, write_letter
 from backend.models import Vacancy
-from backend.repository.agent_profile import build_agent_profile
 
 _CHECKS_ALLOWED = 2
 _ENOUGH = "отбито дважды: отправляй без письма, если поле необязательное, иначе report_failure"
@@ -37,7 +36,7 @@ async def letter_ask(kit: AgentKit, vacancy_id: int, language: str, limit: int |
         vacancy = await session.get(Vacancy, vacancy_id)
         if vacancy is None:
             return None
-        profile = await build_agent_profile(session, kit.today, kit.pipeline.photo_file() is not None)
+        profile = await kit.profile_text(session)
     return LetterAsk(profile_text=profile, title=vacancy.title or "", vacancy_text=vacancy.raw_text or "",
                      language=language, limit=limit)
 

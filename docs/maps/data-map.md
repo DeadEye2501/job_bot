@@ -567,8 +567,9 @@
 
 - `logger` = `logging.getLogger(__name__)`
 - `MEDIA_DIR` = `get_data_dir() / 'media'`
-- `PHOTO_EXTS` = `набор из 4`
-- `_PHOTO_TYPES` = `набор из 3`
+- `PHOTO_SUFFIXES` = `словарь из 3`
+- `PHOTO_EXTS` = `набор из 1 и раскрытых`
+- `_PHOTO_TYPES` = `frozenset(PHOTO_SUFFIXES)`
 - `PHOTO_SIZE_LIMIT` = `10 * 1024 * 1024`
 - `DOCUMENT_SIZE_LIMIT` = `50 * 1024 * 1024`
 
@@ -2372,9 +2373,14 @@
 
 - `SAVED_CHAT` = `словарь из 1`
 
+### `tests/client/test_bridge_photo.py`
+
+- `JPEG` = `photo_head('.jpg') + b'jpeg'`
+- `PNG` = `photo_head('.png') + b'png'`
+
 ### `tests/client/test_bridge_profile.py`
 
-- `PERSON` = `словарь из 4`
+- `PERSON` = `person_fields()`
 
 ### `tests/client/test_front_vocabulary.py`
 

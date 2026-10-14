@@ -76,7 +76,7 @@
 - Строка отправки остаётся на месте и при заслоне, только запертой: пропав, она не сказала бы, почему писать нельзя.
 - принимает: ask, say, hrId, blocked, events, onread
 
-### app/ProfileCv.svelte (297)
+### app/ProfileCv.svelte (305)
 - —
 - принимает: ask
 
@@ -150,7 +150,7 @@
 - принимает: ask, say, onback, onnext
 - берёт: ./TelegramLogin.svelte
 
-## components — 107 файлов
+## components — 111 файлов
 
 ### components/ActionsMenu.svelte (30)
 - —
@@ -256,10 +256,10 @@
 - принимает: message, confirmLabel, locked, onconfirm, oncancel
 - берёт: ./ModalShell.svelte
 
-### components/ConfirmSendDialog.svelte (77)
+### components/ConfirmSendDialog.svelte (79)
 - —
 - принимает: url, items, blocked, onedit, onopen, onconfirm, ondrop, onfold
-- берёт: ./ModalHead.svelte, ./ModalShell.svelte
+- берёт: ./ModalFoot.svelte, ./ModalHead.svelte, ./ModalShell.svelte
 
 ### components/ContactRow.svelte (77)
 - Нажимается вся строка, а не имя в ней: нажатие на одном имени оставляет мёртвыми отступы строки, кружок и хвост. Кнопкой строка быть не может — в строке источника стоит переключатель обхода, — поэтому клавиатуре она отвечает разметкой. Клавишу строка принимает только свою: у переключателя внутри неё нажатие клавиши всплывает сюда, и без этого Enter на переключателе открывал бы карточку вместо переключения.
@@ -275,7 +275,7 @@
 - —
 - принимает: meta, actions
 
-### components/DatePicker.svelte (149)
+### components/DatePicker.svelte (154)
 - —
 - принимает: value, onpick, disabled, up
 
@@ -296,14 +296,18 @@
 - —
 - принимает: draft
 
+### components/DropButton.svelte (13)
+- —
+- принимает: label, empty, open, ontoggle
+
 ### components/DropPanel.svelte (28)
 - Ключ по месту, а не по значению: имя человека уникальным не бывает, и у одного собеседника их трое с одним и тем же. Ключ по значению роняет отрисовку на первом же тёзке — панель не появляется вовсе и молча.
 - принимает: options, value, onpick, keepFocus
 
-### components/Dropdown.svelte (39)
+### components/Dropdown.svelte (37)
 - —
 - принимает: options, value, placeholder, onpick
-- берёт: ./DropPanel.svelte
+- берёт: ./DropButton.svelte, ./DropPanel.svelte
 
 ### components/ExperienceCard.svelte (97)
 - —
@@ -326,8 +330,8 @@
 - —
 - принимает: text, confirm, blocked, onreveal, ondone
 
-### components/LangRows.svelte (49)
-- —
+### components/LangRows.svelte (48)
+- Одной таблицей: строки языков и «Добавить» под ними в общей рамке.
 - принимает: rows, onedit, onadd, onremove
 - берёт: ./Dropdown.svelte
 
@@ -381,9 +385,9 @@
 - принимает: vacancies, empty, loading, onpick
 - берёт: ./MiniList.svelte
 
-### components/ModalFoot.svelte (22)
+### components/ModalFoot.svelte (36)
 - —
-- принимает: label, busyLabel, busy, ready, tip, oncancel, onconfirm
+- принимает: label, busyLabel, busy, ready, tip, cancelLabel, leading, oncancel, onconfirm
 
 ### components/ModalHead.svelte (23)
 - —
@@ -393,7 +397,7 @@
 - —
 - принимает: close, confirm
 
-### components/ModalShell.svelte (34)
+### components/ModalShell.svelte (42)
 - Нажатие по затемнению закрывает окно, нажатие внутри коробки — нет: сверяем, что нажали ровно в затемнение, а не всплыло из содержимого.
 - принимает: extra, over, confirm, awayCloses, onclose, children
 - берёт: ./ModalKeys.svelte
@@ -440,9 +444,19 @@
 - принимает: person, selected, onpick
 - берёт: ./ContactRow.svelte, ./Handle.svelte
 
-### components/PickList.svelte (54)
+### components/PhotoCropDialog.svelte (116)
+- —
+- принимает: image, ratio, onsave, onclose
+- берёт: ./ModalFoot.svelte, ./ModalHead.svelte, ./ModalShell.svelte
+
+### components/PhotoFrame.svelte (30)
+- —
+- принимает: url, onpick, onclear
+
+### components/PickList.svelte (58)
 - —
 - принимает: placeholder, hint, empty, names, chosen, search, onsearch, prefix, onpick
+- берёт: ./DropButton.svelte
 
 ### components/PickerDialog.svelte (149)
 - Пустых слов два, и разница несущая: «ничего не найдено» говорит, что список есть, а показать из него нечего, — и человек ищет причину в поле поиска, а не в том, что заводить он ещё ничего не начинал.
@@ -467,6 +481,11 @@
 - —
 - принимает: draft, up
 - берёт: ./DatePicker.svelte
+
+### components/ProfilePerson.svelte (70)
+- —
+- принимает: form, field, onset, onpickone
+- берёт: ./ChoiceRow.svelte, ./DatePicker.svelte, ./Dropdown.svelte
 
 ### components/ProgressBars.svelte (25)
 - —
@@ -584,10 +603,10 @@
 - принимает: tg, draft, busy, onedit, onlogin, onlogout
 - берёт: ./SecretInput.svelte, ./SettingsSection.svelte
 
-### components/TgLoginDialog.svelte (62)
+### components/TgLoginDialog.svelte (64)
 - Escape закрывает, Enter — нет: шаг уходит только кнопкой.
 - принимает: step, phone, relogin, busy, error, onsubmit, oncancel
-- берёт: ./ModalShell.svelte, ./SecretInput.svelte
+- берёт: ./ModalFoot.svelte, ./ModalHead.svelte, ./ModalShell.svelte, ./SecretInput.svelte
 
 ### components/TopTabs.svelte (12)
 - —
@@ -631,7 +650,7 @@
 - —
 - принимает: marks, dimmed
 
-## state — 69 файлов
+## state — 71 файлов
 
 ### state/aggregators.js (70)
 - * Где агрегатор ищет — подпись под именем. * * У «Поиска по сети» адреса нет — его место занимает то, где он ищет: пустое * место под именем читалось бы как недозаведённый агрегатор.
@@ -660,6 +679,10 @@
 ### state/blacklist.js (158)
 - * Роды строк отсева. Первый — общий: в нём экран открывается. * * Порядок несущий: слова стоят перед предметами, потому что ими отсев и * пользуются чаще всего — по одному слову отсеивается больше объявлений, чем по * всем каналам вместе.
 - отдаёт: BLACKLIST_KINDS, blacklistCounts, blacklistHints, blacklistShown, blankRow, blockNote, kindIndex, kindOptions, kindPicked, unblockNote, valueField
+
+### state/bounds.js (7)
+- * `value`, прижатое к `low` снизу и к `high` сверху.
+- отдаёт: clamp
 
 ### state/calendar.js (69)
 - * Дни недели с понедельника. Порядок несущий: по нему считается, в какую * колонку встаёт первое число месяца.
@@ -701,7 +724,7 @@
 - * Разложить письма по дням, сохранив их порядок. * * Подпись дня стоит над первым письмом этого дня, а не над каждым: иначе лента * превращается в чересполосицу дат. * * Письмо без времени выпадает вовсе — поставить его некуда, а под чужой * подписью дня оно соврало бы.
 - отдаёт: attachmentKind, byDays, chatTime, isUnread, sendBlock, tick, unread
 
-### state/chosen.js (50)
+### state/chosen.js (52)
 - * Какую долю дорожки залить под это значение. * * Зажато с обеих сторон: значение приезжает с моста и могло быть выставлено * до того, как предел назначили, — заливка шире дорожки выглядит поломкой, а * отрицательная не рисуется вовсе.
 - отдаёт: alone, fillPercent, toggled, without
 
@@ -717,9 +740,9 @@
 - * Заходит на вкладку и отдаёт снятие — его и возвращают из эффекта. * * Перечитывает по вести не страницей, а показанным: иначе занесение в отсев из * карточки схлопывало бы пролистанное до первой страницы.
 - отдаёт: watchContacts
 
-### state/dates.js (120)
+### state/dates.js (131)
 - * Дата для тесной колонки: день, сокращённый месяц и год чужого года. * * Год этого года не пишется: он и так известен, а колонка узка. Негодное и * пустое дают пустоту — прочерк в такой колонке читался бы как значение.
-- отдаёт: asIso, clock, dayIso, dayOf, isoDay, padded, shortDate, showDate, showStamp, validDate
+- отдаёт: asIso, clock, dayIso, dayOf, isoDay, maskedDate, padded, shortDate, showDate, showStamp, validDate
 
 ### state/experience.js (82)
 - * Период работы для шапки карточки. * * Месяц и год без дня: места работы различают по месяцам, а день удлиняет * строку вдвое. Открытый конец назван словами — по нему и читают, работает * человек здесь сейчас или нет.
@@ -741,8 +764,8 @@
 - * Что известно о здоровье сейчас: ответ `system.health` или пусто до первого.
 - отдаёт: healthNow, keepHealth
 
-### state/keys.js (70)
-- * Чем нажатая клавиша отзовётся в окне: закрытием, подтверждением или ничем. * * Многострочное поле — исключение: в нём Enter переносит строку. Иначе заметку * в два абзаца не набрать, первый же перевод строки отправил бы окно.
+### state/keys.js (78)
+- * Чем нажатая клавиша отзовётся в окне: закрытием, подтверждением или ничем. * * Enter не подтверждает там, где делает своё: в многострочном поле заметку в * два абзаца иначе не набрать, а Enter на «Отмене» подтвердил бы обратное * нажатому.
 - отдаёт: modalKey, modalPress, opened, pressKey, saveKey
 
 ### state/logs.js (110)
@@ -777,7 +800,7 @@
 - * Заводит список, читающий себя страницами. * * `ask` — обращение к мосту, `method` — имя метода, `key` — под каким именем * строки лежат в ответе. Обращение принимается обёрткой, а не самим доводом: * довод читается один раз, при заведении списка, и подмена его сверху сюда бы * не доехала.
 - отдаёт: pagedList
 
-### state/paging.js (78)
+### state/paging.js (80)
 - * Сколько строк в странице. Столько же по умолчанию отдаёт мост.
 - отдаёт: PAGE, VACANCY_PAGE, appended, detailScrolled, nearBottom, nearTop, refreshLimit
 
@@ -788,6 +811,10 @@
 ### state/people.js (127)
 - * Как назвать человека в чужой карточке. * * Безымянный назван номером: строка должна читаться, а не пустовать.
 - отдаёт: blankPerson, named, personCandidate, personHead, personLine, personName, personSub, personTitle, unreadLine
+
+### state/photo_crop.js (74)
+- * Самая большая рамка нужной пропорции посередине снимка.
+- отдаёт: movedCrop, outputSize, resizedCrop, startCrop, zoomedCrop
 
 ### state/picker.js (78)
 - * Отперта ли кнопка «Связать». * * Промах мышью по строке списка не должен менять привязку: выбор строки только * помечает её, а связывает отдельная кнопка. Выбор уже привязанного кнопку не * отпирает — нажатие переписало бы связь тем же значением и записало в ленту * перемену, которой не было.
@@ -829,7 +856,7 @@
 - * Разделы в том порядке, в каком они стоят в меню. Значок — лигатура шрифта * `Material Symbols Outlined`.
 - отдаёт: CONTACTS_TABS, PROFILE_TABS, SECTIONS, SYSTEM_TABS
 
-### state/settings.js (441)
+### state/settings.js (442)
 - * Чем подписано пустое поле имени модели. * * Пока имён нет, подсказка не обещает списка: перечень читается с адреса и * ключа, и у непóднятого поставщика его не будет вовсе — имя тогда вписывают * руками. Слова общие на настройки и на шаг мастера: одно и то же поле, * подписанное по-разному, читается как два разных.
 - отдаёт: BOUNDS, CREDS_LIMITS, EMBED_SOURCES, KEY_PLACEHOLDER, NO_FILE_PLACEHOLDER, PRESETS, PRESET_NAMES, SAME_CREDS_LABEL, SCORE_MAX, SOURCE_FILE, SOURCE_SERVER, addressTrouble, addressless, blankCreds, blankTelegram, canShareChat, clampField, credsChanged, embedReading, fileCreds, fileTrouble, idleProbe, isFileSource, isModelFile, llmTrouble, loginTrouble, mailNeedsServer, mailPill, mailToSave, mirrored, modelPlaceholder, nextStep, presetCreds, presetFor, probeLine, probePill, sameCreds, scorePercent, sessionPill, sharesChat, sourceCreds, sourceLabel, telegramCreds, thresholdState
 
@@ -909,7 +936,7 @@
 - * Слово, согласованное с числом. * * «1 категории» человек читает как опечатку и перестаёт верить остальному на * экране. Числа 11–14 — исключение русского счёта и берут последнюю форму.
 - отдаёт: counted, plural, vacancyCount
 
-## styles — 119 файлов
+## styles — 121 файлов
 
 ### styles/accent-fill.css (20)
 - Залито акцентом — так помечено выбранное и главное: основная кнопка окна, зажатая пилюля срока или рода, выбранный день в календаре, текущий шаг мастера, уверенная оценка вакансии и счёт непрочитанного. Одним правилом на все места, а не своим в каждом: заливка здесь несёт один и тот же смысл «вот это», и разъедься её цвет или вес, соседние экраны стали бы помечать выбранное по-разному. Ввозится после оформления самих блоков: у их наведения та же весомость селектора, и выигрывает порядок.
@@ -929,7 +956,7 @@
 - берёт: --accent
 
 ### styles/add-link.css (13)
-- «+ Добавить» мелким текстом: добавляет строку в список, не споря с ним весом. Так стоят «+ Добавить язык» под языками анкеты и «+ Контакт» над контактами вакансии. Место у каждого своё и лежит при списке.
+- «+ Добавить» мелким текстом: добавляет строку в список, не споря с ним весом. Так стоят «+ Контакт» над контактами вакансии и «+ Добавить язык» последней строкой таблицы языков. Место лежит при списке.
 - селекторы (2): .add-link, .add-link:hover
 - берёт: --accent, --text-secondary
 
@@ -966,7 +993,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 - селекторы (1): .big-num
 - берёт: --text-primary
 
-### styles/blacklist-dialog.css (124)
+### styles/blacklist-dialog.css (123)
 - Окно заведения строки отсева: выбор рода, значение с подсказчиком и причина. Шапка, тело и подвал — общие, в modal.css.
 - селекторы (18): .bl-add-modal,
 .bl-add-modal .modal-body, .bl-kind-segmented, .bl-kind-seg, .bl-kind-seg:hover, .bl-kind-seg.active.keyword, .bl-kind-seg.active.hr, .bl-kind-seg.active.company, .bl-kind-seg.active.channel, .bl-kind-seg.active.aggregator, .bl-modal-input,
@@ -1090,7 +1117,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 - селекторы (6): .contact-block, .hr-avatar, .hr-avatar .material-symbols-outlined, img.hr-avatar, .hr-info, .hr-name
 - берёт: --bg-tertiary, --text-primary, --text-secondary
 
-### styles/contact-card.css (99)
+### styles/contact-card.css (98)
 - Карточка контакта в правой панели: шапка, поля и коробки под ними. Одевает три карточки — человека, компании и канала: содержимое у них разное, а места этих мест одни. Переписка — в chat.css, мини-списки — в mini-list.css, числа канала — в channel-stats.css.
 - селекторы (14): .cnt-det-head, .cnt-det-head > div, .cnt-det-head .hr-avatar, .cnt-det-name, .cnt-det-name.muted, .cnt-det-sub, .cnt-det-sub > *, .cnt-det-link, .cnt-det-meta-row, .cnt-det-meta-row > *, .cnt-det-meta-chip, .cnt-det-meta-chip.unread, .cnt-det-meta-chip.blacklist, .cnt-input
 - берёт: --accent, --accent-chip-bg, --danger, --danger-tint-strong, --text-tertiary
@@ -1111,14 +1138,14 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 .mini-chip, .num-pill
 - берёт: --bg-tertiary, --text-secondary
 
-### styles/cv-file.css (47)
-- Файл резюме — в анкете и в мастере. Пунктир до выбора говорит «сюда кладут», сплошная рамка после — что файл уже взят: пустая строка со сплошной рамкой читалась бы как поле, в которое забыли что-то вписать.
-- селекторы (7): .pdf-row, .pdf-row.has-file, .pdf-row > .material-symbols-outlined, .pdf-info, .pdf-name, .pdf-meta, .pdf-actions
-- берёт: --danger, --text-primary, --text-tertiary
+### styles/cv-file.css (59)
+- Файл резюме — в анкете и в мастере, одним видом: высотой с поле ввода, имя и размер одной строкой, кнопки поджаты. Место над строкой задаёт тот, кто её ставит. Пунктир до выбора говорит «сюда кладут», сплошная рамка после — что файл уже взят: пустая строка со сплошной рамкой читалась бы как поле, в которое забыли что-то вписать.
+- селекторы (8): .pdf-row, .pdf-row.has-file, .pdf-row > .material-symbols-outlined, .pdf-info, .pdf-name, .pdf-meta, .pdf-actions, .pdf-actions .btn
+- берёт: --text-primary, --text-secondary, --text-tertiary
 
-### styles/date-picker.css (97)
+### styles/date-picker.css (88)
 - Поле даты и сетка месяца под ним.
-- селекторы (14): .date-picker, .input-date-text, .input-date-text.invalid, .date-panel, .date-panel.up, .date-head, .date-head .icon-btn:hover, .date-title, .date-week, .date-weekday, .date-cell, .date-day, .date-day:hover, .date-day.today
+- селекторы (13): .date-picker, .input-date-text.invalid, .date-panel, .date-panel.up, .date-head, .date-head .icon-btn:hover, .date-title, .date-week, .date-weekday, .date-cell, .date-day, .date-day:hover, .date-day.today
 - берёт: --accent, --bg-tertiary, --err, --scrim, --selected-bg, --text-primary, --text-secondary
 
 ### styles/disabled-look.css (37)
@@ -1148,7 +1175,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 - селекторы (1): .empty-note
 - берёт: --text-tertiary
 
-### styles/experience.css (106)
+### styles/experience.css (105)
 - Место работы: шапка карточки и всё, что внутри. Сама коробка — общая с категорией навыков, в collapsible.css; своя здесь шапка: там её нажимает одна стрелка, а здесь — вся строка целиком, и разложена она сеткой под стрелку, подпись и корзину.
 - селекторы (13): .exp-header, .exp-card.collapsed .exp-header, .exp-summary, .exp-summary > strong, .exp-summary > .role, .exp-summary .period, .exp-delete, .exp-body, .field-row .input, .date-pair, .date-pair .date-picker, .date-dash, .date-current
 - берёт: --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
@@ -1158,9 +1185,10 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 - селекторы (3): .field-caption, .captioned-field, .captioned-field .chips
 - берёт: --text-tertiary
 
-### styles/field-line.css (29)
+### styles/field-line.css (42)
 - Несколько полей одной строкой: вилка «от — до — валюта», страна и город. Не сетка формы (`form-grid.css`): та делит ряд на две равные колонки, а здесь полей бывает три и ширина у них разная — знак валюты уже числа. Высота у всех по самому высокому: рядом с полями ввода стоит и ряд переключателей, и ниже полей он выглядел бы недоделанным.
-- селекторы (4): .field-line, .field-line > *, .field-line > .field-narrow, .field-line > .field-choice
+- селекторы (6): .field-line, .field-line > *, .field-line > .field-narrow, .field-line > .choice-row[data-look='tile'], .field-line .date-picker > .input,
+.field-line .cdd, .field-line > .field-choice
 
 ### styles/filter-group.css (16)
 - Группа отбора: подпись над своими полями и черта под ними.
@@ -1172,14 +1200,20 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 - селекторы (4): .bottom-bar, .bb-left, .bb-right, .bb-center
 - берёт: --bg-secondary, --border
 
-### styles/form-grid.css (47)
+### styles/form-grid.css (68)
 - Сетка формы: два поля в ряд, и место на всю ширину для тех, кому двух колонок мало. Так стоят четыре формы окна: анкета, поля карточки контакта, место работы и настройки. Написаны они были порознь, и правило «занять оба столбца» — под тремя из четырёх: у карточки контакта широких полей сегодня нет, и правила ей не заведено. Своё у каждой формы одно: просвет между полями. Он и правда разный — в тесной панели карточки поля стоят плотнее, чем на просторной вкладке.
-- селекторы (7): .form-grid,
+- селекторы (9): .form-grid,
 .cnt-form-grid,
 .field-row,
 .settings-row, .form-grid .span-2,
 .field-row .span-2,
-.settings-row .span-2, .field-label, .form-grid, .cnt-form-grid, .field-row, .settings-row
+.settings-row .span-2, .field-label, .form-grid, .form-grid .input,
+.form-grid .cdd-btn,
+.form-grid .choice-row[data-look='seg'],
+.form-grid .choice-row[data-look='tile'],
+.form-grid .pdf-row, .form-grid.cv-line, .cnt-form-grid, .field-row, .settings-row
+- объявляет: --control-height, --form-gap
+- берёт: --control-height, --form-gap
 
 ### styles/head-strip.css (12)
 - Полоса-шапка над содержимым: подложка темнее тела и мелкий кегль. Так стоят шапка таблицы отсева и строка сведений над исходным текстом вакансии: обе называют то, что ниже, и читаться наравне с ним не должны. Раскладка и черта остаются при самих блоках.
@@ -1219,27 +1253,40 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 .inline-edit.saved-flash:hover
 - берёт: --accent, --border, --text-primary
 
-### styles/input-pair.css (38)
-- Два поля одной таблеткой: общая рамка и скругление, между полями черта. Так стоят поля, которые читаются одним значением, — имя с фамилией. Рамку держит обёртка, поэтому наведение и фокус подсвечивают её, а не половину.
-- селекторы (6): .input-pair, .input-pair:hover:not(:focus-within), .input-pair:focus-within, .input-pair .input, .input-pair:has(.input.missing):not(:focus-within), .input-pair .input + .input
+### styles/input-pair.css (52)
+- Поля одной рамкой: общая рамка и скругление, между полями черта. Так стоят поля, которые читаются одним значением, — имя с фамилией (`.input-pair`), — и строки языков таблицей (`.lang-table`, раскладка в lang-rows.css). Рамку держит обёртка, поэтому наведение и фокус подсвечивают её, а не одну ячейку.
+- селекторы (8): .input-pair,
+.lang-table, .input-pair:hover:not(:focus-within),
+.lang-table:hover:not(:focus-within), .input-pair:focus-within,
+.lang-table:focus-within, .input-pair .input,
+.lang-table .input,
+.lang-table .cdd-btn, .input-pair:has(.input.missing):not(:focus-within),
+.lang-table:has(.input.missing):not(:focus-within), .input-pair, .input-pair .input, .input-pair .input + .input
 - берёт: --accent, --border, --danger-border, --text-secondary
 
-### styles/input.css (91)
+### styles/input.css (97)
 - Поле ввода, многострочное поле и поле для секрета рядом с глазом. Экран настроек уменьшает их своим правилом — там полей вдвое больше.
 - селекторы (11): .input,
 .textarea,
-.cdd-btn, .input,
+.cdd-btn,
+.choice-row[data-look='seg'],
+.choice-row[data-look='tile'],
+.pdf-row,
+.photo-frame, .input,
 .textarea, .input:hover:not(:disabled, :focus),
-.textarea:hover:not(:disabled, :focus), .input:focus,
+.textarea:hover:not(:disabled, :focus),
+.photo-frame:hover, .input:focus,
 .textarea:focus, .input::placeholder,
 .textarea::placeholder, .textarea, .textarea.grown, .secret-input, .secret-input .input, .input.missing:not(:focus),
 .textarea.missing:not(:focus), .input.mono
 - берёт: --accent, --bg-secondary, --border, --danger-border, --danger-wash, --text-primary, --text-secondary, --text-tertiary
 
-### styles/lang-rows.css (33)
-- Языки анкеты: строка на язык и кнопка добавления под списком.
-- селекторы (5): .lang-list, .lang-row, .lang-row .input, .lang-row .cdd-label,
+### styles/lang-rows.css (41)
+- Языки анкеты одной таблицей: строка на язык — название, уровень, крестик, — и «Добавить язык» последней строкой во всю ширину. Общая рамка — та же, что у полей одной рамкой (`input-pair.css`); здесь раскладка ячеек. Обрезки по рамке нет нарочно: из ячейки уровня выпадает список, и рамка его срезала бы. Подложка у ячеек прозрачная, поэтому угол таблицы им не нужен.
+- селекторы (6): .lang-table, .lang-row, .lang-row > * + *, .lang-table .input,
+.lang-table .cdd-btn, .lang-row .cdd-label,
 .lang-row .cdd-option, .lang-add
+- берёт: --bg-secondary, --border, --control-height
 
 ### styles/link-hover.css (8)
 - Ссылка-кнопка под курсором: акцент и подчёркивание. Так отзываются ссылки под именем в шапке карточки и контакты вакансии: и то и другое уводит наружу, и отклик у них один.
@@ -1299,9 +1346,9 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 .hr-mini-name, .hr-mini-row .hr-avatar, .hr-mini-meta, .hr-mini-go, .mini-list-empty, .mini-list-more
 - берёт: --accent, --border, --selected-bg, --text-primary, --text-tertiary
 
-### styles/modal.css (195)
+### styles/modal.css (201)
 - Окно поверх окна: затемнение на весь экран и коробка по центру.
-- селекторы (23): .modal-backdrop, .modal-dialog, .modal-dialog.narrow, .modal-dialog.narrow.tall, .modal-dialog.narrow.roomy, .modal-dialog.narrow .modal-body, .modal-dialog.narrow .modal-body > *, .modal-message, .modal-title, .modal-title .material-symbols-outlined, .modal-head, .modal-head .modal-title, .modal-head > .material-symbols-outlined, .modal-title-meta, .modal-close, .modal-close:hover, .modal-close .material-symbols-outlined, .modal-body, .modal-actions,
+- селекторы (24): .modal-backdrop, .modal-dialog, .modal-dialog:focus, .modal-dialog.narrow, .modal-dialog.narrow.tall, .modal-dialog.narrow.roomy, .modal-dialog.narrow .modal-body, .modal-dialog.narrow .modal-body > *, .modal-message, .modal-title, .modal-title .material-symbols-outlined, .modal-head, .modal-head .modal-title, .modal-head > .material-symbols-outlined, .modal-title-meta, .modal-close, .modal-close:hover, .modal-close .material-symbols-outlined, .modal-body, .modal-actions,
 .modal-footer, .modal-footer, .modal-footer .btn, .modal-subtitle, .modal-error
 - берёт: --bg-tertiary, --border, --danger, --scrim, --shadow-modal, --text-primary, --text-secondary, --text-tertiary
 
@@ -1310,9 +1357,10 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 - селекторы (10): .mode-control, .mode-track, .mode-knob, .mode-control[data-mode='Off'] .mode-knob, .mode-control[data-mode='Off'] .mode-track, .mode-control[data-mode='DM Only'] .mode-knob, .mode-control[data-mode='DM Only'] .mode-track, .mode-control[data-mode='Full'] .mode-knob, .mode-control[data-mode='Full'] .mode-track, .mode-control.is-disabled
 - берёт: --accent, --accent-muted, --bg-tertiary, --border, --err, --err-muted, --text-tertiary, --warn, --warn-muted
 
-### styles/name-grid.css (9)
-- Имя анкеты одной строкой: имя с фамилией, они же латиницей и пол. Пары делят ширину поровну, плитки пола берут сколько им нужно. Просвет — тот же, что у сетки формы под ней (`form-grid.css`).
-- селекторы (1): .name-grid
+### styles/name-grid.css (20)
+- Шапка анкеты: фото слева, справа столбец строк о человеке. Просвет и по горизонтали, и по вертикали — тот же, что у сетки формы под ней (`form-grid.css`): разный читается неряшливо.
+- селекторы (3): .profile-head, .name-grid, .name-grid .field-line
+- берёт: --form-gap
 
 ### styles/nav.css (102)
 - Боковое меню: разделы и кнопка разворота.
@@ -1348,36 +1396,42 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 .unread-popup-row:hover
 - берёт: --selected-bg
 
-### styles/palette.css (198)
+### styles/palette.css (201)
 - Палитра приложения: единственное место, где цвет записан значением, — всё остальное оформление берёт его через var(), и это держит хук. Собрана сплошным вычитыванием обоих <style> прежней разметки (`main.html` и `wizard.html`, снесены слайсом В1): 237 записей литералами, 104 различных цвета. Оттенки не сведены и не подправлены — близкие, но разные пары оставлены разными, потому что разницу видно на экране.
 - селекторы (1): :root
-- объявляет: --accent, --accent-badge-hover, --accent-chip-bg, --accent-chip-selected, --accent-flash, --accent-focus-ring, --accent-glow-inner, --accent-glow-outer, --accent-hover-faint, --accent-hover-fill, --accent-hover-soft, --accent-muted, --accent-option-active, --accent-row-current, --accent-row-hover, --alert, --alert-card-bg, --alert-card-border, --alert-fill, --alert-muted, --alert-text, --bg-over-content, --bg-primary, --bg-secondary, --bg-tertiary, --border, --danger, --danger-border, --danger-btn, --danger-hover-fg, --danger-tint, --danger-tint-strong, --danger-toast-bg, --danger-toast-fg, --danger-wash, --dot-outline, --err, --err-btn-bg, --err-btn-bg-hover, --err-fill, --err-fill-strong, --err-glow-inner, --err-glow-outer, --err-muted, --err-stop-hover, --err-zone-bg, --err-zone-border, --fg-max, --info, --info-card-bg, --info-card-border, --info-fill, --info-muted, --kind-aggregator-active-bg, --kind-aggregator-bg, --kind-aggregator-fg, --kind-channel-active-bg, --kind-channel-bg, --kind-channel-fg, --kind-company-active-bg, --kind-company-bg, --kind-company-fg, --kind-hr-active-bg, --kind-hr-bg, --kind-keyword-active-bg, --kind-keyword-bg, --kind-keyword-fg, --ok, --ok-fill, --ok-text, --score-warn, --scrim, --selected-bg, --shadow-dropdown, --shadow-modal, --shadow-popup, --shadow-soft, --stats-group-funnel, --stats-group-ingest, --stats-group-outcome, --status-applied, --status-not-fit, --status-not-fit-timeline, --status-offer, --status-test, --surface-hover-firm, --surface-raised, --surface-raised-hover, --text-primary, --text-secondary, --text-tertiary, --tl-halo-answered, --tl-halo-applied, --tl-halo-decline, --tl-halo-default, --tl-halo-ghosting, --tl-halo-in-progress, --tl-halo-invitation, --tl-halo-new, --tl-halo-not-fit, --tl-halo-offer, --tl-halo-scam, --tl-halo-test, --warn, --warn-glow-inner, --warn-glow-outer, --warn-muted
+- объявляет: --accent, --accent-badge-hover, --accent-chip-bg, --accent-chip-selected, --accent-flash, --accent-focus-ring, --accent-glow-inner, --accent-glow-outer, --accent-hover-faint, --accent-hover-fill, --accent-hover-soft, --accent-muted, --accent-option-active, --accent-row-current, --accent-row-hover, --alert, --alert-card-bg, --alert-card-border, --alert-fill, --alert-muted, --alert-text, --bg-over-content, --bg-primary, --bg-secondary, --bg-tertiary, --border, --danger, --danger-border, --danger-btn, --danger-hover-fg, --danger-tint, --danger-tint-strong, --danger-toast-bg, --danger-toast-fg, --danger-wash, --dot-outline, --err, --err-btn-bg, --err-btn-bg-hover, --err-fill, --err-fill-strong, --err-glow-inner, --err-glow-outer, --err-muted, --err-stop-hover, --err-zone-bg, --err-zone-border, --fg-max, --info, --info-card-bg, --info-card-border, --info-fill, --info-muted, --kind-aggregator-active-bg, --kind-aggregator-bg, --kind-aggregator-fg, --kind-channel-active-bg, --kind-channel-bg, --kind-channel-fg, --kind-company-active-bg, --kind-company-bg, --kind-company-fg, --kind-hr-active-bg, --kind-hr-bg, --kind-keyword-active-bg, --kind-keyword-bg, --kind-keyword-fg, --ok, --ok-fill, --ok-text, --photo-clear-bg, --score-warn, --scrim, --selected-bg, --shadow-dropdown, --shadow-modal, --shadow-popup, --shadow-soft, --stats-group-funnel, --stats-group-ingest, --stats-group-outcome, --status-applied, --status-not-fit, --status-not-fit-timeline, --status-offer, --status-test, --surface-hover-firm, --surface-raised, --surface-raised-hover, --text-primary, --text-secondary, --text-tertiary, --tl-halo-answered, --tl-halo-applied, --tl-halo-decline, --tl-halo-default, --tl-halo-ghosting, --tl-halo-in-progress, --tl-halo-invitation, --tl-halo-new, --tl-halo-not-fit, --tl-halo-offer, --tl-halo-scam, --tl-halo-test, --warn, --warn-glow-inner, --warn-glow-outer, --warn-muted
 
-### styles/panel-frame.css (29)
-- Рамка панели: подложка, тонкая рамка и скругление — у всего, что стоит отдельной коробкой поверх фона: блоки карточек, секции настроек и карточки чисел, сворачиваемые коробки, таблица отсева, строка файла резюме, ряды выбора, всплывающие панели, модальные окна и плашка отказа. Одним правилом, а не своим в каждом файле: написанная порознь, рамка расходится скруглением с первой же правки, и соседние коробки одного окна выглядят сделанными разными руками. Своё у каждой — отступы, тень и обрезка — остаётся в её файле. Ввозится раньше них: где коробке нужна своя рамка (выпадающая панель, плашка беды), её правило стоит позже и перебивает.
+### styles/panel-frame.css (27)
+- Рамка панели: подложка, тонкая рамка и скругление — у всего, что стоит отдельной коробкой поверх фона: блоки карточек, секции настроек и карточки чисел, сворачиваемые коробки, таблица отсева, всплывающие панели, модальные окна и плашка отказа. Ряды выбора и строка файла резюме сюда не входят: они стоят в формах среди полей ввода и носят рамку поля (`input.css`). Одним правилом, а не своим в каждом файле: написанная порознь, рамка расходится скруглением с первой же правки, и соседние коробки одного окна выглядят сделанными разными руками. Своё у каждой — отступы, тень и обрезка — остаётся в её файле. Ввозится раньше них: где коробке нужна своя рамка (выпадающая панель, плашка беды), её правило стоит позже и перебивает.
 - селекторы (1): .card-section,
 .settings-section,
 .stats-card,
 .collapsible,
 .exp-card,
 .bl-table,
-.pdf-row,
-.choice-row[data-look='seg'],
-.choice-row[data-look='tile'],
 .pop,
 .pop-frame,
 .modal-dialog,
 .app-toast
 - берёт: --bg-secondary, --border
 
-### styles/pick-list.css (45)
-- Выбор многих из длинного перечня: кнопка со счётом и раскрывающаяся панель с поиском под ней. Кнопка — та же, что у выпадающего списка одного значения (dropdown.css): открывается она так же, и выглядеть иначе ей незачем.
-- селекторы (5): .pick, .pick-panel, .pick-list, .pick-list .checkbox-row, .pick-list .empty-note
-- берёт: --bg-tertiary, --shadow-dropdown
+### styles/photo-crop.css (40)
+- Окно обрезки фото: снимок, рамка поверх него и затемнение вокруг рамки. Затемнение — тенью самой рамки: так то, что уйдёт в анкету, видно светлым, а отрезаемое — тёмным, и второго слоя под это не нужно. Углы рамки скруглены так же, как у рамки фото в анкете (`photo-frame.css`).
+- селекторы (8): .crop-stage, .crop-stage img, .crop-box, .crop-corner, .crop-corner[data-corner='nw'], .crop-corner[data-corner='se'], .crop-corner[data-corner='ne'], .crop-corner[data-corner='sw']
+- берёт: --fg-max, --scrim
 
-### styles/picker.css (142)
+### styles/photo-frame.css (73)
+- Рамка фото анкеты: высотой со столбец строк справа и неизменной шириной. Снимок заполняет её целиком и размер рамки не трогает: он лежит поверх, а не внутри потока. Подложка, рамка и её подсветка — общие с полями (`input.css`). Крестик очистки виден только под курсором: снимок на виду чаще, чем его убирают, и постоянный значок закрывал бы угол лица. Подложка у него почти прозрачная — заметная и на светлом снимке, но не заплатой.
+- селекторы (9): .photo-frame, .photo-pick, .photo-pick .material-symbols-outlined, .photo-frame:hover .photo-pick, .photo-pick img, .photo-clear, .photo-clear .material-symbols-outlined, .photo-frame:hover .photo-clear, .photo-clear:hover
+- берёт: --fg-max, --photo-clear-bg, --text-secondary, --text-tertiary
+
+### styles/pick-list.css (33)
+- Выбор многих из длинного перечня: кнопка со счётом и раскрывающаяся панель с поиском под ней. Кнопка и оправа панели — те же, что у выпадающего списка одного значения (`DropButton`, `.drop-panel` в dropdown.css): открывается он так же, и выглядеть иначе ему незачем. Своё здесь — только начинка панели.
+- селекторы (5): .pick, .pick-panel, .pick-list, .pick-list .checkbox-row, .pick-list .empty-note
+
+### styles/picker.css (141)
 - Окно выбора: полоса поиска, список кандидатов и строка заведения под ним. Шапка, тело и подвал — общие, в modal.css; кружок с именами — в contact-block.css.
-- селекторы (22): .vac-picker-modal, .picker-search-bar, .picker-search-bar .search-input, .picker-list, .picker-empty,
+- селекторы (22): .modal-dialog.narrow.vac-picker-modal, .picker-search-bar, .picker-search-bar .search-input, .picker-list, .picker-empty,
 .skill-picker-empty, .picker-empty, .picker-row, .picker-row.selected, .picker-row:hover:not(.selected):not(.current), .picker-row.current, .picker-row.current .picker-name, .picker-row.blocked, .picker-info, .picker-name, .picker-current-mark, .picker-sub, .picker-meta, .vac-count, .picker-create, .picker-create-toggle, .picker-create-toggle:hover, .picker-create-toggle .material-symbols-outlined
 - берёт: --accent, --accent-hover-faint, --accent-row-current, --bg-tertiary, --border, --selected-bg, --surface-raised-hover, --text-primary, --text-secondary, --text-tertiary
 
@@ -1491,7 +1545,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 .settings-section.danger .settings-section-title .material-symbols-outlined, .danger-row, .danger-text, .danger-sub, .danger-row .btn
 - берёт: --danger, --err-zone-bg, --err-zone-border, --text-primary, --text-secondary, --text-tertiary
 
-### styles/settings.css (62)
+### styles/settings.css (61)
 - Экран настроек: колонка секций посреди поля. Что внутри секций — сетка полей, пороги, опасная зона — своими файлами.
 - селекторы (8): .settings-page, .settings-inner, .settings-page .input, .settings-page .btn, .settings-page .btn .material-symbols-outlined, .settings-page .btn.danger, .settings-page .btn.danger:hover:not(:disabled), .settings-row.spaced
 - берёт: --bg-tertiary, --border, --danger
@@ -1607,10 +1661,9 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 - селекторы (4): .top-tabs, .top-tabs .tab, .top-tabs .tab:hover, .top-tabs .tab.active
 - берёт: --accent, --bg-secondary, --border, --text-primary, --text-secondary
 
-### styles/tg-login.css (41)
-- Окно входа в Telegram — своё, а не общее окно-вопрос. Отличия не в украшении: коробка у́же и без тени, потому что спрашивает одно короткое поле, а поле в ней темнее подложки — на общем цвете оно совпадает с коробкой, и человеку не видно, куда набирать код.
-- селекторы (5): .tg-login, .modal-dialog.tg-login-box, .tg-login .modal-title, .tg-login .input, .tg-login .modal-actions
-- берёт: --bg-tertiary
+### styles/tg-login.css (6)
+- Окно входа в Telegram — общее окно (`narrow`), своё у него только место в стопке: над экраном настроек, но ниже общих окон и плашки отказа — та говорит о беде и обязана быть видна поверх всего.
+- селекторы (1): .tg-login
 
 ### styles/timeline.css (152)
 - Лента жизни вакансии: точка, текст и время в три колонки.
@@ -1672,7 +1725,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 - селекторы (19): .filter-wrap, .filter-btn.active, .filter-panel, .filter-head, .filter-head .material-symbols-outlined, .filter-title, .filter-meta, .filter-close, .filter-close:hover, .filter-close .material-symbols-outlined, .filter-panel .input, .filter-body .status-dot, .filter-body .choice:hover, .filter-pair, .filter-dates, .filter-dates .date-picker:last-child .date-panel, .filter-foot, .filter-foot .btn .material-symbols-outlined, .filter-foot-right
 - берёт: --accent, --bg-tertiary, --selected-bg, --surface-hover-firm, --text-primary, --text-secondary, --text-tertiary
 
-### styles/wizard.css (248)
+### styles/wizard.css (247)
 - Мастер первого запуска: полосы окна, обложка, финал и поджатия общих блоков под него. Полосы те же, что у самого приложения, и это нарочно: мастер — не отдельная программа, а первый разговор с этой. Что стоит внутри шага — карточки подсказок, инструкция, выбор файла, строка состояния — вынесено своими файлами: те же блоки встречаются и вне мастера.
 - селекторы (34): .wiz-window, .wiz-steps, .wiz-steps.dimmed, .wiz-step, .wiz-step::before, .wiz-step:first-child::before, .wiz-step[data-mark='active']::before,
 .wiz-step[data-mark='done']::before, .wiz-step-mark, .wiz-step[data-mark='done'] .wiz-step-mark, .wiz-step-label, .wiz-step[data-mark='active'] .wiz-step-label, .wiz-step[data-mark='done'] .wiz-step-label, .wiz-body, .wiz-body > *:last-child, .wiz-head, .wiz-head .material-symbols-outlined, .wiz-head h1, .wiz-text, .wiz-text strong, .wiz-foot, .wiz-foot-right, .wiz-done, .wiz-done .material-symbols-outlined, .wiz-done h2, .wiz-done .wiz-text, .wiz-subtitle, .wiz-subtitle strong, .wiz-welcome, .wiz-window .input,
@@ -1680,7 +1733,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 .wiz-body > .warning-card, .wiz-fields, .wiz-modes, .wiz-fields .help
 - берёт: --accent, --accent-chip-selected, --bg-secondary, --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
 
-## tests — 100 файлов
+## tests — 101 файлов
 
 ### tests/aggregators.test.js (118)
 - —
@@ -1781,7 +1834,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 - * Связка адрес–ключ–модель на локальном сервере; модель — своя у каждой проверки.
 - отдаёт: serverCreds
 
-### tests/dates.test.js (111)
+### tests/dates.test.js (130)
 - —
 
 ### tests/events.test.js (205)
@@ -1799,7 +1852,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/fresh.test.js (65)
 - —
 
-### tests/keys.test.js (97)
+### tests/keys.test.js (130)
 - —
 
 ### tests/live_props.svelte.js (21)
@@ -1855,6 +1908,9 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/person_chat_live.test.js (69)
 - * Переписка с записанными за ней просьбами к мосту.
 
+### tests/photo_crop.test.js (62)
+- —
+
 ### tests/picker.test.js (134)
 - —
 
@@ -1865,8 +1921,8 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/profile.test.js (163)
 - —
 
-### tests/profile_cv_live.test.js (52)
-- * Анкета, у которой мост отдаёт этот файл резюме.
+### tests/profile_cv_live.test.js (192)
+- * Анкета, у которой мост отдаёт этот файл резюме и это фото.
 
 ### tests/profile_experience_live.test.js (54)
 - * Завести место работы и заполнить три обязательных поля.

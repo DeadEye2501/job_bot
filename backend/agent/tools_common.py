@@ -20,7 +20,6 @@ from backend.agent.kit import AgentKit
 from backend.agent.page_fields import field_or_none
 from backend.domain.apply_order import VIA_AGGREGATOR
 from backend.domain.hosts import normalize_host
-from backend.repository.agent_profile import build_agent_profile
 from backend.repository.aggregators import set_logged_in
 
 
@@ -33,8 +32,7 @@ def common_tools(kit: AgentKit, job) -> list[Callable]:
     async def profile() -> str:
         """Анкета человека целиком, со стажем общим и по навыкам."""
         async with kit.pipeline.session_factory() as session:
-            text = await build_agent_profile(session, kit.today, kit.pipeline.photo_file() is not None)
-            return text or "Анкета не заполнена."
+            return await kit.profile_text(session) or "Анкета не заполнена."
 
     async def finish(result: str, reason: str = "") -> str:
         """Итог сессии. Искатель: done или failed. Откликатель: vacancy_closed, platform_closed или not_fit. Проверка входа: done."""

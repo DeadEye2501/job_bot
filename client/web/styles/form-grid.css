@@ -29,8 +29,29 @@
   font-size: 0.7rem;
 }
 
+/* Просвет вкладки анкеты один по обеим осям и объявлен переменной: шапка с
+   фото и строки полей внутри сетки берут его отсюда, а не своим числом. */
 .form-grid {
-  gap: 8px 14px;
+  --form-gap: 8px;
+  --control-height: 32px;
+  gap: var(--form-gap);
+}
+
+/* Всё, что стоит в анкете строкой, — одной высоты: поле, список, ряд выбора,
+   строка файла. Разной высоты соседи читаются недоделкой. */
+.form-grid .input,
+.form-grid .cdd-btn,
+.form-grid .choice-row[data-look='seg'],
+.form-grid .choice-row[data-look='tile'],
+.form-grid .pdf-row {
+  min-height: var(--control-height);
+}
+
+/* Строки анкеты во всю ширину по одной — файл резюме и ссылка на него: в
+   половине строки имя файла не помещалось. */
+.form-grid.cv-line {
+  margin-top: var(--form-gap);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .cnt-form-grid {

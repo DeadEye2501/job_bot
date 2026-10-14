@@ -11,6 +11,7 @@ from adapters.browser import BrowserHost
 from adapters.claude_code_agent import AgentEnd
 from backend.agent.human_gate import HumanGate
 from backend.flows.pipeline import IngestionPipeline
+from backend.repository.agent_profile import build_agent_profile
 
 
 @dataclass(frozen=True)
@@ -48,3 +49,8 @@ class AgentKit:
         async with self.pipeline.session_factory() as session:
             async with session.begin():
                 return await write(session)
+
+    async def profile_text(self, session: AsyncSession) -> str:
+        """Анкета для агента на сегодня; есть ли фото — по тому же `photo_file`,
+        что даёт файл инструменту прикладывания."""
+        return await build_agent_profile(session, self.today, self.pipeline.photo_file() is not None)

@@ -4,12 +4,9 @@
 сохраняются вовсе. Файл резюме лежит своим файлом — он не рассказ, а вложение.
 """
 
-PERSON = {
-    "first_name": "Иван",
-    "last_name": "Петров",
-    "title": "Питон-разработчик",
-    "email": "ivan@example.com",
-}
+from tests.factories import person_fields
+
+PERSON = person_fields()
 
 
 async def _saved_person(api, ask, **extra) -> None:
@@ -51,7 +48,7 @@ async def test_a_saved_person_comes_back_on_the_next_request(api, ask):
     assert profile == {
         "first_name": "Иван",
         "last_name": "Петров",
-        "title": "Питон-разработчик",
+        "title": "Python-разработчик",
         "email": "ivan@example.com",
         "phone": None,
         "location": "Москва",

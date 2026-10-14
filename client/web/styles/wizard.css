@@ -214,7 +214,6 @@
 /* Кнопки мастера крупнее прочих: их на экране две, и нажимают их подряд. */
 .wiz-window .btn {
   padding: 6px 14px;
-  border-radius: 5px;
   background: var(--bg-secondary);
   font-size: 0.82rem;
 }

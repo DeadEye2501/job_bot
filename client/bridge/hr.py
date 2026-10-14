@@ -18,7 +18,7 @@ from client.bridge.cards import (
 from client.bridge.hr_chat import HrChat
 from client.bridge.hub import Hub
 from client.bridge.mark import HR_MARK, marked, unmarked
-from client.bridge.media import _avatar_data_url
+from client.bridge.media import image_data_url
 from client.bridge.pickers import HR_PICKER
 from client.bridge.refusals import (
     HR_TELEGRAM_TAKEN,
@@ -123,7 +123,7 @@ class Hr(HrChat):
                 "last_company_name": detail.last_company_name,
                 "unread_count": detail.unread_count,
                 "blacklist_value": detail.blacklist_value,
-                "avatar": _avatar_data_url(detail.hr.avatar),
+                "avatar": image_data_url(detail.hr.avatar),
             }
 
         return reply(self._hub.runner, run())

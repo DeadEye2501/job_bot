@@ -18,32 +18,31 @@
   async function add() {
     onadd();
     await tick();
-    const fresh = list.lastElementChild;
-    if (fresh) fresh.querySelector('.lang-name').focus();
+    const names = list.querySelectorAll('.lang-name');
+    names[names.length - 1]?.focus();
   }
 </script>
 
-<div class="span-2">
-  <div class="lang-list" bind:this={list}>
-    {#each rows as row, index (index)}
-      <div class="lang-row">
-        <input
-          class="input lang-name"
-          maxlength="50"
-          placeholder="Язык"
-          value={row.language}
-          onblur={(event) => onedit(index, { language: event.currentTarget.value.trim() })}
-        />
-        <Dropdown
-          options={LANG_LEVELS}
-          value={row.level}
-          onpick={(level) => onedit(index, { level })}
-        />
-        <button class="remove-cross" type="button" title="удалить" onclick={() => onremove(index)}>
-          ×
-        </button>
-      </div>
-    {/each}
-  </div>
+<!-- Одной таблицей: строки языков и «Добавить» под ними в общей рамке. -->
+<div class="lang-table span-2" bind:this={list}>
+  {#each rows as row, index (index)}
+    <div class="lang-row">
+      <input
+        class="input lang-name"
+        maxlength="50"
+        placeholder="Язык"
+        value={row.language}
+        onblur={(event) => onedit(index, { language: event.currentTarget.value.trim() })}
+      />
+      <Dropdown
+        options={LANG_LEVELS}
+        value={row.level}
+        onpick={(level) => onedit(index, { level })}
+      />
+      <button class="remove-cross" type="button" title="Удалить язык" onclick={() => onremove(index)}>
+        ×
+      </button>
+    </div>
+  {/each}
   <button class="add-link lang-add" type="button" onclick={add}>+ Добавить язык</button>
 </div>

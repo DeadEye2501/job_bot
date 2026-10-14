@@ -19,7 +19,6 @@
    секции не помещаются на один взгляд. */
 .settings-page .input {
   background: var(--bg-tertiary);
-  border-radius: 3px;
   padding: 5px 9px;
   font-size: 0.83rem;
 }

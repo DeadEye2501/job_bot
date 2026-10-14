@@ -8,7 +8,7 @@ from typing import Any
 
 from backend.domain.skill_names import skill_key
 from backend.models import Blacklist
-from client.bridge.media import _avatar_data_url, _media_url
+from client.bridge.media import image_data_url, _media_url
 
 
 def _iso(dt: datetime | None) -> str | None:
@@ -204,7 +204,7 @@ def _hr_face(hr) -> dict:
         "id": hr.id,
         "name": hr.name,
         "telegram_username": hr.telegram_username,
-        "avatar": _avatar_data_url(hr.avatar),
+        "avatar": image_data_url(hr.avatar),
     }
 
 
@@ -330,7 +330,7 @@ def _hr_picker_row_to_dict(item) -> dict:
         "last_company_name": item.last_company_name,
         "unread_count": item.unread_count,
         "is_blacklisted": item.is_blacklisted,
-        "avatar": _avatar_data_url(hr.avatar),
+        "avatar": image_data_url(hr.avatar),
     }
 
 
@@ -408,7 +408,7 @@ def _channel_fields(ch) -> dict:
         "username": ch.username,
         "title": ch.title,
         "is_active": bool(ch.is_active),
-        "avatar": _avatar_data_url(ch.avatar),
+        "avatar": image_data_url(ch.avatar),
     }
 
 
@@ -473,7 +473,7 @@ def _aggregator_row_to_dict(row) -> dict:
         "is_active": bool(row.is_active),
         "is_logged_in": bool(row.is_logged_in),
         "is_web_search": row.host is None,
-        "avatar": _avatar_data_url(row.avatar),
+        "avatar": image_data_url(row.avatar),
     }
 
 

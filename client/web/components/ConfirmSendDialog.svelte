@@ -8,6 +8,7 @@
   // нижней полосы, а правки остаются.
   import { isChecked } from '$state/round.svelte.js';
 
+  import ModalFoot from './ModalFoot.svelte';
   import ModalHead from './ModalHead.svelte';
   import ModalShell from './ModalShell.svelte';
 
@@ -62,16 +63,17 @@
       {/each}
     </div>
 
-    <div class="modal-footer">
+    {#snippet fold()}
       <button class="btn" type="button" onclick={() => onfold()}>Свернуть</button>
-      <button class="btn" type="button" onclick={() => ondrop()}>Закончить</button>
-      <button
-        class="btn primary"
-        type="button"
-        disabled={Boolean(blocked)}
-        title={blocked || null}
-        onclick={() => onconfirm()}>Подтвердить</button
-      >
-    </div>
+    {/snippet}
+    <ModalFoot
+      leading={fold}
+      cancelLabel="Закончить"
+      label="Подтвердить"
+      ready={!blocked}
+      tip={blocked}
+      oncancel={ondrop}
+      {onconfirm}
+    />
   {/snippet}
 </ModalShell>

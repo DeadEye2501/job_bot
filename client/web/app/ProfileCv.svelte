@@ -9,19 +9,18 @@
   import { call } from '$api/bridge.js';
   import CvFileRow from '$components/CvFileRow.svelte';
   import DelayedTextarea from '$components/DelayedTextarea.svelte';
-  import Dropdown from '$components/Dropdown.svelte';
   import LangRows from '$components/LangRows.svelte';
   import ChoiceRow from '$components/ChoiceRow.svelte';
+  import PhotoCropDialog from '$components/PhotoCropDialog.svelte';
+  import PhotoFrame from '$components/PhotoFrame.svelte';
+  import ProfilePerson from '$components/ProfilePerson.svelte';
   import { living } from '$state/alive.js';
   import { autosave } from '$state/autosave.js';
   import { saveKey } from '$state/keys.js';
   import { oneWrite } from '$state/one_write.js';
   import { alone, toggled } from '$state/chosen.js';
   import {
-    CURRENCIES,
-    GENDERS,
     GRADES,
-    SALARY_PERIODS,
     WORK_FORMATS,
     blankProfile,
     cvOpenable,
@@ -39,27 +38,20 @@
   // Пределы длины держит только окно: ни мост, ни база длину полей анкеты не
   // меряют. `must` — поле, без которого мост анкету не примет вовсе. Звёздочка в
   // подсказке говорит о том же, но только пока поле пустое и подсказка видна.
-  const NAME_FIELDS = [
-    { key: 'first_name', placeholder: 'Имя *', max: 64, must: true },
-    { key: 'last_name', placeholder: 'Фамилия *', max: 64, must: true },
-  ];
-  const LATIN_FIELDS = [
-    { key: 'first_name_latin', placeholder: 'Имя латиницей', max: 64 },
-    { key: 'last_name_latin', placeholder: 'Фамилия латиницей', max: 64 },
-  ];
-  const FIELDS = [
-    { key: 'title', placeholder: 'Должность *', max: 120, wide: true, must: true },
+  const CONTACT_FIELDS = [
     { key: 'email', placeholder: 'Email *', max: 254, must: true },
     { key: 'phone', placeholder: 'Телефон', max: 32 },
     { key: 'telegram_username', placeholder: 'Telegram (@username)', max: 64 },
     { key: 'github_url', placeholder: 'GitHub (URL)', max: 255 },
-    { key: 'location', placeholder: 'Локация', max: 120, wide: true },
   ];
 
   let loaded = $state(false);
   let trouble = $state('');
   let form = $state(null);
   let meta = $state(null);
+  let photoUrl = $state(null);
+  // Выбранный снимок, который сейчас обрезают; пусто — окно обрезки закрыто.
+  let cropping = $state(null);
   let grades = $state(new Set());
   let formats = $state(new Set());
   let fields = $state(null);
@@ -74,6 +66,7 @@
     const now = await ask('profile.get');
     if (now === null || !alive.now) return;
     meta = now.cv_meta;
+    photoUrl = now.photo_url;
     const fresh = now.profile || blankProfile();
     // Пока курсор стоит в форме, с моста берётся одна отметка о правке:
     // остальное человек сейчас и набирает, а анкету перечитывают в том числе
@@ -163,9 +156,10 @@
     return save();
   }
 
-  /** Валюту из списка выбирают, а не переключают: выбранная повторно остаётся. */
-  function pickCurrency(sign) {
-    form = { ...form, expected_salary_currency: sign };
+  /** Значение, которое выбирают, а не переключают, — валюта и дата рождения:
+   *  выбранное повторно остаётся. */
+  function setField(key, value) {
+    form = { ...form, [key]: value };
     return save();
   }
 
@@ -180,14 +174,38 @@
    * Путь спрашивает мост диалогом самого окна: браузер отдаёт выбранный файл
    * содержимым, а не путём, — а отклику нужен именно путь.
    */
-  async function replaceCv() {
-    const answer = await ask('profile.pick');
+  function replaceCv() {
+    return afterPick(ask('profile.pick'), refresh);
+  }
+
+  /** Дождаться выбора файла и сделать следующее; закрытый диалог не меняет ничего. */
+  async function afterPick(picking, next) {
+    const answer = await picking;
     if (answer === null || !alive.now || answer.cancelled) return;
-    await refresh();
+    await next(answer);
   }
 
   async function openCv() {
     await ask('profile.open');
+  }
+
+  /** Выбрать фото: файл спрашивает мост диалогом окна, а нужную часть снимка
+   *  вырезают в окне обрезки под пропорцию рамки. */
+  function pickPhoto(ratio) {
+    return afterPick(ask('profile.pick_photo'), (answer) => {
+      cropping = { image: answer.image, ratio };
+    });
+  }
+
+  async function savePhoto(image) {
+    cropping = null;
+    await ask('profile.store_photo', image);
+    if (alive.now) await refresh();
+  }
+
+  async function clearPhoto() {
+    await ask('profile.clear_photo');
+    if (alive.now) await refresh();
   }
 
   $effect(() => {
@@ -218,46 +236,14 @@
     />
   {/snippet}
 
-  <div class="form-grid" bind:this={fields}>
-    <div class="name-grid span-2">
-      <div class="input-pair">
-        {#each NAME_FIELDS as one (one.key)}{@render field(one)}{/each}
-      </div>
-      <div class="input-pair">
-        {#each LATIN_FIELDS as one (one.key)}{@render field(one)}{/each}
-      </div>
-      <ChoiceRow
-        options={GENDERS}
-        chosen={new Set([form.gender])}
-        look="tile"
-        onpick={(value) => pickOne('gender', value)}
-      />
+  <div bind:this={fields}>
+  <div class="form-grid">
+    <div class="profile-head span-2">
+      <PhotoFrame url={photoUrl} onpick={pickPhoto} onclear={clearPhoto} />
+      <ProfilePerson {form} {field} onset={setField} onpickone={pickOne} />
     </div>
 
-    {#each FIELDS as one (one.key)}{@render field(one)}{/each}
-
-    <div class="field-line span-2">
-      {@render field({
-        key: 'expected_salary',
-        placeholder: 'Ожидаемая зарплата на руки',
-        max: 12,
-        mode: 'numeric',
-      })}
-      <div class="field-narrow">
-        <Dropdown
-          options={CURRENCIES}
-          value={form.expected_salary_currency}
-          placeholder="—"
-          onpick={pickCurrency}
-        />
-      </div>
-      <ChoiceRow
-        options={SALARY_PERIODS}
-        chosen={new Set([form.expected_salary_period])}
-        look="seg"
-        onpick={(value) => pickOne('expected_salary_period', value)}
-      />
-    </div>
+    {#each CONTACT_FIELDS as one (one.key)}{@render field(one)}{/each}
 
     <DelayedTextarea
       maxlength="1000"
@@ -273,8 +259,17 @@
     <LangRows rows={form.languages} onedit={editLang} onadd={addLang} onremove={dropLang} />
 
     <DelayedTextarea
+      maxlength="4000"
+      placeholder="О себе"
+      lines={10}
+      value={form.about_me}
+      ontyped={(text) => typed('about_me', text)}
+      onflush={() => saver.flush()}
+    />
+
+    <DelayedTextarea
       maxlength="2000"
-      placeholder="Личные предпочтения — что важно при выборе работы, что точно не подойдёт"
+      placeholder="Дополнительные инструкции и ограничения для поиска"
       lines={10}
       value={form.free_preferences}
       ontyped={(text) => typed('free_preferences', text)}
@@ -282,16 +277,29 @@
     />
   </div>
 
-  <CvFileRow {meta}>
-    {#snippet actions()}
-      <button class="btn" type="button" onclick={replaceCv}>Заменить</button>
-      <button class="btn" type="button" disabled={!cvOpenable(meta)} onclick={openCv}>
-        Открыть
-      </button>
-    {/snippet}
-  </CvFileRow>
+  <div class="form-grid cv-line">
+    <CvFileRow {meta}>
+      {#snippet actions()}
+        <button class="btn" type="button" onclick={replaceCv}>Заменить</button>
+        <button class="btn" type="button" disabled={!cvOpenable(meta)} onclick={openCv}>
+          Открыть
+        </button>
+      {/snippet}
+    </CvFileRow>
+    {@render field({ key: 'resume_url', placeholder: 'Ссылка на резюме', max: 255 })}
+  </div>
+  </div>
 
   {#if trouble}
     <div class="autosave-error">{trouble}</div>
+  {/if}
+
+  {#if cropping}
+    <PhotoCropDialog
+      image={cropping.image}
+      ratio={cropping.ratio}
+      onsave={savePhoto}
+      onclose={() => (cropping = null)}
+    />
   {/if}
 {/if}

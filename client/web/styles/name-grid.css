@@ -1,9 +1,20 @@
-/* Имя анкеты одной строкой: имя с фамилией, они же латиницей и пол. Пары
-   делят ширину поровну, плитки пола берут сколько им нужно. Просвет — тот же,
-   что у сетки формы под ней (`form-grid.css`). */
+/* Шапка анкеты: фото слева, справа столбец строк о человеке. Просвет и по
+   горизонтали, и по вертикали — тот же, что у сетки формы под ней
+   (`form-grid.css`): разный читается неряшливо. */
+
+.profile-head {
+  display: flex;
+  gap: var(--form-gap);
+}
 
 .name-grid {
+  flex: 1;
+  min-width: 0;
   display: grid;
-  grid-template-columns: 1fr 1fr auto;
-  gap: 8px 14px;
+  grid-template-columns: 1fr;
+  gap: var(--form-gap);
+}
+
+.name-grid .field-line {
+  gap: var(--form-gap);
 }

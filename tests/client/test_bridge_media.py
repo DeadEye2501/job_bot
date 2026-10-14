@@ -2,7 +2,7 @@
 
 import pytest
 
-from client.bridge.media import _avatar_data_url
+from client.bridge.media import image_data_url
 
 
 @pytest.mark.parametrize(
@@ -18,4 +18,4 @@ from client.bridge.media import _avatar_data_url
 def test_the_data_url_names_the_type_of_its_bytes(head, kind):
     """Значок сайта бывает png, ico, webp, а снимок Telegram — jpeg; назови адрес
     чужой тип, и строгий к нему разбор показал бы пустоту вместо значка."""
-    assert _avatar_data_url(head + b"\x00" * 16).startswith(f"data:{kind};base64,")
+    assert image_data_url(head + b"\x00" * 16).startswith(f"data:{kind};base64,")

@@ -4,6 +4,8 @@
 // канала, — и правило у них одно на всех. Про предмет списка этот файл не
 // знает ничего: строки приходят и уходят как есть.
 
+import { clamp } from './bounds.js';
+
 /** Сколько строк в странице. Столько же по умолчанию отдаёт мост. */
 export const PAGE = 50;
 
@@ -74,5 +76,5 @@ export function appended(shown, page) {
  * двадцати строк вырос бы вдвое с половиной от одной смены статуса.
  */
 export function refreshLimit(shownCount, page = PAGE) {
-  return Math.min(RELOAD_MAX, Math.max(page, shownCount));
+  return clamp(shownCount, page, RELOAD_MAX);
 }

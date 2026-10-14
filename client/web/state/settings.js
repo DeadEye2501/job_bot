@@ -3,6 +3,7 @@
 // Чистые функции: ввод и ответы моста приходят доводами, наружу уходят числа,
 // строки и признаки. Ни моста, ни разметки этот файл не знает.
 
+import { clamp } from './bounds.js';
 import { fillPercent } from './chosen.js';
 import { atHandle } from './telegram.js';
 
@@ -94,7 +95,7 @@ export const BOUNDS = {
 export function clampField(raw, { min, max, fallback }) {
   const parsed = Number.parseInt(raw, 10);
   if (!Number.isFinite(parsed)) return fallback;
-  return Math.max(min, Math.min(max, parsed));
+  return clamp(parsed, min, max);
 }
 
 /** Какую долю дорожки залить под этот порог. */

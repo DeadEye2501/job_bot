@@ -12,14 +12,14 @@
   gap: 8px;
   padding: 7px 10px;
   background: var(--bg-tertiary);
-  border-radius: 5px 5px 0 0;
+  border-radius: 6px 6px 0 0;
   user-select: none;
   cursor: pointer;
 }
 
 /* У свёрнутой карточки шапка — вся карточка, и низ у неё тоже скруглён. */
 .exp-card.collapsed .exp-header {
-  border-radius: 5px;
+  border-radius: 6px;
 }
 
 .exp-summary {
@@ -75,7 +75,6 @@
 .field-row .input {
   font-size: 0.83rem;
   padding: 5px 8px;
-  border-radius: 3px;
 }
 
 .date-pair {

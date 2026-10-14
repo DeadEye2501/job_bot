@@ -5,6 +5,7 @@
   // выглядит светлой заплатой, а его список нельзя ни оформить, ни сузить.
   import { whileOpen } from '$state/outside.js';
 
+  import DropButton from './DropButton.svelte';
   import DropPanel from './DropPanel.svelte';
 
   let { options, value, placeholder = '', onpick } = $props();
@@ -22,10 +23,7 @@
 </script>
 
 <div class="cdd" class:open bind:this={root}>
-  <button class="cdd-btn" type="button" onclick={() => (open = !open)}>
-    <span class="cdd-label" class:empty={!value}>{value || placeholder}</span>
-    <span class="material-symbols-outlined">expand_more</span>
-  </button>
+  <DropButton label={value || placeholder} empty={!value} {open} ontoggle={() => (open = !open)} />
   {#if open}
     <DropPanel
       {options}

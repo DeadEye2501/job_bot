@@ -1,21 +1,30 @@
-/* Языки анкеты: строка на язык и кнопка добавления под списком. */
+/* Языки анкеты одной таблицей: строка на язык — название, уровень, крестик, —
+   и «Добавить язык» последней строкой во всю ширину. Общая рамка — та же, что
+   у полей одной рамкой (`input-pair.css`); здесь раскладка ячеек.
 
-.lang-list {
+   Обрезки по рамке нет нарочно: из ячейки уровня выпадает список, и рамка
+   его срезала бы. Подложка у ячеек прозрачная, поэтому угол таблицы им не
+   нужен. */
+
+.lang-table {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  background: var(--bg-secondary);
 }
 
 .lang-row {
   display: grid;
-  grid-template-columns: 1fr 96px 20px;
-  gap: 4px;
-  align-items: center;
+  grid-template-columns: 1fr 96px var(--control-height);
+  border-bottom: 1px solid var(--border);
 }
 
-.lang-row .input {
-  padding: 4px 8px;
-  font-size: 0.82rem;
+.lang-row > * + * {
+  border-left: 1px solid var(--border);
+}
+
+.lang-table .input,
+.lang-table .cdd-btn {
+  background: transparent;
 }
 
 /* «native» показывается с прописной, рядом с C2 и B1 — оно тут такая же
@@ -26,8 +35,7 @@
   text-transform: capitalize;
 }
 
-/* Вид кнопки — общий, в add-link.css; своё здесь — место под списком. */
+/* Вид кнопки — общий, в add-link.css; своё здесь — высота строки таблицы. */
 .lang-add {
-  margin-top: 3px;
-  align-self: flex-start;
+  min-height: var(--control-height);
 }

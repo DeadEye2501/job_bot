@@ -1,10 +1,12 @@
 <script>
   // Вход в Telegram: код из приложения, а следом облачный пароль, если он есть.
   //
-  // Рама общая, а вид свой: у окна свой заголовок, объяснение на три строки и
-  // поле ввода — оформление лежит в styles/tg-login.css. Нажатием по затемнению
-  // оно не закрывается: код набирают в чужом приложении, и промах мимо коробки
-  // стоил бы нового кода.
+  // Рама, шапка, тело и подвал — общие окна (`narrow`); своё у окна только
+  // место в стопке (styles/tg-login.css). Нажатием по затемнению оно не
+  // закрывается: код набирают в чужом приложении, и промах мимо коробки стоил
+  // бы нового кода.
+  import ModalFoot from './ModalFoot.svelte';
+  import ModalHead from './ModalHead.svelte';
   import ModalShell from './ModalShell.svelte';
   import SecretInput from './SecretInput.svelte';
 
@@ -20,43 +22,43 @@
 </script>
 
 <!-- Escape закрывает, Enter — нет: шаг уходит только кнопкой. -->
-<ModalShell extra="tg-login-box" over="tg-login" awayCloses={false} onclose={oncancel}>
+<ModalShell extra="narrow" over="tg-login" awayCloses={false} onclose={oncancel}>
   {#snippet children()}
-    <div class="modal-title">
-      <span class="material-symbols-outlined">login</span>
-      {relogin ? 'Перелогиниться' : 'Войти в Telegram'}
+    <ModalHead icon="login" title={relogin ? 'Перелогиниться' : 'Войти в Telegram'} />
+
+    <div class="modal-body">
+      {#if asking.secret}
+        <div class="modal-subtitle">
+          На аккаунте включена двухфакторная защита. Введите облачный пароль Telegram.
+        </div>
+      {:else}
+        <div class="modal-subtitle">
+          Код отправлен в Telegram-приложение на <strong>{phone}</strong>. Откройте Telegram и
+          введите его сюда.
+        </div>
+      {/if}
+
+      <!-- Фокус сразу в поле: окно открылось затем, чтобы в него набрали. Пароль
+           — полем секрета с глазом; набранное уходит при уходе из поля, а уходят
+           из него раньше, чем засчитывается нажатие «Войти». -->
+      {#if asking.secret}
+        <SecretInput {value} placeholder={asking.placeholder} autofocus onsave={(typed) => (value = typed)} />
+      {:else}
+        <!-- svelte-ignore a11y_autofocus -->
+        <input class="input" placeholder={asking.placeholder} autofocus bind:value />
+      {/if}
+
+      {#if error}
+        <div class="modal-error">{error}</div>
+      {/if}
     </div>
 
-    {#if asking.secret}
-      <div class="modal-subtitle">
-        На аккаунте включена двухфакторная защита. Введите облачный пароль Telegram.
-      </div>
-    {:else}
-      <div class="modal-subtitle">
-        Код отправлен в Telegram-приложение на <strong>{phone}</strong>. Откройте Telegram и
-        введите его сюда.
-      </div>
-    {/if}
-
-    <!-- Фокус сразу в поле: окно открылось затем, чтобы в него набрали. Пароль
-         — полем секрета с глазом; набранное уходит при уходе из поля, а уходят
-         из него раньше, чем засчитывается нажатие «Войти». -->
-    {#if asking.secret}
-      <SecretInput {value} placeholder={asking.placeholder} autofocus onsave={(typed) => (value = typed)} />
-    {:else}
-      <!-- svelte-ignore a11y_autofocus -->
-      <input class="input" placeholder={asking.placeholder} autofocus bind:value />
-    {/if}
-
-    {#if error}
-      <div class="modal-error">{error}</div>
-    {/if}
-
-    <div class="modal-actions">
-      <button class="btn" type="button" onclick={() => oncancel()}>Отмена</button>
-      <button class="btn primary" type="button" disabled={busy} onclick={() => onsubmit(value)}>
-        {busy ? 'Проверка…' : asking.confirm}
-      </button>
-    </div>
+    <ModalFoot
+      label={asking.confirm}
+      busyLabel="Проверка…"
+      {busy}
+      {oncancel}
+      onconfirm={() => onsubmit(value)}
+    />
   {/snippet}
 </ModalShell>
