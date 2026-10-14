@@ -8,6 +8,7 @@ from backend.agent.human_gate import HumanGate
 from backend.agent.jobs import ApplyJob
 from backend.agent.kit import AgentEnd, AgentKit, SessionPlan
 from backend.domain.apply_order import Way
+from backend.payloads import SeenResume
 from tests.fakes.browser import FakeBrowser
 
 TODAY = date(2026, 10, 9)
@@ -84,6 +85,15 @@ def login_step(logged_in: bool):
     """Шаг сценария: агент говорит, вошёл ли человек, и кончает сессию."""
     async def step(tools):
         await tools["report_login"](logged_in=logged_in)
+        await tools["finish"](result="done")
+    return step
+
+
+def resumes_step(resumes: list[tuple[str, str]], can_add: bool = False):
+    """Шаг сценария: агент перечисляет резюме сайта (название, ссылка) и кончает сессию."""
+    async def step(tools):
+        await tools["report_resumes"](resumes=[SeenResume(title, url) for title, url in resumes],
+                                      can_add=can_add)
         await tools["finish"](result="done")
     return step
 

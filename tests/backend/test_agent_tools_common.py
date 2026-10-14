@@ -1,6 +1,6 @@
 """Общие инструменты агента: анкета, вход, итог, неудача."""
 
-from backend.agent.jobs import Applied, Failed, Finished, LoginJob, Source
+from backend.agent.jobs import Applied, Failed, Finished, LoginJob, ScanJob, Source
 from backend.agent.tools_common import common_tools
 from backend.models import Aggregator
 from backend.repository.agent_profile import build_agent_profile
@@ -116,3 +116,21 @@ async def test_the_applier_asks_for_a_human_on_the_site_of_its_method(make_pipel
     assert await need_human(kind="captcha") == "готово"
     assert await need_human(kind="password") != "готово"
     assert gate.asked == [("captcha", "company.test")]
+
+
+async def test_the_scan_calls_a_human_on_its_site_and_marks_its_login(
+    make_pipeline, session_factory
+):
+    """Сканирование по кнопке может упереться во вход заново и в капчу."""
+    site = aggregator_row(is_logged_in=True)
+    await put(session_factory, site)
+    gate = _Gate()
+    job = ScanJob(Source.of(site))
+    tools = common_tools(kit_for(await make_pipeline(), gate=gate), job)
+
+    assert await tool(tools, "need_human")(kind="login") == "готово"
+    await tool(tools, "report_login")(logged_in=False)
+    await tool(tools, "finish")(result="done")
+
+    assert gate.asked == [("login", "hh.ru")] and job.outcome == Finished("done", "")
+    assert (await all_rows(session_factory, Aggregator))[0].is_logged_in is False

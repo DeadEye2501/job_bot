@@ -389,6 +389,9 @@ class Bot:
     async def login_aggregator(self, aggregator_id) -> aggregators.AgentOutcome:
         return await aggregators.login_aggregator(self, aggregator_id)
 
+    async def scan_aggregator(self, aggregator_id) -> aggregators.AgentOutcome:
+        return await aggregators.scan_aggregator(self, aggregator_id)
+
     async def apply_chosen_way(self, vacancy_id: int, way: Way) -> apply.ApplyOutcome:
         return await apply.apply_chosen_way(self, vacancy_id, way)
 

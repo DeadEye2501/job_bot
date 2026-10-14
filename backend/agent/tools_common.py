@@ -14,6 +14,7 @@ from backend.agent.jobs import (
     Failed,
     Finished,
     LoginJob,
+    ScanJob,
     SeekJob,
 )
 from backend.agent.kit import AgentKit
@@ -35,7 +36,7 @@ def common_tools(kit: AgentKit, job) -> list[Callable]:
             return await kit.profile_text(session) or "Анкета не заполнена."
 
     async def finish(result: str, reason: str = "") -> str:
-        """Итог сессии. Искатель: done или failed. Откликатель: vacancy_closed, platform_closed или not_fit. Проверка входа: done."""
+        """Итог сессии. Искатель: done или failed. Откликатель: vacancy_closed, platform_closed или not_fit. Проверка входа и перечень резюме: done."""
         if result not in RESULTS[type(job)]:
             return f"Итога «{result}» у этой задачи не бывает: {', '.join(sorted(RESULTS[type(job)]))}."
         if isinstance(job.outcome, FINAL):
@@ -53,7 +54,7 @@ def common_tools(kit: AgentKit, job) -> list[Callable]:
 
 
 def _login_target(job) -> int | None:
-    if isinstance(job, (LoginJob, SeekJob)):
+    if isinstance(job, (LoginJob, ScanJob, SeekJob)):
         return job.source.id if job.source.host is not None else None
     return job.way.aggregator_id if job.way.method == VIA_AGGREGATOR else None
 

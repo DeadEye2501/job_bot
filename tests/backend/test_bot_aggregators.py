@@ -7,15 +7,17 @@ import pytest
 from backend.bot import aggregators, loop, slot, work
 from backend.bot.turn import launch_turn
 from backend.models import Aggregator, BotMode
+from backend.repository.aggregator_resumes import resumes_of
 from tests.backend.fixtures.bot import slot_freed, switch_to
 from tests.dbio import all_rows, put
 from tests.factories import blacklist_row
-from tests.factories_aggregators import aggregator_row, web_search_row
+from tests.factories_aggregators import aggregator_resume_row, aggregator_row, web_search_row
 from tests.fakes.agent import (
     captcha_step,
     finish_step,
     kit_for,
     login_step,
+    resumes_step,
     scripted,
     silent_gate,
 )
@@ -269,23 +271,85 @@ async def test_a_login_opens_the_profile_for_a_human(make_bot, sites, agent):
     """Входит человек руками, и браузер для входа открыт без пометки «управляется
     программой»: с ней вход Google отказывает."""
     bot = await make_bot()
-    kit = agent(bot, [login_step(True)])
+    seen = []
+
+    async def check(tools):
+        seen.append(kit.browser.as_person)
+        await login_step(True)(tools)
+
+    kit = agent(bot, [check, resumes_step([])])
 
     await aggregators.login_aggregator(bot, sites.id)
 
-    assert kit.browser.as_person is True
+    assert seen == [True]
 
 
 async def test_the_login_check_is_not_told_to_call_a_person(make_bot, sites, agent):
     """Проверка входа идёт, когда человек уже закрыл окно, и звать его ей нечем:
     правила про зов человека в её наставлении нет."""
     bot = await make_bot()
-    kit = agent(bot, [login_step(True)])
+    kit = agent(bot, [login_step(True), resumes_step([])])
 
     await aggregators.login_aggregator(bot, sites.id)
 
-    (plan,) = kit.run_session.plans
-    assert "need_human" not in plan.system_prompt
+    assert "need_human" not in kit.run_session.plans[0].system_prompt
+
+
+async def test_a_confirmed_login_is_followed_by_the_resume_scan(
+    make_bot, sites, agent, session_factory
+):
+    bot = await make_bot()
+    agent(bot, [login_step(True), resumes_step([("Повар", "https://site.test/r/1")])])
+
+    assert await aggregators.login_aggregator(bot, sites.id) == "ok"
+
+    async with session_factory() as session:
+        assert [r.title for r in await resumes_of(session, sites.id)] == ["Повар"]
+
+
+async def test_a_login_stays_done_when_the_scan_brings_no_list(
+    make_bot, sites, agent, session_factory
+):
+    bot = await make_bot()
+    await put(session_factory, aggregator_resume_row(sites.id, title="Было"))
+    agent(bot, [login_step(True), finish_step()])
+
+    assert await aggregators.login_aggregator(bot, sites.id) == "ok"
+
+    async with session_factory() as session:
+        assert [r.title for r in await resumes_of(session, sites.id)] == ["Было"]
+
+
+async def test_an_unconfirmed_login_is_not_scanned(make_bot, sites, agent):
+    bot = await make_bot()
+    kit = agent(bot, [login_step(False)])
+
+    await aggregators.login_aggregator(bot, sites.id)
+
+    assert len(kit.run_session.plans) == 1
+
+
+async def test_a_scan_by_hand_reaches_the_base(make_bot, sites, agent, session_factory):
+    bot = await make_bot()
+    agent(bot, [resumes_step([("Повар", "https://site.test/r/1")])])
+
+    assert await aggregators.scan_aggregator(bot, sites.id) == "ok"
+
+    async with session_factory() as session:
+        assert [r.title for r in await resumes_of(session, sites.id)] == ["Повар"]
+
+
+async def test_a_scan_while_the_slot_is_taken_is_refused(make_bot, sites, agent):
+    bot = await make_bot()
+    agent(bot, [_hold(asyncio.Event())])
+    running = asyncio.create_task(aggregators.run_aggregator_now(bot, sites.id))
+    await wait_until(lambda: bot.current_poll_task)
+    await asyncio.sleep(0)
+
+    assert await aggregators.scan_aggregator(bot, sites.id) == "busy"
+
+    bot.cancel_current_poll()
+    await running
 
 
 async def test_a_login_window_left_open_is_not_called_a_captcha(make_bot, sites, agent):

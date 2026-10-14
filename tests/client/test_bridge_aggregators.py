@@ -116,6 +116,30 @@ async def test_a_login_on_a_busy_slot_is_explained(api, ask, with_bot, told, ses
     assert await told() == {"message": "Уже идёт другой цикл, попробуйте позже.", "danger": True}
 
 
+async def test_a_scan_answers_before_it_runs_and_tells_the_resumes_are_updated(
+    api, ask, with_bot, told, session_factory
+):
+    bot = with_bot()
+    site = aggregator_row()
+    await put(session_factory, site)
+
+    answer = await ask(api.aggregators.scan, site.id)
+
+    assert answer["ok"]["started"] is True
+    assert await told() == {"message": "Резюме обновлены.", "danger": False}
+    assert ("scan_aggregator", site.id) in bot.calls
+
+
+async def test_a_scan_on_a_busy_slot_is_explained(api, ask, with_bot, told, session_factory):
+    with_bot(aggregator_scan="busy")
+    site = aggregator_row()
+    await put(session_factory, site)
+
+    await ask(api.aggregators.scan, site.id)
+
+    assert await told() == {"message": "Уже идёт другой цикл, попробуйте позже.", "danger": True}
+
+
 async def test_without_a_bot_nothing_is_launched(api, ask, session_factory):
     site = aggregator_row()
     await put(session_factory, site)

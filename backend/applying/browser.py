@@ -5,8 +5,7 @@ from backend.agent.jobs import Applied, ApplyJob, Failed, Finished
 from backend.agent.kit import AgentKit, SessionPlan
 from backend.agent.prompts.applier import APPLIER_PROMPT, applier_task
 from backend.agent.prompts.frame import system_prompt
-from backend.agent.sessions import run_guarded
-from backend.agent.stops import LimitExhausted
+from backend.agent.sessions import run_to_limit
 from backend.agent.tools_applier import applier_tools
 from backend.agent.tools_browser import browser_tools
 from backend.agent.tools_common import common_tools
@@ -32,9 +31,7 @@ async def via_browser(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome:
     if plan is None:
         return GONE
     await kit.browser.open_profile(job.profile_id, sending=not job.simulated)
-    end = await run_guarded(kit, plan)
-    if end.limit_exhausted:
-        raise LimitExhausted
+    await run_to_limit(kit, plan)
     outcome = _settle(job, way)
     if isinstance(outcome, Unfit):
         await _mark_unfit(kit, vacancy_id, outcome.reason)
