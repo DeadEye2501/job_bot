@@ -31,6 +31,17 @@ export function loginMark(loggedIn, block) {
   };
 }
 
+/** Почему нового резюме на сайте не завести; пусто — можно.
+ *
+ * Запор действий агента старше всего, затем вход: без него сайт не пустит
+ * никуда. Последним — то, что увидел перечень резюме: сайт не даёт ещё одно.
+ */
+export function newResumeTip(card, block) {
+  if (block) return block;
+  if (!card.is_logged_in) return LOGIN_FIRST;
+  return card.can_add_resume ? '' : 'Сайт не даёт завести ещё одно резюме';
+}
+
 /** Слова вкладки «Агрегаторы». */
 export const AGGREGATORS_TAB = {
   search: 'Поиск агрегатора...',

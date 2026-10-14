@@ -14,7 +14,7 @@
 
 ## app — 31 файлов
 
-### app/AggregatorCard.svelte (212)
+### app/AggregatorCard.svelte (237)
 - —
 - принимает: ask, say, lockedTip, lock, events, aggregatorId, onvacancy, onclose, onchanged
 
@@ -505,9 +505,9 @@
 - Нажимается вся шапка, а не одна стрелка: свёрнутых карточек столбик, и целиться в значок ради раскрытия человеку не за что.
 - принимает: title, open, ontoggle, onremove, removeLabel, children
 
-### components/ResumeList.svelte (33)
+### components/ResumeList.svelte (44)
 - —
-- принимает: resumes, site, onchoose, onopen
+- принимает: resumes, site, rewriteTip, onchoose, onopen, onrewrite
 
 ### components/RowMarks.svelte (15)
 - —
@@ -656,9 +656,9 @@
 
 ## state — 71 файлов
 
-### state/aggregators.js (70)
+### state/aggregators.js (81)
 - * Где агрегатор ищет — подпись под именем. * * У «Поиска по сети» адреса нет — его место занимает то, где он ищет: пустое * место под именем читалось бы как недозаведённый агрегатор.
-- отдаёт: AGGREGATORS_TAB, LOGIN_FIRST, actionBlock, aggregatorToggle, aggregatorWhere, loginMark
+- отдаёт: AGGREGATORS_TAB, LOGIN_FIRST, actionBlock, aggregatorToggle, aggregatorWhere, loginMark, newResumeTip
 
 ### state/alive.js (59)
 - * Заводит признак жизни экрана.
@@ -1500,9 +1500,9 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 - селекторы (2): .remove-cross, .remove-cross:hover
 - берёт: --danger, --text-tertiary
 
-### styles/resume-list.css (21)
+### styles/resume-list.css (26)
 - Строка резюме в карточке агрегатора: кружок выбора и название-ссылка. Кружок — родной, в цвет акцента по общему правилу (`base.css`); подсветка названия под курсором — общая со ссылками шапки (`link-hover.css`).
-- селекторы (3): .resume-row, .resume-row input, .resume-title
+- селекторы (4): .resume-row, .resume-row input, .resume-title, .resume-rewrite
 - берёт: --text-primary
 
 ### styles/row-hover.css (26)
@@ -1744,7 +1744,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 
 ## tests — 103 файлов
 
-### tests/aggregator_card_live.test.js (148)
+### tests/aggregator_card_live.test.js (204)
 - —
 
 ### tests/aggregators.test.js (118)

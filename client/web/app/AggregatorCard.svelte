@@ -20,6 +20,7 @@
     actionBlock,
     aggregatorWhere,
     loginMark,
+    newResumeTip,
   } from '$state/aggregators.js';
   import { cardBlocking } from '$state/card_block.js';
   import { cardFinish } from '$state/card_finish.js';
@@ -69,6 +70,7 @@
     actionBlock({ blocked: !!card?.blacklist_value, running: round.running, lock, lockedTip }),
   );
   const runTip = $derived(block || (card && !card.is_logged_in ? LOGIN_FIRST : ''));
+  const createTip = $derived(card ? newResumeTip(card, block) : '');
   const dropTip = $derived(round.running ? RUNNING : '');
 
   /** Дочитать следующую страницу: зовёт список — прокручивается панель целиком. */
@@ -91,6 +93,19 @@
   async function scan() {
     const done = await ask('aggregators.scan', aggregatorId);
     if (done !== null) say('Резюме обновляются');
+  }
+
+  /** Заполнить резюме по анкете: агент работает на сайте, итог скажет весть. */
+  async function fillResume(resumeId) {
+    const payload = { aggregator_id: aggregatorId, resume_id: resumeId };
+    const done = await ask('aggregators.fill_resume', payload);
+    if (done !== null) say('Резюме заполняется');
+  }
+
+  /** Завести новое резюме по анкете: агент создаёт и заполняет, итог скажет весть. */
+  async function createResume() {
+    const done = await ask('aggregators.create_resume', aggregatorId);
+    if (done !== null) say('Новое резюме заполняется');
   }
 
   async function chooseResume(resumeId) {
@@ -168,6 +183,14 @@
           {close}
           onpick={scan}
         />
+        <MenuItem
+          icon="add_circle"
+          label="Создать новое резюме"
+          title={createTip || 'Завести на сайте новое резюме по вашей анкете'}
+          disabled={!!createTip}
+          {close}
+          onpick={createResume}
+        />
       {/if}
     {/snippet}
     <CardActions
@@ -186,7 +209,9 @@
     <ResumeList
       resumes={card.resumes}
       site={card.name}
+      rewriteTip={block}
       onchoose={chooseResume}
+      onrewrite={fillResume}
       onopen={(url) => ask('system.open_url', url)}
     />
   {/if}

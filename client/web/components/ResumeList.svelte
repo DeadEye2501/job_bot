@@ -5,7 +5,8 @@
   // Отметку решает база, а не список: кружок показывает пришедшее `chosen`, а
   // нажатие только сообщает, какое резюме выбрали. Само нажатие отменено —
   // иначе кружок стоял бы на нажатом и тогда, когда база выбор не приняла.
-  let { resumes, site, onchoose, onopen } = $props();
+  // Справа — «Перезаписать»: `rewriteTip` — почему сейчас нельзя, пусто — можно.
+  let { resumes, site, rewriteTip, onchoose, onopen, onrewrite } = $props();
 </script>
 
 <div class="card-section">
@@ -26,6 +27,16 @@
         />
         <button class="resume-title link-hover" type="button" onclick={() => onopen(one.url)}>
           {one.title}
+        </button>
+        <button
+          class="icon-btn resume-rewrite"
+          class:is-disabled={!!rewriteTip}
+          type="button"
+          title={rewriteTip || 'Перезаписать резюме по вашей анкете'}
+          disabled={!!rewriteTip}
+          onclick={() => onrewrite(one.id)}
+        >
+          <span class="material-symbols-outlined">restart_alt</span>
         </button>
       </div>
     {/each}

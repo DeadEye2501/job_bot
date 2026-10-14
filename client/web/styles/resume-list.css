@@ -19,3 +19,8 @@
   color: var(--text-primary);
   text-align: left;
 }
+
+/* «Перезаписать» прижата к правому краю строки, за названием любой длины. */
+.resume-rewrite {
+  margin-left: auto;
+}
