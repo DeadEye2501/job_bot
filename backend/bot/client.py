@@ -392,6 +392,12 @@ class Bot:
     async def scan_aggregator(self, aggregator_id) -> aggregators.AgentOutcome:
         return await aggregators.scan_aggregator(self, aggregator_id)
 
+    async def fill_resume(self, aggregator_id, resume_id) -> aggregators.AgentOutcome:
+        return await aggregators.fill_resume(self, aggregator_id, resume_id)
+
+    async def create_resume(self, aggregator_id) -> aggregators.AgentOutcome:
+        return await aggregators.create_resume(self, aggregator_id)
+
     async def apply_chosen_way(self, vacancy_id: int, way: Way) -> apply.ApplyOutcome:
         return await apply.apply_chosen_way(self, vacancy_id, way)
 

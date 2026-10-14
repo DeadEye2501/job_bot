@@ -8,7 +8,9 @@ from backend.agent.human_gate import LIMIT_SEC
 from backend.agent.jobs import LoginJob, Source
 from backend.agent.kit import AgentKit
 from backend.agent.prompts.login import LOGIN_PROMPT, login_task
-from backend.flows.aggregator_scan import run_on_site, scan
+from backend.agent.tools_browser import browser_tools
+from backend.agent.sessions import run_on_site
+from backend.flows.aggregator_scan import scan
 from backend.repository.aggregators import is_logged_in
 
 
@@ -26,7 +28,8 @@ async def log_in(kit: AgentKit, source: Source) -> str:
     # Вход — то же ожидание человека, что капча: срок у них один.
     if not await kit.browser.wait_closed(LIMIT_SEC):
         return "login_timeout"
-    await run_on_site(kit, LoginJob(source), LOGIN_PROMPT, login_task(source.host))
+    await run_on_site(kit, LoginJob(source), LOGIN_PROMPT, login_task(source.host),
+                      *browser_tools(kit, None, None))
     async with kit.pipeline.session_factory() as session:
         if not await is_logged_in(session, source.id):
             return "not_logged_in"

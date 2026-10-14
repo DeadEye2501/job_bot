@@ -1,0 +1,130 @@
+"""Заполнение резюме: агент заполняет, следом — перечень резюме и отметка заполненного."""
+
+import logging
+
+from backend.agent.jobs import Source
+from backend.flows.resume_fill import fill
+from backend.repository.aggregator_resumes import resumes_of
+from tests.dbio import put
+from tests.factories_aggregators import aggregator_resume_row, aggregator_row
+from tests.fakes.agent import finish_step, resumes_step, scripted_kit
+
+FIRST = "https://hh.ru/resume/1"
+SECOND = "https://hh.ru/resume/2"
+
+
+async def _site(session_factory):
+    site = aggregator_row(is_logged_in=True, can_add_resume=True)
+    await put(session_factory, site)
+    first = aggregator_resume_row(site.id, title="Швея", url=FIRST)
+    await put(session_factory, first,
+              aggregator_resume_row(site.id, title="Повар", url=SECOND, position=1, is_chosen=True))
+    return site, first
+
+
+async def _marks(session_factory, aggregator_id):
+    async with session_factory() as session:
+        return {r.title: r.is_chosen for r in await resumes_of(session, aggregator_id)}
+
+
+async def test_an_overwritten_resume_is_scanned_and_becomes_the_chosen_one(
+    make_pipeline, session_factory
+):
+    site, first = await _site(session_factory)
+    kit = scripted_kit(await make_pipeline(), [
+        finish_step(), resumes_step([("Швея-закройщица", FIRST), ("Повар", SECOND)]),
+    ])
+
+    assert await fill(kit, Source.of(site), first.id) == "ok"
+
+    assert await _marks(session_factory, site.id) == {"Швея-закройщица": True, "Повар": False}
+
+
+async def test_a_created_resume_is_found_by_its_new_link_and_chosen(make_pipeline, session_factory):
+    site, _ = await _site(session_factory)
+    kit = scripted_kit(await make_pipeline(), [
+        finish_step(),
+        resumes_step([("Швея", FIRST), ("Повар", SECOND), ("Кондитер", "https://hh.ru/resume/3")]),
+    ])
+
+    assert await fill(kit, Source.of(site), None) == "ok"
+
+    assert await _marks(session_factory, site.id) == {"Швея": False, "Повар": False, "Кондитер": True}
+
+
+async def test_missing_required_data_leaves_the_mark_and_skips_the_scan(
+    make_pipeline, session_factory
+):
+    site, first = await _site(session_factory)
+
+    async def missing(tools):
+        await tools["report_required_missing"](labels=["Гражданство"])
+
+    kit = scripted_kit(await make_pipeline(), [missing])
+
+    assert await fill(kit, Source.of(site), first.id) == "required_missing"
+
+    assert await _marks(session_factory, site.id) == {"Швея": False, "Повар": True}
+    assert len(kit.run_session.plans) == 1
+
+
+async def test_the_fill_leaves_a_short_summary_in_the_log(make_pipeline, session_factory, caplog):
+    site, first = await _site(session_factory)
+    kit = scripted_kit(await make_pipeline(), [finish_step(), resumes_step([("Швея", FIRST)])])
+
+    with caplog.at_level(logging.INFO):
+        await fill(kit, Source.of(site), first.id)
+
+    assert any("страниц" in record.getMessage() for record in caplog.records)
+
+
+async def test_the_fill_works_in_the_profile_of_its_site_able_to_save(make_pipeline, session_factory):
+    site, first = await _site(session_factory)
+    seen = []
+
+    async def filling(tools):
+        seen.append((kit.browser.calls[-1], kit.browser.sending))
+        await tools["finish"](result="done")
+
+    kit = scripted_kit(await make_pipeline(), [filling, resumes_step([("Швея", FIRST)])])
+
+    await fill(kit, Source.of(site), first.id)
+
+    assert seen == [(("profile", site.id), True)]
+    assert FIRST in kit.run_session.plans[0].task
+
+
+async def test_a_resume_relinked_by_the_overwrite_is_found_as_the_only_new_link(
+    make_pipeline, session_factory
+):
+    site, first = await _site(session_factory)
+    kit = scripted_kit(await make_pipeline(), [
+        finish_step(), resumes_step([("Швея", "https://hh.ru/resume/9"), ("Повар", SECOND)]),
+    ])
+
+    await fill(kit, Source.of(site), first.id)
+
+    assert await _marks(session_factory, site.id) == {"Швея": True, "Повар": False}
+
+
+async def test_two_new_links_leave_the_mark_alone(make_pipeline, session_factory):
+    site, _ = await _site(session_factory)
+    kit = scripted_kit(await make_pipeline(), [finish_step(), resumes_step([
+        ("Швея", FIRST), ("Повар", SECOND),
+        ("Кондитер", "https://hh.ru/resume/3"), ("Пекарь", "https://hh.ru/resume/4"),
+    ])])
+
+    await fill(kit, Source.of(site), None)
+
+    marks = await _marks(session_factory, site.id)
+    assert marks["Кондитер"] is False and marks["Пекарь"] is False and marks["Повар"] is True
+
+
+async def test_overwriting_a_resume_the_site_does_not_have_is_refused_before_the_agent(
+    make_pipeline, session_factory
+):
+    site, _ = await _site(session_factory)
+    kit = scripted_kit(await make_pipeline(), [])
+
+    assert await fill(kit, Source.of(site), 999) == "missing"
+    assert kit.run_session.plans == []

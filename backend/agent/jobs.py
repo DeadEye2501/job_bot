@@ -139,7 +139,9 @@ class FillJob:
     поля», той же формы, что `ApplyJob.confirmed`: вписать можно только их.
     `page_checks` — сколько раз проверяющий смотрел запасной путь на адресе.
     `general` — поля, названные общими (у пункта было обоснование запасного
-    пути): вписать в них можно только проверенное. Итог `required_missing`
+    пути): вписать в них можно только проверенное. `skipped` — подписи
+    необязательных полей, оставленных без пункта, по адресу последней
+    раскладки — для сводки в журнал. Итог `required_missing`
     ставит только `report_required_missing`, с перечнем полей, — поэтому его
     нет в `RESULTS`.
     """
@@ -150,6 +152,7 @@ class FillJob:
     accepted: dict[tuple[str, str], dict] = field(default_factory=dict)
     page_checks: dict[str, int] = field(default_factory=dict)
     general: set[tuple[str, str]] = field(default_factory=set)
+    skipped: dict[str, list[str]] = field(default_factory=dict)
 
 
 RESULTS = {

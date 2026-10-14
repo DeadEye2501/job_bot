@@ -6,25 +6,19 @@ from backend.agent.availability import current_refusal
 from backend.flows.aggregator_name import create_named_aggregator
 from backend.repository import aggregators as repo
 from backend.repository.aggregator_resumes import choose_resume, resumes_of
-from client.bridge.answer import (
-    BAD_PAYLOAD,
-    Denied,
-    asked_id,
-    bad_fields,
-    launched_on_bot,
-    read_toggle,
-    reply,
-)
+from client.bridge.answer import Denied, asked_id, launched_on_bot, read_toggle, reply
 from client.bridge.hub import Hub
 from client.bridge.mark import AGGREGATOR_MARK, marked, unmarked
 from client.bridge.page import read_search
 from client.bridge.refusals import (
     AGGREGATOR_REFUSALS,
     BLACKLISTED_STAYS_OFF,
+    FILL_REFUSALS,
     LOGIN_FIRST,
     LOGIN_REFUSALS,
     NO_AGGREGATOR,
     NO_BOT,
+    RESUME_FILLED,
     WEB_SEARCH_KEPT,
     agent_refusals,
 )
@@ -168,12 +162,10 @@ class Aggregators:
 
     def choose_resume(self, payload: dict | None = None) -> dict:
         """Отметить резюме, которым откликаться на этом сайте; прежняя отметка снимается."""
-        payload = payload if isinstance(payload, dict) else {}
-        try:
-            aggregator_id = int(payload["aggregator_id"])
-            resume_id = int(payload["resume_id"])
-        except BAD_PAYLOAD as e:
-            return bad_fields("aggregators.choose_resume", e)
+        ids, refusal = _resume_ids(payload, "aggregators.choose_resume")
+        if refusal is not None:
+            return refusal
+        aggregator_id, resume_id = ids
 
         async def run() -> dict:
             async with self._hub.session_factory() as session:
@@ -198,6 +190,21 @@ class Aggregators:
         return self._launch(aggregator_id, "scan", lambda bot: bot.scan_aggregator(aggregator_id),
                             "Резюме обновлены.", LOGIN_REFUSALS)
 
+    def fill_resume(self, payload: dict | None = None) -> dict:
+        """Перезаписать резюме на сайте по анкете."""
+        ids, refusal = _resume_ids(payload, "aggregators.fill_resume")
+        if refusal is not None:
+            return refusal
+        aggregator_id, resume_id = ids
+        return self._launch(aggregator_id, "fill_resume",
+                            lambda bot: bot.fill_resume(aggregator_id, resume_id),
+                            RESUME_FILLED, FILL_REFUSALS)
+
+    def create_resume(self, aggregator_id: int) -> dict:
+        """Завести на сайте новое резюме и заполнить его по анкете."""
+        return self._launch(aggregator_id, "create_resume", lambda bot: bot.create_resume(aggregator_id),
+                            RESUME_FILLED, FILL_REFUSALS)
+
     def _launch(self, aggregator_id: int, action: str, start, done: str, refusals: dict) -> dict:
         """Пустить работу бота на источнике. Зов бота приходит готовым: имя зова
         пишется литералом у каждого действия, иначе шов имён моста его не видит."""
@@ -209,6 +216,16 @@ class Aggregators:
             aggregator_id=aggregator_id,
             action=action,
         )
+
+
+def _resume_ids(payload: dict | None, slot: str) -> tuple[tuple[int, int] | None, dict | None]:
+    """Номера агрегатора и резюме из нагрузки, а при негодной — готовый отказ
+    окну; каждый номер читает общий `asked_id`."""
+    payload = payload if isinstance(payload, dict) else {}
+    aggregator_id, refusal = asked_id(payload, "aggregator_id", slot)
+    resume_id, missing = asked_id(payload, "resume_id", slot)
+    refusal = refusal or missing
+    return (None, refusal) if refusal is not None else ((aggregator_id, resume_id), None)
 
 
 def _resume_to_dict(row) -> dict:

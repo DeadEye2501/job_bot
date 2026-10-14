@@ -416,3 +416,35 @@ async def test_the_switch_over_all_aggregators_leaves_a_manual_run_alone(
     await bot.rs.set_app("aggregators_enabled", "false")
 
     assert await aggregators.run_aggregator_now(bot, sites.id) == "ok"
+
+
+async def test_a_fill_while_the_slot_is_taken_is_refused(make_bot, sites, agent):
+    bot = await make_bot()
+    agent(bot, [_hold(asyncio.Event())])
+    running = asyncio.create_task(aggregators.run_aggregator_now(bot, sites.id))
+    await wait_until(lambda: bot.current_poll_task)
+    await asyncio.sleep(0)
+
+    assert await aggregators.create_resume(bot, sites.id) == "busy"
+
+    bot.cancel_current_poll()
+    await running
+
+
+async def test_a_stopped_fill_marks_nothing_and_closes_the_browser(
+    make_bot, sites, agent, session_factory
+):
+    bot = await make_bot()
+    resume = aggregator_resume_row(sites.id, title="Швея", url="https://site.test/r/1")
+    await put(session_factory, resume)
+    kit = agent(bot, [_hold(asyncio.Event())])
+    running = asyncio.create_task(aggregators.fill_resume(bot, sites.id, resume.id))
+    await wait_until(lambda: bot.current_poll_task)
+    await asyncio.sleep(0)
+
+    bot.cancel_current_poll()
+
+    assert await running == "cancelled"
+    assert "close" in kit.browser.calls
+    async with session_factory() as session:
+        assert [r.is_chosen for r in await resumes_of(session, sites.id)] == [False]

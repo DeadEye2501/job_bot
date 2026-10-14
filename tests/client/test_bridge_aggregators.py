@@ -358,3 +358,30 @@ async def test_choosing_a_resume_moves_the_mark(api, ask, session_factory):
     assert "ok" in answer
     card = (await ask(api.aggregators.detail, site.id))["ok"]
     assert [r["chosen"] for r in card["resumes"]] == [False, True]
+
+
+async def test_a_fill_answers_before_it_runs_and_tells_the_resume_is_filled(
+    api, ask, with_bot, told, session_factory
+):
+    bot = with_bot()
+    site = aggregator_row()
+    await put(session_factory, site)
+
+    answer = await ask(api.aggregators.fill_resume, {"aggregator_id": site.id, "resume_id": 7})
+
+    assert answer["ok"]["started"] is True
+    assert await told() == {"message": "Резюме заполнено", "danger": False}
+    assert ("fill_resume", site.id, 7) in bot.calls
+
+
+async def test_a_new_resume_without_data_for_required_fields_says_so(
+    api, ask, with_bot, told, session_factory
+):
+    bot = with_bot(resume_fill="required_missing")
+    site = aggregator_row()
+    await put(session_factory, site)
+
+    await ask(api.aggregators.create_resume, site.id)
+
+    assert await told() == {"message": "Не хватает данных для обязательных полей", "danger": True}
+    assert ("create_resume", site.id) in bot.calls
