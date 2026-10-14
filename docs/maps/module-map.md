@@ -467,12 +467,14 @@ resume autofill
   - `async def written(self, write: Callable[[AsyncSession], Awaitable[T]]) -> T` (9)
   - `async def profile_text(self, session: AsyncSession) -> str` (4)
 
-### `backend/agent/page_fields.py` — 67 строк
+### `backend/agent/page_fields.py` — 176 строк
 
-Поле страницы глазами браузера: вид, группа кружка и обязательность.
+Поля страницы глазами браузера.
 
 Зависит от: —
 
+- `class FieldEntry(NamedTuple)` (10)
+- `async def page_inventory(page) -> list[FieldEntry]` (3)
 - `class PageField(NamedTuple)` (7)
 - `async def page_field(page, selector: str) -> PageField` (2)
 - `async def field_or_none(page, selector: str) -> PageField | None` (10)
@@ -3871,7 +3873,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 332 модулей
+## tests — 334 модулей
 
 ### `tests/adapters/test_agent_mcp.py` — 85 строк
 
@@ -4215,6 +4217,14 @@ Runtime settings layer.
 - `def parse_into(monkeypatch, calls: list, *, done=True, fails=()) -> None` (21)
   - `async def parse(pipeline, vacancy_id, text, username, *, allow_delete=True)` (5)
 
+### `tests/backend/fixtures/real_page.py` — 27 строк
+
+Страница в настоящем браузере — для скриптов, которые исполняет сам браузер.
+
+Зависит от: `adapters.browser`
+
+- `async def page_with(html: str)` (12)
+
 ### `tests/backend/fixtures/rerun.py` — 71 строк
 
 Обстановка для проверок повторного прогона вакансии.
@@ -4287,15 +4297,25 @@ Runtime settings layer.
 
 - `def _gate(limit=60.0)` (5)
 
-### `tests/backend/test_agent_page_fields.py` — 77 строк
+### `tests/backend/test_agent_page_fields.py` — 68 строк
 
 Поле страницы глазами браузера: вид, группа кружка, обязательность.
 
-Зависит от: `adapters.browser`, `backend.agent.page_fields`
+Зависит от: `backend.agent.page_fields`, `tests.backend.fixtures.real_page`
 
 Тестов: 7
 
-- `async def page()` (11)
+- `async def page()` (3)
+
+### `tests/backend/test_agent_page_fields_inventory.py` — 138 строк
+
+Опись полей страницы: всё, что форма просит заполнить, с подписью, видом и вариантами.
+
+Зависит от: `backend.agent.page_fields`, `tests.backend.fixtures.real_page`
+
+Тестов: 11
+
+- `async def page()` (3)
 
 ### `tests/backend/test_agent_prompts.py` — 133 строк
 
