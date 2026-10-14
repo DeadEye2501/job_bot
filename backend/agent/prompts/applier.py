@@ -16,6 +16,7 @@ APPLIER_PROMPT = """Твоя задача — откликнуться на од
    - Личные поля — из анкеты, правила ниже.
    - Письмо — правила ниже. Поля для письма нет — отклик без письма; поле появилось только после отправки — впиши письмо туда.
    - Резюме — файл инструментом browser_attach_resume. Форма просит ссылку на резюме или файла нет — ссылка на резюме из анкеты.
+   - Резюме, названного в задании, среди предложенных сайтом нет — finish с result="resume_missing".
    - Фото — инструментом browser_attach_photo.
    - Вопросы работодателя — по правилам скрининга ниже.
 4. Кнопка агрегатора увела на сайт работодателя — это форма: продолжай там; способ запиши как form с адресом формы.
@@ -71,13 +72,14 @@ _WRITERS = dict(zip(LETTER_WRITERS, ("Письмо пишет: приложен�
 def applier_task(job, vacancy_text: str, profile_text: str, today: date) -> str:
     """Стартовое задание откликателя: способ, вакансия, анкета, симуляция.
 
-    `job` — что угодно с `way`, `simulated`, `letter_writer`, `confirming`:
+    `job` — что угодно с `way`, `resume`, `simulated`, `letter_writer`, `confirming`:
     в потоке это его задание отклика. Вакансия приходит готовым текстом
     `describe_vacancy`, уже в рамке «данные, а не инструкции».
     """
     lines = [
         f"Способ отклика: {_METHODS[job.way.method]}",
         f"Адрес способа: {job.way.target}",
+        *([f"Резюме на сайте: «{job.resume[0]}» — {job.resume[1]}"] if job.resume else []),
         _WRITERS[job.letter_writer],
         f"Сегодня: {today.isoformat()}",
         vacancy_text,

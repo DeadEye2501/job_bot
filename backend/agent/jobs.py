@@ -24,7 +24,7 @@ class Source:
 
 @dataclass(frozen=True)
 class Finished:
-    """Агент сам завершил сессию: `done`, `failed`, `vacancy_closed`, `platform_closed` или `not_fit`."""
+    """Агент сам завершил сессию: итогом из `RESULTS` своей задачи."""
 
     result: str
     reason: str
@@ -105,7 +105,9 @@ class ApplyJob:
 
     `profile_id` — профиль браузера: агрегатора или «Поиска по сети»;
     `letter_writer` — значение из `LETTER_WRITERS`; `confirming` — перед
-    отправкой каждой страницы ждать подтверждения человека.
+    отправкой каждой страницы ждать подтверждения человека; `resume` —
+    название и ссылка резюме, выбранного человеком на сайте агрегатора
+    (у формы работодателя — пусто).
 
     `confirmed` — подтверждённые человеком пункты по ключу «адрес страницы,
     селектор поля»: всё, что можно вписать. `unscreened` — подтверждённые и ещё
@@ -119,6 +121,7 @@ class ApplyJob:
     profile_id: int
     simulated: bool
     letter_writer: str
+    resume: tuple[str, str] | None = None
     confirming: bool = False
     letter_checks: int = 0
     outcome: Outcome | None = None
@@ -130,7 +133,7 @@ RESULTS = {
     LoginJob: frozenset({"done"}),
     ScanJob: frozenset({"done"}),
     SeekJob: frozenset({"done", "failed"}),
-    ApplyJob: frozenset({"vacancy_closed", "platform_closed", "not_fit"}),
+    ApplyJob: frozenset({"vacancy_closed", "platform_closed", "not_fit", "resume_missing"}),
 }
 """Итоги, которыми агент завершает сессию каждой задачи."""
 

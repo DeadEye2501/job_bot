@@ -36,7 +36,7 @@ def common_tools(kit: AgentKit, job) -> list[Callable]:
             return await kit.profile_text(session) or "Анкета не заполнена."
 
     async def finish(result: str, reason: str = "") -> str:
-        """Итог сессии. Искатель: done или failed. Откликатель: vacancy_closed, platform_closed или not_fit. Проверка входа и перечень резюме: done."""
+        """Итог сессии. Искатель: done или failed. Откликатель: vacancy_closed, platform_closed, not_fit или resume_missing. Проверка входа и перечень резюме: done."""
         if result not in RESULTS[type(job)]:
             return f"Итога «{result}» у этой задачи не бывает: {', '.join(sorted(RESULTS[type(job)]))}."
         if isinstance(job.outcome, FINAL):

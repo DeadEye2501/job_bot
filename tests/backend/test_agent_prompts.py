@@ -71,7 +71,7 @@ def test_the_login_check_knows_the_site():
 def _task(vacancy_text="Текст вакансии", profile_text="Анкета", method=ApplicationVia.FORM.value,
           **job) -> str:
     fields = dict(way=Way(method, "https://site.test/form", None), simulated=False, letter_writer="app",
-                  confirming=False)
+                  confirming=False, resume=None)
     fields.update(job)
     return applier_task(SimpleNamespace(**fields), vacancy_text, profile_text, TODAY)
 

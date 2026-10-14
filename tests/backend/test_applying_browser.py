@@ -2,14 +2,16 @@
 
 import pytest
 
-from backend.agent.stops import LimitExhausted
+from backend.agent.stops import LimitExhausted, ResumeMissing
 from backend.applying.browser import via_browser
 from backend.applying.result import Dropped, Missed, SiteClosed, Unfit
 from backend.domain.apply_order import Way
-from backend.models import Vacancy, VacancyEvent, VacancyStatus, VacancyStatusHistory
+from backend.models import (
+    AggregatorResume, Vacancy, VacancyEvent, VacancyStatus, VacancyStatusHistory,
+)
 from tests.backend.fixtures.applying import FORM, PAGE
 from tests.dbio import all_rows, only_row, put
-from tests.factories_aggregators import web_search_row
+from tests.factories_aggregators import aggregator_resume_row, web_search_row
 from tests.fakes.agent import (
     LimitHit,
     edited,
@@ -172,3 +174,35 @@ async def test_a_form_opens_in_the_web_search_profile(board, kit_with, session_f
     await via_browser(kit, vacancy.id, Way("form", FORM, None))
 
     assert ("profile", web.id) in kit.browser.calls
+
+
+async def test_the_applier_is_told_which_resume_to_choose(board, kit_with, session_factory):
+    site, vacancy = await board()
+    await put(session_factory, aggregator_resume_row(
+        site.id, title="Повар-кондитер", url="https://site.test/resume/7", is_chosen=True))
+    kit = await kit_with([record_step(PAGE, via="aggregator")])
+
+    await via_browser(kit, vacancy.id, Way("aggregator", PAGE, site.id))
+
+    (plan,) = kit.run_session.plans
+    assert "Повар-кондитер" in plan.task and "https://site.test/resume/7" in plan.task
+
+
+async def test_a_chosen_resume_missing_on_the_site_stops_the_run_and_leaves_none_chosen(
+    board, kit_with, session_factory
+):
+    site, vacancy = await board()
+    await put(session_factory,
+              aggregator_resume_row(site.id, title="Пропало", url="https://site.test/resume/1",
+                                    is_chosen=True),
+              aggregator_resume_row(site.id, title="Осталось", url="https://site.test/resume/2",
+                                    position=1))
+    kit = await kit_with([finish_step("resume_missing")])
+
+    with pytest.raises(ResumeMissing) as stop:
+        await via_browser(kit, vacancy.id, Way("aggregator", PAGE, site.id))
+
+    assert stop.value.site == "site.test"
+
+    rows = await all_rows(session_factory, AggregatorResume)
+    assert [(r.title, r.is_chosen) for r in rows] == [("Осталось", False)]

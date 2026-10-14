@@ -4,6 +4,7 @@ import time
 
 import pytest
 
+from backend.agent.stops import ResumeMissing
 from backend.applying import run
 from backend.applying.result import Dropped, Missed, TelegramClosed, Unfit
 from backend.models import Vacancy, VacancyStatus
@@ -116,3 +117,21 @@ async def test_a_chosen_way_is_tried_alone(executors, two_vacancies, kit):
     answers[(first, "email")] = Missed("сервер не принял")
     outcome = await run.apply_chosen(kit, first, MAIL)
     assert isinstance(outcome, Missed) and calls == [(first, "email")]
+
+
+async def test_a_missing_chosen_resume_stops_the_whole_run(
+    executors, two_vacancies, kit, monkeypatch
+):
+    """Список резюме сайта устарел: следующий отклик на нём ушёл бы не тем резюме,
+    поэтому ни следующий способ, ни следующая вакансия не начинаются."""
+    calls, _ = executors
+    first, second = (v.id for v in two_vacancies)
+
+    async def missing(kit, vacancy_id, way):
+        calls.append((vacancy_id, way.method))
+        raise ResumeMissing("site.test")
+
+    monkeypatch.setitem(run.EXECUTORS, "telegram", missing)
+    with pytest.raises(ResumeMissing):
+        await run.apply_vacancies(kit, [first, second])
+    assert calls == [(first, "telegram")]

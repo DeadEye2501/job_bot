@@ -13,7 +13,7 @@ from typing import Literal
 from adapters.browser import BrowserHost, find_browser
 from backend.agent.kit import AgentKit
 from backend.agent.sessions import live_session
-from backend.agent.stops import HumanTimeout, LimitExhausted
+from backend.agent.stops import HumanTimeout, LimitExhausted, ResumeMissing
 from backend.bot import slot
 from backend.notify import fire
 
@@ -23,9 +23,11 @@ logger = logging.getLogger(__name__)
 # что именно не дождалось ответа, человек видит сам по плашке, которая была.
 HUMAN_TIMEOUT_NOTE = "Время ожидания истекло."
 LIMIT_NOTE = "Исчерпан лимит подписки Claude Code — работа остановлена."
+RESUME_MISSING_NOTE = "Выбранное резюме не найдено на {site} — пересканируйте резюме."
 
-AgentStop = Literal["human_timeout", "limit"]
-"""Чем работа с набором агента обрывается сама: человек не пришёл, лимит кончился."""
+AgentStop = Literal["human_timeout", "limit", "resume_missing"]
+"""Чем работа с набором агента обрывается сама: человек не пришёл, лимит кончился,
+выбранного резюме на сайте не оказалось."""
 
 WorkOutcome = Literal[slot.CycleOutcome, AgentStop]
 """Чем кончилась работа с набором агента в месте прогона, если своих исходов у
@@ -49,6 +51,11 @@ async def agent_work(bot, work: Callable[[AgentKit], Awaitable[str]]) -> str:
         logger.warning(LIMIT_NOTE)
         fire(bot.on_round_note, "on_round_note", LIMIT_NOTE)
         return "limit"
+    except ResumeMissing as stop:
+        note = RESUME_MISSING_NOTE.format(site=stop.site)
+        logger.warning(note)
+        fire(bot.on_round_note, "on_round_note", note)
+        return "resume_missing"
     finally:
         bot.kit = None
         kit.gate.abort()

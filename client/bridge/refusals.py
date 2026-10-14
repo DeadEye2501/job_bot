@@ -18,7 +18,7 @@
 """
 
 from backend.agent.availability import current_refusal
-from backend.bot.work import HUMAN_TIMEOUT_NOTE, LIMIT_NOTE
+from backend.bot.work import HUMAN_TIMEOUT_NOTE, LIMIT_NOTE, RESUME_MISSING_NOTE
 
 NO_BOT = "Бот ещё не готов."
 """Бот не поднят: без него нет ни отправки, ни отметки о прочтении, ни опроса
@@ -150,9 +150,13 @@ LOGS_TOO_OFTEN = "Журнал спрашивают не чаще раза в с
 AGENT_STOPS = {
     "human_timeout": HUMAN_TIMEOUT_NOTE,
     "limit": LIMIT_NOTE,
+    # Итог действия имени сайта не несёт — его называет весть прогона; шаблон
+    # тот же, чтобы слова не разошлись.
+    "resume_missing": RESUME_MISSING_NOTE.format(site="сайте"),
 }
 """Чем обрывается работа с набором агента — у всех, кто может дойти до
-браузерного отклика, одними словами: истёкшее ожидание и лимит человек узнаёт по фразе."""
+браузерного отклика, одними словами: истёкшее ожидание, лимит и пропавшее
+резюме человек узнаёт по фразе."""
 
 RUN_REFUSALS = {
     "busy": BUSY_CYCLE,

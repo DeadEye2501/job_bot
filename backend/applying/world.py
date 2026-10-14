@@ -9,6 +9,7 @@ from backend.agent.availability import current_refusal
 from backend.applying.result import Lesson, TelegramClosed
 from backend.domain.apply_order import KnownSite, VacancyFacts, Way, World, apply_ways
 from backend.models import HR, Aggregator, Vacancy, VacancyStatus
+from backend.repository.aggregator_resumes import chosen_resume
 from backend.repository.aggregators import list_aggregators
 from backend.repository.mail_account import get_mail_account
 from backend.repository.vacancy_contacts import contact_values
@@ -18,12 +19,14 @@ async def read_world(rs, session_factory) -> World:
     """Что доступно прямо сейчас; закрытых до конца прогона сайтов ещё нет."""
     async with session_factory() as session:
         mail_ready = await get_mail_account(session) is not None
-        aggregators = await list_aggregators(session)
+        sites = [KnownSite(a.id, a.host, a.is_logged_in,
+                           await chosen_resume(session, a.id) is not None)
+                 for a in await list_aggregators(session)]
     return World(
         telegram_open=rs.flood_wait_until_ts <= time.time(),
         mail_ready=mail_ready,
         agent_ready=current_refusal(rs.chat) is None,
-        sites=[KnownSite(a.id, a.host, a.is_logged_in) for a in aggregators],
+        sites=sites,
         closed_sites=set(),
     )
 
