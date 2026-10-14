@@ -1,4 +1,4 @@
-"""Работа агента у бота с источниками: обход агрегаторов, вход на сайт, перечень резюме и удаление источника."""
+"""Работа агента у бота с источниками: обход агрегаторов, вход на сайт, перечень и заполнение резюме, удаление источника."""
 
 import logging
 from collections.abc import Awaitable, Callable
@@ -12,6 +12,7 @@ from backend.bot import slot, work
 from backend.flows.aggregator_login import log_in
 from backend.flows.aggregator_round import seek_source
 from backend.flows.aggregator_scan import scan
+from backend.flows.resume_fill import fill
 from backend.models import Aggregator
 from backend.repository import aggregators as repo
 
@@ -19,10 +20,11 @@ logger = logging.getLogger(__name__)
 
 AgentOutcome = Literal[
     work.WorkOutcome, "missing", "locked", "blacklisted",
-    "not_logged_in", "login_timeout",
+    "not_logged_in", "login_timeout", "required_missing",
 ]
 """Чем кончилось действие агента: исходы места прогона и свои — у источника
-(в отсеве) и у входа (не вошёл, окно не закрыто)."""
+(в отсеве), у входа (не вошёл, окно не закрыто) и у заполнения резюме (не
+хватило данных для обязательных полей)."""
 
 
 def aggregators_available(bot) -> str | None:
@@ -84,6 +86,18 @@ async def login_aggregator(bot, aggregator_id: int) -> AgentOutcome:
 async def scan_aggregator(bot, aggregator_id: int) -> AgentOutcome:
     """Перечень резюме по кнопке окна."""
     return await _on_site(bot, aggregator_id, scan, "aggregator scan")
+
+
+async def fill_resume(bot, aggregator_id: int, resume_id: int) -> AgentOutcome:
+    """Перезаписать резюме по анкете — по кнопке в его строке."""
+    return await _on_site(bot, aggregator_id, lambda kit, source: fill(kit, source, resume_id),
+                          "resume fill")
+
+
+async def create_resume(bot, aggregator_id: int) -> AgentOutcome:
+    """Завести новое резюме по анкете — по пункту меню карточки."""
+    return await _on_site(bot, aggregator_id, lambda kit, source: fill(kit, source, None),
+                          "resume create")
 
 
 async def _on_site(

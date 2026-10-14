@@ -355,6 +355,7 @@
   - `accepted: dict[tuple[str, str], dict]` = `field(default_factory=dict)`
   - `page_checks: dict[str, int]` = `field(default_factory=dict)`
   - `general: set[tuple[str, str]]` = `field(default_factory=set)`
+  - `skipped: dict[str, list[str]]` = `field(default_factory=dict)`
 - `RESULTS` = `словарь из 5`
 - `HUMAN_KINDS` = `набор из 2`
 
@@ -393,6 +394,10 @@
 - `_CONFIRMING` = `'Режим подтверждения: всё, что вводится на стран…`
 - `_METHODS` = `словарь из 2`
 - `_WRITERS` = `dict(zip(LETTER_WRITERS, ('Письмо пишет: приложе…`
+
+### `backend/agent/prompts/fill.py`
+
+- `FILL_PROMPT` = `'Твоя задача — заполнить резюме человека на этом…`
 
 ### `backend/agent/prompts/frame.py`
 
@@ -962,6 +967,10 @@
 - `RECOVERED_PER_TURN` = `10`
 - `LONGEST_WAIT` = `timedelta(days=1)`
 
+### `backend/flows/resume_fill.py`
+
+- `logger` = `logging.getLogger(__name__)`
+
 ### `backend/flows/sameness.py`
 
 - `class Match`
@@ -1131,6 +1140,7 @@
 - `TONE_RULE` = `'Всё, что пишешь работодателю от имени человека,…`
 - `GENDER_RULE` = `'Родовые формы — по полю «Пол» анкеты; пол не ук…`
 - `LATIN_NAME_RULE` = `'Имя, фамилию и отчество пиши алфавитом текста, …`
+- `PERSONAL_FIELD_RULES` = `'\n'.join(('- имя, фамилия и отчество — как в ан…`
 - `ATTRIBUTION_RULES` = `'\n'.join(('- Атрибуция достижений: каждое дости…`
 - `FACTS_RULE` = `'Факты о человеке — только из анкеты; анкета и е…`
 - `EXAMPLE_SOURCE` = `'При прочих равных пример из места работы приори…`
@@ -2136,6 +2146,8 @@
 - `WAY_UNKNOWN` = `'Этим способом на вакансию не откликнуться.'`
 - `AGGREGATOR_REFUSALS` = `словарь из 5 и раскрытых`
 - `LOGIN_REFUSALS` = `словарь из 2 и раскрытых`
+- `FILL_REFUSALS` = `словарь из 1 и раскрытых`
+- `RESUME_FILLED` = `'Резюме заполнено'`
 - `APPLY_VIA_REFUSALS` = `словарь из 7 и раскрытых`
 - `APPLY_ALL_REFUSALS` = `словарь из 3 и раскрытых`
 - `UPDATE_REFUSALS` = `словарь из 6`
@@ -2362,6 +2374,11 @@
 - `pytestmark` = `pytest.mark.usefixtures('one_vector')`
 - `WITH_ARTICLE` = `'Senior QA https://telegra.ph/QA-08-21'`
 
+### `tests/backend/test_flows_resume_fill.py`
+
+- `FIRST` = `'https://hh.ru/resume/1'`
+- `SECOND` = `'https://hh.ru/resume/2'`
+
 ### `tests/backend/test_llm_cv_response.py`
 
 - `MINIMAL_CV` = `json.dumps({'profile': CV_REQUIRED_PROFILE}, ens…`
@@ -2544,6 +2561,6 @@
 
 - `class Sent`
   - `id: int`
-- `ANSWERS` = `словарь из 17`
+- `ANSWERS` = `словарь из 18`
 - `class UiBot`
   - `is_running_round` = `False`

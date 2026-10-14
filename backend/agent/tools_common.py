@@ -43,6 +43,10 @@ def common_tools(kit: AgentKit, job) -> list[Callable]:
             return f"Итога «{result}» у этой задачи не бывает: {', '.join(sorted(results))}."
         if isinstance(job.outcome, FINAL):
             return FINAL_ANSWER
+        # Итог записывается один раз: нехватку данных у заполнения ставит свой
+        # инструмент, и «done» следом превратил бы остановку в успех.
+        if isinstance(job.outcome, Finished):
+            return "Итог уже записан, работа окончена."
         job.outcome = Finished(result, reason)
         return "Итог записан, работа окончена."
 

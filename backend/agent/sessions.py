@@ -5,7 +5,9 @@ import asyncio
 from adapters.agent_mcp import serve_tools
 from adapters.claude_code_agent import AgentEnd, AgentRun, run_agent
 from backend.agent.kit import AgentKit, RunSession, SessionPlan
+from backend.agent.prompts.frame import system_prompt
 from backend.agent.stops import HumanTimeout, LimitExhausted
+from backend.agent.tools_common import common_tools
 from backend.task_stop import put_out
 
 # Зависший процесс Claude Code иначе держал бы место прогона, а с ним и обход
@@ -49,6 +51,16 @@ async def run_to_limit(kit: AgentKit, plan: SessionPlan) -> AgentEnd:
     if end.limit_exhausted:
         raise LimitExhausted
     return end
+
+
+async def run_on_site(kit: AgentKit, job, prompt: str, task: str, *own_tools) -> AgentEnd:
+    """Сессия агента на сайте источника — у входа, перечня и заполнения резюме:
+    общие инструменты задачи и её собственные, браузер среди них; веб-поиск
+    сайту не нужен. Браузер задача приносит сама: заполнению он нужен со
+    строгим вводом и файлами, прочим — простой."""
+    tools = [*common_tools(kit, job), *own_tools]
+    plan = SessionPlan(system_prompt(prompt, tools), task, tools, web_search=False)
+    return await run_to_limit(kit, plan)
 
 
 def live_session(model: str) -> RunSession:

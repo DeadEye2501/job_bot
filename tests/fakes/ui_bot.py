@@ -33,6 +33,7 @@ ANSWERS = {
     "aggregator_run": "ok",
     "aggregator_login": "ok",
     "aggregator_scan": "ok",
+    "resume_fill": "ok",
     "apply_via": "ok",
     "apply_all": "ok",
     "update": "ok",
@@ -133,6 +134,14 @@ class UiBot:
     async def scan_aggregator(self, aggregator_id: int) -> str:
         self.calls.append(("scan_aggregator", aggregator_id))
         return self.answers["aggregator_scan"]
+
+    async def fill_resume(self, aggregator_id: int, resume_id: int) -> str:
+        self.calls.append(("fill_resume", aggregator_id, resume_id))
+        return self.answers["resume_fill"]
+
+    async def create_resume(self, aggregator_id: int) -> str:
+        self.calls.append(("create_resume", aggregator_id))
+        return self.answers["resume_fill"]
 
     async def apply_chosen_way(self, vacancy_id: int, way) -> str:
         self.calls.append(("apply_chosen_way", vacancy_id, way))

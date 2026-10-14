@@ -166,3 +166,14 @@ async def test_a_fill_reports_its_login_calls_a_human_and_finishes(make_pipeline
 
     assert gate.asked == [("captcha", "hh.ru")] and job.outcome == Finished("done", "")
     assert (await all_rows(session_factory, Aggregator))[0].is_logged_in is False
+
+
+async def test_a_written_outcome_is_not_overwritten_by_a_later_finish(make_pipeline, session_factory):
+    """Нехватка данных — итог заполнения; «done» следом сделало бы его успехом."""
+    site = aggregator_row()
+    await put(session_factory, site)
+    job = FillJob(Source.of(site), outcome=Finished("required_missing", "Гражданство"))
+
+    await tool(common_tools(kit_for(await make_pipeline()), job), "finish")(result="done")
+
+    assert job.outcome == Finished("required_missing", "Гражданство")

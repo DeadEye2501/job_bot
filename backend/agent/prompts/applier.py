@@ -3,7 +3,7 @@
 from datetime import date
 
 from backend.agent.prompts.screening import SCREENING_RULES
-from backend.llm.rules import LETTER_SHAPE
+from backend.llm.rules import LETTER_SHAPE, PERSONAL_FIELD_RULES
 from backend.domain.apply_order import VIA_AGGREGATOR, VIA_FORM
 from backend.runtime_settings import LETTER_WRITERS
 
@@ -34,9 +34,7 @@ APPLIER_PROMPT = """Твоя задача — откликнуться на од
 
 """ + LETTER_SHAPE + """
 Личные поля формы:
-- имя, фамилия и отчество — как в анкете; форма просит латиницу — по общему правилу о латинице;
-- ФИО одной строкой — фамилия, имя, отчество; латинское «Full name» — имя и фамилия; «Middle name» — отчество латиницей;
-- дата рождения — в формате, которого просит форма; возраст — из анкеты;
+""" + PERSONAL_FIELD_RULES + """
 - почта, телефон, Telegram, GitHub, место, гражданство — из анкеты;
 - поле «О себе» и рассказ о себе — из «О себе» анкеты;
 - поле, пустое в анкете: необязательное пропусти, обязательное — report_failure с причиной «форма требует <поле>».

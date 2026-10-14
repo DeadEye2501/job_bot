@@ -37,11 +37,16 @@ def fill_tools(kit: AgentKit, job: FillJob) -> list[Callable]:
         """Раскладка страницы целиком: каждый пункт — поле страницы и всё его значение из анкеты, одно поле — один пункт. У данных, положенных в общее текстовое поле, fallback_reason — почему узкие поля страницы им не подходят. Вписать можно только принятое."""
         page = await kit.browser.page()
         url = page.url
+        inventory = await page_inventory(page)
+        named = {item["selector"] for item in items}
+        job.skipped[url] = [entry.label for entry in inventory
+                            if not entry.required and entry.selector not in named]
         job.general |= {(url, item["selector"]) for item in items if item.get("fallback_reason")}
         refused = _unfit(job, url, items)
         fallbacks = [item for item in items
                      if (url, item["selector"]) in job.general and item["selector"] not in refused]
-        refused |= await _reviewed(kit, job, page, fallbacks)
+        refused |= await _reviewed(job, url, fallbacks, lambda pending: review_fallbacks(
+            kit.pipeline.lm_client, kit.pipeline.lm_chat_model, inventory, pending))
         for item in items:
             if item["selector"] not in refused:
                 job.accepted[(url, item["selector"])] = item
@@ -68,26 +73,25 @@ def _unfit(job: FillJob, url: str, items: list[dict]) -> dict[str, str]:
     return refused
 
 
-async def _reviewed(kit: AgentKit, job: FillJob, page, fallbacks: list[dict]) -> dict[str, str]:
-    """Отбитые пункты запасного пути по селектору — с причиной для агента.
+async def _reviewed(job: FillJob, url: str, fallbacks: list[dict], review: Callable) -> dict[str, str]:
+    """Отбитые пункты запасного пути по селектору — с причиной для агента;
+    `review` — вызов проверяющего над пунктами этой страницы.
 
     Проверок на адрес столько же, сколько у писем (`CHECKS_ALLOWED`): следующая
     раскладка с запасным путём на той же странице не проверяется и не принимается.
     """
     if not fallbacks:
         return {}
-    checks = job.page_checks.get(page.url, 0)
+    checks = job.page_checks.get(url, 0)
     if checks >= CHECKS_ALLOWED:
         refused = {item["selector"]: _ENOUGH for item in fallbacks}
     else:
-        job.page_checks[page.url] = checks + 1
-        verdicts = await review_fallbacks(kit.pipeline.lm_client, kit.pipeline.lm_chat_model,
-                                          await page_inventory(page), fallbacks)
+        job.page_checks[url] = checks + 1
+        verdicts = await review(fallbacks)
         refused = {selector: _why(verdict.reason, verdict.field)
                    for selector, verdict in verdicts.items() if not verdict.ok}
     if refused and checks + 1 >= CHECKS_ALLOWED:
-        logger.warning("заполнение резюме: проверяющий не пропустил %s на %s",
-                       ", ".join(refused), page.url)
+        logger.warning("заполнение резюме: проверяющий не пропустил %s на %s", ", ".join(refused), url)
     return refused
 
 
