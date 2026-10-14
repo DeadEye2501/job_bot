@@ -12,6 +12,12 @@ def place_period(place) -> str:
     return f"{place.start_date.strftime('%m.%Y')} — {end}"
 
 
+def years_text(years: int) -> str:
+    """Стаж словами — одной записью у анкеты агента и у блока письма. Меньше
+    года — словами: «0+ г.» модель пересказала бы как «0+ годами опыта»."""
+    return f"{years}+ г." if years else "меньше года"
+
+
 def full_years(start: date, end: date) -> int:
     """Полных лет между датами. Отрицательным не бывает: место, начатое
     «завтра», — опечатка, а не отрицательный стаж."""

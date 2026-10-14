@@ -4,13 +4,13 @@
 // чья карточка сейчас открыта, а вернувшись, получает её обратно той же разовой
 // отметкой, что приходит со стороны.
 
-import { cleanup, render } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import ContactsScreen from '../app/ContactsScreen.svelte';
 import VacanciesScreen from '../app/VacanciesScreen.svelte';
 import { hearRound } from '../state/round.svelte.js';
-import { heldMemory } from '../state/section_memory.svelte.js';
+import { heldMemory, sectionMemory } from '../state/section_memory.svelte.js';
 import { settled } from './settled.js';
 
 afterEach(() => {
@@ -70,11 +70,62 @@ describe('экран и настоящая память разделов', () =>
         openFilter: null,
         onfiltered: () => {},
         onchosen: memory.remember('vacancies'),
+        view: memory.views.vacancies,
+        onview: memory.keepView('vacancies'),
       },
     });
     await settled();
 
     expect(memory.cards.vacancies).toEqual({ id: 9 });
+  });
+});
+
+describe('порядок вакансий живёт в памяти разделов', () => {
+  async function vacancies(memory) {
+    const sorts = [];
+    render(VacanciesScreen, {
+      props: {
+        ...quiet,
+        ask: async (method, args) => {
+          if (method !== 'vacancies.list') return null;
+          sorts.push(args.sort);
+          return { vacancies: [], has_more: false, score_threshold: 5 };
+        },
+        oncontacts: () => {},
+        open: null,
+        openFilter: null,
+        onfiltered: () => {},
+        onchosen: () => {},
+        view: memory.views.vacancies,
+        onview: memory.keepView('vacancies'),
+      },
+    });
+    await settled();
+    return sorts;
+  }
+
+  it('выбранный порядок переживает уход из раздела', async () => {
+    const memory = heldMemory();
+    await vacancies(memory);
+    await fireEvent.click(screen.getByTitle(/^Сортировка:/));
+    await fireEvent.click(screen.getByText('Сначала старые'));
+    cleanup();
+
+    const sorts = await vacancies(memory);
+
+    expect(sorts.at(-1)).toBe('oldest');
+  });
+
+  it('свежее окно начинает с первого порядка', async () => {
+    const before = heldMemory();
+    await vacancies(before);
+    await fireEvent.click(screen.getByTitle(/^Сортировка:/));
+    await fireEvent.click(screen.getByText('Сначала старые'));
+    cleanup();
+
+    const sorts = await vacancies(heldMemory());
+
+    expect(sorts.at(-1)).toBe('newest');
   });
 });
 
@@ -91,6 +142,8 @@ describe('вакансии говорят, чья карточка открыт�
         openFilter: null,
         onfiltered: () => {},
         onchosen: (id) => chosen.push(id),
+        view: sectionMemory().views.vacancies,
+        onview: () => {},
       },
     });
     await settled();

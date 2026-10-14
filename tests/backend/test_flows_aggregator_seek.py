@@ -7,6 +7,7 @@ from backend.agent.jobs import Source
 from backend.agent.stops import HumanTimeout, LimitExhausted
 from backend.flows.aggregator_round import seek_source
 from backend.models import Aggregator, Vacancy
+from tests.backend.fixtures.applying import PAGE
 from tests.backend.fixtures.flows import similar_by_hand
 from tests.backend.fixtures.parse_stub import parse_into
 from tests.dbio import all_rows, put
@@ -15,8 +16,6 @@ from tests.factories_aggregators import aggregator_row
 from tests.fakes.agent import LimitHit, captcha_step, finish_step, scripted_kit
 
 pytestmark = pytest.mark.usefixtures("one_vector")
-
-PAGE = "https://site.test/vacancy/1"
 
 
 @pytest.fixture

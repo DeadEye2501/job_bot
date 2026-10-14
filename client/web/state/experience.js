@@ -21,19 +21,23 @@ export function period(startIso, endIso) {
   return `${short(startIso)} — ${endIso ? short(endIso) : 'настоящее время'}`;
 }
 
-/** Готово ли место работы к записи.
+/** Какие обязательные поля места работы пусты.
  *
  * Три поля, ровно те же, что требует мост (`repository/profile_experience`):
  * название, должность и дата начала. Сверять их надо здесь, потому что перечень
  * уезжает целиком и отбивается тоже целиком — одна недозаполненная карточка
- * отменяла бы правки всех соседних, заполненных.
+ * отменяла бы правки всех соседних, заполненных. По этому же списку карточка
+ * метит пустые поля.
  *
  * Даты конца среди них нет: «по настоящее время» — обычный случай.
  */
+export function experienceMissing(exp) {
+  return ['company', 'role', 'start_date'].filter((name) => !(exp[name] || '').trim());
+}
+
+/** Готово ли место работы к записи: обязательные поля заполнены. */
 export function experienceReady(exp) {
-  return Boolean(
-    (exp.company || '').trim() && (exp.role || '').trim() && (exp.start_date || '').trim(),
-  );
+  return experienceMissing(exp).length === 0;
 }
 
 /** Что из перечня мест работы уедет на мост — и почему не уедет ничего. */
@@ -41,9 +45,9 @@ export function experienceGoing(rows) {
   return recordsGoing(
     rows,
     experienceReady,
-    (shown) =>
+    (shown, whole) =>
       `Место работы #${shown}: заполните компанию, должность и дату начала — `
-      + 'пока они пусты, оно не сохраняется.',
+      + `пока они пусты, ${whole ? 'перечень мест работы' : 'оно'} не сохраняется.`,
   );
 }
 
@@ -78,5 +82,6 @@ export const EXPERIENCE = {
     skill_names: [],
   }),
   going: experienceGoing,
+  missing: experienceMissing,
   leaving: (one) => `Удалить место работы «${one.company || 'без названия'}»?`,
 };

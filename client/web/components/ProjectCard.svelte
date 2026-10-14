@@ -6,8 +6,8 @@
   import RecordCard from './RecordCard.svelte';
   import StackField from './StackField.svelte';
 
-  // `held` — проект не сохранили из-за пустого названия: оно метится.
-  let { record, known, open, held, ontoggle, onedit, onremove } = $props();
+  // `missing` — пустые обязательные поля, из-за которых проект не сохранили.
+  let { record, known, open, missing, ontoggle, onedit, onremove } = $props();
 
   const title = $derived(projectTitle(record));
 </script>
@@ -16,7 +16,7 @@
   <div class="field-row">
     <input
       class="input"
-      class:missing={held && !record.name}
+      class:missing={missing.includes('name')}
       maxlength="255"
       placeholder="Название проекта"
       value={record.name}

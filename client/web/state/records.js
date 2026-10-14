@@ -23,17 +23,25 @@ function stored(one) {
  *
  * Задержанной (`held`) считается недозаполненная запись, которую человек уже
  * правил (`touched`) или которая лежит в базе: молча пропавшая, она выглядела
- * бы сохранённой. Про первую из них говорим её номером (`complaint`) — по тому
- * списку, который человек видит, а не по укороченной посылке. Нетронутая
- * свежая запись не задерживается: её только что завели.
+ * бы сохранённой. Нетронутая свежая запись не задерживается: её только что
+ * завели.
  *
  * Уже записанная не отсеивается никогда, чем бы её ни опустошили: мост
  * заменяет перечень целиком, и вычеркнутая из посылки была бы стёрта из базы
- * молча. Тогда не уезжает ничего (`going` пусто — `null`).
+ * молча. Тогда не уезжает ничего (`going` пусто — `null`), и говорим именно о
+ * ней: она держит весь перечень (`complaint` со вторым доводом). Иначе — о
+ * первой задержанной. Номер — по тому списку, который человек видит, а не по
+ * укороченной посылке.
  */
 export function recordsGoing(rows, ready, complaint) {
   const held = rows.filter((one) => !ready(one) && (stored(one) || Boolean(one.touched)));
-  const trouble = held.length ? complaint(rows.indexOf(held[0]) + 1) : '';
-  const going = held.some(stored) ? null : rows.filter(ready);
-  return { going, trouble, held };
+  const blocking = held.find(stored);
+  const named = blocking || held[0];
+  const trouble = named ? complaint(rows.indexOf(named) + 1, Boolean(blocking)) : '';
+  return { going: blocking ? null : rows.filter(ready), trouble, held };
+}
+
+/** Меняет ли правка запись: побывавшее в фокусе и оставленное как было — нет. */
+export function changes(one, part) {
+  return Object.entries(part).some(([name, value]) => one[name] !== value);
 }

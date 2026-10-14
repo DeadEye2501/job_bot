@@ -10,13 +10,14 @@
   import { living } from '$state/alive.js';
   import { toggled, without } from '$state/chosen.js';
   import { oneWrite } from '$state/one_write.js';
+  import { changes } from '$state/records.js';
 
   let { load, save: send, kind, Card } = $props();
 
   let leaving = $state(null);
   let trouble = $state('');
   // Ключи задержанных при последней записи карточек: их пустые обязательные
-  // поля метятся красным.
+  // поля (`kind.missing`) метятся красным.
   let held = $state(new Set());
 
   let loaded = $state(false);
@@ -70,6 +71,7 @@
   }
 
   function edit(key, part) {
+    if (!changes(rows.find((one) => one.key === key), part)) return undefined;
     rows = rows.map((one) => (one.key === key ? { ...one, ...part, touched: true } : one));
     return save();
   }
@@ -113,7 +115,7 @@
       record={one}
       {known}
       open={!closed.has(one.key)}
-      held={held.has(one.key)}
+      missing={held.has(one.key) ? kind.missing(one) : []}
       ontoggle={() => (closed = toggled(closed, one.key))}
       onedit={(part) => edit(one.key, part)}
       onremove={() => (leaving = one)}

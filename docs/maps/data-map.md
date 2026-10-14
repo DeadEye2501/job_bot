@@ -797,7 +797,7 @@
 - `WORK_FORMAT_LABELS_RU: dict[str, str]` = `словарь из 3`
 - `CEFR_LEVELS: tuple[str, ...]` = `набор из 6`
 - `NATIVE_LEVEL` = `'native'`
-- `NATIVE_SPELLINGS: tuple[str, ...]` = `набор из 7`
+- `NATIVE_SPELLINGS: tuple[str, ...]` = `набор из 20`
 - `LEVEL_SPELLINGS: dict[str, tuple[str, ...]]` = `словарь из 6`
 - `LEVELS_BY_SPELLING: tuple[tuple[str, str], ...]` = `tuple(sorted(((spelling.replace('-', ' '), level…`
 - `LEVEL_WHEN_UNTOLD: str` = `CEFR_LEVELS[-1]`
@@ -1013,6 +1013,7 @@
 
 ### `backend/llm/candidate.py`
 
+- `GENDER_WORDS` = `словарь из 2`
 - `class CandidateLanguage`
   - `name: str`
   - `level: str`
@@ -1055,6 +1056,7 @@
 - `logger` = `logging.getLogger(__name__)`
 - `_LEVEL_NEAR_CHARS` = `60`
 - `_STACK_WORDS` = `'(?:\\w+\\s+)?(?:стек|стэк)(?:\\s+\\w+)?|(?:\\w+…`
+- `_LINE_START_STACK_WORDS` = `'программ\\w*(?:\\s+и\\s+сервис\\w*)?|программно…`
 - `_STACK_HEADING_RE` = `re.compile(f'(?<!\\w)(?:{_STACK_WORDS})\\s*:|^[\…`
 
 ### `backend/llm/cv_native.py`
@@ -1106,15 +1108,15 @@
 
 ### `backend/llm/fit_place.py`
 
-- `logger` = `logging.getLogger(__name__)`
 - `PURPOSE` = `'validate_place_fit'`
 - `PLACE_FIT_PROMPT` = `'Ты проверяешь объявление о вакансии по ОДНОМУ к…`
+- `validate_place_fit` = `text_fit_question(PURPOSE, _prompt_for)`
 
 ### `backend/llm/fit_preferences.py`
 
-- `logger` = `logging.getLogger(__name__)`
 - `PURPOSE` = `'validate_preferences_fit'`
 - `PREFERENCES_FIT_PROMPT` = `'Ты проверяешь объявление о вакансии по ОДНОМУ к…`
+- `validate_preferences_fit` = `text_fit_question(PURPOSE, _prompt_for)`
 
 ### `backend/llm/fit_role.py`
 
@@ -1722,7 +1724,6 @@
 
 ### `backend/repository/agent_profile.py`
 
-- `GENDER_WORDS` = `словарь из 2`
 - `_PERIOD` = `словарь из 3`
 
 ### `backend/repository/aggregators.py`
@@ -2327,10 +2328,6 @@
 
 - `PLAN` = `SessionPlan(system_prompt='', task='', tools=[],…`
 
-### `tests/backend/test_agent_tools_browser.py`
-
-- `VACANCY` = `'https://site.test/vacancy/1'`
-
 ### `tests/backend/test_agent_tools_fill.py`
 
 - `FORM` = `'https://hh.ru/resume/edit'`
@@ -2379,7 +2376,6 @@
 ### `tests/backend/test_flows_aggregator_seek.py`
 
 - `pytestmark` = `pytest.mark.usefixtures('one_vector')`
-- `PAGE` = `'https://site.test/vacancy/1'`
 
 ### `tests/backend/test_flows_ghosting_timer.py`
 

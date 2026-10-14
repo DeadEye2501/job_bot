@@ -5,17 +5,15 @@ from datetime import date
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.salary import salary_text
-from backend.domain.tenure import full_years, place_period, skill_years, years_in_it
-from backend.llm.candidate import candidate_languages, format_languages
-from backend.models import Gender, SalaryPeriod
+from backend.domain.tenure import full_years, place_period, skill_years, years_in_it, years_text
+from backend.llm.candidate import GENDER_WORDS, candidate_languages, format_languages
+from backend.models import SalaryPeriod
 from backend.repository.profile import get_profile
 from backend.repository.profile_experience import list_experience
 from backend.repository.profile_languages import list_profile_languages
 from backend.repository.profile_projects import list_projects
 from backend.repository.profile_skills import list_skills
 
-GENDER_WORDS = {Gender.MALE: "мужской", Gender.FEMALE: "женский"}
-"""Пол словом — для анкеты агента и блока письма: род письма берётся отсюда."""
 _PERIOD = {SalaryPeriod.HOUR: "в час", SalaryPeriod.MONTH: "в месяц", SalaryPeriod.YEAR: "в год"}
 
 
@@ -135,9 +133,3 @@ def _project_lines(projects) -> list[str]:
             [("О проекте", p.about), ("Навыки", _skill_names(p))],
         )
     ]
-
-
-def years_text(years: int) -> str:
-    """Стаж словами — одной записью у анкеты агента и у блока письма. Меньше
-    года — словами: «0+ г.» модель пересказала бы как «0+ годами опыта»."""
-    return f"{years}+ г." if years else "меньше года"

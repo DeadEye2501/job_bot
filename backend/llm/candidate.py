@@ -4,10 +4,14 @@
 from dataclasses import dataclass, field
 
 from backend.domain.taxonomy import NATIVE_LEVEL
-from backend.models import Profile
+from backend.models import Gender, Profile
 from backend.models import ProfileLanguage
 from backend.models import ProfileSkill
 from backend.incoming import str_list
+
+
+GENDER_WORDS = {Gender.MALE: "мужской", Gender.FEMALE: "женский"}
+"""Пол словом — для анкеты агента и блока письма: род письма берётся отсюда."""
 
 
 @dataclass(frozen=True)

@@ -29,8 +29,7 @@ async def via_email(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome:
     Почта и резюме проверяются до письма: не с чем отправить — незачем ни
     писать, ни звать человека подтверждать. Резюме — файлом, а нет файла —
     ссылкой в конце письма."""
-    async with kit.pipeline.session_factory() as session:
-        account = await get_mail_account(session)
+    account = await kit.read(get_mail_account)
     resume = await resume_for_letter(kit.pipeline)
     if account is None:
         return Missed("почта для откликов не настроена")

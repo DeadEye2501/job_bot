@@ -2,7 +2,9 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { cardTitle, experienceGoing, experienceReady, period } from '../state/experience.js';
+import {
+  cardTitle, experienceGoing, experienceMissing, experienceReady, period,
+} from '../state/experience.js';
 
 describe('период в шапке карточки', () => {
   it('месяц и год с обеих сторон', () => {
@@ -34,6 +36,13 @@ describe('подпись свёрнутой карточки', () => {
     // Свежую карточку иначе не отличить от пустого места в списке.
     expect(cardTitle({ company: '', role: '', start_date: null, end_date: null }))
       .toEqual({ name: 'Без названия', role: '', period: '' });
+  });
+});
+
+describe('чего не хватает месту работы', () => {
+  it('называет пустые обязательные поля, пробелы — тоже пустота', () => {
+    expect(experienceMissing({ company: '  ', role: 'Повар', start_date: null }))
+      .toEqual(['company', 'start_date']);
   });
 });
 
@@ -107,6 +116,17 @@ describe('что из перечня мест работы уезжает на �
     const emptied = { ...FILLED, role: '' };
 
     expect(experienceGoing([emptied]).going).toBeNull();
+  });
+
+  it('держащую весь перечень называют её номером и говорят, что не сохраняется перечень', () => {
+    // Свежая недозаполненная стоит выше, но держит запись не она.
+    const begun = { ...FRESH, touched: true, company: 'Контур' };
+    const emptied = { ...FILLED, role: '' };
+
+    const { trouble } = experienceGoing([begun, emptied]);
+
+    expect(trouble).toContain('#2');
+    expect(trouble).toContain('перечень');
   });
 
   it('заведённая в этот заход и уже уехавшая тоже не отсеивается', () => {

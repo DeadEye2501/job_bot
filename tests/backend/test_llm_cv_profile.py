@@ -143,7 +143,8 @@ async def test_language_levels_come_back_uppercase():
 
 @pytest.mark.parametrize(
     "native",
-    ["native", "родной", "Native speaker", "родной язык", "носитель", "mother tongue"],
+    ["native", "родной", "Native speaker", "родной язык", "носитель", "mother tongue",
+     "Muttersprache", "lengua materna"],
 )
 async def test_a_native_language_is_recognised_in_both_spellings(native):
     """Родной язык распознаётся, каким бы словом его ни назвали."""

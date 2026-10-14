@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import VacanciesScreen from '../app/VacanciesScreen.svelte';
 import { hearRound } from '../state/round.svelte.js';
+import { sectionMemory } from '../state/section_memory.svelte.js';
 import { roundGoes } from './bridge_stub.js';
 import { livingProps } from './live_props.svelte.js';
 import { buttonBy, press } from './press.js';
@@ -77,6 +78,8 @@ function screen() {
     onchosen: () => {},
     openFilter: null,
     onfiltered: () => {},
+    view: sectionMemory().views.vacancies,
+    onview: () => {},
   });
   host = document.createElement('div');
   document.body.append(host);

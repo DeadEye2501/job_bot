@@ -47,7 +47,7 @@
   // как поломку, а не как «мастер сейчас откроется».
   let setup = $state(null);
   let section = $state(SECTIONS[0].key);
-  // Вкладка и открытая карточка каждого раздела.
+  // Вкладка и открытая карточка каждого раздела, отбор и порядок вакансий.
   const memory = heldMemory();
   let expanded = $state(false);
   // Чью карточку открыть, придя в раздел, — по ключу раздела: в контакты со
@@ -247,6 +247,8 @@
         onchosen={memory.remember('vacancies')}
         openFilter={openFilter}
         onfiltered={() => (openFilter = null)}
+        view={memory.views.vacancies}
+        onview={memory.keepView('vacancies')}
       />
     {:else if section === 'system'}
       <TopTabs tabs={SYSTEM_TABS} active={memory.tabs.system} onpick={memory.pickTab('system')} />
