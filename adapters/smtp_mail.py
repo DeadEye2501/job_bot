@@ -28,7 +28,7 @@ class OutgoingMail:
     to: str
     subject: str
     body: str
-    attachment: Path
+    attachment: Path | None
 
 
 def send_mail(account: MailAccountConfig, mail: OutgoingMail) -> None:
@@ -67,6 +67,8 @@ def _message(sender: str, mail: OutgoingMail) -> EmailMessage:
     message = EmailMessage()
     message["From"], message["To"], message["Subject"] = sender, mail.to, mail.subject
     message.set_content(mail.body)
+    if mail.attachment is None:
+        return message
     kind = mimetypes.guess_type(mail.attachment.name)[0] or "application/octet-stream"
     main, sub = kind.split("/", 1)
     message.add_attachment(

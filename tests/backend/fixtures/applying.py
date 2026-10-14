@@ -63,6 +63,16 @@ async def _pipeline(make_pipeline, *, simulated: bool, resume=None):
     return pipeline
 
 
+async def _resume_given(session_factory, tmp_path, resume: bool | str):
+    """Путь к резюме стенда. `True` — файл лежит; `False` — ни файла, ни ссылки;
+    строка — файла нет, а в анкете эта ссылка на резюме."""
+    if resume is True:
+        return resume_file(tmp_path, "cv.pdf")
+    if resume:
+        await put(session_factory, profile_row(resume_url=resume))
+    return tmp_path / "cv.pdf"
+
+
 @pytest.fixture
 def kit_with(make_pipeline):
     """Набор с водителем по сценарию; `send_locked` — симуляция отправки."""
@@ -94,11 +104,13 @@ def telegram_case(make_pipeline, session_factory, tmp_path, monkeypatch, outbox)
 
     `prior_letter` — этому HR уже писали о другой его вакансии; `flood_wait` —
     Telegram просит подождать столько секунд; `simulated` — симуляция отправки;
-    `hr_user_id` — HR известен ещё и номером учётной записи.
+    `hr_user_id` — HR известен ещё и номером учётной записи; `resume` — как в
+    `_resume_given`.
     """
 
-    async def make(*, prior_letter=False, flood_wait=None, simulated=False, hr_user_id=None):
-        resume = resume_file(tmp_path)
+    async def make(*, prior_letter=False, flood_wait=None, simulated=False, hr_user_id=None,
+                   resume=True):
+        cv = await _resume_given(session_factory, tmp_path, resume)
         vacancy = await telegram_vacancy(session_factory, hr_user_id=hr_user_id)
         if prior_letter:
             other = vacancy_row(hr_id=vacancy.hr_id, title="Прежняя")
@@ -107,7 +119,7 @@ def telegram_case(make_pipeline, session_factory, tmp_path, monkeypatch, outbox)
                                                    is_incoming=False, sent_at=days_ago(1)))
         if flood_wait is not None:
             outbox.error = FloodWait(value=flood_wait)
-        pipeline = await _pipeline(make_pipeline, simulated=simulated, resume=resume)
+        pipeline = await _pipeline(make_pipeline, simulated=simulated, resume=cv)
         pipeline.profile_block = "Иван Петров, Python-разработчик"
         _model_writes_the_letter(monkeypatch)
         return kit_for(pipeline, browser=FakeBrowser()), vacancy, outbox.sent
@@ -162,11 +174,11 @@ def mail_case(make_pipeline, session_factory, tmp_path, monkeypatch):
     """Вакансия с адресом HR, почта настроена, резюме есть, письмо от модели готово.
 
     `server_refuses` — сервер почты не принимает письмо; `simulated` — симуляция;
-    `mail` и `resume` — настроена ли почта и лежит ли файл резюме.
+    `mail` — настроена ли почта; `resume` — как в `_resume_given`.
     """
 
     async def make(*, server_refuses=False, simulated=False, mail=True, resume=True):
-        cv = resume_file(tmp_path, "cv.pdf") if resume else tmp_path / "cv.pdf"
+        cv = await _resume_given(session_factory, tmp_path, resume)
         if mail:
             await put(session_factory, mail_account_row())
         vacancy = vacancy_row()

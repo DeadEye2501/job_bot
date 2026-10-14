@@ -59,6 +59,21 @@ def test_a_letter_goes_out_with_the_resume_attached(monkeypatch, tmp_path):
     assert _FakeSmtp.logins == [("me@mail.test", "secret")]
 
 
+def test_a_letter_without_a_file_goes_out_bare(monkeypatch):
+    """Файла резюме нет — письмо уходит без вложения: ссылка на резюме в тексте."""
+    monkeypatch.setattr(_FakeSmtp, "sent", [])
+    monkeypatch.setattr("smtplib.SMTP_SSL", _FakeSmtp)
+
+    send_mail(
+        MailAccountConfig("me@mail.test", "smtp.mail.test", 465, "secret"),
+        OutgoingMail("hr@site.test", "Отклик", "Текст", None),
+    )
+
+    (message,) = _FakeSmtp.sent
+    assert message.get_content().strip() == "Текст"
+    assert list(message.iter_attachments()) == []
+
+
 def test_port_587_secures_the_line_before_the_login(monkeypatch, tmp_path):
     """На 587 сервер ждёт STARTTLS, а не шифрования с порога: `SMTP_SSL` там не подключится."""
     monkeypatch.setattr(_FakeSmtp, "sent", [])

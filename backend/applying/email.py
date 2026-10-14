@@ -11,6 +11,7 @@ from backend.agent.confirm import confirmed, text_item
 from backend.agent.kit import AgentKit
 from backend.agent.tools_applier import record_and_announce
 from backend.agent.tools_letter import letter_ask
+from backend.applying.resume_link import resume_for_letter
 from backend.applying.result import GONE, Dropped, Missed, Outcome, delivered
 from backend.domain.apply_order import Way
 from backend.llm.agent_letter import write_letter
@@ -26,10 +27,11 @@ async def via_email(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome:
     не записанное письмо дало бы второе на следующем отклике.
 
     Почта и резюме проверяются до письма: не с чем отправить — незачем ни
-    писать, ни звать человека подтверждать."""
+    писать, ни звать человека подтверждать. Резюме — файлом, а нет файла —
+    ссылкой в конце письма."""
     async with kit.pipeline.session_factory() as session:
         account = await get_mail_account(session)
-    resume = kit.pipeline.cv_file()
+    resume = await resume_for_letter(kit.pipeline)
     if account is None:
         return Missed("почта для откликов не настроена")
     if resume is None:
@@ -41,11 +43,12 @@ async def via_email(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome:
     if letter is None:
         return Missed(f"письмо не написано: {'; '.join(issues)}")
     # Тема тоже уходит работодателю: подтверждается вместе с письмом.
-    kept = await confirmed(kit, vacancy_id, [text_item("Тема", letter.subject), text_item("", letter.body)])
+    kept = await confirmed(kit, vacancy_id, [text_item("Тема", letter.subject),
+                                             text_item("", resume.under(letter.body))])
     if isinstance(kept, Dropped):
         return kept
     # Тема — одной строкой: перевод строки в заголовке письмо не соберёт.
-    mail = OutgoingMail(way.target, " ".join(kept[0]["value"].split()), kept[1]["value"], resume)
+    mail = OutgoingMail(way.target, " ".join(kept[0]["value"].split()), kept[1]["value"], resume.file)
     sending = asyncio.ensure_future(_send_and_record(kit, vacancy_id, account, mail))
     return await asyncio.shield(sending)
 

@@ -284,7 +284,7 @@ Claude через установленный Claude Code по подписке: 
 - `def _vector(tag) -> bool` (2)
 - `def _hints(soup: BeautifulSoup) -> SiteHints` (10)
 
-### `adapters/smtp_mail.py` — 75 строк
+### `adapters/smtp_mail.py` — 77 строк
 
 Отправка письма по SMTP с вложением, под паролем приложения.
 
@@ -294,7 +294,7 @@ Claude через установленный Claude Code по подписке: 
 - `class OutgoingMail` (5)
 - `def send_mail(account: MailAccountConfig, mail: OutgoingMail) -> None` (19)
 - `def _part(smtp) -> None` (9)
-- `def _message(sender: str, mail: OutgoingMail) -> EmailMessage` (10)
+- `def _message(sender: str, mail: OutgoingMail) -> EmailMessage` (12)
 
 ### `adapters/telegram.py` — 222 строк
 
@@ -387,7 +387,7 @@ resume autofill
 - `def upgrade() -> None` (22)
 - `def downgrade() -> None` (14)
 
-## backend — 198 модулей
+## backend — 199 модулей
 
 ### `backend/agent/__init__.py` — 1 строк
 
@@ -687,13 +687,13 @@ resume autofill
 - `async def _apply_plan(kit: AgentKit, job: ApplyJob) -> SessionPlan | None` (15)
 - `def _settle(job: ApplyJob, way: Way) -> Outcome` (16)
 
-### `backend/applying/email.py` — 66 строк
+### `backend/applying/email.py` — 69 строк
 
 Отклик письмом без агента: модель приложения пишет, сервер почты принимает,
 
-Зависит от: `adapters`, `adapters.smtp_mail`, `backend.agent.confirm`, `backend.agent.kit`, `backend.agent.tools_applier`, `backend.agent.tools_letter`, `backend.applying.result`, `backend.domain.apply_order`, `backend.llm.agent_letter`, `backend.models`, `backend.repository.applications`, `backend.repository.mail_account`
+Зависит от: `adapters`, `adapters.smtp_mail`, `backend.agent.confirm`, `backend.agent.kit`, `backend.agent.tools_applier`, `backend.agent.tools_letter`, `backend.applying.result`, `backend.applying.resume_link`, `backend.domain.apply_order`, `backend.llm.agent_letter`, `backend.models`, `backend.repository.applications`, `backend.repository.mail_account`
 
-- `async def via_email(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome` (27)
+- `async def via_email(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome` (29)
 - `async def _send_and_record(kit: AgentKit, vacancy_id: int, account: MailAccountConfig, mail: OutgoingMail) -> Outcome` (14)
 
 ### `backend/applying/result.py` — 64 строк
@@ -707,6 +707,16 @@ resume autofill
 - `class Missed` (5)
 - `class Unfit` (7)
 - `async def delivered(record: Awaitable, vacancy_id: int) -> Outcome` (11)
+
+### `backend/applying/resume_link.py` — 38 строк
+
+Резюме к письму: файл, а нет файла — ссылка на резюме из анкеты.
+
+Зависит от: `backend.repository.profile`
+
+- `class LetterResume` (13)
+  - `def under(self, body: str) -> str` (7)
+- `async def resume_for_letter(pipeline) -> LetterResume | None` (10)
 
 ### `backend/applying/run.py` — 80 строк
 
@@ -741,11 +751,11 @@ resume autofill
 - `async def note_flood_wait(rs, error) -> float` (14)
 - `async def clear_flood_wait(rs) -> None` (8)
 
-### `backend/applying/telegram_letter.py` — 106 строк
+### `backend/applying/telegram_letter.py` — 107 строк
 
 Письмо HR в Telegram: полное с резюме или короткое вдогон.
 
-Зависит от: `backend.llm.cover_letter`, `backend.models`, `backend.payloads`
+Зависит от: `backend.applying.resume_link`, `backend.llm.cover_letter`, `backend.models`, `backend.payloads`
 
 - `class Letter` (9)
 - `def format_channel_ref(channel_username: str | None) -> str | None` (8)
@@ -904,7 +914,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def run(bot, *, once: bool=False) -> None` (39)
 - `async def persist_session_if_changed(bot) -> None` (25)
 
-### `backend/bot/media.py` — 170 строк
+### `backend/bot/media.py` — 189 строк
 
 Вложения: распознание, кэш и скачивание.
 
@@ -918,6 +928,8 @@ First-run bootstrap: ensure DB schema exists.
 - `def cache_sent_file(src: Path, hr_id: int, tg_message_id: int, *, as_photo: bool) -> str | None` (24)
 - `def media_path_for_db(path) -> str` (11)
 - `def stored_media(relative: str) -> Path | None` (5)
+- `def copy_profile_photo(source: Path) -> str` (10)
+- `def drop_stored_media(relative: str) -> None` (5)
 - `async def download_media(client, msg, hr_id: int) -> str | None` (25)
 
 ### `backend/bot/pasted.py` — 38 строк
@@ -2996,7 +3008,7 @@ Runtime settings layer.
 - `def _remove_the_data() -> list[str]` (27)
 - `async def wipe_all(engine) -> list[str]` (28)
 
-## client — 51 модулей
+## client — 52 модулей
 
 ### `client/bridge/__init__.py` — 23 строк
 
@@ -3425,6 +3437,19 @@ Runtime settings layer.
 
 - `def _log_invalid_payload(slot: str, exc: Exception) -> None` (8)
 
+### `client/bridge/photo.py` — 56 строк
+
+Фото человека, которое окно показывает в анкете: выбрать копией и убрать.
+
+Зависит от: `backend.bot.media`, `backend.repository.app_settings`, `client.bridge.answer`, `client.bridge.desktop`
+
+- `class Photo` (41)
+  - `def pick_photo(self) -> dict` (6)
+  - `def _store_photo(self, source: Path) -> dict` (17)
+    - `async def run() -> dict` (7)
+  - `def clear_photo(self) -> dict` (9)
+    - `async def run() -> dict` (4)
+
 ### `client/bridge/pickers.py` — 130 строк
 
 Списки кандидатов, которые окно показывает в модалке выбора.
@@ -3436,15 +3461,15 @@ Runtime settings layer.
 - `async def merge_picker(session, subject: PickerSubject, absorbed_id: int, search: str | None) -> dict` (21)
 - `async def link_picker(session, subject: PickerSubject, vacancy, search: str | None) -> dict` (18)
 
-### `client/bridge/profile.py` — 204 строк
+### `client/bridge/profile.py` — 207 строк
 
 Анкета соискателя: сведения о себе, навыки, места работы и проекты.
 
-Зависит от: `backend.domain.salary`, `backend.domain.taxonomy`, `backend.incoming`, `backend.models`, `backend.payloads`, `backend.repository`, `backend.repository.profile_records`, `client.bridge.answer`, `client.bridge.choices`, `client.bridge.cv`, `client.bridge.cv_file`, `client.bridge.hub`, `client.bridge.refusals`, `client.bridge.wire`
+Зависит от: `backend.domain.salary`, `backend.domain.taxonomy`, `backend.incoming`, `backend.models`, `backend.payloads`, `backend.repository`, `backend.repository.profile_records`, `client.bridge.answer`, `client.bridge.choices`, `client.bridge.cv`, `client.bridge.cv_file`, `client.bridge.hub`, `client.bridge.media`, `client.bridge.photo`, `client.bridge.refusals`, `client.bridge.wire`
 
-- `class Profile(Cv)` (135)
-  - `def get(self) -> dict` (19)
-    - `async def run() -> dict` (14)
+- `class Profile(Cv, Photo)` (136)
+  - `def get(self) -> dict` (20)
+    - `async def run() -> dict` (15)
   - `def save(self, payload: dict) -> dict` (22)
     - `async def run() -> dict` (8)
   - `def skills(self) -> dict` (9)
@@ -3793,7 +3818,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 328 модулей
+## tests — 329 модулей
 
 ### `tests/adapters/test_agent_mcp.py` — 85 строк
 
@@ -3940,13 +3965,13 @@ Runtime settings layer.
 Тестов: 4
 
 
-### `tests/adapters/test_smtp_mail.py` — 98 строк
+### `tests/adapters/test_smtp_mail.py` — 113 строк
 
 Письмо уходит по SMTP с вложенным резюме и входом под паролем приложения.
 
 Зависит от: `adapters.smtp_mail`, `tests.factories`
 
-Тестов: 3
+Тестов: 4
 
 - `class _FakeSmtp` (31)
   - `def __enter__(self)` (2)
@@ -3983,7 +4008,7 @@ Runtime settings layer.
 
 - `async def web_search(session_factory) -> Aggregator` (4)
 
-### `tests/backend/fixtures/applying.py` — 191 строк
+### `tests/backend/fixtures/applying.py` — 203 строк
 
 Стенд откликателя: набор агента и вакансии, на которые есть чем откликнуться.
 
@@ -3993,11 +4018,12 @@ Runtime settings layer.
 - `def board(session_factory)` (13)
   - `async def make(**vacancy)` (8)
 - `async def _pipeline(make_pipeline, *, simulated: bool, resume=None)` (7)
+- `async def _resume_given(session_factory, tmp_path, resume: bool | str)` (8)
 - `def kit_with(make_pipeline)` (7)
   - `async def make(steps, *, send_locked=False)` (2)
 - `async def two_vacancies(session_factory)` (12)
-- `def telegram_case(make_pipeline, session_factory, tmp_path, monkeypatch, outbox)` (24)
-  - `async def make(*, prior_letter=False, flood_wait=None, simulated=False, hr_user_id=None)` (14)
+- `def telegram_case(make_pipeline, session_factory, tmp_path, monkeypatch, outbox)` (26)
+  - `async def make(*, prior_letter=False, flood_wait=None, simulated=False, hr_user_id=None, resume=True)` (15)
 - `def manual_case(make_bot, session_factory, tmp_path, monkeypatch)` (21)
   - `async def make(*, status=VacancyStatus.NEW, hang=False)` (14)
 - `async def telegram_vacancy(session_factory, *, hr_user_id=None, status=VacancyStatus.NEW)` (7)
@@ -4325,13 +4351,13 @@ Runtime settings layer.
 - `def _silent(payload)` (2)
 - `async def _confirming(kit, answer, *, limit=3600.0)` (7)
 
-### `tests/backend/test_applying_email.py` — 91 строк
+### `tests/backend/test_applying_email.py` — 110 строк
 
 Отклик письмом: модель приложения пишет, сервер почты принимает, отклик записывается.
 
 Зависит от: `backend.applying.email`, `backend.applying.result`, `backend.models`, `tests.backend.fixtures.applying`, `tests.dbio`, `tests.waiting`
 
-Тестов: 8
+Тестов: 10
 
 
 ### `tests/backend/test_applying_run.py` — 118 строк
@@ -4346,13 +4372,13 @@ Runtime settings layer.
   - `def fake(method)` (5)
     - `async def execute(kit, vacancy_id, way)` (3)
 
-### `tests/backend/test_applying_telegram.py` — 75 строк
+### `tests/backend/test_applying_telegram.py` — 104 строк
 
 Отклик в Telegram: письмо, доставка и след в базе.
 
 Зависит от: `backend.applying.result`, `backend.applying.telegram`, `backend.models`, `tests.backend.fixtures.applying`, `tests.dbio`, `tests.factories`
 
-Тестов: 7
+Тестов: 10
 
 
 ### `tests/backend/test_applying_telegram_letter.py` — 84 строк
@@ -6674,6 +6700,17 @@ Runtime settings layer.
 Тестов: 4
 
 
+### `tests/client/test_bridge_photo.py` — 79 строк
+
+Фото человека: выбор файлом, копия в каталоге медиа, показ и очистка.
+
+Зависит от: `backend.bot.media`, `client.bridge.media`, `tests.client.conftest`
+
+Тестов: 7
+
+- `def _photo(tmp_path, name: str='я.jpg', content: bytes=b'jpeg')` (4)
+- `async def _picked(api, ask, hub, source)` (3)
+
 ### `tests/client/test_bridge_profile.py` — 344 строк ⚠ подошёл к 300
 
 Следствия слотов анкеты — того, что человек рассказывает о себе.
@@ -7407,6 +7444,7 @@ Runtime settings layer.
 - `Login` — наследник один: `Settings`
 - `Mail` — наследник один: `Settings`
 - `Model` — наследник один: `Failing`
+- `Photo` — наследник один: `Profile`
 - `Silent` — наследник один: `Stoppable`
 - `VacancyActions` — наследник один: `Vacancies`
 - `VacancyContacts` — наследник один: `Vacancies`

@@ -2,7 +2,7 @@
 
 import time
 
-from backend.applying.result import TelegramClosed
+from backend.applying.result import Missed, TelegramClosed
 from backend.applying.telegram import via_telegram
 from backend.models import Application, ApplicationVia, Message, VacancyEvent
 from tests.backend.fixtures.applying import TG
@@ -18,6 +18,35 @@ async def test_the_first_letter_goes_with_the_resume(telegram_case):
     assert attachment is not None
     (row,) = await all_rows(kit.pipeline.session_factory, Application)
     assert row.via is ApplicationVia.TELEGRAM and row.target == "@hr_name"
+
+
+async def test_without_a_file_the_letter_goes_with_the_resume_link(telegram_case):
+    """Строку дописывает код после модели и её проверки: проверка, отбивающая
+    слово «резюме», её не видит."""
+    kit, vacancy, sent = await telegram_case(resume="https://hh.ru/resume/1")
+
+    assert await via_telegram(kit, vacancy.id, TG) == "applied"
+
+    ((_, text, attachment),) = sent
+    assert attachment is None
+    assert text.splitlines()[-1] == "Резюме: https://hh.ru/resume/1"
+
+
+async def test_without_a_file_or_link_the_letter_is_not_sent(telegram_case):
+    kit, vacancy, sent = await telegram_case(resume=False)
+
+    outcome = await via_telegram(kit, vacancy.id, TG)
+
+    assert outcome == Missed("письмо не готово: cv_missing") and sent == []
+
+
+async def test_a_letter_with_the_file_gets_no_link_line(telegram_case):
+    kit, vacancy, sent = await telegram_case()
+
+    await via_telegram(kit, vacancy.id, TG)
+
+    ((_, text, _),) = sent
+    assert "Резюме:" not in text
 
 
 async def test_a_second_vacancy_of_the_same_hr_gets_a_short_note(telegram_case):

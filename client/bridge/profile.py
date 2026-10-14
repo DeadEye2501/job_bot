@@ -24,6 +24,8 @@ from client.bridge.choices import _filter_languages
 from client.bridge.cv import Cv
 from client.bridge.cv_file import _stat_cv
 from client.bridge.hub import Hub
+from client.bridge.media import _media_url
+from client.bridge.photo import Photo
 from client.bridge.refusals import PROFILE_FIRST
 from client.bridge.wire import (
     _exp_to_dict,
@@ -33,11 +35,11 @@ from client.bridge.wire import (
 )
 
 
-class Profile(Cv):
+class Profile(Cv, Photo):
     """Экран «Профиль» целиком: чем окно спрашивает анкету и чем правит.
 
-    Файл резюме — у примеси рядом: сама анкета и файл, к которому она
-    прилагается, живут порознь и правятся порознь, а окно видит их одним
+    Файл резюме и фото — у примесей рядом: сама анкета и файлы, которые к ней
+    прилагаются, живут порознь и правятся порознь, а окно видит их одним
     экраном.
 
     Секреты: анкета отдаётся окну как есть — почта, телефон, ник в Telegram,
@@ -64,6 +66,7 @@ class Profile(Cv):
                 "profile": _profile_to_dict(profile, languages),
                 "cv_path": cv_path,
                 "cv_meta": _stat_cv(cv_path),
+                "photo_url": _media_url(self._hub.rs.photo_path),
             }
 
         return reply(self._hub.runner, run())
