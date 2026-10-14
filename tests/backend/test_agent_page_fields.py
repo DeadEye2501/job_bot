@@ -7,10 +7,9 @@
 import time
 
 import pytest
-from playwright.async_api import async_playwright
 
-from adapters.browser import find_browser
 from backend.agent.page_fields import PageField, field_or_none, page_field
+from tests.backend.fixtures.real_page import page_with
 
 FORM = """
 <input type=checkbox id=plain><label for=plain id=plain-label>Согласен</label>
@@ -28,16 +27,8 @@ FORM = """
 
 @pytest.fixture
 async def page():
-    browser = find_browser()
-    if browser is None:
-        pytest.skip("на машине нет Chrome или Edge — скрипт исполнять негде")
-    async with async_playwright() as playwright:
-        launched = await playwright.chromium.launch(
-            channel=browser.channel, executable_path=str(browser.executable) if browser.executable else None)
-        one = await launched.new_page()
-        await one.set_content(FORM)
+    async with page_with(FORM) as one:
         yield one
-        await launched.close()
 
 
 @pytest.mark.parametrize("selector", ["#plain", "#plain-label", "#wrapped", "#fancy", "#fancy-inner"])

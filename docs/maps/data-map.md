@@ -371,7 +371,15 @@
 
 - `logger` = `logging.getLogger(__name__)`
 - `_WAIT_MS` = `15000`
-- `_FIELD_OF` = `"el => {\n  const FIELD = 'input, select, textar…`
+- `_RULES` = `"\n  const FIELD = 'input, select, textarea, [ro…`
+- `_FIELD_OF` = `'el => {' + _RULES + "\n  const target = (el.mat…`
+- `_INVENTORY` = `'() => {' + _RULES + '\n  const SKIP = [\'hidden…`
+- `class FieldEntry(NamedTuple)`
+  - `selector: str`
+  - `label: str`
+  - `kind: str`
+  - `required: bool`
+  - `options: list[str]`
 - `class PageField(NamedTuple)`
   - `kind: str`
   - `group: str`
@@ -2242,6 +2250,12 @@
 ### `tests/backend/test_agent_page_fields.py`
 
 - `FORM` = `'\n<input type=checkbox id=plain><label for=plai…`
+
+### `tests/backend/test_agent_page_fields_inventory.py`
+
+- `FORM` = `'\n<label for=city>Город</label><input id=city r…`
+- `MESSY` = `'\n<label>Город <select name=city><option>Москва…`
+- `STYLED` = `'\n<input type=checkbox id=remote style="display…`
 
 ### `tests/backend/test_agent_prompts.py`
 
