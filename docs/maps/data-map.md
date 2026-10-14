@@ -1608,6 +1608,9 @@
   - `channel: TelegramChannel`
   - `stats: SourceStats`
   - `blacklist_value: str | None` = `None`
+- `class SeenResume`
+  - `title: str`
+  - `url: str`
 - `class VacancyFilter`
   - `sort: str` = `'newest'`
   - `search: str | None` = `None`
