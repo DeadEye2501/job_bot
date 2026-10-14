@@ -494,7 +494,7 @@ resume autofill
 
 - `def applier_task(job, vacancy_text: str, profile_text: str, today: date) -> str` (21)
 
-### `backend/agent/prompts/fill.py` — 42 строк
+### `backend/agent/prompts/fill.py` — 43 строк
 
 Заполнение резюме на сайте агрегатора по анкете человека.
 
@@ -655,16 +655,18 @@ resume autofill
 - `def _report_failure(job: ApplyJob) -> Callable` (9)
   - `async def report_failure(reason: str) -> str` (6)
 
-### `backend/agent/tools_fill.py` — 105 строк
+### `backend/agent/tools_fill.py` — 120 строк
 
 Инструменты заполнения резюме: раскладка страницы и остановка за нехваткой данных.
 
 Зависит от: `backend.agent.confirm`, `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.page_fields`, `backend.agent.tools_letter`, `backend.llm.fill_review`
 
 - `class LayoutItem(ConfirmItem)` (5)
-- `def fill_tools(kit: AgentKit, job: FillJob) -> list[Callable]` (30)
-  - `async def submit_layout(items: list[LayoutItem]) -> str` (18)
+- `def fill_tools(kit: AgentKit, job: FillJob) -> list[Callable]` (28)
+  - `async def submit_layout(items: list[LayoutItem]) -> str` (16)
   - `async def report_required_missing(labels: list[str]) -> str` (6)
+- `def _known(job: FillJob, url: str, item: dict) -> bool` (4)
+- `def _skipped(job: FillJob, url: str, inventory: list) -> list[str]` (9)
 - `def _unfit(job: FillJob, url: str, items: list[dict]) -> dict[str, str]` (9)
 - `async def _reviewed(job: FillJob, url: str, fallbacks: list[dict], review: Callable) -> dict[str, str]` (20)
 - `def _why(reason: str, field: str | None) -> str` (2)
@@ -1733,13 +1735,13 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _recover_one(pipeline, row) -> bool` (20)
 - `async def recover_orphan_vacancies(pipeline) -> int` (47)
 
-### `backend/flows/resume_fill.py` — 85 строк
+### `backend/flows/resume_fill.py` — 86 строк
 
 Заполнение резюме на сайте агрегатора по анкете.
 
 Зависит от: `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.prompts.fill`, `backend.agent.sessions`, `backend.agent.tools_browser`, `backend.agent.tools_fill`, `backend.flows.aggregator_scan`, `backend.repository.aggregator_resumes`
 
-- `async def fill(kit: AgentKit, source: Source, resume_id: int | None) -> str` (29)
+- `async def fill(kit: AgentKit, source: Source, resume_id: int | None) -> str` (30)
 - `async def _links(kit: AgentKit, aggregator_id: int) -> dict[int, str]` (4)
 - `async def _mark_filled(kit: AgentKit, aggregator_id: int, resume_url: str | None, before: set[str]) -> None` (17)
   - `async def mark(session) -> None` (9)
@@ -3596,7 +3598,7 @@ Runtime settings layer.
 - `def _photo_url(relative: str) -> str | None` (11)
 - `def _read_profile_fields(payload: dict) -> dict` (32)
 
-### `client/bridge/refusals.py` — 309 строк ⚠ подошёл к 300
+### `client/bridge/refusals.py` — 311 строк ⚠ подошёл к 300
 
 Слова, которыми мост отказывает окну.
 
@@ -4427,13 +4429,13 @@ Runtime settings layer.
 - `class _Gate` (7)
   - `async def wait(self, kind, host, _browser)` (3)
 
-### `tests/backend/test_agent_tools_fill.py` — 119 строк
+### `tests/backend/test_agent_tools_fill.py` — 139 строк
 
 Раскладка страницы при заполнении резюме: что принимается сразу, что идёт к
 
 Зависит от: `backend.agent`, `backend.agent.jobs`, `backend.agent.tools_fill`, `backend.llm.fill_review`, `backend.payloads`, `tests.fakes.agent`, `tests.fakes.browser`
 
-Тестов: 7
+Тестов: 9
 
 - `def stand(monkeypatch, make_pipeline)` (24)
   - `async def make(verdicts=None)` (18)
@@ -7071,7 +7073,7 @@ Runtime settings layer.
 - `def _values(module: str, name: str) -> list[str]` (3)
 - `def _skip_reasons_the_backend_writes() -> set[str]` (18)
 
-### `tests/client/test_messages_without_dot.py` — 46 строк
+### `tests/client/test_messages_without_dot.py` — 53 строк
 
 Итоги и отказы, которые окно показывает человеку строкой или плашкой, — без
 
@@ -7080,7 +7082,8 @@ Runtime settings layer.
 Тестов: 2
 
 - `def _texts_of(module) -> list[str]` (11)
-- `def _launch_texts() -> list[str]` (9)
+- `def _launch_texts() -> list[str]` (8)
+- `def _tail(arg) -> str | None` (5)
 
 ### `tests/client/test_page_contract.py` — 158 строк
 
@@ -7265,11 +7268,11 @@ Runtime settings layer.
 - `def parsed_cv_project(**overrides) -> ParsedCvProject` (3)
 - `def parsed_cv(**overrides) -> ParsedCv` (11)
 
-### `tests/fakes/agent.py` — 173 строк
+### `tests/fakes/agent.py` — 174 строк
 
 Набор сессии агента без браузера, водителя и человека.
 
-Зависит от: `backend.agent.human_gate`, `backend.agent.jobs`, `backend.agent.kit`, `backend.domain.apply_order`, `backend.payloads`, `tests.fakes.browser`
+Зависит от: `backend.agent.human_gate`, `backend.agent.jobs`, `backend.agent.kit`, `backend.domain.apply_order`, `backend.payloads`, `tests.factories_aggregators`, `tests.fakes.browser`
 
 - `class LimitHit(Exception)` (2)
 - `def tool(tools, name)` (3)

@@ -39,7 +39,7 @@ class Photo:
             return closed_dialog()
         source = Path(path)
         if source.stat().st_size > PHOTO_SIZE_LIMIT:
-            return denied(f"Фото больше {PHOTO_SIZE_LIMIT // (1024 * 1024)} МБ.")
+            return denied(f"Фото больше {PHOTO_SIZE_LIMIT // (1024 * 1024)} МБ")
         return {"ok": {"image": image_data_url(source.read_bytes())}}
 
     def store_photo(self, image: str) -> dict:
@@ -52,7 +52,7 @@ class Photo:
         blob = _image_bytes(image)
         suffix = PHOTO_SUFFIXES.get(image_type(blob[:12]) if blob else None)
         if suffix is None:
-            return denied("Это не фото.")
+            return denied("Это не фото")
 
         async def run() -> dict:
             previous = self._hub.rs.photo_path

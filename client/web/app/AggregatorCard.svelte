@@ -16,11 +16,11 @@
   import ResumeList from '$components/ResumeList.svelte';
   import SourceStats from '$components/SourceStats.svelte';
   import {
-    LOGIN_FIRST,
     actionBlock,
     aggregatorWhere,
     loginMark,
     newResumeTip,
+    siteTip,
   } from '$state/aggregators.js';
   import { cardBlocking } from '$state/card_block.js';
   import { cardFinish } from '$state/card_finish.js';
@@ -69,7 +69,7 @@
   const block = $derived(
     actionBlock({ blocked: !!card?.blacklist_value, running: round.running, lock, lockedTip }),
   );
-  const runTip = $derived(block || (card && !card.is_logged_in ? LOGIN_FIRST : ''));
+  const runTip = $derived(card ? siteTip(card, block) : '');
   const createTip = $derived(card ? newResumeTip(card, block) : '');
   const dropTip = $derived(round.running ? RUNNING : '');
 
@@ -78,35 +78,21 @@
     source.more(aggregatorId);
   }
 
-  /** Войти на сайт: мост открывает видимый браузер, чем кончилось — скажет весть. */
-  async function login() {
-    const done = await ask('aggregators.login', aggregatorId);
-    if (done !== null) say(`Войдите на ${card.host} в открывшемся окне и закройте его`);
+  /** Пустить работу агента на сайте: мост отвечает «пущено» — сказать, что
+   *  пошло; чем кончилось, скажет весть. */
+  async function launch(method, payload, started) {
+    const done = await ask(method, payload);
+    if (done !== null) say(started);
   }
 
-  async function runNow() {
-    const done = await ask('aggregators.run_now', aggregatorId);
-    if (done !== null) say('Обход источника запущен');
-  }
-
-  /** Пересканировать резюме: агент перечисляет их на сайте, итог скажет весть. */
-  async function scan() {
-    const done = await ask('aggregators.scan', aggregatorId);
-    if (done !== null) say('Резюме обновляются');
-  }
-
-  /** Заполнить резюме по анкете: агент работает на сайте, итог скажет весть. */
-  async function fillResume(resumeId) {
-    const payload = { aggregator_id: aggregatorId, resume_id: resumeId };
-    const done = await ask('aggregators.fill_resume', payload);
-    if (done !== null) say('Резюме заполняется');
-  }
-
-  /** Завести новое резюме по анкете: агент создаёт и заполняет, итог скажет весть. */
-  async function createResume() {
-    const done = await ask('aggregators.create_resume', aggregatorId);
-    if (done !== null) say('Новое резюме заполняется');
-  }
+  /** Войти на сайт: мост открывает видимый браузер. */
+  const login = () =>
+    launch('aggregators.login', aggregatorId, `Войдите на ${card.host} в открывшемся окне и закройте его`);
+  const runNow = () => launch('aggregators.run_now', aggregatorId, 'Обход источника запущен');
+  const scan = () => launch('aggregators.scan', aggregatorId, 'Резюме обновляются');
+  const fillResume = (resumeId) =>
+    launch('aggregators.fill_resume', { aggregator_id: aggregatorId, resume_id: resumeId }, 'Резюме заполняется');
+  const createResume = () => launch('aggregators.create_resume', aggregatorId, 'Новое резюме заполняется');
 
   async function chooseResume(resumeId) {
     await ask('aggregators.choose_resume', { aggregator_id: aggregatorId, resume_id: resumeId });

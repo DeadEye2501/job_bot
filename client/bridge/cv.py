@@ -70,7 +70,7 @@ class Cv:
         payload = payload if isinstance(payload, dict) else {}
         path = str(payload.get("path") or "").strip()
         if not path:
-            return denied("Путь пустой.")
+            return denied("Путь пустой")
 
         async def run() -> dict:
             await self._hub.rs.set_app(CV_PATH_KEY, path)
@@ -92,10 +92,10 @@ class Cv:
         """
         cv_path = self._hub.rs.cv_path
         if not cv_path:
-            return denied("Резюме не выбрано.")
+            return denied("Резюме не выбрано")
         chat = self._hub.rs.chat
         if chat is None:
-            return denied("Модель не выбрана — вернитесь на шаг выбора модели.")
+            return denied("Модель не выбрана — вернитесь на шаг выбора модели")
         return launched(
             self._hub,
             lambda: _parse_into_profile(self._hub, Path(cv_path), chat),
@@ -111,12 +111,12 @@ class Cv:
         """
         cv_path = self._hub.rs.cv_path
         if not cv_path:
-            return denied("Резюме не выбрано.")
+            return denied("Резюме не выбрано")
         # Полным путём: настройки помнят его таким, каким назвал человек, а
         # система открывает от своего рабочего каталога — у собранного
         # приложения он чужой.
         if not open_in_system(str(Path(cv_path).resolve())):
-            return denied("Не удалось открыть резюме.", path=cv_path)
+            return denied("Не удалось открыть резюме", path=cv_path)
         return {"ok": {"path": cv_path}}
 
 

@@ -127,7 +127,7 @@ async def test_a_link_the_system_would_not_open_is_named_a_refusal(
     answer = await ask(api.system.open_url, "https://example.test/vacancy")
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "Не удалось открыть ссылку."
+    assert answer["detail"] == "Не удалось открыть ссылку"
 
 
 async def test_an_attachment_the_system_would_not_open_is_named_a_refusal(

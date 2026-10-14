@@ -23,14 +23,15 @@ logger = logging.getLogger(__name__)
 async def fill(kit: AgentKit, source: Source, resume_id: int | None) -> str:
     """Перезаписать резюме `resume_id` или завести новое (пусто).
 
-    Ответ — `ok`, `required_missing` (обязательному полю не хватило данных:
+    Ответ — `ok`, `no_resume` (перезаписываемого резюме у сайта нет — агент не
+    запускается), `required_missing` (обязательному полю не хватило данных:
     перечня и отметки нет), `error` (агент не довёл работу до конца) или
     ответ перечня, если он не удался. Заполненное резюме становится
     отмеченным: это единственная отметка, которую ставит не человек.
     """
     before = await _links(kit, source.id)
     if resume_id is not None and resume_id not in before:
-        return "missing"
+        return "no_resume"
     resume_url = before.get(resume_id)
     await kit.browser.open_profile(source.id)
     job = FillJob(source, resume_url)

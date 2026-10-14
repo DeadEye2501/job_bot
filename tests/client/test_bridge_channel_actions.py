@@ -35,7 +35,7 @@ async def test_an_empty_name_is_refused_before_the_bot(api, ask, with_bot):
     answer = await ask(api.channels.create, {"input": "   "})
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "Укажите @username или ссылку на канал."
+    assert answer["detail"] == "Укажите @username или ссылку на канал"
     assert bot.calls == []
 
 

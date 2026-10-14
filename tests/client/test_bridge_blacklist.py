@@ -40,7 +40,7 @@ async def test_an_unknown_kind_is_refused(api, ask):
     )
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "Неверный тип записи."
+    assert answer["detail"] == "Неверный тип записи"
 
 
 async def test_an_empty_value_is_refused(api, ask):

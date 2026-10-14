@@ -31,7 +31,7 @@ async def test_an_empty_path_is_refused(api, ask):
     answer = await ask(api.profile._replace, {"path": "   "})
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "Путь пустой."
+    assert answer["detail"] == "Путь пустой"
 
 
 async def test_a_replaced_resume_shows_up_in_the_profile(api, ask, tmp_path):
@@ -77,7 +77,7 @@ async def test_a_resume_nobody_chose_is_not_handed_to_the_system(api, ask):
     answer = await ask(api.profile.open)
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "Резюме не выбрано."
+    assert answer["detail"] == "Резюме не выбрано"
 
 
 async def test_a_chosen_resume_goes_to_the_system_by_its_full_path(
@@ -176,7 +176,7 @@ async def test_parsing_a_resume_nobody_chose_is_refused(api, ask):
     answer = await ask(api.profile.parse_cv)
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "Резюме не выбрано."
+    assert answer["detail"] == "Резюме не выбрано"
 
 
 async def test_parsing_without_a_chosen_model_is_refused(api, ask, resume_on_disk):
