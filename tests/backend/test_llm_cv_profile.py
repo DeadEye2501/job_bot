@@ -5,6 +5,7 @@ JSON — вышло такое». Ответ подставляется подд
 """
 
 import json
+from datetime import date
 
 import pytest
 
@@ -360,3 +361,41 @@ async def test_a_zero_salary_is_no_salary():
     parsed = await parse_profile(expected_salary=0)
 
     assert parsed.profile.expected_salary is None
+
+
+async def test_a_full_birth_date_becomes_a_date():
+    parsed = await parse_profile(birth_date="1990-03-15")
+
+    assert parsed.profile.birth_date == date(1990, 3, 15)
+
+
+@pytest.mark.parametrize("written", ["1990", "1990-03", "15 марта", "34 года", ""])
+async def test_a_partial_birth_date_is_no_date(written):
+    """Год или месяц с годом не достраиваются до дня: выдуманный день рождения
+    ушёл бы в анкету на сайте за человека."""
+    parsed = await parse_profile(birth_date=written)
+
+    assert parsed.profile.birth_date is None
+
+
+async def test_the_new_personal_fields_come_through_the_parse():
+    parsed = await parse_profile(
+        patronymic="Сергеевич", patronymic_latin="Sergeevich", citizenship="Россия",
+        about_me="Строю сервисы.", resume_url="https://hh.ru/resume/1",
+    )
+
+    p = parsed.profile
+    assert (p.patronymic, p.patronymic_latin, p.citizenship, p.about_me, p.resume_url) == (
+        "Сергеевич", "Sergeevich", "Россия", "Строю сервисы.", "https://hh.ru/resume/1"
+    )
+
+
+async def test_blank_new_personal_fields_become_absent():
+    parsed = await parse_profile(
+        patronymic=" ", patronymic_latin="", citizenship="  ", about_me="  ", resume_url="",
+    )
+
+    p = parsed.profile
+    assert (p.patronymic, p.patronymic_latin, p.citizenship, p.about_me, p.resume_url) == (
+        None, None, None, None, None
+    )
