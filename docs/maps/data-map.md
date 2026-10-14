@@ -213,7 +213,7 @@
   - `to: str`
   - `subject: str`
   - `body: str`
-  - `attachment: Path`
+  - `attachment: Path | None`
 
 ### `adapters/telegram.py`
 
@@ -472,6 +472,12 @@
   - `reason: str`
 - `Outcome` = `Literal['applied'] | Missed | Unfit | Dropped`
 - `GONE` = `Missed('вакансия удалена')`
+
+### `backend/applying/resume_link.py`
+
+- `class LetterResume`
+  - `file: Path | None`
+  - `link: str | None`
 
 ### `backend/applying/run.py`
 
@@ -2012,6 +2018,10 @@
 ### `client/bridge/payload.py`
 
 - `logger` = `logging.getLogger(__name__)`
+
+### `client/bridge/photo.py`
+
+- `_PHOTO_FILTER` = `file_filter('Фото', sorted(PHOTO_EXTS))`
 
 ### `client/bridge/pickers.py`
 

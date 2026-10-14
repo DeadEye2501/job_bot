@@ -3,6 +3,7 @@
 import logging
 from dataclasses import dataclass
 
+from backend.applying.resume_link import resume_for_letter
 from backend.llm.cover_letter import generate_cover_letter
 from backend.models import Vacancy
 from backend.payloads import DIRECT_PARSED_FIELDS, ParsedVacancy
@@ -19,8 +20,8 @@ RECENT_SEND_WINDOW_DAYS = 14
 class Letter:
     """Письмо к отправке: текст и вложение к нему.
 
-    Пара настоящая: у полного письма вложение есть всегда, у короткого его
-    нет никогда, и решается это одним и тем же выбором ветки.
+    У короткого письма вложения нет никогда; у полного — файл резюме, а нет
+    файла — ссылка на резюме в тексте и вложения нет.
     """
 
     text: str
@@ -59,7 +60,7 @@ def short_note(title: str, channel_ref: str | None, prior_count: int) -> str:
 
 
 async def full_letter(pipeline, parsed: ParsedVacancy, channel_ref: str | None, vacancy_id: int):
-    """Полное письмо с резюме; при беде — пара «пусто и код отказа».
+    """Полное письмо с резюме файлом или ссылкой; при беде — пара «пусто и код отказа».
 
     Название и канал вплетает в текст сама модель: готовая приставка поверх
     живого письма читается штампом.
@@ -79,12 +80,12 @@ async def full_letter(pipeline, parsed: ParsedVacancy, channel_ref: str | None, 
     if body is None:
         logger.warning("vacancy %d: cover letter generation failed, skipping send", vacancy_id)
         return None, "cover_letter_failed"
-    cv_file = pipeline.cv_file()
-    if cv_file is None:
+    resume = await resume_for_letter(pipeline)
+    if resume is None:
         logger.warning("vacancy %d: CV file missing (%s), skipping send",
                        vacancy_id, pipeline.cv_path())
         return None, "cv_missing"
-    return Letter(body, cv_file), None
+    return Letter(resume.under(body), resume.file), None
 
 
 def parsed_from_row(v: Vacancy) -> ParsedVacancy:

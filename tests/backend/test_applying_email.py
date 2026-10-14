@@ -46,10 +46,29 @@ async def test_without_mail_settings_the_way_is_missed(mail_case):
     assert isinstance(outcome, Missed) and outbox == []
 
 
-async def test_without_a_resume_file_the_way_is_missed(mail_case):
+async def test_without_a_resume_file_or_link_the_way_is_missed(mail_case):
     kit, vacancy, outbox = await mail_case(resume=False)
     outcome = await via_email(kit, vacancy.id, MAIL)
     assert outcome == Missed("нет файла резюме") and outbox == []
+
+
+async def test_without_a_file_the_letter_goes_with_the_resume_link(mail_case):
+    """Ссылку дописывает код после модели: модель адреса не набирает."""
+    kit, vacancy, outbox = await mail_case(resume="https://hh.ru/resume/1")
+
+    assert await via_email(kit, vacancy.id, MAIL) == "applied"
+
+    (mail,) = outbox
+    assert mail.attachment is None
+    assert mail.body.splitlines()[-1] == "Резюме: https://hh.ru/resume/1"
+
+
+async def test_a_letter_with_the_file_gets_no_link_line(mail_case):
+    kit, vacancy, outbox = await mail_case()
+
+    await via_email(kit, vacancy.id, MAIL)
+
+    assert "Резюме:" not in outbox[0].body
 
 
 async def test_a_stop_while_the_letter_is_on_its_way_does_not_cut_it_off(mail_case, monkeypatch):

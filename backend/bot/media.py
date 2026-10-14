@@ -143,6 +143,25 @@ def stored_media(relative: str) -> Path | None:
     return path if path.is_file() else None
 
 
+def copy_profile_photo(source: Path) -> str:
+    """Положить копию фото человека в каталог медиа; ответ — путь внутри него.
+
+    Копия, а не ссылка на исходный: исходный человек волен перенести или
+    удалить. Копия с тем же расширением заменяется на месте.
+    """
+    relative = f"profile/photo{source.suffix.lower()}"
+    (MEDIA_DIR / "profile").mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(source, MEDIA_DIR / relative)
+    return relative
+
+
+def drop_stored_media(relative: str) -> None:
+    """Удалить файл по пути внутри каталога медиа, если он там есть."""
+    path = stored_media(relative)
+    if path is not None:
+        path.unlink(missing_ok=True)
+
+
 async def download_media(client, msg, hr_id: int) -> str | None:
     """Download a photo or document to ``media/{hr_id}/{tg_message_id}{ext}``.
     Returns the project-relative posix path or ``None`` if there's no
