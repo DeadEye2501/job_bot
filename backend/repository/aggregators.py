@@ -157,6 +157,12 @@ async def set_logged_in(session: AsyncSession, aggregator_id: int, logged_in: bo
         row.is_logged_in = logged_in
 
 
+async def is_logged_in(session: AsyncSession, aggregator_id: int) -> bool:
+    """Стоит ли отметка входа; пропавший агрегатор — не вошёл."""
+    row = await session.get(Aggregator, aggregator_id)
+    return row is not None and row.is_logged_in
+
+
 async def mark_run(session: AsyncSession, aggregator_id: int, started_at: datetime) -> None:
     row = await session.get(Aggregator, aggregator_id)
     if row is not None:

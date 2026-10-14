@@ -5,7 +5,16 @@ from __future__ import annotations
 from backend.agent.availability import current_refusal
 from backend.flows.aggregator_name import create_named_aggregator
 from backend.repository import aggregators as repo
-from client.bridge.answer import Denied, asked_id, launched_on_bot, read_toggle, reply
+from backend.repository.aggregator_resumes import choose_resume, resumes_of
+from client.bridge.answer import (
+    BAD_PAYLOAD,
+    Denied,
+    asked_id,
+    bad_fields,
+    launched_on_bot,
+    read_toggle,
+    reply,
+)
 from client.bridge.hub import Hub
 from client.bridge.mark import AGGREGATOR_MARK, marked, unmarked
 from client.bridge.page import read_search
@@ -53,18 +62,22 @@ class Aggregators:
         return reply(self._hub.runner, run())
 
     def detail(self, aggregator_id: int) -> dict:
-        """Карточка агрегатора с числами его вакансий; номер едет и в отказе, как у канала."""
+        """Карточка агрегатора с числами его вакансий и резюме человека на сайте в
+        порядке сайта; номер едет и в отказе, как у канала."""
 
         async def run() -> dict:
             async with self._hub.session_factory() as session:
                 found = await repo.get_aggregator_detail(session, aggregator_id)
+                resumes = await resumes_of(session, aggregator_id)
             if found is None:
                 raise Denied(NO_AGGREGATOR, aggregator_id=aggregator_id)
             row, stats, blacklist_value = found
             card = _aggregator_row_to_dict(row)
             return {"aggregator_id": card.pop("id"), **card,
                     "stats": _source_stats_to_dict(stats),
-                    "blacklist_value": blacklist_value}
+                    "blacklist_value": blacklist_value,
+                    "resumes": [_resume_to_dict(one) for one in resumes],
+                    "can_add_resume": bool(row.can_add_resume)}
 
         return reply(self._hub.runner, run())
 
@@ -153,6 +166,23 @@ class Aggregators:
 
         return reply(self._hub.runner, run())
 
+    def choose_resume(self, payload: dict | None = None) -> dict:
+        """Отметить резюме, которым откликаться на этом сайте; прежняя отметка снимается."""
+        payload = payload if isinstance(payload, dict) else {}
+        try:
+            aggregator_id = int(payload["aggregator_id"])
+            resume_id = int(payload["resume_id"])
+        except BAD_PAYLOAD as e:
+            return bad_fields("aggregators.choose_resume", e)
+
+        async def run() -> dict:
+            async with self._hub.session_factory() as session:
+                async with session.begin():
+                    await choose_resume(session, aggregator_id, resume_id)
+            return {"aggregator_id": aggregator_id, "resume_id": resume_id}
+
+        return reply(self._hub.runner, run())
+
     def login(self, aggregator_id: int) -> dict:
         """Вход на сайт: видимый браузер, человек входит и закрывает окно, агент проверяет."""
         return self._launch(aggregator_id, "login", lambda bot: bot.login_aggregator(aggregator_id),
@@ -179,6 +209,11 @@ class Aggregators:
             aggregator_id=aggregator_id,
             action=action,
         )
+
+
+def _resume_to_dict(row) -> dict:
+    """Резюме человека на сайте — строка блока резюме в карточке."""
+    return {"id": row.id, "title": row.title, "url": row.url, "chosen": bool(row.is_chosen)}
 
 
 _DELETION_REFUSALS = {

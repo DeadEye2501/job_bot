@@ -342,7 +342,7 @@
   - `profile_id: int`
   - `simulated: bool`
   - `letter_writer: str`
-  - `resume: tuple[str, str] | None` = `None`
+  - `resume: SeenResume | None` = `None`
   - `confirming: bool` = `False`
   - `letter_checks: int` = `0`
   - `outcome: Outcome | None` = `None`

@@ -13,6 +13,7 @@
   import LoginMark from '$components/LoginMark.svelte';
   import MenuItem from '$components/MenuItem.svelte';
   import MiniVacancies from '$components/MiniVacancies.svelte';
+  import ResumeList from '$components/ResumeList.svelte';
   import SourceStats from '$components/SourceStats.svelte';
   import {
     LOGIN_FIRST,
@@ -86,6 +87,17 @@
     if (done !== null) say('Обход источника запущен');
   }
 
+  /** Пересканировать резюме: агент перечисляет их на сайте, итог скажет весть. */
+  async function scan() {
+    const done = await ask('aggregators.scan', aggregatorId);
+    if (done !== null) say('Резюме обновляются');
+  }
+
+  async function chooseResume(resumeId) {
+    await ask('aggregators.choose_resume', { aggregator_id: aggregatorId, resume_id: resumeId });
+    source.read(aggregatorId);
+  }
+
   function drop() {
     return dropCard({ aggregator_id: aggregatorId, confirmed: false });
   }
@@ -147,6 +159,16 @@
         {close}
         onpick={runNow}
       />
+      {#if !card.is_web_search}
+        <MenuItem
+          icon="sync"
+          label="Обновить резюме"
+          title={runTip || 'Перечислить ваши резюме на сайте заново'}
+          disabled={!!runTip}
+          {close}
+          onpick={scan}
+        />
+      {/if}
     {/snippet}
     <CardActions
       {lead}
@@ -159,6 +181,15 @@
       ondelete={drop}
     />
   </div>
+
+  {#if !card.is_web_search}
+    <ResumeList
+      resumes={card.resumes}
+      site={card.name}
+      onchoose={chooseResume}
+      onopen={(url) => ask('system.open_url', url)}
+    />
+  {/if}
 
   <SourceStats stats={card.stats} empty="С этого агрегатора ещё не пришло вакансий" />
 

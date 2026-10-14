@@ -3,7 +3,7 @@
 from backend.models import Aggregator, AggregatorResume
 from backend.payloads import SeenResume
 from backend.repository.aggregator_resumes import (
-    choose_resume, chosen_resume, drop_chosen_resume, resumes_of, sync_resumes,
+    choose_resume, chosen_resume, drop_resume, resumes_of, sync_resumes,
 )
 from backend.repository.aggregators import delete_aggregator
 from tests.dbio import all_rows, only_row, put
@@ -128,18 +128,20 @@ async def test_a_dropped_resume_leaves_the_site_without_a_chosen_one(session, se
               aggregator_resume_row(other.id, title="Чужое", url="https://other.test/r/1",
                                     is_chosen=True))
     async with session.begin():
-        await drop_chosen_resume(session, site)
+        await drop_resume(session, site, "https://hh.ru/r/1")
     assert await _titles(session_factory, site) == [("Другое", False)]
     assert await _titles(session_factory, other.id) == [("Чужое", True)]
 
 
-async def test_dropping_where_nothing_is_chosen_drops_nothing(session, session_factory):
+async def test_dropping_a_resume_already_gone_keeps_the_new_choice(session, session_factory):
+    """Человек выбрал другое резюме, пока шёл отклик названным: уходит только названное."""
     site = await _site(session_factory)
-    await put(session_factory, aggregator_resume_row(site))
+    await put(session_factory,
+              aggregator_resume_row(site, title="Выбрано заново", url="https://hh.ru/r/2",
+                                    is_chosen=True))
     async with session.begin():
-        await drop_chosen_resume(session, site)
-        await drop_chosen_resume(session, None)
-    assert await _titles(session_factory, site) == [("Разработчик", False)]
+        await drop_resume(session, site, "https://hh.ru/r/1")
+    assert await _titles(session_factory, site) == [("Выбрано заново", True)]
 
 
 async def test_a_deleted_aggregator_takes_its_resumes_with_it(session, session_factory):

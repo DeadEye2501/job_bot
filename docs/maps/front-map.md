@@ -14,7 +14,7 @@
 
 ## app — 31 файлов
 
-### app/AggregatorCard.svelte (181)
+### app/AggregatorCard.svelte (212)
 - —
 - принимает: ask, say, lockedTip, lock, events, aggregatorId, onvacancy, onclose, onchanged
 
@@ -150,7 +150,7 @@
 - принимает: ask, say, onback, onnext
 - берёт: ./TelegramLogin.svelte
 
-## components — 111 файлов
+## components — 112 файлов
 
 ### components/ActionsMenu.svelte (30)
 - —
@@ -504,6 +504,10 @@
 ### components/RecordCard.svelte (42)
 - Нажимается вся шапка, а не одна стрелка: свёрнутых карточек столбик, и целиться в значок ради раскрытия человеку не за что.
 - принимает: title, open, ontoggle, onremove, removeLabel, children
+
+### components/ResumeList.svelte (33)
+- —
+- принимает: resumes, site, onchoose, onopen
 
 ### components/RowMarks.svelte (15)
 - —
@@ -936,7 +940,7 @@
 - * Слово, согласованное с числом. * * «1 категории» человек читает как опечатку и перестаёт верить остальному на * экране. Числа 11–14 — исключение русского счёта и берут последнюю форму.
 - отдаёт: counted, plural, vacancyCount
 
-## styles — 121 файлов
+## styles — 122 файлов
 
 ### styles/accent-fill.css (20)
 - Залито акцентом — так помечено выбранное и главное: основная кнопка окна, зажатая пилюля срока или рода, выбранный день в календаре, текущий шаг мастера, уверенная оценка вакансии и счёт непрочитанного. Одним правилом на все места, а не своим в каждом: заливка здесь несёт один и тот же смысл «вот это», и разъедься её цвет или вес, соседние экраны стали бы помечать выбранное по-разному. Ввозится после оформления самих блоков: у их наведения та же весомость селектора, и выигрывает порядок.
@@ -1496,6 +1500,11 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 - селекторы (2): .remove-cross, .remove-cross:hover
 - берёт: --danger, --text-tertiary
 
+### styles/resume-list.css (21)
+- Строка резюме в карточке агрегатора: кружок выбора и название-ссылка. Кружок — родной, в цвет акцента по общему правилу (`base.css`); подсветка названия под курсором — общая со ссылками шапки (`link-hover.css`).
+- селекторы (3): .resume-row, .resume-row input, .resume-title
+- берёт: --text-primary
+
 ### styles/row-hover.css (26)
 - Строка под курсором подсвечена — так видно, куда попадёт нажатие. Одним правилом на все перечни: строки отсева, контактов, журнала, навыков и вакансий. Отклик этот значит одно и то же везде, и написанный порознь, он разъезжается на глаз — в одном списке строка отзывается, в соседнем нет, и человек решает, что она не нажимается. Само значение держит переменная (`palette.css`), так что цвет тут и так был бы один; своим файлом сведено объявление — чтобы новый перечень получал отклик, а не переписывал его седьмой раз. Строки, у которых своя подложка означает положение дел, из отклика исключены поимённо: шапка таблицы отсева, развёрнутая запись журнала, отмеченная строка контактов и вакансий. Строка подборщика отзывается своим тоном (`picker.css`): лайм в ней значит выбранную. Подсветить их значило бы стереть с них ответ на вопрос, ради которого подложку и красили: отклик тусклее отметки, и наведение на выбранную строку выглядело бы её снятием.
 - селекторы (1): .bl-row:hover:not(.head),
@@ -1733,7 +1742,10 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 .wiz-body > .warning-card, .wiz-fields, .wiz-modes, .wiz-fields .help
 - берёт: --accent, --accent-chip-selected, --bg-secondary, --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
 
-## tests — 101 файлов
+## tests — 103 файлов
+
+### tests/aggregator_card_live.test.js (148)
+- —
 
 ### tests/aggregators.test.js (118)
 - —
@@ -1803,7 +1815,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/card_save.test.js (50)
 - * Карточка, записывающая всё, что с ней сделали.
 
-### tests/channel_card_live.test.js (93)
+### tests/channel_card_live.test.js (87)
 - * Сколько раз спросили названный слот.
 
 ### tests/channels.test.js (140)
@@ -1988,6 +2000,10 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 
 ### tests/stats_channels_card_live.test.js (91)
 - * Строка таблицы с нулями во всех колонках.
+
+### tests/stats_stub.js (11)
+- —
+- отдаёт: EMPTY_STATS
 
 ### tests/suggest_input_live.test.js (92)
 - —

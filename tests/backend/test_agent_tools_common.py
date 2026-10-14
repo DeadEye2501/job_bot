@@ -3,6 +3,7 @@
 from backend.agent.jobs import Applied, Failed, Finished, LoginJob, ScanJob, Source
 from backend.agent.tools_common import common_tools
 from backend.models import Aggregator
+from backend.payloads import SeenResume
 from backend.repository.agent_profile import build_agent_profile
 from tests.dbio import all_rows, put
 from tests.factories import profile_row
@@ -134,3 +135,18 @@ async def test_the_scan_calls_a_human_on_its_site_and_marks_its_login(
 
     assert gate.asked == [("login", "hh.ru")] and job.outcome == Finished("done", "")
     assert (await all_rows(session_factory, Aggregator))[0].is_logged_in is False
+
+
+async def test_a_missing_resume_is_an_outcome_only_where_a_resume_was_named(make_pipeline):
+    """Без названного резюме «его не нашлось» сказать не о чем: форма работодателя
+    своих резюме не держит."""
+    form = apply_job(1)
+    named = apply_job(1, method="aggregator", target="https://hh.ru/vacancy/1", aggregator_id=4,
+                      resume=SeenResume("Повар", "https://hh.ru/resume/1"))
+    kit = kit_for(await make_pipeline())
+
+    refused = await tool(common_tools(kit, form), "finish")(result="resume_missing")
+    await tool(common_tools(kit, named), "finish")(result="resume_missing")
+
+    assert form.outcome is None and "не бывает" in refused
+    assert named.outcome == Finished("resume_missing", "")

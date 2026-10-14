@@ -8,7 +8,9 @@ from backend.models import Aggregator, VacancyStatus
 from backend.repository.aggregators import WEB_SEARCH_NAME
 from tests.dbio import all_rows, put
 from tests.factories import vacancy_row
-from tests.factories_aggregators import aggregator_row, application_row, web_search_row
+from tests.factories_aggregators import (
+    aggregator_resume_row, aggregator_row, application_row, web_search_row,
+)
 from tests.fakes.site_home import serve_home
 
 
@@ -323,3 +325,36 @@ async def test_a_run_of_a_blacklisted_site_is_explained(api, ask, with_bot, told
     assert await told() == {
         "message": "В чёрном списке — снимите запись, чтобы работать с сайтом", "danger": True
     }
+
+
+async def test_the_card_lists_the_resumes_in_site_order_with_the_chosen_one(
+    api, ask, session_factory
+):
+    site = aggregator_row(can_add_resume=True)
+    await put(session_factory, site)
+    await put(session_factory,
+              aggregator_resume_row(site.id, title="Второе", url="https://hh.ru/r/2", position=1,
+                                    is_chosen=True),
+              aggregator_resume_row(site.id, title="Первое", url="https://hh.ru/r/1"))
+
+    card = (await ask(api.aggregators.detail, site.id))["ok"]
+
+    assert [(r["title"], r["url"], r["chosen"]) for r in card["resumes"]] == [
+        ("Первое", "https://hh.ru/r/1", False), ("Второе", "https://hh.ru/r/2", True),
+    ]
+    assert card["can_add_resume"] is True
+
+
+async def test_choosing_a_resume_moves_the_mark(api, ask, session_factory):
+    site = aggregator_row()
+    await put(session_factory, site)
+    first = aggregator_resume_row(site.id, url="https://hh.ru/r/1", is_chosen=True)
+    second = aggregator_resume_row(site.id, title="Другое", url="https://hh.ru/r/2", position=1)
+    await put(session_factory, first, second)
+
+    answer = await ask(api.aggregators.choose_resume,
+                       {"aggregator_id": site.id, "resume_id": second.id})
+
+    assert "ok" in answer
+    card = (await ask(api.aggregators.detail, site.id))["ok"]
+    assert [r["chosen"] for r in card["resumes"]] == [False, True]

@@ -72,6 +72,7 @@ import './styles/contacts.css';
 import './styles/card-section.css';
 import './styles/contact-card.css';
 import './styles/mini-list.css';
+import './styles/resume-list.css';
 import './styles/chat.css';
 import './styles/channel-stats.css';
 import './styles/address-dialog.css';

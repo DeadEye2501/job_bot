@@ -36,9 +36,10 @@ def common_tools(kit: AgentKit, job) -> list[Callable]:
             return await kit.profile_text(session) or "Анкета не заполнена."
 
     async def finish(result: str, reason: str = "") -> str:
-        """Итог сессии. Искатель: done или failed. Откликатель: vacancy_closed, platform_closed, not_fit или resume_missing. Проверка входа и перечень резюме: done."""
-        if result not in RESULTS[type(job)]:
-            return f"Итога «{result}» у этой задачи не бывает: {', '.join(sorted(RESULTS[type(job)]))}."
+        """Итог сессии. Искатель: done или failed. Откликатель: vacancy_closed, platform_closed, not_fit, а при резюме, названном в задании, ещё resume_missing. Проверка входа и перечень резюме: done."""
+        results = _results(job)
+        if result not in results:
+            return f"Итога «{result}» у этой задачи не бывает: {', '.join(sorted(results))}."
         if isinstance(job.outcome, FINAL):
             return FINAL_ANSWER
         job.outcome = Finished(result, reason)
@@ -51,6 +52,15 @@ def common_tools(kit: AgentKit, job) -> list[Callable]:
     if isinstance(job, ApplyJob):
         tools.append(_report_failure(job))
     return tools
+
+
+def _results(job) -> frozenset[str]:
+    """Итоги, которыми эта сессия может кончиться. «Названного резюме нет на
+    сайте» — только у отклика, где резюме названо: остановка всего прогона и
+    удаление резюме иначе случились бы по слову о резюме, которого не было."""
+    if isinstance(job, ApplyJob) and job.resume is None:
+        return RESULTS[ApplyJob] - {"resume_missing"}
+    return RESULTS[type(job)]
 
 
 def _login_target(job) -> int | None:

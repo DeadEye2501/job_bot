@@ -65,16 +65,15 @@ async def choose_resume(session: AsyncSession, aggregator_id: int, resume_id: in
     )
 
 
-async def drop_chosen_resume(session: AsyncSession, aggregator_id: int | None) -> None:
-    """Удалить отмеченное резюме сайта: его не оказалось на сайте. Другое
-    вместо него не отмечается.
+async def drop_resume(session: AsyncSession, aggregator_id: int, url: str) -> None:
+    """Удалить резюме, которого не оказалось на сайте. Другое вместо него не отмечается.
 
-    Удаление — запросом по отметке: отмеченного нет (сняли посреди отклика)
-    или способ без агрегатора — удалять нечего, и это не ошибка.
+    Резюме узнаётся по ссылке, как при сверке, а не по отметке: пока шёл
+    отклик, человек мог отметить другое — его удалять не за что.
     """
     await session.execute(
         delete(AggregatorResume)
-        .where(AggregatorResume.aggregator_id == aggregator_id, AggregatorResume.is_chosen)
+        .where(AggregatorResume.aggregator_id == aggregator_id, AggregatorResume.url == url)
     )
 
 
