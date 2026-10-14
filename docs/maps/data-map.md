@@ -348,7 +348,14 @@
   - `outcome: Outcome | None` = `None`
   - `confirmed: dict[tuple[str, str], dict]` = `field(default_factory=dict)`
   - `unscreened: dict[tuple[str, str, str], dict]` = `field(default_factory=dict)`
-- `RESULTS` = `словарь из 4`
+- `class FillJob`
+  - `source: Source`
+  - `resume_url: str | None` = `None`
+  - `outcome: Outcome | None` = `None`
+  - `accepted: dict[tuple[str, str], dict]` = `field(default_factory=dict)`
+  - `page_checks: dict[str, int]` = `field(default_factory=dict)`
+  - `general: set[tuple[str, str]]` = `field(default_factory=set)`
+- `RESULTS` = `словарь из 5`
 - `HUMAN_KINDS` = `набор из 2`
 
 ### `backend/agent/kit.py`
@@ -374,12 +381,6 @@
 - `_RULES` = `"\n  const FIELD = 'input, select, textarea, [ro…`
 - `_FIELD_OF` = `'el => {' + _RULES + "\n  const target = (el.mat…`
 - `_INVENTORY` = `'() => {' + _RULES + '\n  const SKIP = [\'hidden…`
-- `class FieldEntry(NamedTuple)`
-  - `selector: str`
-  - `label: str`
-  - `kind: str`
-  - `required: bool`
-  - `options: list[str]`
 - `class PageField(NamedTuple)`
   - `kind: str`
   - `group: str`
@@ -446,10 +447,23 @@
 - `_WAIT_MS` = `15000`
 - `_SNAPSHOT_LIMIT` = `60000`
 - `_CUT_MARK` = `'\n… снимок обрезан: страница длиннее, чем помещ…`
+- `class _Ledger(NamedTuple)`
+  - `items: dict[tuple[str, str], dict]`
+  - `accepted_by: str`
+  - `first: str`
+
+### `backend/agent/tools_fill.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `_ENOUGH` = `'проверок больше нет на этой странице: впиши эти…`
+- `_ONE_FIELD` = `'одно поле — один пункт: собери всё, что идёт в …`
+- `_NO_REASON` = `'поле общее: нужно обоснование, почему узкие пол…`
+- `class LayoutItem(ConfirmItem)`
+  - `fallback_reason: str`
 
 ### `backend/agent/tools_letter.py`
 
-- `_CHECKS_ALLOWED` = `2`
+- `CHECKS_ALLOWED` = `2`
 - `_ENOUGH` = `'отбито дважды: отправляй без письма, если поле …`
 
 ### `backend/agent/tools_seeker.py`
@@ -1044,6 +1058,17 @@
 - `MAX_FACTCHECK_TOKENS` = `1500`
 - `FACT_CHECK_COVER_LETTER_PROMPT` = `"Ты — фактчекер сопроводительных писем. Тебе даю…`
 
+### `backend/llm/fill_review.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `_PURPOSE` = `'fill_review'`
+- `MAX_FILL_REVIEW_TOKENS` = `1500`
+- `FILL_REVIEW_PROMPT` = `'Ты проверяешь, как помощник раскладывает данные…`
+- `class Verdict(NamedTuple)`
+  - `ok: bool`
+  - `reason: str`
+  - `field: str | None`
+
 ### `backend/llm/fit.py`
 
 - `MAX_FIT_TOKENS` = `1200`
@@ -1634,6 +1659,12 @@
 - `class SeenResume`
   - `title: str`
   - `url: str`
+- `class FieldEntry(NamedTuple)`
+  - `selector: str`
+  - `label: str`
+  - `kind: str`
+  - `required: bool`
+  - `options: list[str]`
 - `class VacancyFilter`
   - `sort: str` = `'newest'`
   - `search: str | None` = `None`
@@ -2271,6 +2302,11 @@
 
 - `VACANCY` = `'https://site.test/vacancy/1'`
 
+### `tests/backend/test_agent_tools_fill.py`
+
+- `FORM` = `'https://hh.ru/resume/edit'`
+- `INVENTORY` = `набор из 2`
+
 ### `tests/backend/test_agent_tools_seeker.py`
 
 - `pytestmark` = `pytest.mark.usefixtures('one_vector')`
@@ -2329,6 +2365,11 @@
 ### `tests/backend/test_llm_cv_response.py`
 
 - `MINIMAL_CV` = `json.dumps({'profile': CV_REQUIRED_PROFILE}, ens…`
+
+### `tests/backend/test_llm_fill_review.py`
+
+- `INVENTORY` = `набор из 2`
+- `ITEMS` = `набор из 1`
 
 ### `tests/backend/test_llm_fit_languages.py`
 

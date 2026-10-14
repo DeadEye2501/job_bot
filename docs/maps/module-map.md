@@ -387,7 +387,7 @@ resume autofill
 - `def upgrade() -> None` (22)
 - `def downgrade() -> None` (14)
 
-## backend — 203 модулей
+## backend — 205 модулей
 
 ### `backend/agent/__init__.py` — 1 строк
 
@@ -439,7 +439,7 @@ resume autofill
   - `def reset(self) -> None` (6)
   - `async def _take(self, browser) -> str | dict` (13)
 
-### `backend/agent/jobs.py` — 142 строк
+### `backend/agent/jobs.py` — 165 строк
 
 Задачи сессий агента и их итоги.
 
@@ -455,6 +455,7 @@ resume autofill
 - `class ScanJob` (8)
 - `class SeekJob` (10)
 - `class ApplyJob` (27)
+- `class FillJob` (19)
 
 ### `backend/agent/kit.py` — 56 строк
 
@@ -467,13 +468,12 @@ resume autofill
   - `async def written(self, write: Callable[[AsyncSession], Awaitable[T]]) -> T` (9)
   - `async def profile_text(self, session: AsyncSession) -> str` (4)
 
-### `backend/agent/page_fields.py` — 176 строк
+### `backend/agent/page_fields.py` — 166 строк
 
 Поля страницы глазами браузера.
 
-Зависит от: —
+Зависит от: `backend.payloads`
 
-- `class FieldEntry(NamedTuple)` (10)
 - `async def page_inventory(page) -> list[FieldEntry]` (3)
 - `class PageField(NamedTuple)` (7)
 - `async def page_field(page, selector: str) -> PageField` (2)
@@ -581,14 +581,16 @@ resume autofill
 - `async def record_and_announce(kit: AgentKit, entry: ApplicationEntry) -> int` (5)
 - `async def _append(kit: AgentKit, application_id: int, lines: list[tuple[bool, str]]) -> str` (5)
 
-### `backend/agent/tools_browser.py` — 231 строк
+### `backend/agent/tools_browser.py` — 251 строк
 
 Инструменты браузера для агента: открыть, снять, нажать, ввести, выбрать, приложить резюме и фото.
 
 Зависит от: `backend.agent.confirm`, `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.page_fields`
 
 - `class _Refused(Exception)` (2)
-- `def browser_tools(kit: AgentKit, resume: Path | None, photo: Path | None, confirming: ApplyJob | None=None) -> list[Callable]` (36)
+- `class _Ledger(NamedTuple)` (7)
+- `def _ledger(job: ApplyJob | FillJob) -> _Ledger` (6)
+- `def browser_tools(kit: AgentKit, resume: Path | None, photo: Path | None, strict: ApplyJob | FillJob | None=None) -> list[Callable]` (36)
   - `async def browser_open(url: str) -> str` (3)
   - `async def browser_snapshot() -> str` (3)
   - `async def browser_click(selector: str) -> str` (3)
@@ -598,27 +600,27 @@ resume autofill
 - `def _attach_tools(act: Callable, resume: Path | None, photo: Path | None) -> list[Callable]` (16)
   - `async def browser_attach_resume(selector: str) -> str` (5)
   - `async def browser_attach_photo(selector: str) -> str` (5)
-- `def _actions(kit: AgentKit, job: ApplyJob | None) -> tuple[Callable, Callable, Callable, Callable]` (13)
+- `def _actions(kit: AgentKit, job: ApplyJob | FillJob | None) -> tuple[Callable, Callable, Callable, Callable]` (13)
   - `async def act(action: Callable[..., Awaitable]) -> str` (2)
 - `async def _act(kit: AgentKit, action: Callable[..., Awaitable], held: Callable[[], None]) -> str` (16)
 - `def _plain() -> tuple[Callable, Callable, Callable]` (13)
   - `def fill(page, selector, text)` (2)
   - `def select(page, selector, value)` (2)
   - `def click(page, selector)` (2)
-- `def _strict(job: ApplyJob) -> tuple[Callable, Callable, Callable]` (31)
+- `def _strict(job: ApplyJob | FillJob) -> tuple[Callable, Callable, Callable]` (33)
   - `async def fill(page, selector, text)` (5)
   - `async def select(page, selector, value)` (3)
   - `async def click(page, selector)` (8)
-- `async def _refuse_unconfirmed_choice(job: ApplyJob, page, selector: str) -> None` (11)
-- `async def _confirmed_groups(job: ApplyJob, page) -> set[str]` (10)
+- `async def _refuse_unaccepted_choice(ledger: _Ledger, page, selector: str) -> None` (11)
+- `async def _accepted_groups(ledger: _Ledger, page) -> set[str]` (10)
 - `def _going() -> None` (2)
-- `def _not_finished(job: ApplyJob) -> None` (3)
-- `def _confirmed_field(job: ApplyJob, page, selector: str) -> dict` (6)
+- `def _not_finished(job: ApplyJob | FillJob) -> None` (3)
+- `def _accepted_field(ledger: _Ledger, page, selector: str) -> dict` (6)
 - `async def _snapshot(kit: AgentKit) -> str` (12)
 - `async def _attach(page, selector: str, file: Path) -> None` (12)
 - `def _first_line(error: Exception) -> str` (2)
 
-### `backend/agent/tools_common.py` — 180 строк
+### `backend/agent/tools_common.py` — 181 строк
 
 Общие инструменты агента: анкета, итог сессии, зов человека, отметка входа, неудача способа.
 
@@ -644,7 +646,22 @@ resume autofill
 - `def _report_failure(job: ApplyJob) -> Callable` (9)
   - `async def report_failure(reason: str) -> str` (6)
 
-### `backend/agent/tools_letter.py` — 58 строк
+### `backend/agent/tools_fill.py` — 101 строк
+
+Инструменты заполнения резюме: раскладка страницы и остановка за нехваткой данных.
+
+Зависит от: `backend.agent.confirm`, `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.page_fields`, `backend.agent.tools_letter`, `backend.llm.fill_review`
+
+- `class LayoutItem(ConfirmItem)` (5)
+- `def fill_tools(kit: AgentKit, job: FillJob) -> list[Callable]` (25)
+  - `async def submit_layout(items: list[LayoutItem]) -> str` (13)
+  - `async def report_required_missing(labels: list[str]) -> str` (6)
+- `def _unfit(job: FillJob, url: str, items: list[dict]) -> dict[str, str]` (9)
+- `async def _reviewed(kit: AgentKit, job: FillJob, page, fallbacks: list[dict]) -> dict[str, str]` (21)
+- `def _why(reason: str, field: str | None) -> str` (2)
+- `def _answer(accepted: int, refused: dict[str, str]) -> str` (4)
+
+### `backend/agent/tools_letter.py` — 61 строк
 
 Инструмент письма для отклика: пишет приложение или сверяется письмо агента.
 
@@ -1888,6 +1905,17 @@ First-run bootstrap: ensure DB schema exists.
 - `def _verdict_of(obj: dict, elapsed: float) -> tuple[bool, list[str]]` (29)
 - `async def factcheck_cover_letter(profile_block: str, letter: str, client: httpx.AsyncClient, model: str, *, about: str='') -> tuple[bool, list[str]]` (39)
 
+### `backend/llm/fill_review.py` — 94 строк
+
+Проверка запасного пути при заполнении резюме: убедительно ли обоснование.
+
+Зависит от: `adapters.lm_chat`, `backend.llm.answers`, `backend.llm.external`, `backend.payloads`
+
+- `class Verdict(NamedTuple)` (6)
+- `async def review_fallbacks(lm: httpx.AsyncClient, model: str, inventory: list[FieldEntry], items: list[dict]) -> dict[str, Verdict]` (20)
+- `def _verdict(one: dict) -> Verdict` (4)
+- `def _request(inventory: list[FieldEntry], items: list[dict]) -> ChatRequest` (21)
+
 ### `backend/llm/fit.py` — 197 строк
 
 Общее у зовов о пригодности: чем спросить модель и как прочесть ответ.
@@ -2182,7 +2210,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def fire(hook, name: str, *args) -> None` (13)
 
-### `backend/payloads.py` — 471 строк ⚠ подошёл к 300
+### `backend/payloads.py` — 484 строк ⚠ подошёл к 300
 
 Свёртки значений, ходящих между слоями.
 
@@ -2212,6 +2240,7 @@ First-run bootstrap: ensure DB schema exists.
 - `class SourceStats` (20)
 - `class ChannelDetail` (4)
 - `class SeenResume` (6)
+- `class FieldEntry(NamedTuple)` (11)
 - `class VacancyFilter` (53)
 
 ### `backend/provider_config.py` — 74 строк
@@ -3873,7 +3902,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 334 модулей
+## tests — 336 модулей
 
 ### `tests/adapters/test_agent_mcp.py` — 85 строк
 
@@ -4346,28 +4375,43 @@ Runtime settings layer.
 
 - `def _job(vacancy_id, **over) -> ApplyJob` (3)
 
-### `tests/backend/test_agent_tools_browser.py` — 266 строк
+### `tests/backend/test_agent_tools_browser.py` — 292 строк
 
 Инструменты браузера: что агент видит и что доходит до страницы.
 
 Зависит от: `backend.agent.jobs`, `backend.agent.tools_browser`, `tests.fakes.agent`, `tests.fakes.browser`
 
-Тестов: 25
+Тестов: 27
 
 - `def _tools(page, resume=None, photo=None)` (2)
 - `def _item(selector, value, kind='text', url=VACANCY)` (3)
-- `async def _strict(confirmed, outcome=None, fields=None)` (9)
+- `async def _opened(job, fields=None)` (8)
+- `async def _strict(confirmed, outcome=None, fields=None)` (3)
+- `async def _filling(accepted)` (3)
 
-### `tests/backend/test_agent_tools_common.py` — 152 строк
+### `tests/backend/test_agent_tools_common.py` — 168 строк
 
 Общие инструменты агента: анкета, вход, итог, неудача.
 
 Зависит от: `backend.agent.jobs`, `backend.agent.tools_common`, `backend.models`, `backend.payloads`, `backend.repository.agent_profile`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.agent`
 
-Тестов: 11
+Тестов: 12
 
 - `class _Gate` (7)
   - `async def wait(self, kind, host, _browser)` (3)
+
+### `tests/backend/test_agent_tools_fill.py` — 119 строк
+
+Раскладка страницы при заполнении резюме: что принимается сразу, что идёт к
+
+Зависит от: `backend.agent`, `backend.agent.jobs`, `backend.agent.tools_fill`, `backend.llm.fill_review`, `backend.payloads`, `tests.fakes.agent`, `tests.fakes.browser`
+
+Тестов: 7
+
+- `def stand(monkeypatch, make_pipeline)` (24)
+  - `async def make(verdicts=None)` (18)
+    - `async def review(_lm, _model, inventory, items)` (4)
+    - `async def inventory_of(_page)` (2)
 
 ### `tests/backend/test_agent_tools_letter.py` — 77 строк
 
@@ -5466,6 +5510,15 @@ Runtime settings layer.
 Зависит от: `backend.llm.factcheck`, `tests.fakes.llm`
 
 Тестов: 11
+
+
+### `tests/backend/test_llm_fill_review.py` — 60 строк
+
+Проверяющий запасного пути: убедительно ли обоснование, по каждому пункту раскладки.
+
+Зависит от: `backend.llm.fill_review`, `backend.payloads`, `tests.fakes.agent`, `tests.fakes.llm`
+
+Тестов: 4
 
 
 ### `tests/backend/test_llm_fit_languages.py` — 163 строк
@@ -7163,7 +7216,7 @@ Runtime settings layer.
 - `def parsed_cv_project(**overrides) -> ParsedCvProject` (3)
 - `def parsed_cv(**overrides) -> ParsedCv` (11)
 
-### `tests/fakes/agent.py` — 162 строк
+### `tests/fakes/agent.py` — 173 строк
 
 Набор сессии агента без браузера, водителя и человека.
 
@@ -7172,6 +7225,7 @@ Runtime settings layer.
 - `class LimitHit(Exception)` (2)
 - `def tool(tools, name)` (3)
 - `def apply_job(vacancy_id: int, *, method='form', target='https://company.test/apply', aggregator_id=None, **overrides) -> ApplyJob` (7)
+- `def fill_job(**overrides) -> FillJob` (3)
 - `def scripted(steps: list[Callable[[dict[str, Callable]], Awaitable]])` (19)
   - `async def run(plan: SessionPlan) -> AgentEnd` (8)
 - `def finish_step(result: str='done', reason: str='')` (5)
@@ -7190,6 +7244,7 @@ Runtime settings layer.
 - `def answering_gate(answer: Callable[[dict], dict | None], limit_sec: float=3600.0) -> tuple[HumanGate, list]` (14)
   - `def needed(kind, host, payload)` (5)
 - `def page_item(selector: str, value: str, *, label='Имя', kind='text', error='') -> dict` (3)
+- `def layout_item(selector: str, value: str, reason: str='') -> dict` (4)
 - `def edited(values: dict[str, str], by: str='label')` (8)
   - `def answer(payload)` (3)
 - `def finished(payload) -> dict` (3)
@@ -7541,7 +7596,6 @@ Runtime settings layer.
 
 - `AppUpdate` — наследник один: `System`
 - `ChannelActions` — наследник один: `Channels`
-- `ConfirmItem` — наследник один: `ShownItem`
 - `Cv` — наследник один: `Profile`
 - `Desktop` — наследник один: `System`
 - `HrChat` — наследник один: `Hr`

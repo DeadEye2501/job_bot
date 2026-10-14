@@ -2,7 +2,7 @@
 
 from backend.agent.jobs import Dropped
 from backend.agent.tools_browser import browser_tools
-from tests.fakes.agent import apply_job, kit_for, page_item, tool
+from tests.fakes.agent import apply_job, fill_job, kit_for, page_item, tool
 from tests.fakes.browser import FakeBrowser, FakePage
 
 VACANCY = "https://site.test/vacancy/1"
@@ -13,19 +13,23 @@ def _tools(page, resume=None, photo=None):
 
 
 def _item(selector, value, kind="text", url=VACANCY):
-    """Пункт, подтверждённый человеком на странице `url`."""
+    """Пункт, принятый для строгого ввода на странице `url`."""
     return {(url, selector): page_item(selector, value, kind=kind)}
 
 
-async def _strict(confirmed, outcome=None, fields=None):
-    """Страница вакансии под подтверждением: ввод — только подтверждённого.
+async def _opened(job, fields=None):
+    """Страница `VACANCY`, открытая инструментами строгого ввода этой задачи.
     `fields` — что страница называет полями: селектор → (вид, группа)."""
     page = FakePage(fields=fields)
-    job = apply_job(1, confirming=True, confirmed=confirmed, outcome=outcome)
     tools = browser_tools(kit_for(None, browser=FakeBrowser(page)), None, None, job)
     await tool(tools, "browser_open")(url=VACANCY)
     page.calls.clear()
     return page, tools
+
+
+async def _strict(confirmed, outcome=None, fields=None):
+    """Страница вакансии под подтверждением: ввод — только подтверждённого."""
+    return await _opened(apply_job(1, confirming=True, confirmed=confirmed, outcome=outcome), fields)
 
 
 async def test_after_finishing_the_resume_is_not_attached(tmp_path):
@@ -54,7 +58,7 @@ async def test_under_confirmation_an_unconfirmed_field_is_not_typed_into():
 
     answer = await tool(tools, "browser_type")(selector="#name", text="Иван")
 
-    assert answer.startswith("не вышло") and page.calls == []
+    assert answer.startswith("не вышло") and "need_human" in answer and page.calls == []
 
 
 async def test_the_confirmed_text_goes_into_the_confirmed_field():
@@ -264,3 +268,25 @@ async def test_a_long_snapshot_is_cut_with_a_mark():
 
     assert len(seen) < 61_000
     assert "обрезан" in seen.splitlines()[-1]
+
+
+async def _filling(accepted):
+    """Страница при заполнении резюме: ввод — только принятого в раскладке."""
+    return await _opened(fill_job(accepted=accepted))
+
+
+async def test_the_accepted_text_goes_into_the_accepted_field():
+    page, tools = await _filling(_item("#about", "Шью на заказ"))
+
+    await tool(tools, "browser_type")(selector="#about", text="Шью на заказ")
+
+    assert page.calls == [("fill", "#about", "Шью на заказ")]
+
+
+async def test_text_not_in_the_accepted_layout_is_refused_and_the_layout_tool_named():
+    page, tools = await _filling(_item("#about", "Шью на заказ"))
+
+    other = await tool(tools, "browser_type")(selector="#about", text="Пишу код")
+    elsewhere = await tool(tools, "browser_type")(selector="#notes", text="Шью на заказ")
+
+    assert page.calls == [] and "submit_layout" in elsewhere and "Шью на заказ" in other

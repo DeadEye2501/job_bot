@@ -5,7 +5,7 @@ from collections.abc import Awaitable, Callable
 from datetime import date
 
 from backend.agent.human_gate import HumanGate
-from backend.agent.jobs import ApplyJob
+from backend.agent.jobs import ApplyJob, FillJob, Source
 from backend.agent.kit import AgentEnd, AgentKit, SessionPlan
 from backend.domain.apply_order import Way
 from backend.payloads import SeenResume
@@ -30,6 +30,11 @@ def apply_job(vacancy_id: int, *, method="form", target="https://company.test/ap
                   simulated=False, letter_writer="app")
     fields.update(overrides)
     return ApplyJob(**fields)
+
+
+def fill_job(**overrides) -> FillJob:
+    """Заполнение резюме на hh.ru: по умолчанию новое резюме."""
+    return FillJob(Source(id=4, name="HeadHunter", host="hh.ru", last_run_at=None), **overrides)
 
 
 def scripted(steps: list[Callable[[dict[str, Callable]], Awaitable]]):
@@ -122,6 +127,12 @@ def answering_gate(answer: Callable[[dict], dict | None],
 def page_item(selector: str, value: str, *, label="Имя", kind="text", error="") -> dict:
     """Поле страницы с ответом — пункт, которым агент подтверждает страницу."""
     return {"label": label, "kind": kind, "value": value, "error": error, "selector": selector}
+
+
+def layout_item(selector: str, value: str, reason: str = "") -> dict:
+    """Пункт раскладки страницы; `reason` — обоснование запасного пути, пусто — узкое поле."""
+    item = page_item(selector, value, label=selector)
+    return {**item, "fallback_reason": reason} if reason else item
 
 
 def edited(values: dict[str, str], by: str = "label"):
