@@ -405,6 +405,15 @@ class ChannelDetail:
 
 
 @dataclass(frozen=True)
+class SeenResume:
+    """Резюме, увиденное сканированием сайта. Места своего не несёт: место —
+    порядок в списке, который сканирование отдаёт в порядке сайта."""
+
+    title: str
+    url: str
+
+
+@dataclass(frozen=True)
 class VacancyFilter:
     """Отбор списка вакансий: что показать, в каком порядке и сколько.
 

@@ -387,7 +387,7 @@ resume autofill
 - `def upgrade() -> None` (22)
 - `def downgrade() -> None` (14)
 
-## backend — 199 модулей
+## backend — 200 модулей
 
 ### `backend/agent/__init__.py` — 1 строк
 
@@ -2147,7 +2147,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def fire(hook, name: str, *args) -> None` (13)
 
-### `backend/payloads.py` — 462 строк ⚠ подошёл к 300
+### `backend/payloads.py` — 471 строк ⚠ подошёл к 300
 
 Свёртки значений, ходящих между слоями.
 
@@ -2176,6 +2176,7 @@ First-run bootstrap: ensure DB schema exists.
 - `class ChannelWithCount` (4)
 - `class SourceStats` (20)
 - `class ChannelDetail` (4)
+- `class SeenResume` (6)
 - `class VacancyFilter` (53)
 
 ### `backend/provider_config.py` — 74 строк
@@ -2210,7 +2211,19 @@ First-run bootstrap: ensure DB schema exists.
 - `def _project_lines(projects) -> list[str]` (7)
 - `def _years(years: int) -> str` (2)
 
-### `backend/repository/aggregators.py` — 227 строк
+### `backend/repository/aggregator_resumes.py` — 78 строк
+
+Резюме человека на сайте агрегатора — зеркало того, что сейчас на сайте.
+
+Зависит от: `backend.models`, `backend.payloads`
+
+- `async def resumes_of(session: AsyncSession, aggregator_id: int) -> list[AggregatorResume]` (7)
+- `async def sync_resumes(session: AsyncSession, aggregator_id: int, seen: list[SeenResume], can_add: bool) -> None` (24)
+- `async def choose_resume(session: AsyncSession, aggregator_id: int, resume_id: int) -> None` (14)
+- `async def drop_resume(session: AsyncSession, resume_id: int) -> None` (3)
+- `async def chosen_resume(session: AsyncSession, aggregator_id: int) -> AggregatorResume | None` (6)
+
+### `backend/repository/aggregators.py` — 233 строк
 
 Ведение записей об агрегаторах.
 
@@ -2230,7 +2243,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def set_logged_in(session: AsyncSession, aggregator_id: int, logged_in: bool) -> None` (5)
 - `async def mark_run(session: AsyncSession, aggregator_id: int, started_at: datetime) -> None` (4)
 - `async def applications_of(session: AsyncSession, aggregator_id: int) -> int` (12)
-- `async def delete_aggregator(session: AsyncSession, aggregator_id: int) -> str` (25)
+- `async def delete_aggregator(session: AsyncSession, aggregator_id: int) -> str` (31)
 - `async def deletion_block(session: AsyncSession, aggregator_id: int) -> str | None` (6)
 - `async def round_sources(session: AsyncSession) -> list[Aggregator]` (13)
 
@@ -3821,7 +3834,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 329 модулей
+## tests — 330 модулей
 
 ### `tests/adapters/test_agent_mcp.py` — 85 строк
 
@@ -5572,6 +5585,17 @@ Runtime settings layer.
 
 Тестов: 10
 
+
+### `tests/backend/test_repository_aggregator_resumes.py` — 137 строк
+
+Резюме агрегатора в базе: сверка со сканом, отметка «откликаться этим», удаление.
+
+Зависит от: `backend.models`, `backend.payloads`, `backend.repository.aggregator_resumes`, `backend.repository.aggregators`, `tests.dbio`, `tests.factories_aggregators`
+
+Тестов: 10
+
+- `async def _site(session_factory) -> int` (4)
+- `async def _titles(session_factory, aggregator_id: int) -> list[tuple[str, bool]]` (3)
 
 ### `tests/backend/test_repository_aggregators.py` — 110 строк
 

@@ -2,11 +2,11 @@
 
 from datetime import datetime
 
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.hosts import normalize_host, owning_host, owning_hosts
-from backend.models import Aggregator, Application, TrashEvent, Vacancy
+from backend.models import Aggregator, AggregatorResume, Application, TrashEvent, Vacancy
 from backend.payloads import SourceStats
 from backend.models.settings import AGGREGATOR_KIND
 from backend.repository.blacklist_marks import BlacklistMark
@@ -184,6 +184,9 @@ async def delete_aggregator(session: AsyncSession, aggregator_id: int) -> str:
     Вакансии отвязывает общее `repoint_vacancies`; отклики и мусор — другие
     таблицы, и у каждой свой запрос: обобщать `repoint_vacancies` на любую
     модель его докстрока запрещает.
+
+    Резюме сайта уходят вместе с ним: это не след работы, а зеркало сайта, и
+    без сайта им не на что указывать.
     """
     block = await deletion_block(session, aggregator_id)
     if block is not None:
@@ -199,6 +202,9 @@ async def delete_aggregator(session: AsyncSession, aggregator_id: int) -> str:
     await session.execute(
         update(TrashEvent).where(TrashEvent.source_aggregator_id == aggregator_id)
         .values(source_aggregator_id=None)
+    )
+    await session.execute(
+        delete(AggregatorResume).where(AggregatorResume.aggregator_id == aggregator_id)
     )
     await session.delete(row)
     return "ok"
