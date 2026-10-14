@@ -112,7 +112,7 @@ async def test_spellings_of_a_wrong_shape_are_refused_before_the_base(
     assert answer["fail"] == "denied"
     # Словами человека, а не именем колонки: «aliases» на экране не написано
     # нигде, и починить по такой фразе нечего.
-    assert answer["detail"] == "Написания шлют списком или строкой через запятую."
+    assert answer["detail"] == "Написания шлют списком или строкой через запятую"
 
 
 async def test_an_update_without_fields_says_there_is_nothing_to_do(
@@ -129,7 +129,7 @@ async def test_an_update_without_fields_says_there_is_nothing_to_do(
     answer = await ask(api.companies.update, {"company_id": company.id})
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "Нечего обновлять."
+    assert answer["detail"] == "Нечего обновлять"
 
 
 async def test_only_this_company_vacancies_are_shown(api, ask, session_factory):
@@ -233,7 +233,7 @@ async def test_merging_a_company_into_itself_is_refused(api, ask, session_factor
     )
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "Слить карточку саму с собой нельзя."
+    assert answer["detail"] == "Слить карточку саму с собой нельзя"
 
 
 async def test_a_deleted_company_leaves_the_list(api, ask, session_factory):
@@ -321,4 +321,4 @@ async def test_renaming_a_company_into_emptiness_asks_for_a_name(
     )
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "Название обязательно."
+    assert answer["detail"] == "Название обязательно"

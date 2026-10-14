@@ -641,7 +641,7 @@
 ### `backend/bot/work.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `HUMAN_TIMEOUT_NOTE` = `'Время ожидания истекло.'`
+- `HUMAN_TIMEOUT_NOTE` = `'Время ожидания истекло'`
 - `LIMIT_NOTE` = `'Исчерпан лимит подписки Claude Code — работа ос…`
 - `RESUME_MISSING_NOTE` = `'Выбранное резюме не найдено на {site} — переска…`
 - `AgentStop` = `Literal['human_timeout', 'limit', 'resume_missin…`
@@ -2106,44 +2106,44 @@
 
 ### `client/bridge/refusals.py`
 
-- `NO_BOT` = `'Бот ещё не готов.'`
-- `NO_VACANCY` = `'Вакансия не найдена.'`
-- `NO_HR` = `'HR не найден.'`
-- `NO_COMPANY` = `'Компания не найдена.'`
-- `NO_CHANNEL` = `'Канал не найден.'`
-- `NO_ENTRY` = `'Запись не найдена.'`
+- `NO_BOT` = `'Бот ещё не готов'`
+- `NO_VACANCY` = `'Вакансия не найдена'`
+- `NO_HR` = `'HR не найден'`
+- `NO_COMPANY` = `'Компания не найдена'`
+- `NO_CHANNEL` = `'Канал не найден'`
+- `NO_ENTRY` = `'Запись не найдена'`
 - `BLACKLISTED_STAYS_OFF` = `'В чёрном списке — снимите запись, чтобы включит…`
 - `HR_TELEGRAM_TAKEN` = `'Человек с такой учётной записью Telegram уже за…`
 - `SEND_BROKE` = `'Telegram не принял письмо. Проверьте связь и за…`
 - `SPELLINGS_SHAPE` = `'Написания шлют списком или строкой через запяту…`
-- `MERGE_INTO_SELF` = `'Слить карточку саму с собой нельзя.'`
-- `NOTHING_TO_UPDATE` = `'Нечего обновлять.'`
-- `NAME_REQUIRED` = `'Название обязательно.'`
-- `TEXT_REQUIRED` = `'Вставьте текст объявления.'`
-- `IDENTITY_REQUIRED` = `'Укажите хотя бы имя или @username.'`
-- `COMPANY_EXISTS` = `'Компания «{name}» уже существует.'`
-- `CODE_FIRST` = `'Сначала запросите код подтверждения.'`
-- `CODE_STEP_FIRST` = `'Сначала пройдите шаг с кодом подтверждения.'`
-- `LLM_FIELDS_REQUIRED` = `'Заполните base_url и модель.'`
+- `MERGE_INTO_SELF` = `'Слить карточку саму с собой нельзя'`
+- `NOTHING_TO_UPDATE` = `'Нечего обновлять'`
+- `NAME_REQUIRED` = `'Название обязательно'`
+- `TEXT_REQUIRED` = `'Вставьте текст объявления'`
+- `IDENTITY_REQUIRED` = `'Укажите хотя бы имя или @username'`
+- `COMPANY_EXISTS` = `'Компания «{name}» уже существует'`
+- `CODE_FIRST` = `'Сначала запросите код подтверждения'`
+- `CODE_STEP_FIRST` = `'Сначала пройдите шаг с кодом подтверждения'`
+- `LLM_FIELDS_REQUIRED` = `'Заполните base_url и модель'`
 - `EMBED_ON_CLAUDE` = `'Claude не считает эмбеддинги: выберите для них …`
-- `PROFILE_FIRST` = `'Сначала сохраните профайл (CV-таб).'`
-- `BUSY_CYCLE` = `'Уже идёт другой цикл, попробуйте позже.'`
+- `PROFILE_FIRST` = `'Сначала сохраните профайл (CV-таб)'`
+- `BUSY_CYCLE` = `'Уже идёт другой цикл, попробуйте позже'`
 - `WIPE_FILES_BUSY` = `'Файлы открыты в другом процессе и не могут быть…`
-- `LINK_SCHEME_UNKNOWN` = `'Такие ссылки приложение не открывает.'`
-- `ATTACHMENT_MISSING` = `'Вложение не найдено.'`
-- `ATTACHMENT_NOT_OPENED` = `'Не удалось открыть вложение.'`
-- `LOGS_TOO_OFTEN` = `'Журнал спрашивают не чаще раза в секунду.'`
+- `LINK_SCHEME_UNKNOWN` = `'Такие ссылки приложение не открывает'`
+- `ATTACHMENT_MISSING` = `'Вложение не найдено'`
+- `ATTACHMENT_NOT_OPENED` = `'Не удалось открыть вложение'`
+- `LOGS_TOO_OFTEN` = `'Журнал спрашивают не чаще раза в секунду'`
 - `AGENT_STOPS` = `словарь из 3`
 - `RUN_REFUSALS` = `словарь из 3 и раскрытых`
 - `POLL_REFUSALS` = `словарь из 5 и раскрытых`
 - `RERUN_REFUSALS` = `словарь из 6 и раскрытых`
 - `PASTED_REFUSALS` = `словарь из 7 и раскрытых`
 - `PARSE_CV_REFUSALS` = `словарь из 5`
-- `NO_AGGREGATOR` = `'Агрегатор не найден.'`
+- `NO_AGGREGATOR` = `'Агрегатор не найден'`
 - `WEB_SEARCH_KEPT` = `'Поиск по сети удалить нельзя'`
 - `LOGIN_FIRST` = `'Сначала войдите на сайт'`
 - `WEB_SEARCH_UNMARKED` = `'Поиск по сети в чёрный список не заносится'`
-- `WAY_UNKNOWN` = `'Этим способом на вакансию не откликнуться.'`
+- `WAY_UNKNOWN` = `'Этим способом на вакансию не откликнуться'`
 - `AGGREGATOR_REFUSALS` = `словарь из 5 и раскрытых`
 - `LOGIN_REFUSALS` = `словарь из 2 и раскрытых`
 - `FILL_REFUSALS` = `словарь из 1 и раскрытых`
@@ -2475,6 +2475,11 @@
 ### `tests/client/test_front_vocabulary.py`
 
 - `STATE` = `Path(__file__).resolve().parents[2] / 'client' /…`
+
+### `tests/client/test_messages_without_dot.py`
+
+- `BRIDGE` = `Path(refusals.__file__).parent`
+- `LAUNCHERS` = `набор из 3`
 
 ### `tests/client/test_page_contract.py`
 

@@ -54,7 +54,7 @@ async def test_a_manual_run_before_the_bot_is_up_is_refused_by_name(api, ask):
     answer = await ask(api.system.run_now)
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "Бот ещё не готов."
+    assert answer["detail"] == "Бот ещё не готов"
 
 
 async def test_a_busy_run_is_explained_not_swallowed(api, ask, with_bot, told):
@@ -69,7 +69,7 @@ async def test_a_busy_run_is_explained_not_swallowed(api, ask, with_bot, told):
 
     assert answer["ok"]["started"] is True
     assert await told() == {
-        "message": "Уже идёт другой цикл, попробуйте позже.",
+        "message": "Уже идёт другой цикл, попробуйте позже",
         "danger": True,
     }
 
@@ -87,7 +87,7 @@ async def test_a_finished_run_says_so_when_it_is_finished(api, ask, with_bot, to
     assert answer["ok"] == {"started": True, "action": "run_now"}
     # Весть звучит, когда пройден весь оборот: каналы, агрегаторы и отклики
     # идут одной задачей.
-    assert await told() == {"message": "Обход завершён.", "danger": False}
+    assert await told() == {"message": "Обход завершён", "danger": False}
 
 
 async def test_a_stop_reaches_the_bot(api, ask, with_bot):
@@ -107,7 +107,7 @@ async def test_a_stop_reaches_the_bot(api, ask, with_bot):
 async def test_apply_all_before_the_bot_is_up_is_refused_by_name(api, ask):
     answer = await ask(api.system.apply_all_new)
 
-    assert (answer["fail"], answer["detail"]) == ("denied", "Бот ещё не готов.")
+    assert (answer["fail"], answer["detail"]) == ("denied", "Бот ещё не готов")
 
 
 async def test_apply_all_reaches_the_bot_and_says_when_finished(api, ask, with_bot, told):
@@ -116,7 +116,7 @@ async def test_apply_all_reaches_the_bot_and_says_when_finished(api, ask, with_b
     answer = await ask(api.system.apply_all_new)
 
     assert answer["ok"] == {"started": True, "action": "apply_all_new"}
-    assert await told() == {"message": "Отклики на новые вакансии закончены.", "danger": False}
+    assert await told() == {"message": "Отклики на новые вакансии закончены", "danger": False}
     assert ("apply_all_new",) in bot.calls
 
 
@@ -126,7 +126,7 @@ async def test_apply_all_stopped_by_a_missing_resume_asks_for_a_rescan(api, ask,
     await ask(api.system.apply_all_new)
 
     assert await told() == {
-        "message": "Выбранное резюме не найдено на сайте — пересканируйте резюме.", "danger": True,
+        "message": "Выбранное резюме не найдено на сайте — пересканируйте резюме", "danger": True,
     }
 
 
@@ -137,7 +137,7 @@ async def test_a_stopped_apply_all_says_its_own_words(api, ask, with_bot, told):
 
     await ask(api.system.apply_all_new)
 
-    assert await told() == {"message": "Отклики на новые вакансии остановлены.", "danger": True}
+    assert await told() == {"message": "Отклики на новые вакансии остановлены", "danger": True}
 
 
 async def test_a_rerun_before_the_bot_is_up_is_refused_by_name(
@@ -154,7 +154,7 @@ async def test_a_rerun_before_the_bot_is_up_is_refused_by_name(
     answer = await ask(api.vacancies.rerun, {"vacancy_id": vacancy.id})
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "Бот ещё не готов."
+    assert answer["detail"] == "Бот ещё не готов"
 
 
 async def test_a_rerun_that_had_nothing_to_parse_says_so(
@@ -174,7 +174,7 @@ async def test_a_rerun_that_had_nothing_to_parse_says_so(
     await ask(api.vacancies.rerun, {"vacancy_id": vacancy.id})
 
     assert await told() == {
-        "message": "У вакансии нет исходного текста — разбирать нечего.",
+        "message": "У вакансии нет исходного текста — разбирать нечего",
         "danger": True,
     }
 
@@ -190,7 +190,7 @@ async def test_a_rerun_the_model_slept_through_says_that_instead(
     await ask(api.vacancies.rerun, {"vacancy_id": vacancy.id})
 
     said = await told()
-    assert said["message"] == "Модель не ответила — разбор не состоялся, см. логи."
+    assert said["message"] == "Модель не ответила — разбор не состоялся, см. логи"
 
 
 async def test_a_rerun_answers_before_it_parses(
@@ -212,7 +212,7 @@ async def test_a_rerun_answers_before_it_parses(
         "vacancy_id": vacancy.id,
         "action": "rerun",
     }
-    assert await told() == {"message": "Вакансия разобрана заново.", "danger": False}
+    assert await told() == {"message": "Вакансия разобрана заново", "danger": False}
 
 
 async def test_a_refused_application_is_told_in_human_words(
@@ -226,7 +226,7 @@ async def test_a_refused_application_is_told_in_human_words(
     await ask(api.vacancies.apply_via, _by_mail(vacancy))
 
     assert await told() == {
-        "message": "Отклик не состоялся — причина в журнале.",
+        "message": "Отклик не состоялся — причина в журнале",
         "danger": True,
     }
 
@@ -245,7 +245,7 @@ async def test_an_unknown_refusal_code_still_reaches_the_window(
     await ask(api.vacancies.apply_via, _by_mail(vacancy))
 
     assert await told() == {
-        "message": "Не удалось откликнуться — см. логи.",
+        "message": "Не удалось откликнуться — см. логи",
         "danger": True,
     }
 
@@ -268,7 +268,7 @@ async def test_an_application_answers_before_it_is_done(
         "vacancy_id": vacancy.id,
         "action": "apply_via",
     }
-    assert await told() == {"message": "Отклик записан.", "danger": False}
+    assert await told() == {"message": "Отклик записан", "danger": False}
 
 
 async def test_deleting_with_the_bot_up_goes_through_the_bot(
@@ -305,5 +305,5 @@ async def test_a_launched_job_that_broke_still_answers_the_window(
         said = await told()
 
     assert answer["ok"]["started"] is True
-    assert said == {"message": "Не удалось откликнуться — см. логи.", "danger": True}
+    assert said == {"message": "Не удалось откликнуться — см. логи", "danger": True}
     assert "сорвалось на полпути" in caplog.text

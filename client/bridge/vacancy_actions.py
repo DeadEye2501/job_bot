@@ -43,7 +43,7 @@ class VacancyActions:
             self._hub,
             lambda bot: bot.ui_rerun_vacancy_pipeline(vacancy_id),
             RERUN_REFUSALS,
-            "Вакансия разобрана заново.",
+            "Вакансия разобрана заново",
             vacancy_id=vacancy_id,
             action="rerun",
         )
@@ -87,7 +87,7 @@ class VacancyActions:
             self._hub,
             lambda bot: bot.apply_chosen_way(vacancy_id, found["ok"]),
             APPLY_VIA_REFUSALS,
-            "Отклик записан.",
+            "Отклик записан",
             vacancy_id=vacancy_id,
             action="apply_via",
         )

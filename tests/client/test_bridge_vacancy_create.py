@@ -172,7 +172,7 @@ async def test_pasted_text_goes_to_the_bot_without_waiting_for_the_parser(
     ]
     # Об удаче человеку говорят вестью, а не ответом на зов: к её приходу окно
     # уже закрыто, и другого способа сказать «получилось» нет.
-    assert await told() == {"message": "Объявление заведено.", "danger": False}
+    assert await told() == {"message": "Объявление заведено", "danger": False}
 
 
 async def test_the_named_publication_date_reaches_the_bot(api, ask, with_bot):
@@ -206,7 +206,7 @@ async def test_an_empty_paste_is_refused_with_words(api, ask, with_bot):
     answer = await ask(api.vacancies.create_from_text, {"raw_text": "   "})
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "Вставьте текст объявления."
+    assert answer["detail"] == "Вставьте текст объявления"
 
 
 async def test_pasting_before_the_bot_is_up_is_refused_by_name(api, ask):
@@ -218,7 +218,7 @@ async def test_pasting_before_the_bot_is_up_is_refused_by_name(api, ask):
     answer = await ask(api.vacancies.create_from_text, {"raw_text": "Ищем повара"})
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "Бот ещё не готов."
+    assert answer["detail"] == "Бот ещё не готов"
 
 
 async def test_a_pasted_duplicate_is_explained_not_swallowed(
@@ -235,7 +235,7 @@ async def test_a_pasted_duplicate_is_explained_not_swallowed(
 
     assert answer["ok"]["started"] is True
     assert await told() == {
-        "message": "Такое объявление уже заведено.",
+        "message": "Такое объявление уже заведено",
         "danger": True,
     }
 

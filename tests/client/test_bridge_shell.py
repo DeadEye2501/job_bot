@@ -144,7 +144,7 @@ async def test_an_attachment_the_system_would_not_open_is_named_a_refusal(
     answer = await ask(api.system.open_attachment, f"{MEDIA_PREFIX}1/42.pdf")
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "Не удалось открыть вложение."
+    assert answer["detail"] == "Не удалось открыть вложение"
 
 
 async def test_an_attachment_we_do_not_open_is_shown_in_the_folder(

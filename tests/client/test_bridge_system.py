@@ -100,7 +100,7 @@ async def test_an_update_before_the_bot_is_up_is_refused_by_name(api, ask):
     """Скачивание занимает место прогона, а оно живёт в боте."""
     answer = await ask(api.system.update)
 
-    assert (answer["fail"], answer["detail"]) == ("denied", "Бот ещё не готов.")
+    assert (answer["fail"], answer["detail"]) == ("denied", "Бот ещё не готов")
 
 
 @pytest.fixture
@@ -119,7 +119,7 @@ async def test_a_downloaded_update_closes_the_window(api, ask, with_bot, told, h
     answer = await ask(api.system.update)
 
     assert answer["ok"] == {"started": True, "action": "update"}
-    assert await told() == {"message": "Обновление скачано — приложение перезапускается.", "danger": False}
+    assert await told() == {"message": "Обновление скачано — приложение перезапускается", "danger": False}
     assert ("download_update",) in bot.calls
     assert handed_over == ["окно закрыто"]
 
@@ -130,7 +130,7 @@ async def test_a_copy_that_did_not_start_says_so_and_keeps_the_app(api, ask, wit
     await ask(api.system.update)
 
     assert await told() == {
-        "message": "Обновление скачано, но запустить подмену не вышло — см. логи.", "danger": True,
+        "message": "Обновление скачано, но запустить подмену не вышло — см. логи", "danger": True,
     }
     assert handed_over == []
 
@@ -141,7 +141,7 @@ async def test_a_download_that_did_not_match_says_so_and_keeps_the_app(api, ask,
     await ask(api.system.update)
 
     assert await told() == {
-        "message": "Скачанный файл не сошёлся с релизом — обновление не поставлено.", "danger": True,
+        "message": "Скачанный файл не сошёлся с релизом — обновление не поставлено", "danger": True,
     }
     assert handed_over == []
 

@@ -31,7 +31,7 @@ async def test_the_window_gets_only_available_ways(api, ask, session_factory):
 async def test_a_missing_vacancy_has_no_ways(api, ask):
     answer = await ask(api.vacancies.apply_ways, 999)
 
-    assert (answer["fail"], answer["detail"]) == ("denied", "Вакансия не найдена.")
+    assert (answer["fail"], answer["detail"]) == ("denied", "Вакансия не найдена")
 
 
 async def test_a_chosen_way_goes_to_the_applier(api, ask, with_bot, told, session_factory):

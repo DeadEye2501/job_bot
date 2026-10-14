@@ -319,6 +319,6 @@ class Vacancies(VacancyActions, VacancyLinks, VacancyContacts):
             self._hub,
             lambda bot: bot.ui_ingest_pasted_text(text, posted_at),
             PASTED_REFUSALS,
-            "Объявление заведено.",
+            "Объявление заведено",
             action="create_from_text",
         )

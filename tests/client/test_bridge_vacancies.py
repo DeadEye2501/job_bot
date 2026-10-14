@@ -428,4 +428,4 @@ async def test_the_screening_comes_application_by_application(api, ask, session_
 async def test_the_screening_of_a_missing_vacancy_is_refused(api, ask):
     answer = await ask(api.vacancies.screening, 999)
 
-    assert (answer["fail"], answer["detail"]) == ("denied", "Вакансия не найдена.")
+    assert (answer["fail"], answer["detail"]) == ("denied", "Вакансия не найдена")

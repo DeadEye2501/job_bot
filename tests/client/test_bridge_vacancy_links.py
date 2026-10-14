@@ -56,7 +56,7 @@ async def test_linking_a_person_who_is_gone_is_refused_in_human_words(
     )
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "HR не найден."
+    assert answer["detail"] == "HR не найден"
 
 
 async def test_linking_a_company_that_is_gone_is_refused_in_human_words(
@@ -76,7 +76,7 @@ async def test_linking_a_company_that_is_gone_is_refused_in_human_words(
     )
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "Компания не найдена."
+    assert answer["detail"] == "Компания не найдена"
 
 
 async def test_a_linked_hr_shows_up_in_the_list_row(api, ask, session_factory):
@@ -143,7 +143,7 @@ async def test_an_hr_without_a_name_and_without_a_nick_is_refused(
     )
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "Укажите хотя бы имя или @username."
+    assert answer["detail"] == "Укажите хотя бы имя или @username"
     assert answer["vacancy_id"] == vacancy.id
 
 
@@ -176,7 +176,7 @@ async def test_a_company_without_a_name_is_refused(api, ask, session_factory):
     )
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "Название обязательно."
+    assert answer["detail"] == "Название обязательно"
     # Номер вакансии едет обратно в отказе: подборщик открыт из неё, и по
     # номеру окно понимает, чью модалку красить.
     assert answer["vacancy_id"] == vacancy.id

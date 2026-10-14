@@ -138,7 +138,7 @@ async def test_marking_read_before_the_bot_is_up_is_refused(api, ask, session_fa
     answer = await ask(api.hr.mark_read, hr.id)
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "Бот ещё не готов."
+    assert answer["detail"] == "Бот ещё не готов"
 
 
 async def test_marking_read_reaches_the_bot(api, ask, with_bot, session_factory):

@@ -100,7 +100,7 @@ class Cv:
             self._hub,
             lambda: _parse_into_profile(self._hub, Path(cv_path), chat),
             PARSE_CV_REFUSALS,
-            "Резюме разобрано, анкета заполнена.",
+            "Резюме разобрано, анкета заполнена",
         )
 
     def open(self) -> dict:

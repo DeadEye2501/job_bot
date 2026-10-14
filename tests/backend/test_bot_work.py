@@ -15,4 +15,4 @@ async def test_a_missing_resume_stops_the_work_and_names_the_site(make_bot, monk
         raise ResumeMissing("site.test")
 
     assert await work.in_slot(bot, apply, "apply") == "resume_missing"
-    assert notes == ["Выбранное резюме не найдено на site.test — пересканируйте резюме."]
+    assert notes == ["Выбранное резюме не найдено на site.test — пересканируйте резюме"]
