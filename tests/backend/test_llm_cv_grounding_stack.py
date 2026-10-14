@@ -268,6 +268,16 @@ def test_a_word_ending_in_po_is_not_a_stack_heading():
     assert grounded.experience[0].stack == []
 
 
+def test_a_duty_heading_ending_in_a_stack_word_is_not_a_stack_heading():
+    """«Обслуживание оборудования:» — шапка обязанностей, а не перечень оборудования."""
+    parsed = parsed_cv(experience=[parsed_cv_place(company="Контур", stack=["Станок ЧПУ"])])
+    text = "Контур\nНаладчик\n\nОбслуживание оборудования:\n    плановый ремонт\n"
+
+    grounded = grounded_in_cv(parsed, text)
+
+    assert grounded.experience[0].stack == []
+
+
 def test_a_stack_heading_is_recognised_however_it_is_written():
     """Заголовок стека пишут по-разному, и своего стека из-за этого не лишают."""
     for heading in (

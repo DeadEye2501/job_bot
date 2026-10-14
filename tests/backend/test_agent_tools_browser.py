@@ -3,9 +3,8 @@
 from backend.agent.jobs import Dropped
 from backend.agent.tools_browser import browser_tools
 from tests.fakes.agent import apply_job, fill_job, kit_for, page_item, tool
+from tests.backend.fixtures.applying import PAGE as VACANCY
 from tests.fakes.browser import FakeBrowser, FakePage
-
-VACANCY = "https://site.test/vacancy/1"
 
 
 def _tools(page, resume=None, photo=None):

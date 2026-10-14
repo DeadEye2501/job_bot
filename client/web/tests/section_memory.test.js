@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { sectionMemory, withCard, withTab } from '../state/section_memory.svelte.js';
+import { sectionMemory, withCard, withTab, withView } from '../state/section_memory.svelte.js';
 
 describe('память разделов', () => {
   it('открытая карточка помнится по разделу', () => {
@@ -21,6 +21,15 @@ describe('память разделов', () => {
     const after = withTab(before, 'contacts', 'aggregators');
 
     expect([after.tabs.contacts, after.cards.contacts]).toEqual(['aggregators', null]);
+  });
+
+  it('смена вкладки не трогает отбор и порядок вакансий', () => {
+    const view = { filter: { statuses: ['New'] }, sort: 'Сначала старые' };
+    const before = withView(sectionMemory(), 'vacancies', view);
+
+    const after = withTab(before, 'contacts', 'aggregators');
+
+    expect(after.views.vacancies).toEqual(view);
   });
 
   it('та же вкладка карточку не трогает', () => {

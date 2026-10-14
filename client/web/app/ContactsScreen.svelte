@@ -18,7 +18,7 @@
   import CompaniesList from './CompaniesList.svelte';
   import PeopleList from './PeopleList.svelte';
 
-  // Вкладку и открытую карточку держит оболочка (`sectionMemory`).
+  // Вкладку и открытую карточку держит оболочка (`heldMemory`).
   let { ask, say, lockedTip, events, openCard, onopened, onvacancy, tab, ontab, onchosen } =
     $props();
 

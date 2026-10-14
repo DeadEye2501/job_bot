@@ -10,16 +10,8 @@
 """
 
 
-import logging
-
-import httpx
-
-from backend.payloads import FitValidation, ParsedVacancy
-
 from backend.llm.candidate import CandidateProfile, format_text
-from backend.llm.fit import ANSWER_RULES, VERDICT_SCOPE, FitQuestion, ask_fit, vacancy_text
-
-logger = logging.getLogger(__name__)
+from backend.llm.fit import ANSWER_RULES, VERDICT_SCOPE, text_fit_question
 
 PURPOSE = "validate_place_fit"
 
@@ -100,15 +92,5 @@ def _prompt_for(profile: CandidateProfile) -> str:
     )
 
 
-async def validate_place_fit(
-    parsed: ParsedVacancy, raw_text: str, client: httpx.AsyncClient, model: str,
-    *, profile: CandidateProfile,
-) -> tuple[FitValidation | None, str | None]:
-    """Может ли кандидат работать там, где требует вакансия, и, если не спросилось, почему."""
-    logger.debug("%s: title=%r", PURPOSE, parsed.title)
-    return await ask_fit(
-        FitQuestion(purpose=PURPOSE, prompt=_prompt_for(profile)),
-        vacancy_text(raw_text),
-        client,
-        model,
-    )
+validate_place_fit = text_fit_question(PURPOSE, _prompt_for)
+"""Может ли кандидат работать там, где требует вакансия, и, если не спросилось, почему."""

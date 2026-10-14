@@ -21,7 +21,6 @@
   import { round } from '$state/round.svelte.js';
   import { VACANCY_PAGE, appended, nearBottom, refreshLimit } from '$state/paging.js';
   import { filterPayload } from '$state/vacancy_filter.js';
-  import { vacancyView } from '$state/vacancy_view.svelte.js';
   import {
     SORTS,
     emptyNote,
@@ -34,6 +33,9 @@
   // `lockedTip` приходит сверху, а не спрашивается здесь: лампы состояния
   // опрашивает оболочка для нижней полосы, и второй опрос из карточки дал бы
   // две разные правды об одном.
+  //
+  // Отбор и порядок (`view`) держит оболочка (`heldMemory`): экран при уходе из
+  // раздела снимается, а выбранное человеком должно его пережить.
   let {
     ask,
     say,
@@ -45,6 +47,8 @@
     onchosen,
     openFilter,
     onfiltered,
+    view,
+    onview,
   } = $props();
 
   let loaded = $state(false);
@@ -67,7 +71,7 @@
   // считался бы по уже другой выдаче — строки на стыке страниц пропали бы.
   // Заход в раздел — тот же миг применения: отбор человек оставил прошлый, а
   // «за неделю» отсчитывается от того, когда он на список смотрит.
-  let asked = $state(filterPayload(vacancyView.filter, new Date()));
+  let asked = $state(filterPayload(untrack(() => view.filter), new Date()));
   // Каналы и компании для панели собраны мимо действующего отбора: считай их
   // мост по выдаче, меню сжималось бы до того, что уже отобрано, и вернуть
   // отброшенное было бы нечем. Спрашиваются своим зовом — `askOptions`.
@@ -227,7 +231,7 @@
     const now = await fresh(() =>
       ask('vacancies.list', {
         search,
-        sort: sortKey(vacancyView.sort),
+        sort: sortKey(view.sort),
         limit,
         offset: 0,
         ...asked,
@@ -268,7 +272,7 @@
    * страницу становится некуда.
    */
   async function more() {
-    const was = { search, sort: sortKey(vacancyView.sort), filter: asked, rows };
+    const was = { search, sort: sortKey(view.sort), filter: asked, rows };
     const page = await ask('vacancies.list', {
       search: was.search,
       sort: was.sort,
@@ -278,7 +282,7 @@
     });
     if (page === null || !alive.now) return;
     if (rows !== was.rows || search !== was.search) return;
-    if (sortKey(vacancyView.sort) !== was.sort || asked !== was.filter) return;
+    if (sortKey(view.sort) !== was.sort || asked !== was.filter) return;
     rows = appended(rows, page.vacancies);
     hasMore = page.has_more;
   }
@@ -303,13 +307,13 @@
   }
 
   function order(label) {
-    vacancyView.sort = label;
+    onview({ ...view, sort: label });
     sortOpen = false;
     return refresh();
   }
 
   function apply(next) {
-    vacancyView.filter = next;
+    onview({ ...view, filter: next });
     asked = filterPayload(next, new Date());
     return refresh();
   }
@@ -360,7 +364,7 @@
       <button
         class="icon-btn"
         type="button"
-        title="Сортировка: {vacancyView.sort}"
+        title="Сортировка: {view.sort}"
         onclick={() => {
           sortOpen = !sortOpen;
           filterOpen = false;
@@ -370,7 +374,7 @@
       </button>
 
       <VacancyFilters
-        applied={vacancyView.filter}
+        applied={view.filter}
         {options}
         onapply={apply}
         shown={filterOpen}
@@ -385,7 +389,7 @@
           {#each SORTS as one (one.key)}
             <button
               class="vac-sort-option"
-              class:active={vacancyView.sort === one.label}
+              class:active={view.sort === one.label}
               type="button"
               onclick={() => order(one.label)}
             >

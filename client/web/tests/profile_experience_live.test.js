@@ -52,6 +52,19 @@ describe('живая вкладка мест работы', () => {
     expect(sent.at(-1)).not.toHaveLength(0);
   });
 
+  it('свежую карточку, где только побывали курсором, не метит', async () => {
+    const { q } = tab();
+    await settled();
+    q.getByText('+ Добавить место работы').click();
+    await settled();
+
+    fill(q.getByPlaceholderText('URL компании'), '');
+    await settled();
+
+    expect(q.getByPlaceholderText('Компания').classList.contains('missing')).toBe(false);
+    expect(q.queryByText(/Место работы #1/)).toBeNull();
+  });
+
   it('начатую карточку без даты начала не сохраняет, говорит об этом и метит пустые поля', async () => {
     const { sent, q } = tab();
     await settled();

@@ -72,6 +72,9 @@ NATIVE_LEVEL = "native"
 NATIVE_SPELLINGS: tuple[str, ...] = (
     "native", "native speaker", "родной", "родной язык",
     "носитель", "носитель языка", "mother tongue",
+    "muttersprache", "langue maternelle", "lengua materna", "nativo", "nativa",
+    "madrelingua", "língua materna", "moedertaal", "ojczysty", "рідна", "рідна мова",
+    "ana dili", "anadil",
 )
 """Какими словами язык называют родным. Рядом с написаниями уровней по тому же
 доводу: разбор ответа модели читает их отсюда, а не своим перечнем."""

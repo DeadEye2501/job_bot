@@ -9,8 +9,8 @@ from datetime import date
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.domain.tenure import place_period, years_in_it
-from backend.repository.agent_profile import GENDER_WORDS, years_text
+from backend.domain.tenure import place_period, years_in_it, years_text
+from backend.llm.candidate import GENDER_WORDS
 from backend.repository.profile import get_profile
 from backend.repository.profile_experience import list_experience
 from backend.repository.profile_projects import list_projects

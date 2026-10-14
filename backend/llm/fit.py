@@ -11,6 +11,7 @@
 
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import httpx
@@ -112,6 +113,26 @@ def vacancy_block(parsed: ParsedVacancy, raw_text: str) -> str:
 def vacancy_text(raw_text: str) -> str:
     """Одна вакансия текстом, без разобранных полей."""
     return "Оригинальный текст вакансии:\n" f"{raw_text[:VACANCY_TEXT_CHARS]}"
+
+
+def text_fit_question(purpose: str, prompt_for: Callable) -> Callable:
+    """Зов о пригодности, которому нужен только текст поста и своё наставление.
+
+    Зовы такого вида отличаются лишь целью и наставлением (`prompt_for` строит
+    его из профиля кандидата), поэтому и собираются здесь одним телом.
+    """
+
+    async def validate(
+        parsed: ParsedVacancy, raw_text: str, client: httpx.AsyncClient, model: str,
+        *, profile,
+    ) -> tuple[FitValidation | None, str | None]:
+        logger.debug("%s: title=%r", purpose, parsed.title)
+        return await ask_fit(
+            FitQuestion(purpose=purpose, prompt=prompt_for(profile)),
+            vacancy_text(raw_text), client, model,
+        )
+
+    return validate
 
 
 def _parse_fit_validation(answer: str, purpose: str) -> FitValidation | None:

@@ -80,7 +80,7 @@
 - —
 - принимает: ask
 
-### app/ProfileRecords.svelte (137)
+### app/ProfileRecords.svelte (139)
 - —
 - принимает: load, save, kind, Card
 
@@ -98,7 +98,7 @@
 - принимает: ask, say
 - берёт: ./TelegramLogin.svelte
 
-### app/Shell.svelte (272)
+### app/Shell.svelte (274)
 - —
 - берёт: ./BottomBar.svelte, ./ContactsScreen.svelte, ./LogsScreen.svelte, ./ProfileScreen.svelte, ./SettingsScreen.svelte, ./StatsScreen.svelte, ./VacanciesScreen.svelte, ./WizardScreen.svelte
 
@@ -114,9 +114,9 @@
 - Окно пересоздаётся на смене шага: код и облачный пароль — разные секреты, и набранный код не должен доехать до поля пароля.
 - принимает: say, creds, relogin, ondone, onclose
 
-### app/VacanciesScreen.svelte (452)
+### app/VacanciesScreen.svelte (456)
 - —
-- принимает: ask, say, lockedTip, events, oncontacts, open, onopened, onchosen, openFilter, onfiltered
+- принимает: ask, say, lockedTip, events, oncontacts, open, onopened, onchosen, openFilter, onfiltered, view, onview
 - берёт: ./VacancyCard.svelte
 
 ### app/VacancyCard.svelte (460)
@@ -309,9 +309,9 @@
 - принимает: options, value, placeholder, onpick
 - берёт: ./DropButton.svelte, ./DropPanel.svelte
 
-### components/ExperienceCard.svelte (104)
+### components/ExperienceCard.svelte (105)
 - —
-- принимает: record, known, open, held, ontoggle, onedit, onremove
+- принимает: record, known, open, missing, ontoggle, onedit, onremove
 - берёт: ./BulletList.svelte, ./DatePicker.svelte, ./RecordCard.svelte, ./StackField.svelte
 
 ### components/FilterGroup.svelte (12)
@@ -493,7 +493,7 @@
 
 ### components/ProjectCard.svelte (42)
 - —
-- принимает: record, known, open, held, ontoggle, onedit, onremove
+- принимает: record, known, open, missing, ontoggle, onedit, onremove
 - берёт: ./BulletList.svelte, ./RecordCard.svelte, ./StackField.svelte
 
 ### components/RawTextDialog.svelte (36)
@@ -654,7 +654,7 @@
 - —
 - принимает: marks, dimmed
 
-## state — 72 файлов
+## state — 71 файлов
 
 ### state/aggregators.js (89)
 - * Где агрегатор ищет — подпись под именем. * * У «Поиска по сети» адреса нет — его место занимает то, где он ищет: пустое * место под именем читалось бы как недозаведённый агрегатор.
@@ -748,9 +748,9 @@
 - * Дата для тесной колонки: день, сокращённый месяц и год чужого года. * * Год этого года не пишется: он и так известен, а колонка узка. Негодное и * пустое дают пустоту — прочерк в такой колонке читался бы как значение.
 - отдаёт: asIso, clock, dayIso, dayOf, isoDay, maskedDate, padded, shortDate, showDate, showStamp, validDate
 
-### state/experience.js (82)
+### state/experience.js (87)
 - * Период работы для шапки карточки. * * Месяц и год без дня: места работы различают по месяцам, а день удлиняет * строку вдвое. Открытый конец назван словами — по нему и читают, работает * человек здесь сейчас или нет.
-- отдаёт: EXPERIENCE, cardTitle, experienceGoing, experienceReady, period
+- отдаёт: EXPERIENCE, cardTitle, experienceGoing, experienceMissing, experienceReady, period
 
 ### state/flash.js (24)
 - * Заводит отметку, которая гаснет сама. * * Второе зажигание подряд отсчёт продлевает, а не гасит: быстрая правка двух * полей иначе тушила бы рамку по времени первого, и вторая запись выглядела бы * незаписанной.
@@ -792,7 +792,7 @@
 - * Заводит запись, у которой в полёте не бывает двух снимков. * * `write` отвечает, а не бросает: отказ моста — обычное дело для анкеты, и все * трое зовущих ловят его у себя, каждый своими словами человеку. * * Отдаёт обещание, которое кончается вместе с отправкой снимка: на нём держится * и уход с вкладки — набранное должно успеть уехать. * * Кончается оно исходом последней уехавшей записи, а не своей: сведённый снимок * включает в себя все, что были до него, и «легло ли» — это про него.
 - отдаёт: oneWrite
 
-### state/open_mark.js (39)
+### state/open_mark.js (40)
 - * Отметка открытой записи — та же, что ставят соседние экраны; `where` — * где запись живёт (вкладка контактов). Закрытая карточка — пусто.
 - отдаёт: markOf, takeOpened, tellOpened
 
@@ -832,9 +832,9 @@
 - * Чем заперто то, что занимает место прогона, пока он идёт: мост второй прогон * не пустит.
 - отдаёт: COUNTLESS_STAGES, RUNNING, STARTING, applyNote, bar, caption, countlessNote, humanText, updateNote
 
-### state/projects.js (37)
-- * Готов ли проект к записи: обязательно одно название, как требует мост.
-- отдаёт: PROJECTS, projectReady, projectTitle, projectsGoing
+### state/projects.js (45)
+- * Какие обязательные поля проекта пусты: обязательно одно название, как требует мост.
+- отдаёт: PROJECTS, projectMissing, projectReady, projectTitle, projectsGoing
 
 ### state/provider.js (64)
 - * Спросить у поставщика имена его моделей. * * Отказ и пустой перечень — разные ответы, и путать их нельзя: первое значит * «сервер не отозвался», второе — «сервер поднят, но модели в нём нет», и * чинятся они по-разному. Отказ приходит фразой, а не пустотой. * * Имя модели в вопрос не идёт: перечень читается с адреса и ключа, а имя — как * раз то, что в нём ищут.
@@ -844,9 +844,9 @@
 - * Заводит поля поставщика. * * `kind` — чат или эмбеддинги: с ним спрашивают поставщика. `alive` — признак * жизни экрана (`alive.js`): ответ, пришедший после ухода, класть некуда.
 - отдаёт: providerForm
 
-### state/records.js (39)
+### state/records.js (47)
 - * Лежит ли запись уже в базе. * * Номера мало: его даёт мост, а вкладка себя после записи не перечитывает — * заведённая в этот заход запись живёт с пустым номером до конца визита, уже * будучи записанной. Отметку об уехавшей записи ставит сама вкладка, и без неё * опустошённое обязательное поле вычёркивало такую строку из посылки, а мост * стирал её молча вместе со всем, что в ней было.
-- отдаёт: recordsGoing
+- отдаёт: changes, recordsGoing
 
 ### state/round.svelte.js (136)
 - * Что известно о прогоне сейчас.
@@ -856,9 +856,9 @@
 - * Что из списка остаётся видно под набранное. * * Пустое набранное оставляет список целым: поле поиска стоит над уже открытым * списком, и до первого знака резать нечего. Одни пробелы — то же самое: их * набирают между словами и стирают последними, и схлопнутый на них список * мигал бы под руками. * * Регистр не различается — человек набирает как придётся, а значения приходят * как записаны. Вхождением, а не началом строки: имена приходят с приставками * («qwen/qwen3-4b», «@ник · компания»), и отбор по началу прятал бы строку от * того, кто набирает её собственное имя. * * `text` называет, где искать: у строки списка полей несколько, и по какому из * них её вспоминают, знает не этот файл, а тот, кто её показывает.
 - отдаёт: matching
 
-### state/section_memory.svelte.js (53)
-- * Память свежего окна: первые вкладки, ни одной открытой карточки.
-- отдаёт: heldMemory, sectionMemory, withCard, withTab
+### state/section_memory.svelte.js (76)
+- * Память свежего окна: первые вкладки, ни одной открытой карточки, пустой * отбор и первый порядок. * * Порядок хранится подписью, а не ключом: подписью его выбирают в меню и * подписью же показывают в подсказке кнопки.
+- отдаёт: heldMemory, sectionMemory, withCard, withTab, withView
 
 ### state/sections.js (35)
 - * Разделы в том порядке, в каком они стоят в меню. Значок — лигатура шрифта * `Material Symbols Outlined`.
@@ -931,10 +931,6 @@
 ### state/vacancy_filter.js (193)
 - * Грейды объявлены анкетой: значения те же — и туда, и сюда они ездят через * мост, а второе их написание разошлось бы с первым молча.
 - отдаёт: COMPANY_MAX, DATE_PRESETS, GRADE_CHOICES, HR_CHOICES, REMOTE_CHOICES, activeCount, blankFilter, filterPayload, pickNames
-
-### state/vacancy_view.svelte.js (34)
-- * Отбор и порядок, какими их оставили в прошлый заход.
-- отдаёт: vacancyView
 
 ### state/wizard.js (124)
 - * Экраны по порядку. Приветствие и финал — обложки: шага у них нет, и в * строке шагов они ничего не подсвечивают.
@@ -1044,10 +1040,10 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 - Коробка блока в карточке. Так отделены друг от друга разделы правой панели: заметки, мини-списки, числа канала, стек вакансии, её описание и лента, переписка с человеком. Заголовков на панели нет, и без рамки блоки слились бы в одну простыню. Своим файлом, а не в оформлении каждой карточки: коробка была написана трижды — у контакта, у вакансии и у переписки, — и первые две совпадали всеми пятью объявлениями. Своё каждый блок дописывает сам: у переписки нет внутреннего отступа, потому что лента прижимается к рамке.
 - селекторы (1): .card-section
 
-### styles/channel-stats.css (77)
+### styles/channel-stats.css (74)
 - Числа канала: четыре плитки и полоса воронки под ними. Полосой, а не кольцом: доли здесь читают одну относительно другой — сколько из собранного дошло до отклика, — и в ряд это видно, а по кругу нет. Цвет отрезков — общий набор из status-color.css.
 - селекторы (12): .ch-stats-grid, .ch-stat, .ch-stat-num.fit, .ch-stat-num.apply, .ch-stat-num.response, .ch-stat-label, .ch-bar, .ch-bar-seg, .ch-bar-legend, .ch-bar-legend .legend-item, .ch-bar-legend .status-dot, .ch-stats-empty
-- берёт: --accent, --bg-tertiary, --info, --status-applied, --text-secondary
+- берёт: --accent, --info, --status-applied, --text-secondary
 
 ### styles/chat.css (291)
 - Переписка в карточке человека: лента писем, пузыри и строка отправки. Своим файлом, а не в оформлении карточки: карточку одевают три предмета, а переписка есть только у человека.
@@ -1344,11 +1340,12 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 .menu-item.danger:hover .material-symbols-outlined, .menu-line
 - берёт: --border, --danger, --danger-hover-fg, --danger-tint, --text-primary, --text-secondary, --text-tertiary
 
-### styles/meter-track.css (14)
-- Подложка тонкой шкалы: полосы хода в нижней полосе, шкала навыка в статистике и счётчик отклика канала. Заливка внутри обрезается по скруглению. Одним правилом, а не своим в каждом файле: написанные порознь, шкалы одного окна расходятся скруглением и цветом подложки с первой же правки. Своё у каждой — высота, ширина и раскладка — остаётся в её файле.
+### styles/meter-track.css (16)
+- Подложка тонкой шкалы: полосы хода в нижней полосе, шкала навыка в статистике, счётчик отклика канала и полоса статусов в карточке источника. Заливка внутри обрезается по скруглению. Одним правилом, а не своим в каждом файле: написанные порознь, шкалы одного окна расходятся скруглением и цветом подложки с первой же правки. Своё у каждой — высота, ширина и раскладка — остаётся в её файле.
 - селекторы (1): .progress-bar,
 .stats-skill-bar,
-.stats-ch-grid .stats-ch-conv-meter
+.stats-ch-grid .stats-ch-conv-meter,
+.ch-bar
 - берёт: --bg-tertiary
 
 ### styles/mini-list.css (97)
@@ -1865,7 +1862,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/events.test.js (205)
 - * Мост, отвечающий заготовленным, а на исходе — закрытой очередью.
 
-### tests/experience.test.js (129)
+### tests/experience.test.js (149)
 - —
 
 ### tests/flash.test.js (34)
@@ -1949,7 +1946,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/profile_cv_live.test.js (192)
 - * Анкета, у которой мост отдаёт этот файл резюме и это фото.
 
-### tests/profile_experience_live.test.js (70)
+### tests/profile_experience_live.test.js (83)
 - * Завести место работы и заполнить три обязательных поля.
 
 ### tests/profile_projects_live.test.js (66)
@@ -1968,7 +1965,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 - * Вкладка вида `kind` с карточкой `Card` и перечнем `rows` от моста.
 - отдаёт: fill, recordsTab
 
-### tests/remembered_card_live.test.js (100)
+### tests/remembered_card_live.test.js (153)
 - —
 
 ### tests/round.test.js (66)
@@ -1977,7 +1974,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/search.test.js (49)
 - —
 
-### tests/section_memory.test.js (33)
+### tests/section_memory.test.js (42)
 - —
 
 ### tests/section_tabs_live.test.js (68)
@@ -2039,7 +2036,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/vacancies.test.js (297)
 - —
 
-### tests/vacancies_screen_new_live.test.js (319)
+### tests/vacancies_screen_new_live.test.js (322)
 - * Мост, отвечающий тем же, чем отвечает настоящий. * * Заведение чужой карточки отказывает: так ведёт себя настоящий, когда имя * занято или связь оборвалась, — и это единственный способ увидеть, что * остаётся в черновике после неудачи.
 
 ### tests/vacancy_actions.test.js (185)

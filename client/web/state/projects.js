@@ -6,9 +6,14 @@
 import { recordsGoing } from './records.js';
 import { counted } from './words.js';
 
-/** Готов ли проект к записи: обязательно одно название, как требует мост. */
+/** Какие обязательные поля проекта пусты: обязательно одно название, как требует мост. */
+export function projectMissing(project) {
+  return (project.name || '').trim() ? [] : ['name'];
+}
+
+/** Готов ли проект к записи. */
 export function projectReady(project) {
-  return Boolean((project.name || '').trim());
+  return projectMissing(project).length === 0;
 }
 
 /** Что из перечня проектов уедет на мост — и почему не уедет ничего. */
@@ -16,7 +21,9 @@ export function projectsGoing(rows) {
   return recordsGoing(
     rows,
     projectReady,
-    (shown) => `Проект #${shown}: заполните название — пока оно пусто, проект не сохраняется.`,
+    (shown, whole) =>
+      `Проект #${shown}: заполните название — пока оно пусто, `
+      + `${whole ? 'перечень проектов' : 'проект'} не сохраняется.`,
   );
 }
 
@@ -33,5 +40,6 @@ export const PROJECTS = {
   addLabel: '+ Добавить проект',
   blank: () => ({ id: null, name: '', url: '', about: [], skill_names: [] }),
   going: projectsGoing,
+  missing: projectMissing,
   leaving: (one) => `Удалить проект «${one.name || 'без названия'}»?`,
 };
