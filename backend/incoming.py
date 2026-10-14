@@ -3,7 +3,8 @@
 Нагрузку составляет не наш код: она приходит из формы окна, из ответа модели
 и из ответа Telegram, и приходит в ней что угодно — не тот тип, пустота трёх
 видов, пробелы по краям. Каждому зовущему все эти случаи значат одно: взять
-то, что годится, и не уронить разбор.
+то, что годится, и не уронить разбор. Исключение — дата, выбранная человеком
+в календаре: негодная отбивает запись, а не стирается молча.
 
 Чем отличается от соседей. `payloads.py` объявляет **свёртки** — из чего
 состоит вакансия, письмо, карточка; здесь **чтение** отдельного значения, из
@@ -12,7 +13,7 @@
 """
 
 import enum
-from datetime import datetime
+from datetime import date, datetime
 
 _HOMOGLYPHS = str.maketrans("авсеАВСЕ", "abceABCE")
 
@@ -106,6 +107,21 @@ def moment_or_none(value) -> datetime | None:
         return datetime.fromisoformat(str(value))
     except ValueError:
         return None
+
+
+def date_or_refusal(value, label: str) -> date | None:
+    """Дата из поля окна по ISO; пусто — даты нет, негодная — отказ с её названием.
+
+    В отличие от соседей негодное не читается отсутствием: дату человек
+    выбирал в календаре, и запись без неё молча стёрла бы выбранное.
+    """
+    iso = (value or "").strip()
+    if not iso:
+        return None
+    try:
+        return date.fromisoformat(iso)
+    except ValueError:
+        raise ValueError(f"неверная дата {label}: {iso!r}")
 
 
 def str_list(value) -> list[str]:

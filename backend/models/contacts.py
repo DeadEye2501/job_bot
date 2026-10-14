@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import JSON, BigInteger, DateTime, Index, LargeBinary, text
+from sqlalchemy import JSON, BigInteger, DateTime, ForeignKey, Index, LargeBinary, text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import expression
 
@@ -41,6 +41,33 @@ class Aggregator(IdMixin, Base):
     # Значок сайта — то же место, что аватар у канала: по нему агрегатор
     # узнают в списке, не читая имени.
     avatar: Mapped[bytes | None] = mapped_column(LargeBinary)
+    can_add_resume: Mapped[bool] = mapped_column(server_default=expression.false())
+
+
+class AggregatorResume(IdMixin, Base):
+    """Резюме человека на сайте агрегатора.
+
+    Отмеченное — то, которым откликаться. Больше одного отмеченного на сайте
+    база не примет: какое из двух брать, иначе решал бы случай.
+    """
+
+    __tablename__ = "aggregator_resume"
+    __table_args__ = (
+        Index("uq_aggregator_resume_url", "aggregator_id", "url", unique=True),
+        Index(
+            "uq_aggregator_resume_chosen",
+            "aggregator_id",
+            unique=True,
+            postgresql_where=text("is_chosen"),
+            sqlite_where=text("is_chosen"),
+        ),
+    )
+
+    aggregator_id: Mapped[int] = mapped_column(ForeignKey("aggregator.id"))
+    title: Mapped[str]
+    url: Mapped[str]
+    position: Mapped[int]
+    is_chosen: Mapped[bool] = mapped_column(server_default=expression.false())
 
 
 class HR(IdMixin, Base):

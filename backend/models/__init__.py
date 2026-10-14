@@ -7,7 +7,7 @@ alembic autogenerate неполный набор, и тот выписал бы 
 
 from backend.models.application import Application, Screening
 from backend.models.base import Base
-from backend.models.contacts import HR, Aggregator, Company, TelegramChannel
+from backend.models.contacts import HR, Aggregator, AggregatorResume, Company, TelegramChannel
 from backend.models.enums import (
     ApplicationVia,
     BotMode,
@@ -50,6 +50,7 @@ from backend.models.vacancy import (
 __all__ = [
     "HR",
     "Aggregator",
+    "AggregatorResume",
     "AppSetting",
     "Application",
     "ApplicationVia",

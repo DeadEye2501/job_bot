@@ -269,6 +269,14 @@
 - `branch_labels: Union[str, Sequence[str], None]` = `None`
 - `depends_on: Union[str, Sequence[str], None]` = `None`
 
+### `alembic/versions/f3b8d1c2a7e4_resume_autofill.py`
+
+- `revision: str` = `'f3b8d1c2a7e4'`
+- `down_revision: Union[str, Sequence[str], None]` = `'6cc10045aeb6'`
+- `branch_labels: Union[str, Sequence[str], None]` = `None`
+- `depends_on: Union[str, Sequence[str], None]` = `None`
+- `_PROFILE_COLUMNS` = `набор из 6`
+
 ## backend
 
 ### `backend/agent/availability.py`
@@ -1177,6 +1185,15 @@
   - `is_logged_in: Mapped[bool]` = `mapped_column(server_default=expression.false())`
   - `last_run_at: Mapped[datetime | None]` = `mapped_column(DateTime(timezone=True))`
   - `avatar: Mapped[bytes | None]` = `mapped_column(LargeBinary)`
+  - `can_add_resume: Mapped[bool]` = `mapped_column(server_default=expression.false())`
+- `class AggregatorResume(IdMixin, Base)`
+  - `__tablename__` = `'aggregator_resume'`
+  - `__table_args__` = `набор из 2`
+  - `aggregator_id: Mapped[int]` = `mapped_column(ForeignKey('aggregator.id'))`
+  - `title: Mapped[str]`
+  - `url: Mapped[str]`
+  - `position: Mapped[int]`
+  - `is_chosen: Mapped[bool]` = `mapped_column(server_default=expression.false())`
 - `class HR(IdMixin, Base)`
   - `__tablename__` = `'hr'`
   - `__table_args__` = `набор из 1`
@@ -1277,6 +1294,12 @@
   - `first_name_latin: Mapped[str | None]`
   - `last_name_latin: Mapped[str | None]`
   - `gender: Mapped[Gender | None]` = `mapped_column(enum_column(Gender, 'gender'))`
+  - `patronymic: Mapped[str | None]`
+  - `patronymic_latin: Mapped[str | None]`
+  - `birth_date: Mapped[date | None]`
+  - `citizenship: Mapped[str | None]`
+  - `about_me: Mapped[str | None]`
+  - `resume_url: Mapped[str | None]`
 - `class ProfileLanguage(IdMixin, Base)`
   - `__tablename__` = `'profile_language'`
   - `__table_args__` = `набор из 1`
@@ -1479,6 +1502,12 @@
   - `first_name_latin: str | None`
   - `last_name_latin: str | None`
   - `gender: Gender | None`
+  - `patronymic: str | None` = `None`
+  - `patronymic_latin: str | None` = `None`
+  - `birth_date: date | None` = `None`
+  - `citizenship: str | None` = `None`
+  - `about_me: str | None` = `None`
+  - `resume_url: str | None` = `None`
 - `class ParsedCvLanguage`
   - `language: str`
   - `level: str`
@@ -1718,7 +1747,7 @@
 
 - `logger` = `logging.getLogger(__name__)`
 - `_SALARY` = `набор из 3`
-- `_PERSON` = `набор из 3`
+- `_PERSON` = `набор из 9`
 - `_KEPT_ACROSS_RESUMES` = `_SALARY + _PERSON`
 
 ### `backend/repository/profile_experience.py`
@@ -2276,6 +2305,11 @@
 - `_QUENCHED` = `_REBUILD_HEAD.format(quench='    op.execute("PRA…`
 - `_AS_IS` = `_REBUILD_HEAD.format(quench='')`
 
+### `tests/backend/test_migration_resume_autofill.py`
+
+- `_BEFORE` = `'6cc10045aeb6'`
+- `_NEW_PROFILE_COLUMNS` = `набор из 6`
+
 ### `tests/backend/test_repository_channel_detail.py`
 
 - `_FUNNEL_SET` = `[VacancyStatus.NOT_FIT] * 2 + [VacancyStatus.SCA…`
@@ -2283,6 +2317,10 @@
 ### `tests/backend/test_repository_hr_attribution.py`
 
 - `REPLIED_AT` = `at(90)`
+
+### `tests/backend/test_repository_profile_cv_saving.py`
+
+- `_TYPED_BY_HAND` = `словарь из 6`
 
 ### `tests/backend/test_repository_vacancy_ghosting.py`
 

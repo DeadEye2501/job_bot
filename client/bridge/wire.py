@@ -119,6 +119,12 @@ def _profile_to_dict(p, languages=None) -> dict | None:
         "first_name_latin": p.first_name_latin,
         "last_name_latin": p.last_name_latin,
         "gender": _enum_value(p.gender),
+        "patronymic": p.patronymic,
+        "patronymic_latin": p.patronymic_latin,
+        "birth_date": p.birth_date.isoformat() if p.birth_date else None,
+        "citizenship": p.citizenship,
+        "about_me": p.about_me,
+        "resume_url": p.resume_url,
         "grades": list(p.grades or []),
         "work_format": list(p.work_format or []),
         "languages": [

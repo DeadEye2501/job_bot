@@ -793,7 +793,7 @@
 - * Отперта ли кнопка «Связать». * * Промах мышью по строке списка не должен менять привязку: выбор строки только * помечает её, а связывает отдельная кнопка. Выбор уже привязанного кнопку не * отпирает — нажатие переписало бы связь тем же значением и записало в ленту * перемену, которой не было.
 - отдаёт: candidate, labelOf, labels, linkReady, sameName
 
-### state/profile.js (151)
+### state/profile.js (157)
 - * Грейды, какими их выбирают в анкете. Значения едут на мост и совпадают с * перечнем `backend/domain/taxonomy.py`.
 - отдаёт: CURRENCIES, GENDERS, GRADES, LANG_LEVELS, SALARY_PERIODS, WORK_FORMATS, blankProfile, cvNote, cvOpenable, fileSize, langRow, named, profileSheet, updatedNote
 
@@ -1491,7 +1491,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 .settings-section.danger .settings-section-title .material-symbols-outlined, .danger-row, .danger-text, .danger-sub, .danger-row .btn
 - берёт: --danger, --err-zone-bg, --err-zone-border, --text-primary, --text-secondary, --text-tertiary
 
-### styles/settings.css (59)
+### styles/settings.css (62)
 - Экран настроек: колонка секций посреди поля. Что внутри секций — сетка полей, пороги, опасная зона — своими файлами.
 - селекторы (8): .settings-page, .settings-inner, .settings-page .input, .settings-page .btn, .settings-page .btn .material-symbols-outlined, .settings-page .btn.danger, .settings-page .btn.danger:hover:not(:disabled), .settings-row.spaced
 - берёт: --bg-tertiary, --border, --danger
@@ -1862,7 +1862,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 - * Кнопка с этой подписью.
 - отдаёт: buttonBy, press, typed
 
-### tests/profile.test.js (157)
+### tests/profile.test.js (163)
 - —
 
 ### tests/profile_cv_live.test.js (52)
