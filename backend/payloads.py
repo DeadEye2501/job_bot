@@ -184,6 +184,12 @@ class ParsedCvProfile:
     first_name_latin: str | None
     last_name_latin: str | None
     gender: Gender | None
+    patronymic: str | None = None
+    patronymic_latin: str | None = None
+    birth_date: date | None = None
+    citizenship: str | None = None
+    about_me: str | None = None
+    resume_url: str | None = None
 
 
 @dataclass(frozen=True)

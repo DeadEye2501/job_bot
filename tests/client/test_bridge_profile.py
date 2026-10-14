@@ -65,6 +65,8 @@ async def test_a_saved_person_comes_back_on_the_next_request(api, ask):
         "first_name_latin": None,
         "last_name_latin": None,
         "gender": None,
+        "patronymic": None, "patronymic_latin": None, "birth_date": None,
+        "citizenship": None, "about_me": None, "resume_url": None,
         "grades": [],
         "work_format": [],
         "languages": [],
@@ -88,6 +90,41 @@ async def test_the_answers_for_forms_come_back_as_saved(api, ask):
         "expected_salary_period": "month", "first_name_latin": "Ivan",
         "last_name_latin": "Petrov", "gender": "male",
     }
+
+
+async def test_the_new_personal_fields_come_back_as_saved(api, ask):
+    await ask(api.profile.save, {
+        **PERSON, "patronymic": " Сергеевич ", "patronymic_latin": "Sergeevich",
+        "birth_date": "1990-03-15", "citizenship": "Россия",
+        "about_me": "Строю сервисы.\nЛюблю тесты.", "resume_url": "https://hh.ru/resume/1",
+    })
+
+    profile = (await ask(api.profile.get))["ok"]["profile"]
+
+    assert {k: profile[k] for k in (
+        "patronymic", "patronymic_latin", "birth_date", "citizenship", "about_me", "resume_url",
+    )} == {
+        "patronymic": "Сергеевич", "patronymic_latin": "Sergeevich",
+        "birth_date": "1990-03-15", "citizenship": "Россия",
+        "about_me": "Строю сервисы.\nЛюблю тесты.", "resume_url": "https://hh.ru/resume/1",
+    }
+
+
+async def test_a_wrong_birth_date_is_refused_by_its_name_and_nothing_is_written(api, ask):
+    """Негодная дата рождения отбивает всю запись, и отказ называет поле.
+
+    Запись идёт после каждой правки: ляг остальное без даты, человек не узнал
+    бы, что набранное в календаре пропало.
+    """
+    await _saved_person(api, ask, education="МГУ")
+
+    answer = await ask(api.profile.save, {**PERSON, "education": "СПбГУ",
+                                          "birth_date": "15.03.1990"})
+
+    assert answer["fail"] == "fields"
+    assert "дата рождения" in answer["detail"]
+    profile = (await ask(api.profile.get))["ok"]["profile"]
+    assert (profile["education"], profile["birth_date"]) == ("МГУ", None)
 
 
 async def test_a_zero_salary_is_saved_as_no_salary(api, ask):

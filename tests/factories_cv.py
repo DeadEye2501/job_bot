@@ -36,6 +36,12 @@ def parsed_cv_profile(**overrides) -> ParsedCvProfile:
         first_name_latin=None,
         last_name_latin=None,
         gender=None,
+        patronymic=None,
+        patronymic_latin=None,
+        birth_date=None,
+        citizenship=None,
+        about_me=None,
+        resume_url=None,
     )
     fields.update(overrides)
     return ParsedCvProfile(**fields)

@@ -6,6 +6,7 @@ from backend.domain.salary import currency_sign
 from backend.domain.taxonomy import GRADES, WORK_FORMATS
 from backend.incoming import (
     amount_or_none,
+    date_or_refusal,
     enum_member_or_none,
     normalize_enum_list,
     text_or_none,
@@ -192,6 +193,12 @@ def _read_profile_fields(payload: dict) -> dict:
         "first_name_latin": text_or_none(payload.get("first_name_latin")),
         "last_name_latin": text_or_none(payload.get("last_name_latin")),
         "gender": enum_member_or_none(payload.get("gender"), Gender),
+        "patronymic": text_or_none(payload.get("patronymic")),
+        "patronymic_latin": text_or_none(payload.get("patronymic_latin")),
+        "birth_date": date_or_refusal(payload.get("birth_date"), "рождения"),
+        "citizenship": text_or_none(payload.get("citizenship")),
+        "about_me": text_or_none(payload.get("about_me")),
+        "resume_url": text_or_none(payload.get("resume_url")),
         "grades": normalize_enum_list(payload.get("grades"), GRADES),
         "work_format": normalize_enum_list(payload.get("work_format"), WORK_FORMATS),
     }

@@ -66,6 +66,14 @@ class Profile(IdMixin, UpdatedAtMixin, Base):
     first_name_latin: Mapped[str | None]
     last_name_latin: Mapped[str | None]
     gender: Mapped[Gender | None] = mapped_column(enum_column(Gender, "gender"))
+    patronymic: Mapped[str | None]
+    patronymic_latin: Mapped[str | None]
+    birth_date: Mapped[date | None]
+    citizenship: Mapped[str | None]
+    # Готовый текст для людей: им заполняют «О себе» на сайтах. Указания
+    # модели живут в `free_preferences`, и в решения этот текст не входит.
+    about_me: Mapped[str | None]
+    resume_url: Mapped[str | None]
 
 
 class ProfileLanguage(IdMixin, Base):

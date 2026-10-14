@@ -4,6 +4,7 @@ from backend.crypto import encrypt_str
 from backend.domain.apply_order import World
 from backend.models import (
     Aggregator,
+    AggregatorResume,
     Application,
     ApplicationVia,
     ContactAddedBy,
@@ -20,6 +21,14 @@ def aggregator_row(**overrides) -> Aggregator:
     fields = {"name": "HeadHunter", "host": "hh.ru"}
     fields.update(overrides)
     return Aggregator(**fields)
+
+
+def aggregator_resume_row(aggregator_id: int, **overrides) -> AggregatorResume:
+    """Резюме человека на сайте агрегатора. Ссылка уникальна в пределах сайта —
+    задаётся явно, где строк больше одной."""
+    fields = {"title": "Разработчик", "url": "https://hh.ru/resume/1", "position": 0}
+    fields.update(overrides)
+    return AggregatorResume(aggregator_id=aggregator_id, **fields)
 
 
 def web_search_row(**overrides) -> Aggregator:

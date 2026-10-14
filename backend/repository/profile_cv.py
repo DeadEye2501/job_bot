@@ -86,7 +86,10 @@ def _parsed_records(model, records, profile_id: int, skill_lookup: dict[str, Pro
 
 _SALARY = ("expected_salary", "expected_salary_currency", "expected_salary_period")
 
-_PERSON = ("first_name_latin", "last_name_latin", "gender")
+_PERSON = (
+    "first_name_latin", "last_name_latin", "gender", "patronymic", "patronymic_latin",
+    "birth_date", "citizenship", "about_me", "resume_url",
+)
 
 _KEPT_ACROSS_RESUMES = _SALARY + _PERSON
 """Ответы для форм, которых в резюме может не быть. Повторный разбор их не

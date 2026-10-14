@@ -322,6 +322,40 @@ async def test_a_new_resume_overrides_the_answers_it_gave(session, session_facto
     assert (p.expected_salary, p.gender, p.first_name_latin) == (350000, Gender.MALE, "Ivan")
 
 
+_TYPED_BY_HAND = {
+    "patronymic": "Сергеевна", "patronymic_latin": "Sergeevna",
+    "birth_date": date(1990, 3, 15), "citizenship": "Россия",
+    "about_me": "Строю сервисы.", "resume_url": "https://hh.ru/resume/1",
+}
+
+
+def _new_fields(p) -> dict:
+    return {name: getattr(p, name) for name in _TYPED_BY_HAND}
+
+
+async def test_a_new_resume_keeps_the_new_fields_it_did_not_give(session, session_factory):
+    """Отчество, дата рождения, гражданство, «О себе» и ссылка на резюме
+    переживают разбор файла, где их нет: человек мог ввести их руками."""
+    await put(session_factory, profile_row(**_TYPED_BY_HAND))
+
+    await save_parsed_cv(session, parsed_cv())
+
+    assert _new_fields((await session.scalars(select(Profile))).one()) == _TYPED_BY_HAND
+
+
+async def test_a_new_resume_overrides_the_new_fields_it_gave(session, session_factory):
+    await put(session_factory, profile_row(**_TYPED_BY_HAND))
+    fresh = {
+        "patronymic": "Ивановна", "patronymic_latin": "Ivanovna",
+        "birth_date": date(1991, 4, 16), "citizenship": "Грузия",
+        "about_me": "Веду команды.", "resume_url": "https://hh.ru/resume/2",
+    }
+
+    await save_parsed_cv(session, parsed_cv(profile=parsed_cv_profile(**fresh)))
+
+    assert _new_fields((await session.scalars(select(Profile))).one()) == fresh
+
+
 async def test_a_new_salary_does_not_borrow_the_old_currency(session, session_factory):
     """Зарплата переносится связкой: новая сумма со старой валютой — чужая зарплата."""
     await put(session_factory, profile_row(
