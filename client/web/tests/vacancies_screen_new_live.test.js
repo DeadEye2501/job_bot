@@ -74,6 +74,7 @@ function screen() {
     oncontacts: () => {},
     open: null,
     onopened: () => {},
+    onchosen: () => {},
     openFilter: null,
     onfiltered: () => {},
   });

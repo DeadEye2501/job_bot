@@ -3,6 +3,7 @@
 
 from dataclasses import dataclass, field
 
+from backend.domain.taxonomy import NATIVE_LEVEL
 from backend.models import Profile
 from backend.models import ProfileLanguage
 from backend.models import ProfileSkill
@@ -33,11 +34,21 @@ class CandidateProfile:
 
     title: str | None = None
     location: str | None = None
+    citizenship: str | None = None
     grades: list[str] = field(default_factory=list)
     work_formats: list[str] = field(default_factory=list)
     languages: list[CandidateLanguage] = field(default_factory=list)
     free_preferences: str | None = None
     known_skills: list[ProfileSkill] = field(default_factory=list)
+
+
+def user_language(languages: list[CandidateLanguage]) -> str:
+    """Язык человека: первый родной в его списке, без родного — английский.
+
+    На нём делается всё, что приложение пишет от имени человека, кроме
+    обращений к работодателю: их язык задаёт вакансия.
+    """
+    return next((lang.name for lang in languages if lang.level == NATIVE_LEVEL), "English")
 
 
 def format_languages(languages: list[CandidateLanguage] | None) -> str:
@@ -107,6 +118,7 @@ def build_candidate_profile(
     return CandidateProfile(
         title=profile.title,
         location=profile.location,
+        citizenship=profile.citizenship,
         grades=list(profile.grades or []),
         work_formats=list(profile.work_format or []),
         languages=candidate_languages(languages),

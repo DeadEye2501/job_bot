@@ -137,7 +137,8 @@ class FillJob:
     `resume_url` — резюме, которое перезаписывается; пусто — заводится новое.
     `accepted` — принятые пункты раскладки по ключу «адрес страницы, селектор
     поля», той же формы, что `ApplyJob.confirmed`: вписать можно только их.
-    `page_checks` — сколько раз проверяющий смотрел запасной путь на адресе.
+    `page_checks` — сколько раз проверяющий смотрел запасной путь поля, по
+    ключу «адрес страницы, селектор поля».
     `general` — поля, названные общими (у пункта было обоснование запасного
     пути): вписать в них можно только проверенное. `skipped` — подписи
     необязательных полей, оставленных без пункта, по адресу последней
@@ -150,7 +151,7 @@ class FillJob:
     resume_url: str | None = None
     outcome: Outcome | None = None
     accepted: dict[tuple[str, str], dict] = field(default_factory=dict)
-    page_checks: dict[str, int] = field(default_factory=dict)
+    page_checks: dict[tuple[str, str], int] = field(default_factory=dict)
     general: set[tuple[str, str]] = field(default_factory=set)
     skipped: dict[str, list[str]] = field(default_factory=dict)
 
@@ -158,7 +159,7 @@ class FillJob:
 RESULTS = {
     LoginJob: frozenset({"done"}),
     ScanJob: frozenset({"done"}),
-    FillJob: frozenset({"done"}),
+    FillJob: frozenset({"done", "failed"}),
     SeekJob: frozenset({"done", "failed"}),
     ApplyJob: frozenset({"vacancy_closed", "platform_closed", "not_fit", "resume_missing"}),
 }

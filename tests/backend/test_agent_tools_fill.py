@@ -99,6 +99,19 @@ async def test_a_page_gets_two_reviews_and_the_third_fallback_is_not_accepted(st
     assert any("не пропустил" in record.getMessage() for record in caplog.records)
 
 
+async def test_another_field_on_the_same_page_has_its_own_two_reviews(stand):
+    """Одностраничный редактор: третье место работы — своё поле со своими
+    проверками, а не остаток чужих; иначе оно молча пропадало бы."""
+    _, job, tools, calls = await stand({"#about": Verdict(False, "есть поле", None)})
+    refused = layout_item("#about", "Навыки: вышивка", "поля навыков нет")
+
+    for _ in range(2):
+        await tool(tools, "submit_layout")(items=[refused])
+    await tool(tools, "submit_layout")(items=[layout_item("#skills", "Место 3: швея", "поле общее")])
+
+    assert len(calls) == 3 and (FORM, "#skills") in job.accepted
+
+
 async def test_another_page_has_its_own_two_reviews(stand):
     page, _, tools, calls = await stand({"#about": Verdict(False, "есть поле", None)})
     fallback = layout_item("#about", "Навыки: вышивка", "поля навыков нет")

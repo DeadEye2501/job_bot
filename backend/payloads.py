@@ -233,6 +233,9 @@ class ParsedCv:
     skills: list[ParsedCvSkill]
     experience: list[ParsedCvExperience]
     projects: list[ParsedCvProject]
+    # Язык основного текста резюме, как его назвала модель: родным он
+    # становится, если резюме родного не называет.
+    text_language: str | None
 
 
 @dataclass(frozen=True)

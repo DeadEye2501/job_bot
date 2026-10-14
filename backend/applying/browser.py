@@ -13,7 +13,7 @@ from backend.agent.tools_common import common_tools
 from backend.agent.tools_letter import letter_tools
 from backend.applying.result import GONE, Dropped, Missed, Outcome, SiteClosed, Unfit
 from backend.domain.apply_order import Way
-from backend.domain.hosts import normalize_host
+from backend.models import Aggregator
 from backend.payloads import SeenResume
 from backend.repository.aggregator_resumes import chosen_resume, drop_resume
 from backend.repository.aggregators import web_search_id
@@ -33,8 +33,9 @@ async def via_browser(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome:
     """
     rs = kit.pipeline.rs
     async with kit.pipeline.session_factory() as session:
-        profile = way.aggregator_id or await web_search_id(session)
-        resume = await chosen_resume(session, way.aggregator_id) if way.aggregator_id else None
+        site = await session.get(Aggregator, way.aggregator_id) if way.aggregator_id else None
+        profile = site.id if site else await web_search_id(session)
+        resume = await chosen_resume(session, site.id) if site else None
     job = ApplyJob(vacancy_id, way, profile, simulated=rs.send_locked, letter_writer=rs.letter_writer,
                    resume=SeenResume(resume.title, resume.url) if resume else None,
                    confirming=confirming(kit))
@@ -44,8 +45,8 @@ async def via_browser(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome:
     await kit.browser.open_profile(job.profile_id, sending=not job.simulated)
     await run_to_limit(kit, plan)
     if isinstance(job.outcome, Finished) and job.outcome.result == "resume_missing":
-        await kit.written(lambda session: drop_resume(session, way.aggregator_id, job.resume.url))
-        raise ResumeMissing(normalize_host(way.target))
+        await kit.written(lambda session: drop_resume(session, site.id, job.resume.url))
+        raise ResumeMissing(site.host)
     outcome = _settle(job, way)
     if isinstance(outcome, Unfit):
         await _mark_unfit(kit, vacancy_id, outcome.reason)

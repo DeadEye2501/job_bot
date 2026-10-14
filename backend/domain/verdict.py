@@ -53,20 +53,18 @@ def is_empty_vacancy(parsed: ParsedVacancy | None) -> bool:
 
     Критерии:
     - parsed is None — LLM не извлёк даже title.
-    - title есть, но из 5 ключевых полей (description, stack, hr_contact,
-      company_name, salary) заполнено МЕНЬШЕ ДВУХ. Раньше требовалось
-      чтобы ВСЕ четыре отсутствовали (description+stack+hr_contact+
-      company_name) — это съедало валидные короткие посты типа
-      «Junior дизайнер | удалёнка | контакт @anna_hr» (есть title +
-      hr_contact, остальное пусто → trash). Теперь нужны хотя бы ДВА
-      сигнала из пяти.
+    - title есть, но из пяти признаков (описание, стек, контакт, компания,
+      зарплата) набралось МЕНЬШЕ ДВУХ. Одного мало — так выглядит обрывок; два
+      держат и короткий настоящий пост вроде «должность | контакт | зарплата».
+      Контакт — любой способ отклика: Telegram-контакт или адрес вне Telegram
+      (почта, телефон, форма), иначе пост с одним телефоном считался бы пустым.
     """
     if parsed is None:
         return True
     signals = (
         bool(parsed.description),
         bool(parsed.stack),
-        bool(parsed.hr_contact),
+        bool(parsed.hr_contact or parsed.other_contacts),
         bool(parsed.company_name),
         bool(parsed.salary),
     )

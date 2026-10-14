@@ -120,13 +120,13 @@ async def test_apply_all_reaches_the_bot_and_says_when_finished(api, ask, with_b
     assert ("apply_all_new",) in bot.calls
 
 
-async def test_apply_all_stopped_by_a_missing_resume_asks_for_a_rescan(api, ask, with_bot, told):
+async def test_apply_all_stopped_by_a_missing_resume_asks_to_refresh_the_list(api, ask, with_bot, told):
     with_bot(apply_all="resume_missing")
 
     await ask(api.system.apply_all_new)
 
     assert await told() == {
-        "message": "Выбранное резюме не найдено на сайте — пересканируйте резюме", "danger": True,
+        "message": "Выбранное резюме не найдено на сайте — обновите список резюме", "danger": True,
     }
 
 

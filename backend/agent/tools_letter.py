@@ -18,7 +18,7 @@ def letter_tools(kit: AgentKit, job: ApplyJob) -> list[Callable]:
     """Инструмент письма своей вакансии; кто пишет письмо, задаёт `job.letter_writer`."""
 
     async def letter(language: str, limit: int = 0, subject: str = "", body: str = "") -> str:
-        """Письмо для отклика на языке вакансии; limit — предел знаков поля, 0 — без предела. Если письмо пишешь ты — передай subject и body на сверку."""
+        """Письмо для отклика на языке формы, а если его не видно — на языке вакансии; limit — предел знаков поля, 0 — без предела. Если письмо пишешь ты — передай subject и body на сверку."""
         if job.letter_checks >= CHECKS_ALLOWED:
             return _ENOUGH
         if job.letter_writer == "agent" and not body.strip():

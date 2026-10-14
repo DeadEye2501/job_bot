@@ -8,7 +8,7 @@
   import ChannelCard from './ChannelCard.svelte';
   import SourcesTab from './SourcesTab.svelte';
 
-  let { ask, say, lockedTip, events, open, onopened, onvacancy } = $props();
+  let { ask, say, lockedTip, events, open, onopened, onchosen, onvacancy } = $props();
 
   const source = {
     key: 'channels',
@@ -19,7 +19,7 @@
   };
 </script>
 
-<SourcesTab kind="channel" words={CHANNELS_TAB} {source} {say} {events} {open} {onopened}>
+<SourcesTab kind="channel" words={CHANNELS_TAB} {source} {say} {events} {open} {onopened} {onchosen}>
   {#snippet row(channel, at)}
     <ChannelRow
       {channel}

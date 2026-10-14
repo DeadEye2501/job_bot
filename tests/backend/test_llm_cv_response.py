@@ -19,7 +19,8 @@ from tests.fakes.llm import (
 )
 
 
-MINIMAL_CV = json.dumps({"profile": CV_REQUIRED_PROFILE}, ensure_ascii=False)
+MINIMAL_CV = json.dumps(
+    {"profile": CV_REQUIRED_PROFILE, "text_language": "Русский"}, ensure_ascii=False)
 
 
 async def test_an_empty_text_never_reaches_the_provider():
@@ -147,8 +148,7 @@ async def test_a_well_formed_answer_becomes_a_parsed_resume():
     assert parsed.profile.email == CV_REQUIRED_PROFILE["email"]
     assert parsed.skills == []
     assert parsed.experience == []
-    # Языков в ответе нет, а родной в анкете есть всегда: его дают тексту, а
-    # не берут из ответа модели.
+    # Языков в ответе нет — родным становится язык текста резюме.
     assert [(x.language, x.level) for x in parsed.languages] == [("Русский", "native")]
 
 
@@ -194,6 +194,7 @@ async def test_an_invented_native_language_gives_way_to_the_resume_language():
         {
             "profile": CV_REQUIRED_PROFILE,
             "languages": [{"language": "Армянский", "level": "native"}],
+            "text_language": "Русский",
         },
         ensure_ascii=False,
     )
@@ -202,3 +203,39 @@ async def test_an_invented_native_language_gives_way_to_the_resume_language():
     parsed = await parse_cv("Саркисян Ашот. Электрик. Опыт 8 лет.", client, "qwen")
 
     assert [(x.language, x.level) for x in parsed.languages] == [("Русский", "native")]
+
+
+async def test_a_native_level_the_resume_does_not_name_gives_way_to_the_text_language():
+    """Родным язык делает только слово резюме рядом с ним; уровень, написанный
+    там вместо него, остаётся, а родным становится язык текста."""
+    answer = json.dumps(
+        {
+            "profile": CV_REQUIRED_PROFILE,
+            "languages": [{"language": "Английский", "level": "native"}],
+            "text_language": "Русский",
+        },
+        ensure_ascii=False,
+    )
+    client = provider({CHAT: chat_response(answer)})
+
+    parsed = await parse_cv("Электрик. Английский — Advanced.", client, "qwen")
+
+    assert [(x.language, x.level) for x in parsed.languages] == [
+        ("Русский", "native"), ("Английский", "C1")]
+
+
+async def test_a_native_language_the_resume_names_stays_native():
+    answer = json.dumps(
+        {
+            "profile": CV_REQUIRED_PROFILE,
+            "languages": [{"language": "Армянский", "level": "native"}],
+            "text_language": "Русский",
+        },
+        ensure_ascii=False,
+    )
+    client = provider({CHAT: chat_response(answer)})
+
+    parsed = await parse_cv("Электрик. Армянский — родной.", client, "qwen")
+
+    assert [(x.language, x.level) for x in parsed.languages] == [
+        ("Русский", "C2"), ("Армянский", "native")]

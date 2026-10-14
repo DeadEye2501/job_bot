@@ -67,7 +67,6 @@
     <MenuItem
       icon="forum"
       label="Скрининг"
-      blocked={!screened}
       disabled={!screened}
       {close}
       onpick={onscreening}

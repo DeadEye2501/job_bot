@@ -34,7 +34,7 @@ def fill_tools(kit: AgentKit, job: FillJob) -> list[Callable]:
     """Инструменты заполнения, привязанные к своему сайту."""
 
     async def submit_layout(items: list[LayoutItem]) -> str:
-        """Раскладка страницы целиком: каждый пункт — поле страницы и всё его значение из анкеты, одно поле — один пункт; у галочки value — true или false. У данных, положенных в общее текстовое поле, fallback_reason — почему узкие поля страницы им не подходят. Вписать можно только принятое."""
+        """Раскладка страницы целиком: каждый пункт — поле страницы и всё его значение из анкеты, одно поле — один пункт. label — подпись поля; kind — text, choice (список, переключатель) или check; value — значение, у галочки true или false; error — пусто; selector — тот, которым будешь вписывать. У данных, положенных в общее текстовое поле, fallback_reason — почему узкие поля страницы им не подходят. Вписать можно только принятое."""
         page = await kit.browser.page()
         url = page.url
         inventory = await page_inventory(page)
@@ -92,21 +92,24 @@ async def _reviewed(job: FillJob, url: str, fallbacks: list[dict], review: Calla
     """Отбитые пункты запасного пути по селектору — с причиной для агента;
     `review` — вызов проверяющего над пунктами этой страницы.
 
-    Проверок на адрес столько же, сколько у писем (`CHECKS_ALLOWED`): следующая
-    раскладка с запасным путём на той же странице не проверяется и не принимается.
+    Проверок на поле столько же, сколько у писем (`CHECKS_ALLOWED`): поле, чьи
+    проверки кончились, не проверяется и не принимается. Счёт по полю, а не по
+    странице: в одностраничном редакторе каждое место работы — своё поле, и
+    общий счёт молча оставил бы третье без проверки и без записи.
     """
-    if not fallbacks:
-        return {}
-    checks = job.page_checks.get(url, 0)
-    if checks >= CHECKS_ALLOWED:
-        refused = {item["selector"]: _ENOUGH for item in fallbacks}
-    else:
-        job.page_checks[url] = checks + 1
-        verdicts = await review(fallbacks)
-        refused = {selector: _why(verdict.reason, verdict.field)
-                   for selector, verdict in verdicts.items() if not verdict.ok}
-    if refused and checks + 1 >= CHECKS_ALLOWED:
-        logger.warning("заполнение резюме: проверяющий не пропустил %s на %s", ", ".join(refused), url)
+    spent = [item for item in fallbacks if job.page_checks.get((url, item["selector"]), 0) >= CHECKS_ALLOWED]
+    asked = [item for item in fallbacks if item not in spent]
+    refused = {item["selector"]: _ENOUGH for item in spent}
+    if asked:
+        for item in asked:
+            key = (url, item["selector"])
+            job.page_checks[key] = job.page_checks.get(key, 0) + 1
+        verdicts = await review(asked)
+        refused |= {selector: _why(verdict.reason, verdict.field)
+                    for selector, verdict in verdicts.items() if not verdict.ok}
+    exhausted = [selector for selector in refused if job.page_checks.get((url, selector), 0) >= CHECKS_ALLOWED]
+    if exhausted:
+        logger.warning("заполнение резюме: проверяющий не пропустил %s на %s", ", ".join(exhausted), url)
     return refused
 
 

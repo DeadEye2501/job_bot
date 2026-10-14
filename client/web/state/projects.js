@@ -16,7 +16,7 @@ export function projectsGoing(rows) {
   return recordsGoing(
     rows,
     projectReady,
-    (shown) => `Проект #${shown}: заполните название — пока оно пусто, перечень не записывается.`,
+    (shown) => `Проект #${shown}: заполните название — пока оно пусто, проект не сохраняется.`,
   );
 }
 

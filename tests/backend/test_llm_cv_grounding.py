@@ -169,8 +169,8 @@ def test_a_language_level_named_in_the_text_survives():
     ]
 
 
-def test_a_native_level_is_not_asked_to_be_named_in_the_text():
-    """Родной уровень выводится из языка письма, в тексте его слова нет."""
+def test_a_native_level_the_text_does_not_name_is_not_kept():
+    """Родным язык делает только слово резюме рядом с ним."""
     parsed = parsed_cv(
         languages=[ParsedCvLanguage(language="Английский", level="native")]
     )
@@ -178,7 +178,7 @@ def test_a_native_level_is_not_asked_to_be_named_in_the_text():
     grounded = grounded_in_cv(parsed, "Иностранные языки: английский")
 
     assert [(x.language, x.level) for x in grounded.languages] == [
-        ("Английский", "native")
+        ("Английский", "C2")
     ]
 
 
@@ -288,6 +288,15 @@ def test_a_work_format_the_resume_names_survives():
     grounded = grounded_in_cv(parsed, text)
 
     assert grounded.profile.work_format == ["remote", "hybrid", "office"]
+
+
+def test_an_office_format_named_in_english_survives():
+    """«Remote or in-office» по-английски называет и офис."""
+    parsed = parsed_cv(profile=parsed_cv_profile(work_format=["remote", "office"]))
+
+    grounded = grounded_in_cv(parsed, "Open to remote or in-office work")
+
+    assert grounded.profile.work_format == ["remote", "office"]
 
 
 def test_ms_office_in_the_skills_does_not_confirm_the_office_format():

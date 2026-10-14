@@ -4,8 +4,9 @@ import logging
 
 from backend.agent.jobs import Source
 from backend.flows.resume_fill import fill
-from backend.repository.aggregator_resumes import resumes_of
-from tests.dbio import put
+from backend.models import ProfileLanguage
+from tests.dbio import put, resume_marks
+from tests.factories import profile_row
 from tests.factories_aggregators import aggregator_resume_row, aggregator_row
 from tests.fakes.agent import finish_step, resumes_step, scripted_kit
 
@@ -23,8 +24,7 @@ async def _site(session_factory):
 
 
 async def _marks(session_factory, aggregator_id):
-    async with session_factory() as session:
-        return {r.title: r.is_chosen for r in await resumes_of(session, aggregator_id)}
+    return dict(await resume_marks(session_factory, aggregator_id))
 
 
 async def test_an_overwritten_resume_is_scanned_and_becomes_the_chosen_one(
@@ -68,6 +68,20 @@ async def test_missing_required_data_leaves_the_mark_and_skips_the_scan(
     assert len(kit.run_session.plans) == 1
 
 
+async def test_a_fill_the_agent_could_not_finish_marks_nothing_and_says_so(
+    make_pipeline, session_factory
+):
+    """Застрявший агент говорит «не вышло», а не «готово»: окно не покажет
+    «Резюме заполнено» на полузаполненном резюме, отметка не сдвинется."""
+    site, first = await _site(session_factory)
+    kit = scripted_kit(await make_pipeline(), [finish_step("failed")])
+
+    assert await fill(kit, Source.of(site), first.id) == "error"
+
+    assert await _marks(session_factory, site.id) == {"Швея": False, "Повар": True}
+    assert len(kit.run_session.plans) == 1
+
+
 async def test_the_fill_leaves_a_short_summary_in_the_log(make_pipeline, session_factory, caplog):
     site, first = await _site(session_factory)
     kit = scripted_kit(await make_pipeline(), [finish_step(), resumes_step([("Швея", FIRST)])])
@@ -92,6 +106,22 @@ async def test_the_fill_works_in_the_profile_of_its_site_able_to_save(make_pipel
 
     assert seen == [(("profile", site.id), True)]
     assert FIRST in kit.run_session.plans[0].task
+
+
+async def test_the_resume_is_written_in_the_language_of_the_person(make_pipeline, session_factory):
+    """Резюме пишется на языке человека — первом родном из анкеты, — а не на
+    языке сайта."""
+    site, first = await _site(session_factory)
+    person = profile_row()
+    await put(session_factory, person)
+    await put(session_factory,
+              ProfileLanguage(profile_id=person.id, language="Английский", level="C1"),
+              ProfileLanguage(profile_id=person.id, language="Армянский", level="native"))
+    kit = scripted_kit(await make_pipeline(), [finish_step(), resumes_step([("Швея", FIRST)])])
+
+    await fill(kit, Source.of(site), first.id)
+
+    assert "Армянский" in kit.run_session.plans[0].task
 
 
 async def test_a_resume_relinked_by_the_overwrite_is_found_as_the_only_new_link(

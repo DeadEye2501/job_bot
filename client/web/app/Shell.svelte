@@ -25,6 +25,8 @@
   import NavGroup from '$components/NavGroup.svelte';
   import Plaque from '$components/Plaque.svelte';
   import TopTabs from '$components/TopTabs.svelte';
+  import { markOf } from '$state/open_mark.js';
+  import { heldMemory } from '$state/section_memory.svelte.js';
   import { SECTIONS, SYSTEM_TABS } from '$state/sections.js';
 
   const PLAQUE_MS = 2800;
@@ -45,17 +47,16 @@
   // как поломку, а не как «мастер сейчас откроется».
   let setup = $state(null);
   let section = $state(SECTIONS[0].key);
-  let systemTab = $state(SYSTEM_TABS[0].key);
+  // Вкладка и открытая карточка каждого раздела.
+  const memory = heldMemory();
   let expanded = $state(false);
-  // Чью карточку открыть, придя в контакты со стороны: из списка непрочитанного
-  // над полосой или из карточки вакансии. Отметка разовая: контакты сообщают,
-  // что приняли её, и она гаснет. Останься она лежать — каждый следующий заход
-  // в раздел заново открывал бы ту же карточку, и до остальных вкладок было бы
-  // не добраться.
-  let openCard = $state(null);
-  // Какую вакансию открыть, придя в раздел вакансий из мини-списка чужой
-  // карточки. Отметка такая же разовая, как и та, что ведёт в контакты.
-  let openVacancy = $state(null);
+  // Чью карточку открыть, придя в раздел, — по ключу раздела: в контакты со
+  // стороны (список непрочитанного, карточка вакансии), в вакансии из
+  // мини-списка чужой карточки, в любой из бокового меню — ту, что там была
+  // открыта. Отметка разовая: раздел сообщает, что принял её, и она гаснет.
+  // Останься она лежать — каждый следующий заход в раздел заново открывал бы
+  // ту же карточку, и до остальных вкладок было бы не добраться.
+  let opening = $state({});
   // С каким отбором открыть список вакансий, придя из статистики. Отметка
   // разовая по той же причине: оставленная лежать, она навязывала бы
   // позавчерашний статус каждому следующему заходу в раздел.
@@ -126,16 +127,21 @@
    * знает он, а не раздел.
    */
   function goContacts(mark) {
-    openCard = mark;
+    opening.contacts = mark;
     section = 'contacts';
   }
 
+  /** Перейти в раздел из бокового меню — к тому, что в нём было открыто. */
+  function enter(key) {
+    opening[key] = memory.cards[key] ?? null;
+    section = key;
+  }
   /** Уйти к вакансии — из мини-списка в карточке канала, компании или человека.
    *
    * Оттуда и смотрят, что канал принёс: увидел строку — открыл её саму.
    */
   function goVacancy(id) {
-    openVacancy = { id };
+    opening.vacancies = markOf(id);
     section = 'vacancies';
   }
 
@@ -192,7 +198,7 @@
         icon={one.icon}
         label={one.label}
         active={section === one.key}
-        onpick={() => (section = one.key)}
+        onpick={() => enter(one.key)}
       />
     {/each}
     <div class="sidebar-spacer"></div>
@@ -213,14 +219,17 @@
 
   <main class="main">
     {#if section === 'profile'}
-      <ProfileScreen {ask} />
+      <ProfileScreen {ask} tab={memory.tabs.profile} ontab={memory.pickTab('profile')} />
     {:else if section === 'contacts'}
       <ContactsScreen
         {ask}
         {say}
         {lockedTip}
-        {openCard}
-        onopened={() => (openCard = null)}
+        openCard={opening.contacts}
+        tab={memory.tabs.contacts}
+        ontab={memory.pickTab('contacts')}
+        onchosen={memory.remember('contacts')}
+        onopened={() => (opening.contacts = null)}
         onvacancy={goVacancy}
         events={heard}
       />
@@ -233,14 +242,15 @@
         {lockedTip}
         events={heard}
         oncontacts={goContacts}
-        open={openVacancy}
-        onopened={() => (openVacancy = null)}
+        open={opening.vacancies}
+        onopened={() => (opening.vacancies = null)}
+        onchosen={memory.remember('vacancies')}
         openFilter={openFilter}
         onfiltered={() => (openFilter = null)}
       />
     {:else if section === 'system'}
-      <TopTabs tabs={SYSTEM_TABS} active={systemTab} onpick={(key) => (systemTab = key)} />
-      {#if systemTab === 'logs'}
+      <TopTabs tabs={SYSTEM_TABS} active={memory.tabs.system} onpick={memory.pickTab('system')} />
+      {#if memory.tabs.system === 'logs'}
         <LogsScreen {ask} {say} events={heard} />
       {:else}
         <SettingsScreen {ask} {say} />

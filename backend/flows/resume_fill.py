@@ -13,9 +13,11 @@ from backend.agent.kit import AgentKit
 from backend.agent.prompts.fill import FILL_PROMPT, fill_task
 from backend.agent.tools_browser import browser_tools
 from backend.agent.tools_fill import fill_tools
-from backend.agent.sessions import run_on_site
+from backend.agent.sessions import end_reason, run_on_site
 from backend.flows.aggregator_scan import scan
+from backend.llm.candidate import candidate_languages, user_language
 from backend.repository.aggregator_resumes import choose_resume, resumes_of
+from backend.repository.profile_languages import list_profile_languages
 
 logger = logging.getLogger(__name__)
 
@@ -36,14 +38,15 @@ async def fill(kit: AgentKit, source: Source, resume_id: int | None) -> str:
     await kit.browser.open_profile(source.id)
     job = FillJob(source, resume_url)
     files = (kit.pipeline.cv_file(), kit.pipeline.photo_file())
-    end = await run_on_site(kit, job, FILL_PROMPT, fill_task(source.host, resume_url),
+    language = user_language(candidate_languages(await kit.read(list_profile_languages)))
+    end = await run_on_site(kit, job, FILL_PROMPT, fill_task(source.host, resume_url, language),
                             *fill_tools(kit, job), *browser_tools(kit, *files, job))
     result = job.outcome.result if isinstance(job.outcome, Finished) else None
     if result == "required_missing":
         return result
     _summary(job)
-    if result is None:
-        logger.warning("заполнение резюме на %s: без итога — %s", source.host, end.detail or "агент молчал")
+    if result != "done":
+        logger.warning("заполнение резюме на %s: не доведено — %s", source.host, end_reason(job, end))
         return "error"
     scanned = await scan(kit, source)
     if scanned != "ok":
@@ -54,8 +57,8 @@ async def fill(kit: AgentKit, source: Source, resume_id: int | None) -> str:
 
 async def _links(kit: AgentKit, aggregator_id: int) -> dict[int, str]:
     """Ссылки резюме сайта по номеру — до заполнения: по ним узнаётся новое."""
-    async with kit.pipeline.session_factory() as session:
-        return {row.id: row.url for row in await resumes_of(session, aggregator_id)}
+    rows = await kit.read(lambda session: resumes_of(session, aggregator_id))
+    return {row.id: row.url for row in rows}
 
 
 async def _mark_filled(kit: AgentKit, aggregator_id: int, resume_url: str | None, before: set[str]) -> None:

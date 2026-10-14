@@ -14,6 +14,8 @@ import sqlite3
 
 from sqlalchemy import select
 
+from backend.repository.aggregator_resumes import resumes_of
+
 
 async def put(session_factory, *rows) -> None:
     """Положить строки в базу до того, как их прочитает проверяемый код."""
@@ -37,6 +39,12 @@ async def all_rows(session_factory, model) -> list:
     """
     async with session_factory() as session:
         return list((await session.scalars(select(model))).all())
+
+
+async def resume_marks(session_factory, aggregator_id: int) -> list[tuple[str, bool]]:
+    """Резюме сайта в порядке сайта: название и отметка «откликаться этим»."""
+    async with session_factory() as session:
+        return [(r.title, r.is_chosen) for r in await resumes_of(session, aggregator_id)]
 
 
 def sqlite_rows(db_file, sql: str) -> list[tuple]:

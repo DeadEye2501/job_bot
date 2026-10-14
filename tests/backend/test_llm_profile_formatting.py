@@ -13,6 +13,7 @@ from backend.llm.candidate import (
     format_known_skills,
     format_languages,
     format_text,
+    user_language,
 )
 
 
@@ -58,6 +59,22 @@ def test_a_language_without_a_level_does_not_spoil_the_rest():
     )
 
     assert got == "Русский — native"
+
+
+@pytest.mark.parametrize(
+    ("languages", "expected"),
+    [
+        pytest.param(
+            [CandidateLanguage("Английский", "C1"), CandidateLanguage("Армянский", "native"),
+             CandidateLanguage("Русский", "native")],
+            "Армянский", id="первый родной"),
+        pytest.param([CandidateLanguage("Испанский", "B2")], "English", id="родного нет"),
+        pytest.param([], "English", id="языков нет"),
+    ],
+)
+def test_the_user_language_is_the_first_native_one(languages, expected):
+    """Язык человека — первый родной в его списке, без родного — английский."""
+    assert user_language(languages) == expected
 
 
 @pytest.mark.parametrize(

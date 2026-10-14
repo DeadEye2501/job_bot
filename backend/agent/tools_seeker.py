@@ -96,14 +96,12 @@ async def _numbered(kit: AgentKit, job: SeekJob, url: str) -> tuple[str | None, 
 
 async def _barred(kit: AgentKit, url: str) -> bool:
     """Адрес ведёт на сайт из отсева — его вакансии человеку не нужны."""
-    async with kit.pipeline.session_factory() as session:
-        return await barred_host_of(session, [url]) is not None
+    return await kit.read(lambda session: barred_host_of(session, [url])) is not None
 
 
 async def _known(kit: AgentKit, aggregator_id: int, key: str) -> bool:
     """Номер уже видели: вакансия с ним заведена или удалена как мусор."""
-    async with kit.pipeline.session_factory() as session:
-        return await source_seen(session, aggregator_id, key)
+    return await kit.read(lambda session: source_seen(session, aggregator_id, key))
 
 
 async def _store(kit: AgentKit, job: SeekJob, page: _Page, key: str, embedding: list[float]) -> int:

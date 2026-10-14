@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 //
-// Карточка агрегатора: блок резюме человека на сайте и пункт «Обновить резюме»
-// в меню действий.
+// Карточка агрегатора: блок резюме человека на сайте и пункты резюме в меню
+// действий.
 
 import { cleanup, render } from '@testing-library/svelte';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import AggregatorCard from '../app/AggregatorCard.svelte';
 import { hearRound } from '../state/round.svelte.js';
 import { answering, roundGoes } from './bridge_stub.js';
+import { buttonBy } from './press.js';
 import { settled } from './settled.js';
 import { EMPTY_STATS } from './stats_stub.js';
 
@@ -62,13 +63,11 @@ async function screen(over = {}) {
 async function menuItem(shown, label) {
   shown.container.querySelector('button[title="Действия"]').click();
   await settled();
-  return [...document.querySelectorAll('.menu-item')].find((one) =>
-    one.textContent.includes(label),
-  );
+  return buttonBy(label, { among: '.menu-item' });
 }
 
 function scanItem(shown) {
-  return menuItem(shown, 'Обновить резюме');
+  return menuItem(shown, 'Обновить список резюме');
 }
 
 describe('блок резюме в карточке агрегатора', () => {
@@ -126,12 +125,31 @@ describe('блок резюме в карточке агрегатора', () =>
   });
 });
 
-describe('пункт «Обновить резюме»', () => {
+describe('меню действий агрегатора', () => {
+  it('пункты резюме открывают меню и отделены чертой от остальных', async () => {
+    const { shown } = await screen();
+    await menuItem(shown, 'Прогнать сейчас');
+    const menu = document.querySelector('.menu-item').parentElement;
+    const shape = [...menu.children].map((one) =>
+      one.classList.contains('menu-line') ? '—' : one.textContent.trim(),
+    );
+
+    expect(shape.slice(0, 4)).toEqual([
+      expect.stringContaining('Создать новое резюме'),
+      expect.stringContaining('Обновить список резюме'),
+      '—',
+      expect.stringContaining('Прогнать сейчас'),
+    ]);
+  });
+});
+
+describe('пункт «Обновить список резюме»', () => {
   it('без входа неактивен и просит войти', async () => {
     const { shown } = await screen({ is_logged_in: false });
     const item = await scanItem(shown);
 
     expect([item.disabled, item.title]).toEqual([true, 'Сначала войдите на сайт']);
+    expect(item.classList.contains('blocked')).toBe(true);
   });
 
   it('со входом зовёт пересканирование', async () => {
@@ -183,6 +201,7 @@ describe('заполнение резюме из карточки', () => {
     const item = await menuItem(shown, 'Создать новое резюме');
 
     expect([item.disabled, item.title]).toEqual([true, 'Сайт не даёт завести ещё одно резюме']);
+    expect(item.classList.contains('blocked')).toBe(true);
   });
 
   it('«Создать новое резюме» без входа просит войти', async () => {

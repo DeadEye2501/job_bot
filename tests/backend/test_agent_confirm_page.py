@@ -76,6 +76,16 @@ async def test_finishing_is_final_for_the_whole_session(make_pipeline, session_f
     assert await all_rows(session_factory, Application) == []
 
 
+async def test_a_send_without_fields_is_confirmed_too(make_pipeline, session_factory):
+    """Отклик одной кнопкой: полей нет, а отправка необратима — окно без пунктов,
+    и «Закончить» его отменяет."""
+    job, tools, asked = await _applier(make_pipeline, session_factory, finished)
+
+    await tool(tools, "need_human")(kind="confirm", items=[])
+
+    assert asked[0]["items"] == [] and job.outcome == Dropped()
+
+
 async def test_finishing_after_the_application_leaves_it_applied(make_pipeline, session_factory):
     """Отклик уже у работодателя: «Закончить» на вопросах после отправки его не отменяет."""
     job, tools, _ = await _applier(make_pipeline, session_factory, finished)

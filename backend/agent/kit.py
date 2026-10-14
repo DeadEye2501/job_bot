@@ -50,6 +50,11 @@ class AgentKit:
             async with session.begin():
                 return await write(session)
 
+    async def read(self, query: Callable[[AsyncSession], Awaitable[T]]) -> T:
+        """Прочитать в своей сессии и отдать ответ — пара `written` для чтения."""
+        async with self.pipeline.session_factory() as session:
+            return await query(session)
+
     async def profile_text(self, session: AsyncSession) -> str:
         """Анкета для агента на сегодня; есть ли фото — по тому же `photo_file`,
         что даёт файл инструменту прикладывания."""

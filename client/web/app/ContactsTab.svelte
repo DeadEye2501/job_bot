@@ -11,9 +11,9 @@
   import { contactAdding } from '$state/contact_adding.svelte.js';
   import { watchContacts } from '$state/contacts_watch.js';
   import { NEW_CARD } from '$state/new_card.js';
-  import { takeOpened } from '$state/open_mark.js';
+  import { takeOpened, tellOpened } from '$state/open_mark.js';
 
-  let { kind, words, list, save, say, events, open, onopened, row, pane } = $props();
+  let { kind, words, list, save, say, events, open, onopened, onchosen, row, pane } = $props();
 
   const form = NEW_CARD[kind];
 
@@ -25,6 +25,8 @@
   // Кого открыть, придя со стороны — из списка непрочитанного над полосой или
   // из карточки вакансии.
   $effect(() => takeOpened(open, (id) => (opened = id), onopened));
+
+  $effect(() => tellOpened(opened, onchosen));
 
   // Только про списки: весть о непрочитанном кладётся на каждое сохранённое
   // письмо, и обход в сотню сообщений перечитал бы список сотню раз подряд.

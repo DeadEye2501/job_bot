@@ -258,6 +258,16 @@ def test_a_project_without_a_stack_section_keeps_no_stack():
     assert grounded.projects[0].stack == []
 
 
+def test_a_word_ending_in_po_is_not_a_stack_heading():
+    """«Обязанности по:» — не заголовок стека, хоть и кончается на «по»."""
+    parsed = parsed_cv(experience=[parsed_cv_place(company="Контур", stack=["Python"])])
+    text = "Контур\nМенеджер\n\nОбязанности по:\n    продажам\n"
+
+    grounded = grounded_in_cv(parsed, text)
+
+    assert grounded.experience[0].stack == []
+
+
 def test_a_stack_heading_is_recognised_however_it_is_written():
     """Заголовок стека пишут по-разному, и своего стека из-за этого не лишают."""
     for heading in (
@@ -269,6 +279,11 @@ def test_a_stack_heading_is_recognised_however_it_is_written():
         "Tech stack:",
         "Technologies:",
         "Инструменты:",
+        "Программы:",
+        "ПО:",
+        "Оборудование:",
+        "Стек технологий:",
+        "Программы и сервисы:",
     ):
         parsed = parsed_cv(
             experience=[parsed_cv_place(company="Контур", stack=["Python"])]

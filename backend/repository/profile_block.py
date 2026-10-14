@@ -10,6 +10,7 @@ from datetime import date
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.tenure import place_period, years_in_it
+from backend.repository.agent_profile import GENDER_WORDS, years_text
 from backend.repository.profile import get_profile
 from backend.repository.profile_experience import list_experience
 from backend.repository.profile_projects import list_projects
@@ -46,8 +47,10 @@ def _header_lines(profile, experiences: list) -> list[str]:
         lines.append(f"Роль: {profile.title}")
     if profile.location:
         lines.append(f"Локация: {profile.location}")
+    if profile.gender in GENDER_WORDS:
+        lines.append(f"Пол: {GENDER_WORDS[profile.gender]}")
     if experiences:
-        lines.append(f"Опыт: {years_in_it(experiences, date.today())}+ лет в IT")
+        lines.append(f"Общий стаж: {years_text(years_in_it(experiences, date.today()))}")
     return lines
 
 
@@ -94,7 +97,7 @@ async def build_profile_block(session: AsyncSession) -> str:
         sections.append("\n".join(header_lines))
     skills_lines = _skills_lines(skills)
     if skills_lines:
-        sections.append("Стек:\n" + "\n".join(skills_lines))
+        sections.append("Навыки:\n" + "\n".join(skills_lines))
     exp_lines = _experience_lines(experiences)
     if exp_lines:
         sections.append("Опыт работы:\n" + "\n".join(exp_lines))
@@ -102,5 +105,8 @@ async def build_profile_block(session: AsyncSession) -> str:
     if project_lines:
         sections.append("Проекты:\n" + "\n".join(project_lines))
     if profile.free_preferences:
-        sections.append("Дополнительно:\n" + profile.free_preferences.strip())
+        sections.append(
+            "Пожелания кандидата (в письмо — только то, о чём спрашивает вакансия):\n"
+            + profile.free_preferences.strip()
+        )
     return "\n\n".join(sections)

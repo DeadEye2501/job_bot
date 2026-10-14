@@ -7,10 +7,10 @@
 
 import logging
 
-from backend.agent.jobs import Finished, ScanJob, Source
+from backend.agent.jobs import ScanJob, Source
 from backend.agent.kit import AgentKit
 from backend.agent.prompts.scan import SCAN_PROMPT, scan_task
-from backend.agent.sessions import run_on_site
+from backend.agent.sessions import end_reason, run_on_site
 from backend.agent.tools_browser import browser_tools
 from backend.agent.tools_scan import scan_tools
 from backend.repository.aggregators import is_logged_in
@@ -28,9 +28,7 @@ async def scan(kit: AgentKit, source: Source) -> str:
                             *scan_tools(kit, job), *browser_tools(kit, None, None))
     if job.reported:
         return "ok"
-    async with kit.pipeline.session_factory() as session:
-        if not await is_logged_in(session, source.id):
-            return "not_logged_in"
-    reason = job.outcome.reason if isinstance(job.outcome, Finished) else end.detail
-    logger.warning("перечень резюме %s: списка нет — %s", source.name, reason or "агент молчал")
+    if not await kit.read(lambda session: is_logged_in(session, source.id)):
+        return "not_logged_in"
+    logger.warning("перечень резюме %s: списка нет — %s", source.name, end_reason(job, end))
     return "error"

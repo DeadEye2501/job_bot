@@ -99,9 +99,6 @@
   width: 60px;
   flex-shrink: 0;
   height: 4px;
-  background: var(--bg-tertiary);
-  border-radius: 2px;
-  overflow: hidden;
 }
 
 .stats-ch-grid .stats-ch-conv-meter-fill {

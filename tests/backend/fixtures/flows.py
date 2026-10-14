@@ -91,11 +91,11 @@ def _answer_instead_of_the_model(pipeline, monkeypatch) -> None:
         return pipeline.genre, pipeline.genre_trouble
 
     def asking_fit(about: str):
-        """Один из трёх зовов о пригодности, называющий себя в общем следе.
+        """Один из зовов о пригодности, называющий себя в общем следе.
 
-        Ответ по умолчанию у всех троих один и тот же: предмет большинства
-        проверок — порядок зовов, а не то, кто из троих вынес отказ. Тому,
-        кому нужен ответ именно от второго или третьего, служит `verdict_by`.
+        Ответ по умолчанию у всех один и тот же: предмет большинства
+        проверок — порядок зовов, а не то, кто из них вынес отказ. Тому,
+        кому нужен ответ именно от одного из них, служит `verdict_by`.
         """
 
         async def ask(parsed, text, client_, model, **kwargs):
@@ -111,6 +111,7 @@ def _answer_instead_of_the_model(pipeline, monkeypatch) -> None:
     monkeypatch.setattr(
         "backend.flows.fit_refusal.validate_language_fit", asking_fit("языки")
     )
+    monkeypatch.setattr("backend.flows.fit_refusal.validate_place_fit", asking_fit("место"))
     monkeypatch.setattr(
         "backend.flows.fit_refusal.validate_preferences_fit", asking_fit("предпочтения")
     )

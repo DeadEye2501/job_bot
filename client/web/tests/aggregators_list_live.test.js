@@ -27,6 +27,7 @@ function screen() {
       events: { on: () => () => {} },
       open: null,
       onopened: () => {},
+      onchosen: () => {},
       onvacancy: () => {},
     },
   });

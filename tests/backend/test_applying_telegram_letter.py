@@ -38,7 +38,7 @@ def test_a_channel_reference_is_normalised_or_dropped(raw, expected):
 def test_the_second_vacancy_is_introduced_as_one_more():
     """Вторая вакансия подаётся как «ещё одна»."""
     assert short_note("Python-разработчик", None, 1) == (
-        "А вот я увидел ещё одну интересную вакансию: Python-разработчик"
+        "Ещё одна ваша вакансия меня заинтересовала: Python-разработчик"
     )
 
 
@@ -56,7 +56,7 @@ def test_the_third_and_later_are_introduced_more_briefly(prior):
 @pytest.mark.parametrize(
     ("prior", "expected"),
     [
-        pytest.param(1, "А вот я увидел ещё одну вашу вакансию", id="вторая"),
+        pytest.param(1, "Ещё одна ваша вакансия меня заинтересовала", id="вторая"),
         pytest.param(2, "И ещё одну вашу вакансию", id="третья"),
     ],
 )
@@ -74,7 +74,7 @@ def test_the_channel_is_named_on_its_own_line():
     got = short_note("Python-разработчик", "@pyjobs", 1)
 
     assert got == (
-        "А вот я увидел ещё одну интересную вакансию: Python-разработчик"
+        "Ещё одна ваша вакансия меня заинтересовала: Python-разработчик"
         "\nКанал: @pyjobs"
     )
 

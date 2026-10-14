@@ -68,6 +68,28 @@ async def test_empty_answers_are_named_empty(session, session_factory):
         assert line in text
 
 
+async def test_an_unnamed_person_is_named_unnamed_rather_than_blank(session, session_factory):
+    """Пустые имя и должность названы пустыми: увидев голое «Имя:», письмо
+    вписало бы на его место заглушку, и его отбили бы."""
+    await _person(session_factory, first_name="", last_name="", title="", email="")
+
+    text = await build_agent_profile(session, TODAY, photo=False)
+
+    for line in ("Имя: не указано", "Фамилия: не указана", "Должность: не указана",
+                 "Почта: не указана"):
+        assert line in text
+
+
+async def test_less_than_a_year_is_said_in_words(session, session_factory):
+    """Стаж меньше года — словами: «0+ г.» модель пересказала бы как «0+ годами опыта»."""
+    person = await _person(session_factory)
+    await put(session_factory, experience_row(person.id, start_date=TODAY, end_date=None))
+
+    text = await build_agent_profile(session, TODAY, photo=False)
+
+    assert "Общий стаж: меньше года" in text
+
+
 async def test_the_new_personal_fields_reach_the_agent(session, session_factory):
     await _person(
         session_factory, patronymic="Сергеевич", patronymic_latin="Sergeevich",
@@ -120,9 +142,28 @@ async def test_a_skill_gets_the_tenure_of_the_places_that_name_it(
 
     text = await build_agent_profile(session, TODAY, photo=False)
 
-    assert "Инструмент-А — уровень 3, стаж 4+ г." in text
-    assert "Инструмент-Б — уровень 3, стаж не привязан к местам работы" in text
+    assert "Инструмент-А — уровень 3 из 5, стаж 4+ г." in text
+    assert "Инструмент-Б — уровень 3 из 5, стаж не привязан к местам работы" in text
     assert "Общий стаж: 7+ г." in text
+
+
+async def test_a_place_and_a_project_name_their_own_skills(session, session_factory):
+    """Навыки записи — под самой записью: агенту, заполняющему место работы на
+    сайте, не приходится разносить общий список навыков наугад."""
+    person = await _person(session_factory)
+    tool = profile_skill_row(person.id, "Инструмент-Д")
+    place = experience_row(person.id, company="Место-Д")
+    project = project_row(person.id, name="Проект-Д")
+    await put(session_factory, tool, place, project)
+    await session.execute(profile_experience_skills.insert().values(
+        experience_id=place.id, skill_id=tool.id))
+    await session.execute(profile_project_skills.insert().values(
+        project_id=project.id, skill_id=tool.id))
+    await session.commit()
+
+    text = await build_agent_profile(session, TODAY, photo=False)
+
+    assert text.count("  Навыки: Инструмент-Д") == 2
 
 
 async def test_a_place_of_work_comes_whole(session, session_factory):
@@ -179,7 +220,7 @@ async def test_a_skill_in_a_place_and_a_project_keeps_the_places_tenure(
 
     text = await build_agent_profile(session, TODAY, photo=False)
 
-    assert "Инструмент-Г — уровень 3, стаж 2+ г." in text
+    assert "Инструмент-Г — уровень 3 из 5, стаж 2+ г." in text
 
 
 async def test_a_skill_named_only_in_projects_is_had_without_tenure(session, session_factory):
@@ -194,7 +235,7 @@ async def test_a_skill_named_only_in_projects_is_had_without_tenure(session, ses
 
     text = await build_agent_profile(session, TODAY, photo=False)
 
-    assert "Инструмент-В — уровень 3, опыт есть в проектах, стаж не считается" in text
+    assert "Инструмент-В — уровень 3 из 5, опыт есть в проектах, стаж не считается" in text
     assert "Общий стаж: нет мест работы" in text
 
 

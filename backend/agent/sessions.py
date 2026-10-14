@@ -4,6 +4,7 @@ import asyncio
 
 from adapters.agent_mcp import serve_tools
 from adapters.claude_code_agent import AgentEnd, AgentRun, run_agent
+from backend.agent.jobs import Finished
 from backend.agent.kit import AgentKit, RunSession, SessionPlan
 from backend.agent.prompts.frame import system_prompt
 from backend.agent.stops import HumanTimeout, LimitExhausted
@@ -61,6 +62,13 @@ async def run_on_site(kit: AgentKit, job, prompt: str, task: str, *own_tools) ->
     tools = [*common_tools(kit, job), *own_tools]
     plan = SessionPlan(system_prompt(prompt, tools), task, tools, web_search=False)
     return await run_to_limit(kit, plan)
+
+
+def end_reason(job, end: AgentEnd) -> str:
+    """Почему сессия кончилась не тем, чего ждали, — для журнала: причина итога
+    агента, иначе слово конца сессии, иначе «без итога»."""
+    reason = job.outcome.reason if isinstance(job.outcome, Finished) else end.detail
+    return reason or "без итога"
 
 
 def live_session(model: str) -> RunSession:

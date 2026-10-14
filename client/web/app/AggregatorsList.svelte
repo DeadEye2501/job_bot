@@ -10,7 +10,7 @@
   import AggregatorCard from './AggregatorCard.svelte';
   import SourcesTab from './SourcesTab.svelte';
 
-  let { ask, say, lockedTip, events, open, onopened, onvacancy } = $props();
+  let { ask, say, lockedTip, events, open, onopened, onchosen, onvacancy } = $props();
 
   const source = {
     key: 'aggregators',
@@ -31,6 +31,7 @@
   {events}
   {open}
   {onopened}
+  {onchosen}
 >
   {#snippet row(item, at)}
     <AggregatorRow

@@ -33,11 +33,10 @@ def common_tools(kit: AgentKit, job) -> list[Callable]:
 
     async def profile() -> str:
         """Анкета человека целиком, со стажем общим и по навыкам."""
-        async with kit.pipeline.session_factory() as session:
-            return await kit.profile_text(session) or "Анкета не заполнена."
+        return await kit.read(kit.profile_text) or "Анкета не заполнена."
 
     async def finish(result: str, reason: str = "") -> str:
-        """Итог сессии. Искатель: done или failed. Откликатель: vacancy_closed, platform_closed, not_fit, а при резюме, названном в задании, ещё resume_missing. Проверка входа и перечень резюме: done. Заполнение резюме: done."""
+        """Итог сессии. Искатель: done или failed. Откликатель: vacancy_closed, platform_closed, not_fit, а при резюме, названном в задании, ещё resume_missing. Проверка входа и перечень резюме: done. Заполнение резюме: done, а довести не удалось — failed с причиной."""
         results = _results(job)
         if result not in results:
             return f"Итога «{result}» у этой задачи не бывает: {', '.join(sorted(results))}."
@@ -99,9 +98,11 @@ def _need_human(kit: AgentKit, job) -> Callable:
 
 def _need_human_confirming(kit: AgentKit, job: ApplyJob) -> Callable:
     async def need_human(kind: str, items: list[ConfirmItem] | None = None) -> str:
-        """Нужен человек: kind — captcha, login или confirm. Вызов держится, пока человек не ответит. Ответ «срок вышел» — заверши работу. confirm — подтвердить поля страницы перед вводом: items — все поля с ответами."""
+        """Нужен человек: kind — captcha, login или confirm. Вызов держится, пока человек не ответит. Ответ «срок вышел» — заверши работу. confirm — подтвердить поля страницы перед вводом: items — все поля с ответами; полей нет, а отправка есть — пустой items."""
         if kind == "confirm":
-            return await _confirm_page(kit, job, items) if items else "items — все поля страницы с ответами."
+            if items is None:
+                return "items — все поля страницы с ответами; полей нет — пустой список."
+            return await _confirm_page(kit, job, items)
         return await _wait_in_browser(kit, job, kind)
 
     return need_human

@@ -12,7 +12,8 @@
 
 import pytest
 
-from backend.llm.cover_letter import generate_cover_letter
+from backend.llm.cover_letter import LetterPost, generate_cover_letter
+from backend.llm.rules import POST_REQUESTS
 from tests.factories import parsed_vacancy
 from tests.fakes.llm import (
     CHAT,
@@ -110,7 +111,7 @@ async def test_the_vacancy_reaches_the_model_as_data():
     )
 
     await _written(
-        "профиль", vacancy, client, "qwen", channel_ref="@pyjobs"
+        "профиль", vacancy, client, "qwen", post=LetterPost("@pyjobs")
     )
 
     user = messages_of(client.sent[0])["user"]
@@ -160,10 +161,10 @@ async def test_the_placeholders_of_the_prompt_are_filled_in():
         parsed_vacancy(title="Ведущий питонист"),
         client,
         "qwen",
-        channel_ref="@pyjobs",
+        post=LetterPost("@pyjobs"),
     )
 
-    assert got == "Здравствуйте! Пишу про Ведущий питонист из @pyjobs."
+    assert got =="Здравствуйте! Пишу про Ведущий питонист из @pyjobs."
 
 
 async def test_the_vacancy_the_letter_speaks_of_is_named_apart():
@@ -180,7 +181,7 @@ async def test_the_vacancy_the_letter_speaks_of_is_named_apart():
         parsed_vacancy(title="Ведущий питонист"),
         client,
         "qwen",
-        channel_ref="@pyjobs",
+        post=LetterPost("@pyjobs"),
     )
 
     checked = data_block(client.sent[1])
@@ -220,7 +221,7 @@ async def test_a_letter_about_a_channel_we_cannot_name_is_refused():
         parsed_vacancy(title="Ведущий питонист"),
         client,
         "qwen",
-        channel_ref=None,
+        post=LetterPost(None),
     )
 
     assert got is None
@@ -337,6 +338,35 @@ async def test_a_letter_mentioning_an_attachment_is_rejected():
         await _written("профиль", parsed_vacancy(), client, "qwen")
         is None
     )
+
+
+async def test_the_writer_sees_the_vacancy_text_with_its_requests():
+    """Просьбу поста («укажите стаж») писатель видит только в самом тексте:
+    пересказ вакансии её теряет."""
+    client = _client("Здравствуйте! Стаж 3 года. Давайте обсудим детали.")
+
+    await _written("профиль", parsed_vacancy(), client, "qwen",
+                   post=LetterPost(text="В отклике укажите ваш стаж."))
+
+    assert "В отклике укажите ваш стаж." in messages_of(client.sent[0])["user"]
+
+
+async def test_the_writer_answers_the_post_by_the_rule_of_every_letter():
+    """На просьбы поста письмо в Telegram отвечает тем же правилом, что и письмо
+    агента: сказанное каждому своими словами разошлось бы."""
+    client = _client("Здравствуйте! Давайте обсудим детали.")
+
+    await _written("профиль", parsed_vacancy(), client, "qwen")
+
+    assert POST_REQUESTS in messages_of(client.sent[0])["system"]
+
+
+async def test_the_word_resume_in_its_plain_sense_is_not_an_attachment():
+    """«Разбирала 300 резюме в неделю» — факт опыта рекрутёра, а не вложение:
+    такое письмо уходит."""
+    client = _client("Здравствуйте! Разбирала 300 резюме в неделю. Давайте обсудим детали.")
+
+    assert await _written("профиль", parsed_vacancy(), client, "qwen") is not None
 
 
 async def test_an_empty_letter_is_rejected():

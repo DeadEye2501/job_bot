@@ -15,7 +15,9 @@ from backend.payloads import FieldEntry
 
 logger = logging.getLogger(__name__)
 
-_WAIT_MS = 15_000
+# Сколько ждать элемент страницы: опрос поля и действия агента на странице
+# ждут одинаково, иначе одно и то же поле одно находит, а другое нет.
+WAIT_MS = 15_000
 
 # Правила, общие для вопроса об одном поле и для описи страницы: что считать
 # полем, какого оно вида, обязательно ли и к какой группе кружков относится.
@@ -151,7 +153,7 @@ class PageField(NamedTuple):
 
 
 async def page_field(page, selector: str) -> PageField:
-    return PageField(*await page.locator(selector).first.evaluate(_FIELD_OF, timeout=_WAIT_MS))
+    return PageField(*await page.locator(selector).first.evaluate(_FIELD_OF, timeout=WAIT_MS))
 
 
 async def field_or_none(page, selector: str) -> PageField | None:

@@ -8,11 +8,10 @@ from typing import NamedTuple
 from backend.agent.confirm import is_checked
 from backend.agent.jobs import ApplyJob, Dropped, FillJob
 from backend.agent.kit import AgentKit
-from backend.agent.page_fields import field_or_none, page_field
+from backend.agent.page_fields import WAIT_MS, field_or_none, page_field
 
 logger = logging.getLogger(__name__)
 
-_WAIT_MS = 15_000
 _SNAPSHOT_LIMIT = 60_000
 _CUT_MARK = "\n… снимок обрезан: страница длиннее, чем помещается в ответ."
 
@@ -65,7 +64,7 @@ def browser_tools(
         return await act(lambda page: fill(page, selector, text))
 
     async def browser_select(selector: str, value: str) -> str:
-        """Выбрать значение в выпадающем списке."""
+        """Выбрать значение в родном списке (select). Самодельный список — browser_click по полю, затем по варианту."""
         return await act(lambda page: select(page, selector, value))
 
     async def browser_back() -> str:
@@ -131,13 +130,13 @@ def _plain() -> tuple[Callable, Callable, Callable]:
     """Ввод, выбор и нажатие как есть."""
 
     def fill(page, selector, text):
-        return page.fill(selector, text, timeout=_WAIT_MS)
+        return page.fill(selector, text, timeout=WAIT_MS)
 
     def select(page, selector, value):
-        return page.select_option(selector, value, timeout=_WAIT_MS)
+        return page.select_option(selector, value, timeout=WAIT_MS)
 
     def click(page, selector):
-        return page.click(selector, timeout=_WAIT_MS)
+        return page.click(selector, timeout=WAIT_MS)
 
     return fill, select, click
 
@@ -168,7 +167,7 @@ def _strict(job: ApplyJob | FillJob) -> tuple[Callable, Callable, Callable]:
     async def click(page, selector):
         item = ledger.items.get((page.url, selector))
         if item is not None and item["kind"] == "check":
-            await page.set_checked(selector, is_checked(item), timeout=_WAIT_MS)
+            await page.set_checked(selector, is_checked(item), timeout=WAIT_MS)
             return
         if item is None:
             await _refuse_unaccepted_choice(ledger, page, selector)
@@ -224,7 +223,7 @@ async def _snapshot(kit: AgentKit) -> str:
 
     page = await kit.browser.page()
     try:
-        tree = await page.locator("body").aria_snapshot(timeout=_WAIT_MS)
+        tree = await page.locator("body").aria_snapshot(timeout=WAIT_MS)
         title = await page.title()
     except PlaywrightError as error:
         logger.info("снимок страницы не снят: %s", _first_line(error))
@@ -239,12 +238,12 @@ async def _attach(page, selector: str, file: Path) -> None:
     from playwright.async_api import Error as PlaywrightError
 
     try:
-        async with page.expect_file_chooser(timeout=_WAIT_MS) as chooser_info:
-            await page.click(selector, timeout=_WAIT_MS)
+        async with page.expect_file_chooser(timeout=WAIT_MS) as chooser_info:
+            await page.click(selector, timeout=WAIT_MS)
         chooser = await chooser_info.value
         await chooser.set_files(str(file))
     except PlaywrightError:
-        await page.set_input_files(selector, str(file), timeout=_WAIT_MS)
+        await page.set_input_files(selector, str(file), timeout=WAIT_MS)
 
 
 def _first_line(error: Exception) -> str:

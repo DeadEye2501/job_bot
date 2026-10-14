@@ -15,12 +15,10 @@
   import ProfileRecords from './ProfileRecords.svelte';
   import ProfileSkills from './ProfileSkills.svelte';
 
-  let { ask } = $props();
-
-  let tab = $state(PROFILE_TABS[0].key);
+  let { ask, tab, ontab } = $props();
 </script>
 
-<TopTabs tabs={PROFILE_TABS} active={tab} onpick={(key) => (tab = key)} />
+<TopTabs tabs={PROFILE_TABS} active={tab} onpick={ontab} />
 
 <div class="screen-body">
   {#if tab === 'cv'}
