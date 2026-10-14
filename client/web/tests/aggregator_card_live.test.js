@@ -59,12 +59,16 @@ async function screen(over = {}) {
   return { asked, shown };
 }
 
-async function scanItem(shown) {
+async function menuItem(shown, label) {
   shown.container.querySelector('button[title="Действия"]').click();
   await settled();
   return [...document.querySelectorAll('.menu-item')].find((one) =>
-    one.textContent.includes('Обновить резюме'),
+    one.textContent.includes(label),
   );
+}
+
+function scanItem(shown) {
+  return menuItem(shown, 'Обновить резюме');
 }
 
 describe('блок резюме в карточке агрегатора', () => {
@@ -72,7 +76,10 @@ describe('блок резюме в карточке агрегатора', () =>
     const { shown } = await screen();
     const rows = [...shown.container.querySelectorAll('.resume-row')];
 
-    expect(rows.map((one) => one.textContent.trim())).toEqual(['Повар', 'Дизайнер']);
+    expect(rows.map((one) => one.querySelector('.resume-title').textContent.trim())).toEqual([
+      'Повар',
+      'Дизайнер',
+    ]);
     expect(rows.map((one) => one.querySelector('input[type="radio"]').checked)).toEqual([
       false,
       true,
@@ -106,7 +113,7 @@ describe('блок резюме в карточке агрегатора', () =>
   it('название открывает страницу резюме в браузере', async () => {
     const { asked, shown } = await screen();
 
-    shown.container.querySelectorAll('.resume-row button')[1].click();
+    shown.container.querySelectorAll('.resume-title')[1].click();
     await settled();
 
     expect(asked).toContainEqual({ method: 'system.open_url', payload: 'https://hh.ru/resume/12' });
@@ -143,6 +150,55 @@ describe('пункт «Обновить резюме»', () => {
     const { shown } = await screen();
     const item = await scanItem(shown);
 
+    expect([item.disabled, item.title]).toEqual([true, 'Идёт обход']);
+  });
+});
+
+describe('заполнение резюме из карточки', () => {
+  it('«Перезаписать» в строке зовёт заполнение этого резюме', async () => {
+    const { asked, shown } = await screen();
+
+    shown.container.querySelectorAll('.resume-row button[title="Перезаписать резюме по вашей анкете"]')[1].click();
+    await settled();
+
+    expect(asked).toContainEqual({
+      method: 'aggregators.fill_resume',
+      payload: { aggregator_id: 4, resume_id: 12 },
+    });
+  });
+
+  it('«Создать новое резюме» активно при входе и разрешении сайта и зовёт создание', async () => {
+    const { asked, shown } = await screen({ can_add_resume: true });
+    const item = await menuItem(shown, 'Создать новое резюме');
+
+    item.click();
+    await settled();
+
+    expect(item.disabled).toBe(false);
+    expect(asked).toContainEqual({ method: 'aggregators.create_resume', payload: 4 });
+  });
+
+  it('«Создать новое резюме» видно, но неактивно, когда сайт не даёт завести ещё одно', async () => {
+    const { shown } = await screen({ can_add_resume: false });
+    const item = await menuItem(shown, 'Создать новое резюме');
+
+    expect([item.disabled, item.title]).toEqual([true, 'Сайт не даёт завести ещё одно резюме']);
+  });
+
+  it('«Создать новое резюме» без входа просит войти', async () => {
+    const { shown } = await screen({ can_add_resume: true, is_logged_in: false });
+    const item = await menuItem(shown, 'Создать новое резюме');
+
+    expect([item.disabled, item.title]).toEqual([true, 'Сначала войдите на сайт']);
+  });
+
+  it('во время обхода оба заперты', async () => {
+    roundGoes();
+    const { shown } = await screen({ can_add_resume: true });
+    const rewrite = shown.container.querySelector('.resume-row button[title="Идёт обход"]');
+    const item = await menuItem(shown, 'Создать новое резюме');
+
+    expect(rewrite.disabled).toBe(true);
     expect([item.disabled, item.title]).toEqual([true, 'Идёт обход']);
   });
 });
