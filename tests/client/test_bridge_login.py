@@ -57,7 +57,7 @@ async def test_a_code_before_it_was_asked_for_is_refused(api, ask, hub):
     answer = await ask(api.settings.confirm_code, {"code": "12345"})
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "Сначала запросите код подтверждения."
+    assert answer["detail"] == "Сначала запросите код подтверждения"
 
 
 async def test_a_password_before_the_code_step_is_refused(api, ask, hub):
@@ -72,7 +72,7 @@ async def test_a_password_before_the_code_step_is_refused(api, ask, hub):
     answer = await ask(api.settings.confirm_password, {"password": "тайна"})
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "Сначала пройдите шаг с кодом подтверждения."
+    assert answer["detail"] == "Сначала пройдите шаг с кодом подтверждения"
 
 
 async def test_a_code_that_needs_a_password_says_so(api, ask, hub):

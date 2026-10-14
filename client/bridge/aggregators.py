@@ -178,17 +178,17 @@ class Aggregators:
     def login(self, aggregator_id: int) -> dict:
         """Вход на сайт: видимый браузер, человек входит и закрывает окно, агент проверяет."""
         return self._launch(aggregator_id, "login", lambda bot: bot.login_aggregator(aggregator_id),
-                            "Вход проверен.", LOGIN_REFUSALS)
+                            "Вход проверен", LOGIN_REFUSALS)
 
     def run_now(self, aggregator_id: int) -> dict:
         """Обойти один источник вне очереди."""
         return self._launch(aggregator_id, "run_now", lambda bot: bot.run_aggregator_now(aggregator_id),
-                            "Обход источника закончен.", AGGREGATOR_REFUSALS)
+                            "Обход источника закончен", AGGREGATOR_REFUSALS)
 
     def scan(self, aggregator_id: int) -> dict:
         """Перечислить резюме на сайте заново."""
         return self._launch(aggregator_id, "scan", lambda bot: bot.scan_aggregator(aggregator_id),
-                            "Резюме обновлены.", LOGIN_REFUSALS)
+                            "Резюме обновлены", LOGIN_REFUSALS)
 
     def fill_resume(self, payload: dict | None = None) -> dict:
         """Перезаписать резюме на сайте по анкете."""

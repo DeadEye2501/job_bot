@@ -58,7 +58,7 @@ class ChannelActions:
             self._hub,
             lambda bot: bot.poll_channel_now(channel_id),
             POLL_REFUSALS,
-            "Канал прогнан.",
+            "Канал прогнан",
             channel_id=channel_id,
             action="poll_now",
         )

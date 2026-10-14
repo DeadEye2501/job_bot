@@ -97,7 +97,7 @@ async def test_a_manual_walk_before_the_bot_is_up_is_refused_by_name(
     answer = await ask(api.channels.poll_now, channel.id)
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "Бот ещё не готов."
+    assert answer["detail"] == "Бот ещё не готов"
 
 
 async def test_a_busy_walk_is_explained(api, ask, with_bot, told, session_factory):
@@ -113,7 +113,7 @@ async def test_a_busy_walk_is_explained(api, ask, with_bot, told, session_factor
     await ask(api.channels.poll_now, channel.id)
 
     assert await told() == {
-        "message": "Уже идёт другой цикл, попробуйте позже.",
+        "message": "Уже идёт другой цикл, попробуйте позже",
         "danger": True,
     }
 
@@ -134,7 +134,7 @@ async def test_an_unknown_walk_outcome_still_answers(
 
     said = await told()
     assert said["danger"] is True
-    assert said["message"] == "Не удалось прогнать канал — см. логи."
+    assert said["message"] == "Не удалось прогнать канал — см. логи"
 
 
 async def test_a_walk_answers_before_it_walks(
@@ -157,7 +157,7 @@ async def test_a_walk_answers_before_it_walks(
         "channel_id": channel.id,
         "action": "poll_now",
     }
-    assert await told() == {"message": "Канал прогнан.", "danger": False}
+    assert await told() == {"message": "Канал прогнан", "danger": False}
     assert ("poll_channel_now", channel.id) in bot.calls
 
 
@@ -187,7 +187,7 @@ async def test_a_reset_cursor_for_a_missing_channel_is_refused(api, ask):
     answer = await ask(api.channels.reset_cursor, 404)
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "Канал не найден."
+    assert answer["detail"] == "Канал не найден"
 
 
 async def test_a_channel_is_deleted_without_the_bot(api, ask, session_factory):

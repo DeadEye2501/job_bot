@@ -97,7 +97,7 @@ async def test_the_refusal_says_one_phrase_instead_of_the_system_troubles(
     answer = await ask(api.system.wipe)
 
     assert answer["detail"] == (
-        "Файлы открыты в другом процессе и не могут быть удалены."
+        "Файлы открыты в другом процессе и не могут быть удалены"
     )
 
 

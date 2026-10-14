@@ -163,7 +163,7 @@ async def test_deleting_a_missing_entry_is_refused(api, ask):
     answer = await ask(api.blacklist.delete, 404)
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "Запись не найдена."
+    assert answer["detail"] == "Запись не найдена"
 
 
 async def test_a_deleted_entry_leaves_the_list(api, ask, session_factory):

@@ -162,7 +162,7 @@ class System(Journal, Wipe, Desktop, AppUpdate):
             self._hub,
             lambda bot: bot.force_poll_once(),
             RUN_REFUSALS,
-            "Обход завершён.",
+            "Обход завершён",
             action="run_now",
         )
 
@@ -181,7 +181,7 @@ class System(Journal, Wipe, Desktop, AppUpdate):
             self._hub,
             lambda bot: bot.apply_all_new(),
             APPLY_ALL_REFUSALS,
-            "Отклики на новые вакансии закончены.",
+            "Отклики на новые вакансии закончены",
             action="apply_all_new",
         )
 

@@ -197,7 +197,7 @@ async def test_skills_without_a_person_are_refused_by_name(api, ask):
     answer = await ask(api.profile.save_skills, {"skills": [{"name": "Python"}]})
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "Сначала сохраните профайл (CV-таб)."
+    assert answer["detail"] == "Сначала сохраните профайл (CV-таб)"
 
 
 async def test_a_saved_skill_comes_back_with_its_spellings(api, ask):
@@ -246,7 +246,7 @@ async def test_experience_without_a_person_is_refused_by_name(api, ask):
     )
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "Сначала сохраните профайл (CV-таб)."
+    assert answer["detail"] == "Сначала сохраните профайл (CV-таб)"
 
 
 async def test_a_broken_experience_row_is_named_by_its_number(api, ask):
@@ -338,4 +338,4 @@ async def test_projects_without_a_person_are_refused_by_name(api, ask):
     answer = await ask(api.profile.save_projects, {"projects": [{"name": "Бот"}]})
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "Сначала сохраните профайл (CV-таб)."
+    assert answer["detail"] == "Сначала сохраните профайл (CV-таб)"

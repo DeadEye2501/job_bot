@@ -3929,7 +3929,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 337 модулей
+## tests — 338 модулей
 
 ### `tests/adapters/test_agent_mcp.py` — 85 строк
 
@@ -7070,6 +7070,17 @@ Runtime settings layer.
 - `def _strings(module: str, name: str) -> list[str]` (3)
 - `def _values(module: str, name: str) -> list[str]` (3)
 - `def _skip_reasons_the_backend_writes() -> set[str]` (18)
+
+### `tests/client/test_messages_without_dot.py` — 46 строк
+
+Итоги и отказы, которые окно показывает человеку строкой или плашкой, — без
+
+Зависит от: `backend.bot`, `client.bridge`
+
+Тестов: 2
+
+- `def _texts_of(module) -> list[str]` (11)
+- `def _launch_texts() -> list[str]` (9)
 
 ### `tests/client/test_page_contract.py` — 158 строк
 

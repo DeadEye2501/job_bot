@@ -54,7 +54,7 @@ async def test_a_check_without_an_address_is_refused(api, ask):
     )
 
     assert answer["fail"] == "fields"
-    assert "Заполните base_url и модель." in answer["detail"]
+    assert "Заполните base_url и модель" in answer["detail"]
 
 
 async def test_a_working_provider_names_the_models_it_has(api, ask, provider_says):

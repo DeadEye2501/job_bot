@@ -96,7 +96,7 @@ async def test_merging_an_hr_into_himself_is_refused(api, ask, session_factory):
     assert answer["fail"] == "denied"
     # Словами человека: внутренний текст репозитория показывал ему латиницу с
     # двумя номерами, по которой делать нечего.
-    assert answer["detail"] == "Слить карточку саму с собой нельзя."
+    assert answer["detail"] == "Слить карточку саму с собой нельзя"
 
 
 async def test_a_deleted_hr_leaves_the_list(api, ask, session_factory):
@@ -124,7 +124,7 @@ async def test_an_update_without_fields_says_there_is_nothing_to_do(
     answer = await ask(api.hr.update, {"hr_id": hr.id})
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "Нечего обновлять."
+    assert answer["detail"] == "Нечего обновлять"
 
 
 async def test_a_created_person_shows_up_in_the_list(api, ask):
@@ -161,7 +161,7 @@ async def test_a_second_person_with_the_same_telegram_is_named_as_taken(
     )
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "Человек с такой учётной записью Telegram уже заведён."
+    assert answer["detail"] == "Человек с такой учётной записью Telegram уже заведён"
 
 
 async def test_a_person_without_a_name_and_without_a_nick_is_refused(api, ask):
@@ -177,7 +177,7 @@ async def test_a_person_without_a_name_and_without_a_nick_is_refused(api, ask):
     answer = await ask(api.hr.create, {"name": "  ", "notes": "без имени"})
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "Укажите хотя бы имя или @username."
+    assert answer["detail"] == "Укажите хотя бы имя или @username"
 
 
 async def test_a_nick_that_is_not_a_telegram_one_is_refused(api, ask, session_factory):

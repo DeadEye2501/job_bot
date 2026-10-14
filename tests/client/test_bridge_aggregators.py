@@ -115,7 +115,7 @@ async def test_a_login_on_a_busy_slot_is_explained(api, ask, with_bot, told, ses
 
     await ask(api.aggregators.login, site.id)
 
-    assert await told() == {"message": "Уже идёт другой цикл, попробуйте позже.", "danger": True}
+    assert await told() == {"message": "Уже идёт другой цикл, попробуйте позже", "danger": True}
 
 
 async def test_a_scan_answers_before_it_runs_and_tells_the_resumes_are_updated(
@@ -128,7 +128,7 @@ async def test_a_scan_answers_before_it_runs_and_tells_the_resumes_are_updated(
     answer = await ask(api.aggregators.scan, site.id)
 
     assert answer["ok"]["started"] is True
-    assert await told() == {"message": "Резюме обновлены.", "danger": False}
+    assert await told() == {"message": "Резюме обновлены", "danger": False}
     assert ("scan_aggregator", site.id) in bot.calls
 
 
@@ -139,7 +139,7 @@ async def test_a_scan_on_a_busy_slot_is_explained(api, ask, with_bot, told, sess
 
     await ask(api.aggregators.scan, site.id)
 
-    assert await told() == {"message": "Уже идёт другой цикл, попробуйте позже.", "danger": True}
+    assert await told() == {"message": "Уже идёт другой цикл, попробуйте позже", "danger": True}
 
 
 async def test_without_a_bot_nothing_is_launched(api, ask, session_factory):
@@ -148,7 +148,7 @@ async def test_without_a_bot_nothing_is_launched(api, ask, session_factory):
 
     answer = await ask(api.aggregators.run_now, site.id)
 
-    assert (answer["fail"], answer["detail"]) == ("denied", "Бот ещё не готов.")
+    assert (answer["fail"], answer["detail"]) == ("denied", "Бот ещё не готов")
 
 
 async def test_the_list_counts_each_source_vacancies_and_finds_by_host(

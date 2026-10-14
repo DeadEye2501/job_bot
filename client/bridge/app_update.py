@@ -59,7 +59,7 @@ class AppUpdate:
             self._hub,
             self._download_then_hand_over,
             UPDATE_REFUSALS,
-            "Обновление скачано — приложение перезапускается.",
+            "Обновление скачано — приложение перезапускается",
             action="update",
         )
 

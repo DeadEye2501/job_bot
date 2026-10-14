@@ -25,7 +25,7 @@ async def test_an_empty_model_name_is_refused_before_saving(api, ask):
     )
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "chat: Заполните base_url и модель."
+    assert answer["detail"] == "chat: Заполните base_url и модель"
 
 
 async def test_saved_settings_come_back_on_the_next_request(api, ask):
@@ -114,7 +114,7 @@ async def test_saving_a_provider_without_an_address_is_refused(api, ask):
     )
 
     assert answer["fail"] == "denied"
-    assert "Заполните base_url и модель." in answer["detail"]
+    assert "Заполните base_url и модель" in answer["detail"]
 
 
 async def test_the_aggregator_settings_come_back_after_saving(api, ask):
