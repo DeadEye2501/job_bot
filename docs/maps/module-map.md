@@ -455,15 +455,16 @@ resume autofill
 - `class SeekJob` (10)
 - `class ApplyJob` (24)
 
-### `backend/agent/kit.py` — 50 строк
+### `backend/agent/kit.py` — 56 строк
 
 Набор, с которым работает сессия агента.
 
-Зависит от: `adapters.browser`, `adapters.claude_code_agent`, `backend.agent.human_gate`, `backend.flows.pipeline`
+Зависит от: `adapters.browser`, `adapters.claude_code_agent`, `backend.agent.human_gate`, `backend.flows.pipeline`, `backend.repository.agent_profile`
 
 - `class SessionPlan` (7)
-- `class AgentKit` (19)
+- `class AgentKit` (24)
   - `async def written(self, write: Callable[[AsyncSession], Awaitable[T]]) -> T` (9)
+  - `async def profile_text(self, session: AsyncSession) -> str` (4)
 
 ### `backend/agent/page_fields.py` — 67 строк
 
@@ -604,14 +605,14 @@ resume autofill
 - `async def _attach(page, selector: str, file: Path) -> None` (12)
 - `def _first_line(error: Exception) -> str` (2)
 
-### `backend/agent/tools_common.py` — 171 строк
+### `backend/agent/tools_common.py` — 169 строк
 
 Общие инструменты агента: анкета, итог сессии, зов человека, отметка входа, неудача способа.
 
-Зависит от: `backend.agent.confirm`, `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.page_fields`, `backend.domain.apply_order`, `backend.domain.hosts`, `backend.repository.agent_profile`, `backend.repository.aggregators`
+Зависит от: `backend.agent.confirm`, `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.page_fields`, `backend.domain.apply_order`, `backend.domain.hosts`, `backend.repository.aggregators`
 
-- `def common_tools(kit: AgentKit, job) -> list[Callable]` (28)
-  - `async def profile() -> str` (5)
+- `def common_tools(kit: AgentKit, job) -> list[Callable]` (27)
+  - `async def profile() -> str` (4)
   - `async def finish(result: str, reason: str='') -> str` (8)
 - `def _login_target(job) -> int | None` (4)
 - `def _human_call(kit: AgentKit, job) -> list[Callable]` (13)
@@ -629,11 +630,11 @@ resume autofill
 - `def _report_failure(job: ApplyJob) -> Callable` (9)
   - `async def report_failure(reason: str) -> str` (6)
 
-### `backend/agent/tools_letter.py` — 59 строк
+### `backend/agent/tools_letter.py` — 58 строк
 
 Инструмент письма для отклика: пишет приложение или сверяется письмо агента.
 
-Зависит от: `backend.agent.jobs`, `backend.agent.kit`, `backend.llm.agent_letter`, `backend.models`, `backend.repository.agent_profile`
+Зависит от: `backend.agent.jobs`, `backend.agent.kit`, `backend.llm.agent_letter`, `backend.models`
 
 - `def letter_tools(kit: AgentKit, job: ApplyJob) -> list[Callable]` (17)
   - `async def letter(language: str, limit: int=0, subject: str='', body: str='') -> str` (12)
@@ -676,11 +677,11 @@ resume autofill
 Зависит от: —
 
 
-### `backend/applying/browser.py` — 84 строк
+### `backend/applying/browser.py` — 83 строк
 
 Браузерный способ: сессия агента на кнопку агрегатора или форму работодателя.
 
-Зависит от: `backend.agent.confirm`, `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.prompts.applier`, `backend.agent.prompts.frame`, `backend.agent.sessions`, `backend.agent.stops`, `backend.agent.tools_applier`, `backend.agent.tools_browser`, `backend.agent.tools_common`, `backend.agent.tools_letter`, `backend.applying.result`, `backend.domain.apply_order`, `backend.repository.agent_profile`, `backend.repository.aggregators`, `backend.repository.vacancy_brief`, `backend.repository.vacancy_status`
+Зависит от: `backend.agent.confirm`, `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.prompts.applier`, `backend.agent.prompts.frame`, `backend.agent.sessions`, `backend.agent.stops`, `backend.agent.tools_applier`, `backend.agent.tools_browser`, `backend.agent.tools_common`, `backend.agent.tools_letter`, `backend.applying.result`, `backend.domain.apply_order`, `backend.repository.aggregators`, `backend.repository.vacancy_brief`, `backend.repository.vacancy_status`
 
 - `async def via_browser(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome` (19)
 - `async def _mark_unfit(kit: AgentKit, vacancy_id: int, reason: str) -> None` (5)
@@ -914,9 +915,9 @@ First-run bootstrap: ensure DB schema exists.
 - `async def run(bot, *, once: bool=False) -> None` (39)
 - `async def persist_session_if_changed(bot) -> None` (25)
 
-### `backend/bot/media.py` — 189 строк
+### `backend/bot/media.py` — 191 строк
 
-Вложения: распознание, кэш и скачивание.
+Файлы каталога медиа: вложения переписки и копия фото человека.
 
 Зависит от: `backend.domain.image_types`, `config`
 
@@ -928,7 +929,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def cache_sent_file(src: Path, hr_id: int, tg_message_id: int, *, as_photo: bool) -> str | None` (24)
 - `def media_path_for_db(path) -> str` (11)
 - `def stored_media(relative: str) -> Path | None` (5)
-- `def copy_profile_photo(source: Path) -> str` (10)
+- `def store_profile_photo(blob: bytes, suffix: str) -> str` (10)
 - `def drop_stored_media(relative: str) -> None` (5)
 - `async def download_media(client, msg, hr_id: int) -> str | None` (25)
 
@@ -3407,7 +3408,7 @@ Runtime settings layer.
 - `async def mark(session, subject: MarkSubject, entity_id: int) -> dict` (27)
 - `async def unmark(session, subject: MarkSubject, entity_id: int) -> dict` (24)
 
-### `client/bridge/media.py` — 87 строк
+### `client/bridge/media.py` — 88 строк
 
 Вложение письма, каким его видит окно: адрес разметки и файл за адресом.
 
@@ -3417,7 +3418,7 @@ Runtime settings layer.
 - `def media_file(url: str) -> Path | None` (11)
 - `def _under_media(stored_path: str) -> str | None` (21)
 - `def _image_type(blob: bytes) -> str` (8)
-- `def _avatar_data_url(blob: bytes | None) -> str | None` (9)
+- `def image_data_url(blob: bytes | None) -> str | None` (10)
 
 ### `client/bridge/page.py` — 89 строк
 
@@ -3437,18 +3438,19 @@ Runtime settings layer.
 
 - `def _log_invalid_payload(slot: str, exc: Exception) -> None` (8)
 
-### `client/bridge/photo.py` — 56 строк
+### `client/bridge/photo.py` — 85 строк
 
-Фото человека, которое окно показывает в анкете: выбрать копией и убрать.
+Фото человека, которое окно показывает в анкете: выбрать, обрезать, убрать.
 
-Зависит от: `backend.bot.media`, `backend.repository.app_settings`, `client.bridge.answer`, `client.bridge.desktop`
+Зависит от: `backend.bot.media`, `backend.domain.image_types`, `backend.repository.app_settings`, `client.bridge.answer`, `client.bridge.desktop`, `client.bridge.media`
 
-- `class Photo` (41)
-  - `def pick_photo(self) -> dict` (6)
-  - `def _store_photo(self, source: Path) -> dict` (17)
+- `class Photo` (50)
+  - `def pick_photo(self) -> dict` (9)
+  - `def store_photo(self, image: str) -> dict` (21)
     - `async def run() -> dict` (7)
   - `def clear_photo(self) -> dict` (9)
     - `async def run() -> dict` (4)
+- `def _image_bytes(image) -> bytes | None` (8)
 
 ### `client/bridge/pickers.py` — 130 строк
 
@@ -3461,11 +3463,11 @@ Runtime settings layer.
 - `async def merge_picker(session, subject: PickerSubject, absorbed_id: int, search: str | None) -> dict` (21)
 - `async def link_picker(session, subject: PickerSubject, vacancy, search: str | None) -> dict` (18)
 
-### `client/bridge/profile.py` — 207 строк
+### `client/bridge/profile.py` — 221 строк
 
 Анкета соискателя: сведения о себе, навыки, места работы и проекты.
 
-Зависит от: `backend.domain.salary`, `backend.domain.taxonomy`, `backend.incoming`, `backend.models`, `backend.payloads`, `backend.repository`, `backend.repository.profile_records`, `client.bridge.answer`, `client.bridge.choices`, `client.bridge.cv`, `client.bridge.cv_file`, `client.bridge.hub`, `client.bridge.media`, `client.bridge.photo`, `client.bridge.refusals`, `client.bridge.wire`
+Зависит от: `backend.bot.media`, `backend.domain.salary`, `backend.domain.taxonomy`, `backend.incoming`, `backend.models`, `backend.payloads`, `backend.repository`, `backend.repository.profile_records`, `client.bridge.answer`, `client.bridge.choices`, `client.bridge.cv`, `client.bridge.cv_file`, `client.bridge.hub`, `client.bridge.media`, `client.bridge.photo`, `client.bridge.refusals`, `client.bridge.wire`
 
 - `class Profile(Cv, Photo)` (136)
   - `def get(self) -> dict` (20)
@@ -3483,6 +3485,7 @@ Runtime settings layer.
     - `async def run() -> dict` (8)
   - `def _save_rows(self, payload: dict, key: str, saving) -> dict` (29)
     - `async def run() -> dict` (11)
+- `def _photo_url(relative: str) -> str | None` (11)
 - `def _read_profile_fields(payload: dict) -> dict` (32)
 
 ### `client/bridge/refusals.py` — 296 строк
@@ -6700,22 +6703,22 @@ Runtime settings layer.
 Тестов: 4
 
 
-### `tests/client/test_bridge_photo.py` — 79 строк
+### `tests/client/test_bridge_photo.py` — 109 строк
 
-Фото человека: выбор файлом, копия в каталоге медиа, показ и очистка.
+Фото человека: выбор файлом, обрезка в окне, копия в каталоге медиа, очистка.
 
-Зависит от: `backend.bot.media`, `client.bridge.media`, `tests.client.conftest`
+Зависит от: `backend.bot.media`, `client.bridge.media`, `tests.client.conftest`, `tests.factories`
 
-Тестов: 7
+Тестов: 8
 
-- `def _photo(tmp_path, name: str='я.jpg', content: bytes=b'jpeg')` (4)
-- `async def _picked(api, ask, hub, source)` (3)
+- `def _data_url(blob: bytes, kind: str='image/jpeg') -> str` (2)
+- `async def _stored(api, ask, blob: bytes=JPEG)` (2)
 
-### `tests/client/test_bridge_profile.py` — 344 строк ⚠ подошёл к 300
+### `tests/client/test_bridge_profile.py` — 341 строк ⚠ подошёл к 300
 
 Следствия слотов анкеты — того, что человек рассказывает о себе.
 
-Зависит от: —
+Зависит от: `tests.factories`
 
 Тестов: 19
 

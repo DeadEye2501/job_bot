@@ -1,4 +1,4 @@
-"""Вложения: распознание, кэш и скачивание."""
+"""Файлы каталога медиа: вложения переписки и копия фото человека."""
 
 import logging
 import shutil
@@ -18,11 +18,13 @@ logger = logging.getLogger(__name__)
 MEDIA_DIR = get_data_dir() / "media"
 
 
-PHOTO_EXTS = {".png", ".jpg", ".jpeg", ".webp"}  # GIFs go via send_document → preserved as animation
+PHOTO_SUFFIXES = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
+"""Какие картинки считаются фото и под каким расширением ложатся: это же
+Telegram принимает в send_photo, и это же годится в фото анкеты."""
 
+PHOTO_EXTS = {*PHOTO_SUFFIXES.values(), ".jpeg"}  # GIFs go via send_document → preserved as animation
 
-_PHOTO_TYPES = {"image/jpeg", "image/png", "image/webp"}
-"""Что Telegram принимает в send_photo."""
+_PHOTO_TYPES = frozenset(PHOTO_SUFFIXES)
 
 
 # User-facing caps на upload. Telegram regular doc-limit ≈ 2 GB, но без
@@ -143,15 +145,15 @@ def stored_media(relative: str) -> Path | None:
     return path if path.is_file() else None
 
 
-def copy_profile_photo(source: Path) -> str:
-    """Положить копию фото человека в каталог медиа; ответ — путь внутри него.
+def store_profile_photo(blob: bytes, suffix: str) -> str:
+    """Записать присланное фото человека в каталог медиа; ответ — путь внутри него.
 
-    Копия, а не ссылка на исходный: исходный человек волен перенести или
-    удалить. Копия с тем же расширением заменяется на месте.
+    Своя копия, а не ссылка на исходный файл: исходный человек волен перенести
+    или удалить. Фото с тем же расширением заменяется на месте.
     """
-    relative = f"profile/photo{source.suffix.lower()}"
+    relative = f"profile/photo{suffix}"
     (MEDIA_DIR / "profile").mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(source, MEDIA_DIR / relative)
+    (MEDIA_DIR / relative).write_bytes(blob)
     return relative
 
 

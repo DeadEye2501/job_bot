@@ -58,6 +58,39 @@ describe('стопка открытых окон', () => {
     leaveUnder();
   });
 
+  it('Enter на кнопке нажимает её саму, а не подтверждает окно', () => {
+    // На «Отмене» Enter значит «отмена»: подтверди окно — человек получил бы
+    // обратное тому, что нажал.
+    const mine = {};
+    const leave = opened(mine);
+    let confirmed = false;
+
+    modalPress({ key: 'Enter', target: { tagName: 'BUTTON' }, preventDefault() {} }, mine, {
+      close: () => {},
+      confirm: () => (confirmed = true),
+    });
+
+    expect(confirmed).toBe(false);
+    leave();
+  });
+
+  it('подтверждение по Enter гасит обычное действие клавиши', () => {
+    // Иначе браузер следом нажал бы то, что под фокусом, — и окно, открытое
+    // кнопкой, открылось бы снова сразу после подтверждения.
+    const mine = {};
+    const leave = opened(mine);
+    let prevented = false;
+    let confirmed = false;
+
+    modalPress({ key: 'Enter', target: { tagName: 'DIV' }, preventDefault: () => (prevented = true) }, mine, {
+      close: () => {},
+      confirm: () => (confirmed = true),
+    });
+
+    expect([confirmed, prevented]).toEqual([true, true]);
+    leave();
+  });
+
   it('окно без подтверждения на Enter не закрывается', () => {
     // У подборщика подтверждения нет вовсе: выбирают в нём мышью. Прими он
     // Enter за «закрыть» — окно захлопывалось бы на первом же нажатии в поиске.

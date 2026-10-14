@@ -10,6 +10,8 @@
   // имена, а список только показывает переданное.
   import { whileOpen } from '$state/outside.js';
 
+  import DropButton from './DropButton.svelte';
+
   let { placeholder, hint, empty, names, chosen, search, onsearch, prefix = '', onpick } = $props();
 
   let open = $state(false);
@@ -27,12 +29,14 @@
 </script>
 
 <div class="pick" bind:this={root}>
-  <button class="cdd-btn" type="button" onclick={() => (open = !open)}>
-    <span>{chosen.size ? `Выбрано: ${chosen.size}` : placeholder}</span>
-    <span class="material-symbols-outlined">{open ? 'expand_less' : 'expand_more'}</span>
-  </button>
+  <DropButton
+    label={chosen.size ? `Выбрано: ${chosen.size}` : placeholder}
+    empty={!chosen.size}
+    {open}
+    ontoggle={() => (open = !open)}
+  />
   {#if open}
-    <div class="pop-frame pick-panel">
+    <div class="pop-frame drop-panel cdd-panel pick-panel">
       <input
         class="input"
         type="text"

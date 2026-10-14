@@ -1,4 +1,6 @@
-/* Файл резюме — в анкете и в мастере.
+/* Файл резюме — в анкете и в мастере, одним видом: высотой с поле ввода, имя
+   и размер одной строкой, кнопки поджаты. Место над строкой задаёт тот, кто её
+   ставит.
 
    Пунктир до выбора говорит «сюда кладут», сплошная рамка после — что файл
    уже взят: пустая строка со сплошной рамкой читалась бы как поле, в которое
@@ -7,11 +9,10 @@
 .pdf-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  /* Рамка — общая, в panel-frame.css; здесь только её пунктир. */
+  gap: 8px;
+  padding: 2px 3px 2px 10px;
+  /* Рамка — общая с полями, в input.css; здесь только её пунктир. */
   border-style: dashed;
-  margin-top: 14px;
 }
 
 .pdf-row.has-file {
@@ -19,17 +20,25 @@
 }
 
 .pdf-row > .material-symbols-outlined {
-  color: var(--danger);
-  font-size: 28px;
+  color: var(--text-secondary);
+  font-size: 18px;
   flex-shrink: 0;
 }
 
 .pdf-info {
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .pdf-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--text-primary);
   font-size: 0.85rem;
 }
@@ -37,11 +46,14 @@
 .pdf-meta {
   color: var(--text-tertiary);
   font-size: 0.72rem;
-  margin-top: 1px;
 }
 
 .pdf-actions {
   display: flex;
   gap: 4px;
   flex-shrink: 0;
+}
+
+.pdf-actions .btn {
+  padding: 1px 10px;
 }

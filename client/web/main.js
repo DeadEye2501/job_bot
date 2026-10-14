@@ -40,6 +40,8 @@ import './styles/log-row.css';
 import './styles/screen.css';
 import './styles/form-grid.css';
 import './styles/name-grid.css';
+import './styles/photo-frame.css';
+import './styles/photo-crop.css';
 import './styles/field-caption.css';
 import './styles/field-line.css';
 import './styles/input-pair.css';

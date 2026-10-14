@@ -2,7 +2,9 @@
 //
 // Решение принимается здесь, а окно только зовёт и делает.
 
-const MULTILINE = new Set(['TEXTAREA']);
+// Где Enter делает своё: в многострочном поле переносит строку, на кнопке
+// нажимает её. Там окно его не перехватывает.
+const OWN_ENTER = new Set(['TEXTAREA', 'BUTTON']);
 
 // Открытые окна снизу вверх. Порядок несущий: последнее открытое и есть то,
 // на которое человек сейчас смотрит.
@@ -10,12 +12,13 @@ const OPEN = [];
 
 /** Чем нажатая клавиша отзовётся в окне: закрытием, подтверждением или ничем.
  *
- * Многострочное поле — исключение: в нём Enter переносит строку. Иначе заметку
- * в два абзаца не набрать, первый же перевод строки отправил бы окно.
+ * Enter не подтверждает там, где делает своё: в многострочном поле заметку в
+ * два абзаца иначе не набрать, а Enter на «Отмене» подтвердил бы обратное
+ * нажатому.
  */
 export function modalKey(event) {
   if (event.key === 'Escape') return 'close';
-  if (event.key === 'Enter' && !MULTILINE.has(event.target?.tagName)) return 'confirm';
+  if (event.key === 'Enter' && !OWN_ENTER.has(event.target?.tagName)) return 'confirm';
   return null;
 }
 
@@ -66,5 +69,10 @@ export function modalPress(event, window_, { close, confirm = null }) {
   if (event.defaultPrevented) return;
   const said = modalKey(event);
   if (said === 'close') close();
-  else if (said === 'confirm' && confirm) confirm();
+  else if (said === 'confirm' && confirm) {
+    // Обычное действие Enter гасится: браузер следом нажал бы то, что под
+    // фокусом, — и кнопка, открывшая окно, открыла бы его снова.
+    event.preventDefault();
+    confirm();
+  }
 }

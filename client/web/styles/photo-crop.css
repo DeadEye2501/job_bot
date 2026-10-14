@@ -1,0 +1,40 @@
+/* Окно обрезки фото: снимок, рамка поверх него и затемнение вокруг рамки.
+
+   Затемнение — тенью самой рамки: так то, что уйдёт в анкету, видно светлым,
+   а отрезаемое — тёмным, и второго слоя под это не нужно. Углы рамки скруглены
+   так же, как у рамки фото в анкете (`photo-frame.css`). */
+
+.crop-stage {
+  position: relative;
+  align-self: center;
+  overflow: hidden;
+  user-select: none;
+}
+
+.crop-stage img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.crop-box {
+  position: absolute;
+  border: 1px solid var(--fg-max);
+  border-radius: 4px;
+  box-shadow: 0 0 0 9999px var(--scrim);
+  cursor: move;
+  touch-action: none;
+}
+
+/* За угол рамку растягивают: угол — невидимая зона, стрелка курсора над ней
+   говорит сама за себя. */
+.crop-corner {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+}
+
+.crop-corner[data-corner='nw'] { top: -8px; left: -8px; cursor: nwse-resize; }
+.crop-corner[data-corner='se'] { bottom: -8px; right: -8px; cursor: nwse-resize; }
+.crop-corner[data-corner='ne'] { top: -8px; right: -8px; cursor: nesw-resize; }
+.crop-corner[data-corner='sw'] { bottom: -8px; left: -8px; cursor: nesw-resize; }

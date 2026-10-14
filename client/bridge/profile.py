@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from backend.bot.media import stored_media
 from backend.domain.salary import currency_sign
 from backend.domain.taxonomy import GRADES, WORK_FORMATS
 from backend.incoming import (
@@ -66,7 +67,7 @@ class Profile(Cv, Photo):
                 "profile": _profile_to_dict(profile, languages),
                 "cv_path": cv_path,
                 "cv_meta": _stat_cv(cv_path),
-                "photo_url": _media_url(self._hub.rs.photo_path),
+                "photo_url": _photo_url(self._hub.rs.photo_path),
             }
 
         return reply(self._hub.runner, run())
@@ -171,6 +172,19 @@ class Profile(Cv, Photo):
             return {}
 
         return reply(self._hub.runner, run())
+
+
+def _photo_url(relative: str) -> str | None:
+    """Адрес копии фото с меткой её правки; копии нет — адреса нет.
+
+    Копия заменяется по тому же пути, и без метки окно показывало бы прежний
+    снимок по прежнему адресу. Раздача метку не читает: строка запроса в путь
+    не входит.
+    """
+    copy = stored_media(relative)
+    if copy is None:
+        return None
+    return f"{_media_url(relative)}?v={copy.stat().st_mtime_ns}"
 
 
 def _read_profile_fields(payload: dict) -> dict:

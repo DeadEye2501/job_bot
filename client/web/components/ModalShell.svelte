@@ -17,6 +17,14 @@
   import ModalKeys from './ModalKeys.svelte';
 
   let { extra = '', over = '', confirm = null, awayCloses = true, onclose, children } = $props();
+
+  let box = $state(null);
+
+  $effect(() => {
+    // Фокус уходит в окно, если его не взяло поле внутри: оставшись на кнопке,
+    // открывшей окно, он отдал бы ей Enter — и окно открылось бы снова.
+    if (box && !box.contains(document.activeElement)) box.focus();
+  });
 </script>
 
 <ModalKeys close={onclose} {confirm} />
@@ -28,7 +36,7 @@
   role="presentation"
   onclick={(event) => awayCloses && event.target === event.currentTarget && onclose()}
 >
-  <div class="modal-dialog {extra}" role="dialog" aria-modal="true">
+  <div class="modal-dialog {extra}" role="dialog" aria-modal="true" tabindex="-1" bind:this={box}>
     {@render children()}
   </div>
 </div>

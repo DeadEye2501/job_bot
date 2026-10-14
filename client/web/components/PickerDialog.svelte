@@ -105,7 +105,7 @@
   });
 </script>
 
-<ModalShell extra="vac-picker-modal" {onclose}>
+<ModalShell extra="narrow vac-picker-modal" {onclose}>
   {#snippet children()}
     <ModalHead {icon} {title} {onclose} />
 

@@ -70,7 +70,6 @@
 .bl-modal-input,
 .bl-modal-textarea {
   padding: 6px 9px;
-  border-radius: 3px;
   background: var(--bg-tertiary);
   font-size: 0.83rem;
 }

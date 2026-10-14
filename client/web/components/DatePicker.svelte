@@ -10,7 +10,7 @@
 
   import { whileOpen } from '$state/outside.js';
   import { WEEKDAYS, monthGrid, monthTitle, shiftMonth } from '$state/calendar.js';
-  import { asIso, dayIso, dayOf, isoDay, showDate, validDate } from '$state/dates.js';
+  import { asIso, dayIso, dayOf, isoDay, maskedDate, showDate, validDate } from '$state/dates.js';
 
   // `disabled` — для даты окончания у места работы, где отмечено «по настоящее
   // время»: набирать там нечего, и календарь не открывается вместе с полем.
@@ -102,7 +102,12 @@
     maxlength="10"
     value={text}
     {disabled}
-    oninput={(event) => typed(event.currentTarget.value)}
+    oninput={(event) => {
+      // Поле переписывается и тогда, когда маска не изменила набранного:
+      // лишняя девятая цифра осталась бы в поле, хотя в дату не ушла.
+      event.currentTarget.value = maskedDate(event.currentTarget.value);
+      typed(event.currentTarget.value);
+    }}
     onfocus={() => (open = true)}
   />
 

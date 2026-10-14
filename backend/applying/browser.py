@@ -13,7 +13,6 @@ from backend.agent.tools_common import common_tools
 from backend.agent.tools_letter import letter_tools
 from backend.applying.result import GONE, Dropped, Missed, Outcome, SiteClosed, Unfit
 from backend.domain.apply_order import Way
-from backend.repository.agent_profile import build_agent_profile
 from backend.repository.aggregators import web_search_id
 from backend.repository.vacancy_brief import describe_vacancy
 from backend.repository.vacancy_status import mark_vacancy_unfit
@@ -58,10 +57,10 @@ async def _apply_plan(kit: AgentKit, job: ApplyJob) -> SessionPlan | None:
         vacancy_text = await describe_vacancy(session, job.vacancy_id)
         if vacancy_text is None:
             return None
-        photo = kit.pipeline.photo_file()
-        profile_text = await build_agent_profile(session, kit.today, photo is not None)
+        profile_text = await kit.profile_text(session)
     tools = [*common_tools(kit, job), *applier_tools(kit, job), *letter_tools(kit, job),
-             *browser_tools(kit, kit.pipeline.cv_file(), photo, job if job.confirming else None)]
+             *browser_tools(kit, kit.pipeline.cv_file(), kit.pipeline.photo_file(),
+                            job if job.confirming else None)]
     task = applier_task(job, vacancy_text, profile_text, kit.today)
     return SessionPlan(system_prompt(APPLIER_PROMPT, tools), task, tools, web_search=True)
 

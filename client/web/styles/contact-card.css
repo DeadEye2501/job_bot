@@ -94,6 +94,5 @@
    рамка, подложка, отклик на курсор и на набор — приходит из input.css. */
 .cnt-input {
   padding: 5px 8px;
-  border-radius: 3px;
   font-size: 0.82rem;
 }
