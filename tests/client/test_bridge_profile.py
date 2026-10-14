@@ -25,7 +25,7 @@ async def test_a_missing_required_field_is_refused_by_its_name(api, ask):
     answer = await ask(api.profile.save, {**PERSON, "email": "   "})
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "Поле 'email' обязательно."
+    assert answer["detail"] == "Поле 'email' обязательно"
 
 
 async def test_a_saved_person_comes_back_on_the_next_request(api, ask):

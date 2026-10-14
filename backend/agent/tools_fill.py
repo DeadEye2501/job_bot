@@ -34,22 +34,20 @@ def fill_tools(kit: AgentKit, job: FillJob) -> list[Callable]:
     """Инструменты заполнения, привязанные к своему сайту."""
 
     async def submit_layout(items: list[LayoutItem]) -> str:
-        """Раскладка страницы целиком: каждый пункт — поле страницы и всё его значение из анкеты, одно поле — один пункт. У данных, положенных в общее текстовое поле, fallback_reason — почему узкие поля страницы им не подходят. Вписать можно только принятое."""
+        """Раскладка страницы целиком: каждый пункт — поле страницы и всё его значение из анкеты, одно поле — один пункт; у галочки value — true или false. У данных, положенных в общее текстовое поле, fallback_reason — почему узкие поля страницы им не подходят. Вписать можно только принятое."""
         page = await kit.browser.page()
         url = page.url
         inventory = await page_inventory(page)
-        named = {item["selector"] for item in items}
-        job.skipped[url] = [entry.label for entry in inventory
-                            if not entry.required and entry.selector not in named]
         job.general |= {(url, item["selector"]) for item in items if item.get("fallback_reason")}
         refused = _unfit(job, url, items)
-        fallbacks = [item for item in items
-                     if (url, item["selector"]) in job.general and item["selector"] not in refused]
+        fallbacks = [item for item in items if (url, item["selector"]) in job.general
+                     and item["selector"] not in refused and not _known(job, url, item)]
         refused |= await _reviewed(job, url, fallbacks, lambda pending: review_fallbacks(
             kit.pipeline.lm_client, kit.pipeline.lm_chat_model, inventory, pending))
         for item in items:
             if item["selector"] not in refused:
                 job.accepted[(url, item["selector"])] = item
+        job.skipped[url] = _skipped(job, url, inventory)
         return _answer(len(items) - len(refused), refused)
 
     async def report_required_missing(labels: list[str]) -> str:
@@ -60,6 +58,23 @@ def fill_tools(kit: AgentKit, job: FillJob) -> list[Callable]:
         return "Заполнение остановлено: не хватает данных для обязательных полей. Заверши работу."
 
     return [submit_layout, report_required_missing]
+
+
+def _known(job: FillJob, url: str, item: dict) -> bool:
+    """Пункт уже принят с тем же значением: новые поля на странице дают новую
+    раскладку, и принятое в ней проверок не тратит."""
+    return job.accepted.get((url, item["selector"]), {}).get("value") == item["value"]
+
+
+def _skipped(job: FillJob, url: str, inventory: list) -> list[str]:
+    """Необязательные поля страницы, которым за всю работу на ней не нашлось
+    пункта. Поле узнаётся по селектору или подписи: селектор описи и селектор
+    агента бывают разной записи одного поля."""
+    taken = [item for (where, _), item in job.accepted.items() if where == url]
+    selectors = {item["selector"] for item in taken}
+    labels = {item["label"] for item in taken if item["label"]}
+    return [entry.label for entry in inventory if not entry.required
+            and entry.selector not in selectors and entry.label not in labels]
 
 
 def _unfit(job: FillJob, url: str, items: list[dict]) -> dict[str, str]:

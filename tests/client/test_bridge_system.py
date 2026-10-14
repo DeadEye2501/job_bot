@@ -92,7 +92,7 @@ async def test_an_unreachable_github_is_an_answer_not_a_refusal(api, ask, monkey
     with caplog.at_level(logging.WARNING, logger="client.bridge.app_update"):
         answer = await ask(api.system.check_update)
 
-    assert answer["ok"] == {"newer": None, "trouble": "GitHub не ответил — проверьте связь."}
+    assert answer["ok"] == {"newer": None, "trouble": "GitHub не ответил — проверьте связь"}
     assert any(r.name == "client.bridge.app_update" for r in caplog.records)
 
 

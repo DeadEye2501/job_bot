@@ -221,7 +221,7 @@ class Vacancies(VacancyActions, VacancyLinks, VacancyContacts):
                     "history_id=%d not found (vacancy=%d)", history_id, vacancy_id,
                 )
                 raise Denied(
-                    "Запись истории не найдена.",
+                    "Запись истории не найдена",
                     history_id=history_id,
                     vacancy_id=vacancy_id,
                 )
@@ -248,7 +248,7 @@ class Vacancies(VacancyActions, VacancyLinks, VacancyContacts):
         try:
             new_status = VacancyStatus(status_raw)
         except ValueError:
-            return denied("Неверный статус.", vacancy_id=vacancy_id)
+            return denied("Неверный статус", vacancy_id=vacancy_id)
 
         async def run() -> dict:
             async with self._hub.session_factory() as session:

@@ -1990,7 +1990,7 @@
 ### `client/bridge/app_update.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `GITHUB_SILENT` = `'GitHub не ответил — проверьте связь.'`
+- `GITHUB_SILENT` = `'GitHub не ответил — проверьте связь'`
 
 ### `client/bridge/bot_stop.py`
 
@@ -2146,7 +2146,7 @@
 - `WAY_UNKNOWN` = `'Этим способом на вакансию не откликнуться'`
 - `AGGREGATOR_REFUSALS` = `словарь из 5 и раскрытых`
 - `LOGIN_REFUSALS` = `словарь из 2 и раскрытых`
-- `FILL_REFUSALS` = `словарь из 1 и раскрытых`
+- `FILL_REFUSALS` = `словарь из 2 и раскрытых`
 - `RESUME_FILLED` = `'Резюме заполнено'`
 - `APPLY_VIA_REFUSALS` = `словарь из 7 и раскрытых`
 - `APPLY_ALL_REFUSALS` = `словарь из 3 и раскрытых`
@@ -2479,7 +2479,7 @@
 ### `tests/client/test_messages_without_dot.py`
 
 - `BRIDGE` = `Path(refusals.__file__).parent`
-- `LAUNCHERS` = `набор из 3`
+- `LAUNCHERS` = `набор из 5`
 
 ### `tests/client/test_page_contract.py`
 

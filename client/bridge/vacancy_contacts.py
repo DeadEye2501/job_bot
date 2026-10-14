@@ -22,7 +22,7 @@ class VacancyContacts:
         except BAD_PAYLOAD as e:
             return bad_fields("add_contact", e)
         if value is None or not contact_key(value):
-            return denied("Пустой контакт не добавить.")
+            return denied("Пустой контакт не добавить")
 
         async def run() -> dict:
             async with self._hub.session_factory() as session:

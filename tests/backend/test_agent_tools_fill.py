@@ -100,7 +100,7 @@ async def test_a_page_gets_two_reviews_and_the_third_fallback_is_not_accepted(st
 
 
 async def test_another_page_has_its_own_two_reviews(stand):
-    page, _, tools, calls = await stand()
+    page, _, tools, calls = await stand({"#about": Verdict(False, "есть поле", None)})
     fallback = layout_item("#about", "Навыки: вышивка", "поля навыков нет")
 
     for _ in range(2):
@@ -117,3 +117,23 @@ async def test_missing_required_data_ends_the_fill_with_the_fields_named(stand):
     await tool(tools, "report_required_missing")(labels=["Гражданство", "Дата рождения"])
 
     assert job.outcome == Finished("required_missing", "Гражданство, Дата рождения")
+
+
+async def test_a_fallback_already_accepted_is_not_reviewed_again(stand):
+    """Новые поля на той же странице — новая раскладка; принятое в ней не тратит проверок."""
+    _, job, tools, calls = await stand()
+    fallback = layout_item("#about", "Навыки: вышивка", "поля навыков нет")
+
+    for _ in range(3):
+        await tool(tools, "submit_layout")(items=[fallback, layout_item("#skills", "Вышивка")])
+
+    assert len(calls) == 1 and (FORM, "#about") in job.accepted
+
+
+async def test_a_field_filled_in_an_earlier_layout_is_not_called_skipped(stand):
+    _, job, tools, _ = await stand()
+
+    await tool(tools, "submit_layout")(items=[layout_item("#skills", "Вышивка")])
+    await tool(tools, "submit_layout")(items=[layout_item("#about", "Шью на заказ")])
+
+    assert job.skipped[FORM] == []

@@ -9,6 +9,7 @@ from backend.agent.jobs import ApplyJob, FillJob, Source
 from backend.agent.kit import AgentEnd, AgentKit, SessionPlan
 from backend.domain.apply_order import Way
 from backend.payloads import SeenResume
+from tests.factories_aggregators import aggregator_row
 from tests.fakes.browser import FakeBrowser
 
 TODAY = date(2026, 10, 9)
@@ -33,8 +34,8 @@ def apply_job(vacancy_id: int, *, method="form", target="https://company.test/ap
 
 
 def fill_job(**overrides) -> FillJob:
-    """Заполнение резюме на hh.ru: по умолчанию новое резюме."""
-    return FillJob(Source(id=4, name="HeadHunter", host="hh.ru", last_run_at=None), **overrides)
+    """Заполнение резюме на сайте строки агрегатора по умолчанию: новое резюме."""
+    return FillJob(Source.of(aggregator_row(id=4)), **overrides)
 
 
 def scripted(steps: list[Callable[[dict[str, Callable]], Awaitable]]):

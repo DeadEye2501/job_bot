@@ -82,7 +82,7 @@ class Profile(Cv, Photo):
 
         for required in REQUIRED_PROFILE_FIELDS:
             if not fields[required]:
-                return denied(f"Поле '{required}' обязательно.")
+                return denied(f"Поле '{required}' обязательно")
 
         async def run() -> dict:
             async with self._hub.session_factory() as session:

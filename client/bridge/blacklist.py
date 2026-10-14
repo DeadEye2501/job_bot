@@ -63,7 +63,7 @@ class Blacklist:
         reason = payload.get("reason")
 
         if kind not in BLACKLIST_KINDS:
-            return denied("Неверный тип записи.", action="create")
+            return denied("Неверный тип записи", action="create")
 
         async def run() -> dict:
             try:

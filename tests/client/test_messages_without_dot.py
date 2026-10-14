@@ -9,7 +9,8 @@ from backend.bot import work
 from client.bridge import refusals
 
 BRIDGE = Path(refusals.__file__).parent
-LAUNCHERS = {"launched", "launched_on_bot", "_launch"}
+LAUNCHERS = {"launched", "launched_on_bot", "_launch", "denied", "Denied"}
+"""Зовы, строки которых уходят в окно: итог пущенной работы и отказ по месту."""
 
 
 def _texts_of(module) -> list[str]:
@@ -26,14 +27,20 @@ def _texts_of(module) -> list[str]:
 
 
 def _launch_texts() -> list[str]:
-    """Строки, которые мост передаёт в пущенную работу: итог «готово» среди них."""
+    """Строки, которые мост передаёт в пущенную работу и в отказ по месту."""
     texts = []
     for path in BRIDGE.glob("*.py"):
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
             if isinstance(node, ast.Call) and getattr(node.func, "attr", getattr(node.func, "id", "")) in LAUNCHERS:
-                texts += [arg.value for arg in node.args
-                          if isinstance(arg, ast.Constant) and isinstance(arg.value, str)]
+                texts += [_tail(arg) for arg in node.args if _tail(arg) is not None]
     return texts
+
+
+def _tail(arg) -> str | None:
+    """Конец строки-довода: у f-строки — её последний постоянный кусок."""
+    if isinstance(arg, ast.JoinedStr) and arg.values:
+        arg = arg.values[-1]
+    return arg.value if isinstance(arg, ast.Constant) and isinstance(arg.value, str) else None
 
 
 def test_no_refusal_or_run_note_ends_with_a_dot():

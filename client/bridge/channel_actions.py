@@ -123,13 +123,13 @@ class ChannelActions:
         payload = payload if isinstance(payload, dict) else {}
         raw = (payload.get("input") or "").strip()
         if not raw:
-            return denied("Укажите @username или ссылку на канал.", action="create")
+            return denied("Укажите @username или ссылку на канал", action="create")
 
         username = normalize_username(raw)
         if not username:
             return denied(
                 "Не удалось распознать @username канала. "
-                "Поддерживаются форматы: @name, name, t.me/name.",
+                "Поддерживаются форматы: @name, name, t.me/name",
                 action="create",
             )
 
@@ -140,13 +140,13 @@ class ChannelActions:
             channel_id, status = await bot.add_channel(username)
             if status == "invalid":
                 raise Denied(
-                    f"Telegram не нашёл канал @{username}. Проверьте имя.",
+                    f"Telegram не нашёл канал @{username}. Проверьте имя",
                     action="create", status=status,
                 )
             if status == "error":
                 raise Denied(
                     f"Не вышло спросить Telegram о канале @{username}. "
-                    "Попробуйте ещё раз, причина в журнале.",
+                    "Попробуйте ещё раз, причина в журнале",
                     action="create", status=status,
                 )
             return {

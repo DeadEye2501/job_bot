@@ -206,7 +206,7 @@ async def test_an_unknown_status_is_refused_by_name(api, ask, session_factory):
     )
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == "Неверный статус."
+    assert answer["detail"] == "Неверный статус"
 
 
 async def test_a_changed_status_reaches_the_card(api, ask, session_factory):

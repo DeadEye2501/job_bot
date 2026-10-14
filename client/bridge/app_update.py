@@ -18,7 +18,7 @@ from client.bridge.refusals import UPDATE_REFUSALS
 
 logger = logging.getLogger(__name__)
 
-GITHUB_SILENT = "GitHub не ответил — проверьте связь."
+GITHUB_SILENT = "GitHub не ответил — проверьте связь"
 
 
 class AppUpdate:

@@ -126,5 +126,5 @@ async def test_overwriting_a_resume_the_site_does_not_have_is_refused_before_the
     site, _ = await _site(session_factory)
     kit = scripted_kit(await make_pipeline(), [])
 
-    assert await fill(kit, Source.of(site), 999) == "missing"
+    assert await fill(kit, Source.of(site), 999) == "no_resume"
     assert kit.run_session.plans == []

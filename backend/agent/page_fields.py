@@ -25,6 +25,7 @@ _WAIT_MS = 15_000
 # группа «отметьте хотя бы одно» не делает обязательной каждую галочку в ней.
 _RULES = r"""
   const FIELD = 'input, select, textarea, [role=checkbox], [role=switch], [role=radio], [role=combobox], [role=textbox]';
+  const RADIOS = 'input[type=radio], [role=radio]';
   const kindOf = (el) => {
     const type = (el.type || '').toLowerCase();
     const role = (el.getAttribute?.('role') || '').toLowerCase();
@@ -55,7 +56,7 @@ _FIELD_OF = "el => {" + _RULES + """
     || el;
   const kind = target.matches?.(FIELD) ? kindOf(target) : '';
   if (kind === 'check') return ['check', '', ownRequired(target)];
-  const radio = kind === 'radio' ? target : target.querySelector?.('input[type=radio], [role=radio]');
+  const radio = kind === 'radio' ? target : target.querySelector?.(RADIOS);
   const required = requiredOf(target) || Boolean(radio && requiredOf(radio));
   return [kind === 'radio' ? 'radio' : '', radio ? groupOf(radio) : '', required];
 }"""
@@ -97,7 +98,6 @@ _INVENTORY = "() => {" + _RULES + r"""
     if (!el.dataset.jobBotField) el.dataset.jobBotField = String(++marks);
     return `[data-job-bot-field="${el.dataset.jobBotField}"]`;
   };
-  const RADIOS = 'input[type=radio], [role=radio]';
   const groupEntry = (el, key) => {
     const set = el.closest('fieldset');
     const whole = set && [...set.querySelectorAll(RADIOS)].every((one) => (groupOf(one) || one) === key);

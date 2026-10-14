@@ -14,7 +14,7 @@
 
 ## app — 31 файлов
 
-### app/AggregatorCard.svelte (237)
+### app/AggregatorCard.svelte (223)
 - —
 - принимает: ask, say, lockedTip, lock, events, aggregatorId, onvacancy, onclose, onchanged
 
@@ -656,9 +656,9 @@
 
 ## state — 71 файлов
 
-### state/aggregators.js (81)
+### state/aggregators.js (89)
 - * Где агрегатор ищет — подпись под именем. * * У «Поиска по сети» адреса нет — его место занимает то, где он ищет: пустое * место под именем читалось бы как недозаведённый агрегатор.
-- отдаёт: AGGREGATORS_TAB, LOGIN_FIRST, actionBlock, aggregatorToggle, aggregatorWhere, loginMark, newResumeTip
+- отдаёт: AGGREGATORS_TAB, LOGIN_FIRST, NO_MORE_RESUMES, actionBlock, aggregatorToggle, aggregatorWhere, loginMark, newResumeTip, siteTip
 
 ### state/alive.js (59)
 - * Заводит признак жизни экрана.
