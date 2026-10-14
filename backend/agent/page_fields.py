@@ -11,6 +11,8 @@
 import logging
 from typing import NamedTuple
 
+from backend.payloads import FieldEntry
+
 logger = logging.getLogger(__name__)
 
 _WAIT_MS = 15_000
@@ -132,18 +134,6 @@ _INVENTORY = "() => {" + _RULES + r"""
   }
   return entries;
 }"""
-
-
-class FieldEntry(NamedTuple):
-    """Поле в описи страницы: селектор, по которому его находит Playwright,
-    подпись, вид (`text`, `textarea`, `select`, `check`, `radio`),
-    обязательность и варианты — у списка и группы кружков."""
-
-    selector: str
-    label: str
-    kind: str
-    required: bool
-    options: list[str]
 
 
 async def page_inventory(page) -> list[FieldEntry]:

@@ -17,7 +17,7 @@
 
 from dataclasses import dataclass
 from datetime import date, datetime
-from typing import Any, Literal
+from typing import Any, Literal, NamedTuple
 
 from backend.domain.stack import joined_stack
 from backend.models import (
@@ -411,6 +411,19 @@ class SeenResume:
 
     title: str
     url: str
+
+
+class FieldEntry(NamedTuple):
+    """Поле в описи страницы: селектор, по которому его находит Playwright,
+    подпись, вид (`text`, `textarea`, `select`, `check`, `radio`),
+    обязательность и варианты — у списка и группы кружков. Снимает опись
+    браузер (`agent/page_fields`), читает и проверяющий раскладки (`llm`)."""
+
+    selector: str
+    label: str
+    kind: str
+    required: bool
+    options: list[str]
 
 
 @dataclass(frozen=True)

@@ -7,7 +7,10 @@ from backend.agent.kit import AgentKit
 from backend.llm.agent_letter import Letter, LetterAsk, check_letter, write_letter
 from backend.models import Vacancy
 
-_CHECKS_ALLOWED = 2
+CHECKS_ALLOWED = 2
+"""Сколько раз проверка второй моделью смотрит предложение агента — письмо или
+раскладку страницы резюме: спор сверх этого не сходится, а стоит вызовов."""
+
 _ENOUGH = "отбито дважды: отправляй без письма, если поле необязательное, иначе report_failure"
 
 
@@ -16,7 +19,7 @@ def letter_tools(kit: AgentKit, job: ApplyJob) -> list[Callable]:
 
     async def letter(language: str, limit: int = 0, subject: str = "", body: str = "") -> str:
         """Письмо для отклика на языке вакансии; limit — предел знаков поля, 0 — без предела. Если письмо пишешь ты — передай subject и body на сверку."""
-        if job.letter_checks >= _CHECKS_ALLOWED:
+        if job.letter_checks >= CHECKS_ALLOWED:
             return _ENOUGH
         if job.letter_writer == "agent" and not body.strip():
             return "Письмо пишешь ты: передай subject и body, приложение сверит их с анкетой."

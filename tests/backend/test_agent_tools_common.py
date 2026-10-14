@@ -1,6 +1,6 @@
 """Общие инструменты агента: анкета, вход, итог, неудача."""
 
-from backend.agent.jobs import Applied, Failed, Finished, LoginJob, ScanJob, Source
+from backend.agent.jobs import Applied, Failed, FillJob, Finished, LoginJob, ScanJob, Source
 from backend.agent.tools_common import common_tools
 from backend.models import Aggregator
 from backend.payloads import SeenResume
@@ -150,3 +150,19 @@ async def test_a_missing_resume_is_an_outcome_only_where_a_resume_was_named(make
 
     assert form.outcome is None and "не бывает" in refused
     assert named.outcome == Finished("resume_missing", "")
+
+
+async def test_a_fill_reports_its_login_calls_a_human_and_finishes(make_pipeline, session_factory):
+    """Заполнение резюме — работа на сайте: вход может слететь, капча — встретиться."""
+    site = aggregator_row(is_logged_in=True)
+    await put(session_factory, site)
+    gate = _Gate()
+    job = FillJob(Source.of(site))
+    tools = common_tools(kit_for(await make_pipeline(), gate=gate), job)
+
+    assert await tool(tools, "need_human")(kind="captcha") == "готово"
+    await tool(tools, "report_login")(logged_in=False)
+    await tool(tools, "finish")(result="done")
+
+    assert gate.asked == [("captcha", "hh.ru")] and job.outcome == Finished("done", "")
+    assert (await all_rows(session_factory, Aggregator))[0].is_logged_in is False

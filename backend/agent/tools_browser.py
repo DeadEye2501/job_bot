@@ -3,9 +3,10 @@
 import logging
 from collections.abc import Awaitable, Callable
 from pathlib import Path
+from typing import NamedTuple
 
 from backend.agent.confirm import is_checked
-from backend.agent.jobs import ApplyJob, Dropped
+from backend.agent.jobs import ApplyJob, Dropped, FillJob
 from backend.agent.kit import AgentKit
 from backend.agent.page_fields import field_or_none, page_field
 
@@ -17,18 +18,35 @@ _CUT_MARK = "\n… снимок обрезан: страница длиннее,
 
 
 class _Refused(Exception):
-    """Ввод, которого человек не подтверждал: на страницу он не попадает."""
+    """Ввод, которого не принимали: на страницу он не попадает."""
+
+
+class _Ledger(NamedTuple):
+    """Принятое для строгого ввода: пункты по ключу «адрес, селектор», чем они
+    приняты и каким инструментом агенту их принять."""
+
+    items: dict[tuple[str, str], dict]
+    accepted_by: str
+    first: str
+
+
+def _ledger(job: ApplyJob | FillJob) -> _Ledger:
+    """Отклик под подтверждением держит подтверждённое человеком, заполнение
+    резюме — принятое в раскладке страницы. Решается здесь, один раз."""
+    if isinstance(job, ApplyJob):
+        return _Ledger(job.confirmed, "подтверждено человеком", "need_human с kind=confirm")
+    return _Ledger(job.accepted, "принято в раскладке", "submit_layout")
 
 
 def browser_tools(
-    kit: AgentKit, resume: Path | None, photo: Path | None, confirming: ApplyJob | None = None
+    kit: AgentKit, resume: Path | None, photo: Path | None, strict: ApplyJob | FillJob | None = None
 ) -> list[Callable]:
     """Инструменты над вкладкой агента. Ответ действия — «готово; адрес: …» или «не вышло: …».
 
-    `confirming` — отклик под подтверждением: ввод, выбор и нажатия делают
-    только подтверждённое человеком, а после «Закончить» — ничего.
+    `strict` — ввод, выбор и нажатия делают только принятое: отклик под
+    подтверждением (после «Закончить» — ничего) или заполнение резюме.
     """
-    act, fill, select, click = _actions(kit, confirming)
+    act, fill, select, click = _actions(kit, strict)
 
     async def browser_open(url: str) -> str:
         """Открыть адрес во вкладке."""
@@ -76,7 +94,7 @@ def _attach_tools(act: Callable, resume: Path | None, photo: Path | None) -> lis
     return [browser_attach_resume, browser_attach_photo]
 
 
-def _actions(kit: AgentKit, job: ApplyJob | None) -> tuple[Callable, Callable, Callable, Callable]:
+def _actions(kit: AgentKit, job: ApplyJob | FillJob | None) -> tuple[Callable, Callable, Callable, Callable]:
     """Действие над страницей и ввод, выбор, нажатие — обычные или под подтверждением.
 
     После «Закончить» не проходит ни одно действие — решается здесь, один раз на
@@ -101,7 +119,7 @@ async def _act(kit: AgentKit, action: Callable[..., Awaitable], held: Callable[[
         held()
         await action(page)
     except _Refused as refusal:
-        logger.info("ввод агента без подтверждения отклонён: %s", refusal)
+        logger.info("ввод агента вне принятого отклонён: %s", refusal)
         return f"не вышло: {refusal}"
     except PlaywrightError as error:
         logger.info("действие агента в браузере не вышло: %s", _first_line(error))
@@ -124,57 +142,59 @@ def _plain() -> tuple[Callable, Callable, Callable]:
     return fill, select, click
 
 
-def _strict(job: ApplyJob) -> tuple[Callable, Callable, Callable]:
-    """Ввод, выбор и нажатие под подтверждением человека.
+def _strict(job: ApplyJob | FillJob) -> tuple[Callable, Callable, Callable]:
+    """Ввод, выбор и нажатие только принятого: подтверждённого человеком или
+    принятого в раскладке (`_ledger`).
 
-    Текст — только подтверждённый и только в своё поле. Вариант списка выбирает
-    агент, ближайший к подтверждённому тексту, но поле должно быть подтверждено.
-    Нажатие на подтверждённую галочку ставит подтверждённую отметку, а не
-    переключает её: повторное нажатие отметку не снимет. Нажатия не по полям —
-    резюме, «Отправить», переходы — как есть.
+    Текст — только принятый и только в своё поле. Вариант списка выбирает
+    агент, ближайший к принятому тексту, но поле должно быть принято.
+    Нажатие на принятую галочку ставит принятую отметку, а не переключает её:
+    повторное нажатие отметку не снимет. Нажатия не по полям — резюме,
+    «Отправить», переходы — как есть.
     """
     plain_fill, plain_select, plain_click = _plain()
+    ledger = _ledger(job)
 
     async def fill(page, selector, text):
-        item = _confirmed_field(job, page, selector)
+        item = _accepted_field(ledger, page, selector)
         if text != item["value"]:
-            raise _Refused(f"вписать можно только подтверждённое: «{item['value']}»")
+            raise _Refused(f"вписать можно только то, что {ledger.accepted_by}: «{item['value']}»")
         await plain_fill(page, selector, text)
 
     async def select(page, selector, value):
-        _confirmed_field(job, page, selector)
+        _accepted_field(ledger, page, selector)
         await plain_select(page, selector, value)
 
     async def click(page, selector):
-        item = job.confirmed.get((page.url, selector))
+        item = ledger.items.get((page.url, selector))
         if item is not None and item["kind"] == "check":
             await page.set_checked(selector, is_checked(item), timeout=_WAIT_MS)
             return
         if item is None:
-            await _refuse_unconfirmed_choice(job, page, selector)
+            await _refuse_unaccepted_choice(ledger, page, selector)
         await plain_click(page, selector)
 
     return fill, select, click
 
 
-async def _refuse_unconfirmed_choice(job: ApplyJob, page, selector: str) -> None:
-    """Нажатие по галочке или кружку, которых человек не подтверждал, — тоже ввод.
+async def _refuse_unaccepted_choice(ledger: _Ledger, page, selector: str) -> None:
+    """Нажатие по непринятой галочке или кружку — тоже ввод.
 
-    Кружок проходит, если подтверждена его группа: вариант, ближайший к
-    подтверждённому тексту, выбирает агент — как в выпадающем списке.
+    Кружок проходит, если принята его группа: вариант, ближайший к принятому
+    тексту, выбирает агент — как в выпадающем списке.
     """
     kind, group, _ = await page_field(page, selector)
     if kind == "check":
-        raise _Refused("галочка не подтверждена человеком — сначала need_human с kind=confirm")
-    if kind == "radio" and (not group or group not in await _confirmed_groups(job, page)):
-        raise _Refused("переключатель не подтверждён человеком — сначала need_human с kind=confirm")
+        raise _Refused(f"галочка не {ledger.accepted_by} — сначала {ledger.first}")
+    if kind == "radio" and (not group or group not in await _accepted_groups(ledger, page)):
+        raise _Refused(f"переключатель не {ledger.accepted_by} — сначала {ledger.first}")
 
 
-async def _confirmed_groups(job: ApplyJob, page) -> set[str]:
-    """Группы кружков, подтверждённых на этой странице пунктом-переключателем.
+async def _accepted_groups(ledger: _Ledger, page) -> set[str]:
+    """Группы кружков, принятых на этой странице пунктом-переключателем.
     Поле прошлого шага формы, ушедшее со страницы, группы не даёт."""
     groups = set()
-    for (url, selector), item in job.confirmed.items():
+    for (url, selector), item in ledger.items.items():
         if url == page.url and item["kind"] == "choice":
             field = await field_or_none(page, selector)
             if field is not None:
@@ -186,16 +206,16 @@ def _going() -> None:
     """Не под подтверждением действия ничто не держит."""
 
 
-def _not_finished(job: ApplyJob) -> None:
+def _not_finished(job: ApplyJob | FillJob) -> None:
     if isinstance(job.outcome, Dropped):
         raise _Refused("человек закончил работу по этой вакансии — заверши работу")
 
 
-def _confirmed_field(job: ApplyJob, page, selector: str) -> dict:
-    """Пункт, подтверждённый человеком для этого поля на этой странице."""
-    item = job.confirmed.get((page.url, selector))
+def _accepted_field(ledger: _Ledger, page, selector: str) -> dict:
+    """Пункт, принятый для этого поля на этой странице."""
+    item = ledger.items.get((page.url, selector))
     if item is None:
-        raise _Refused("поле не подтверждено человеком на этой странице — сначала need_human с kind=confirm")
+        raise _Refused(f"поле не {ledger.accepted_by} на этой странице — сначала {ledger.first}")
     return item
 
 
