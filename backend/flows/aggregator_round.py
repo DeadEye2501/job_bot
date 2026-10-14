@@ -11,7 +11,7 @@ from backend.agent.prompts.frame import system_prompt
 from backend.agent.prompts.seeker import (
     SEEKER_PROMPT, WEB_SEEKER_PROMPT, blacklisted_sites, seeker_task, web_seeker_task,
 )
-from backend.agent.sessions import run_guarded
+from backend.agent.sessions import end_reason, run_guarded
 from backend.agent.stops import RUN_STOPPERS, LimitExhausted
 from backend.agent.tools_browser import browser_tools
 from backend.agent.tools_common import common_tools
@@ -85,9 +85,6 @@ async def _seek_plan(kit: AgentKit, job: SeekJob, queue: ParseQueue) -> SessionP
 async def _settle(kit: AgentKit, job: SeekJob, end: AgentEnd, started: datetime) -> None:
     """`last_run_at` двигается только по `finish(done)` и только если модель эмбеддингов отвечала."""
     if isinstance(job.outcome, Finished) and job.outcome.result == "done" and not job.refused:
-        async with kit.pipeline.session_factory() as session:
-            async with session.begin():
-                await mark_run(session, job.source.id, started)
+        await kit.written(lambda session: mark_run(session, job.source.id, started))
         return
-    reason = job.outcome.reason if isinstance(job.outcome, Finished) else end.detail
-    logger.warning("обход источника %s: сбой — %s", job.source.name, reason or "без итога")
+    logger.warning("обход источника %s: сбой — %s", job.source.name, end_reason(job, end))

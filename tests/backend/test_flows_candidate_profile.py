@@ -34,12 +34,14 @@ def test_the_slice_carries_what_the_validator_reads():
         grades=["middle", "senior"],
         work_format=["remote"],
         free_preferences="без релокации",
+        citizenship="Страна Q9",
     )
 
     got = build_candidate_profile(profile, [])
 
     assert got.title == "Python-разработчик"
     assert got.location == "Тверь"
+    assert got.citizenship == "Страна Q9"
     assert got.grades == ["middle", "senior"]
     assert got.work_formats == ["remote"]
     assert got.free_preferences == "без релокации"

@@ -40,6 +40,16 @@ async def test_without_a_file_or_link_the_letter_is_not_sent(telegram_case):
     assert outcome == Missed("письмо не готово: cv_missing") and sent == []
 
 
+async def test_the_letter_model_reads_the_post_itself(telegram_case):
+    """Язык письма и просьбы поста видны только в исходном тексте: разбор их теряет."""
+    kit, vacancy, sent = await telegram_case()
+
+    await via_telegram(kit, vacancy.id, TG)
+
+    ((_, text, _),) = sent
+    assert vacancy.raw_text in text
+
+
 async def test_a_letter_with_the_file_gets_no_link_line(telegram_case):
     kit, vacancy, sent = await telegram_case()
 
@@ -53,7 +63,7 @@ async def test_a_second_vacancy_of_the_same_hr_gets_a_short_note(telegram_case):
     kit, vacancy, sent = await telegram_case(prior_letter=True)
     await via_telegram(kit, vacancy.id, TG)
     _, text, attachment = sent[-1]
-    assert attachment is None and text.startswith("А вот я увидел")
+    assert attachment is None and text.startswith("Ещё одна ваша вакансия")
 
 
 async def test_a_rerun_writes_the_full_letter_again(telegram_case):

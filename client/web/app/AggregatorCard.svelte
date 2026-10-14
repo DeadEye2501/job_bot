@@ -152,23 +152,7 @@
     </div>
 
     {#snippet lead(close)}
-      <MenuItem
-        icon="refresh"
-        label="Прогнать сейчас"
-        title={runTip || 'Обойти этот источник сейчас'}
-        disabled={!!runTip}
-        {close}
-        onpick={runNow}
-      />
       {#if !card.is_web_search}
-        <MenuItem
-          icon="sync"
-          label="Обновить резюме"
-          title={runTip || 'Перечислить ваши резюме на сайте заново'}
-          disabled={!!runTip}
-          {close}
-          onpick={scan}
-        />
         <MenuItem
           icon="add_circle"
           label="Создать новое резюме"
@@ -177,7 +161,25 @@
           {close}
           onpick={createResume}
         />
+        <MenuItem
+          icon="sync"
+          label="Обновить список резюме"
+          title={runTip || 'Перечислить ваши резюме на сайте заново'}
+          disabled={!!runTip}
+          {close}
+          onpick={scan}
+        />
+
+        <div class="menu-line"></div>
       {/if}
+      <MenuItem
+        icon="refresh"
+        label="Прогнать сейчас"
+        title={runTip || 'Обойти этот источник сейчас'}
+        disabled={!!runTip}
+        {close}
+        onpick={runNow}
+      />
     {/snippet}
     <CardActions
       {lead}

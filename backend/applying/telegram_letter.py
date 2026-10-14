@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass
 
 from backend.applying.resume_link import resume_for_letter
-from backend.llm.cover_letter import generate_cover_letter
+from backend.llm.cover_letter import LetterPost, generate_cover_letter
 from backend.models import Vacancy
 from backend.payloads import DIRECT_PARSED_FIELDS, ParsedVacancy
 
@@ -40,17 +40,18 @@ def format_channel_ref(channel_username: str | None) -> str | None:
 
 def short_note(title: str, channel_ref: str | None, prior_count: int) -> str:
     """Короткое письмо вдогон. ``prior_count`` — сколько раз уже писали этому HR
-    в окне (1 → «А вот ещё одну», 2+ → «И ещё одну»). Пустое название отклик
-    не отменяет — письмо говорит «вашу вакансию»."""
+    в окне (1 → «Ещё одна ваша вакансия», 2+ → «И ещё одну»). Слова без рода:
+    готовый текст уходит от имени любого человека. Пустое название отклик не
+    отменяет — письмо говорит «вашу вакансию»."""
     if title:
         intro = (
-            f"А вот я увидел ещё одну интересную вакансию: {title}"
+            f"Ещё одна ваша вакансия меня заинтересовала: {title}"
             if prior_count == 1
             else f"И ещё одну: {title}"
         )
     else:
         intro = (
-            "А вот я увидел ещё одну вашу вакансию"
+            "Ещё одна ваша вакансия меня заинтересовала"
             if prior_count == 1
             else "И ещё одну вашу вакансию"
         )
@@ -59,7 +60,7 @@ def short_note(title: str, channel_ref: str | None, prior_count: int) -> str:
     return intro
 
 
-async def full_letter(pipeline, parsed: ParsedVacancy, channel_ref: str | None, vacancy_id: int):
+async def full_letter(pipeline, parsed: ParsedVacancy, post: LetterPost, vacancy_id: int):
     """Полное письмо с резюме файлом или ссылкой; при беде — пара «пусто и код отказа».
 
     Название и канал вплетает в текст сама модель: готовая приставка поверх
@@ -71,7 +72,7 @@ async def full_letter(pipeline, parsed: ParsedVacancy, channel_ref: str | None, 
     body, trouble = await generate_cover_letter(
         pipeline.profile_block, parsed,
         pipeline.lm_client, pipeline.lm_chat_model,
-        channel_ref=channel_ref,
+        post=post,
     )
     if trouble is not None:
         logger.warning("vacancy %d: письмо не сочинилось — модель не ответила (%s)",

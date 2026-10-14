@@ -14,7 +14,8 @@ from backend.repository.profile_languages import list_profile_languages
 from backend.repository.profile_projects import list_projects
 from backend.repository.profile_skills import list_skills
 
-_GENDER = {Gender.MALE: "мужской", Gender.FEMALE: "женский"}
+GENDER_WORDS = {Gender.MALE: "мужской", Gender.FEMALE: "женский"}
+"""Пол словом — для анкеты агента и блока письма: род письма берётся отсюда."""
 _PERIOD = {SalaryPeriod.HOUR: "в час", SalaryPeriod.MONTH: "в месяц", SalaryPeriod.YEAR: "в год"}
 
 
@@ -34,7 +35,7 @@ async def build_agent_profile(session: AsyncSession, today: date, photo: bool) -
     return "\n".join([
         *_person_lines(profile, languages, today),
         f"Фото: {'есть' if photo else 'нет'}",
-        f"Общий стаж: {_years(years_in_it(places, today)) if places else 'нет мест работы'}",
+        f"Общий стаж: {years_text(years_in_it(places, today)) if places else 'нет мест работы'}",
         "Навыки:", *_skill_lines(skills, places, projects, today),
         "Опыт работы:", *_place_lines(places),
         "Проекты:", *_project_lines(projects),
@@ -46,21 +47,21 @@ async def build_agent_profile(session: AsyncSession, today: date, photo: bool) -
 def _person_lines(p, languages, today: date) -> list[str]:
     spoken = format_languages(candidate_languages(languages))
     return [
-        f"Имя: {p.first_name}",
-        f"Фамилия: {p.last_name}",
+        f"Имя: {p.first_name or 'не указано'}",
+        f"Фамилия: {p.last_name or 'не указана'}",
         f"Отчество: {p.patronymic or 'не указано'}",
         f"Имя латиницей: {p.first_name_latin or 'не указано'}",
         f"Фамилия латиницей: {p.last_name_latin or 'не указана'}",
         f"Отчество латиницей: {p.patronymic_latin or 'не указано'}",
         *_birth_lines(p.birth_date, today),
         f"Гражданство: {p.citizenship or 'не указано'}",
-        f"Пол: {_GENDER.get(p.gender, 'не указан')}",
-        f"Должность: {p.title}",
+        f"Пол: {GENDER_WORDS.get(p.gender, 'не указан')}",
+        f"Должность: {p.title or 'не указана'}",
         f"Грейды: {', '.join(p.grades) or 'не указаны'}",
         f"Формат работы: {', '.join(p.work_format) or 'не указан'}",
         f"Место: {p.location or 'не указано'}",
         f"Языки: {spoken}",
-        f"Почта: {p.email}",
+        f"Почта: {p.email or 'не указана'}",
         f"Телефон: {p.phone or 'не указан'}",
         f"Telegram: {p.telegram_username or 'не указан'}",
         f"GitHub: {p.github_url or 'не указан'}",
@@ -88,7 +89,7 @@ def _salary(p) -> str:
 
 def _skill_lines(skills, places, projects, today: date) -> list[str]:
     return [
-        f"- {skill.name} — уровень {skill.level}, {_skill_term(skill, places, projects, today)}"
+        f"- {skill.name} — уровень {skill.level} из 5, {_skill_term(skill, places, projects, today)}"
         for skill in skills
     ]
 
@@ -99,7 +100,7 @@ def _skill_term(skill, places, projects, today: date) -> str:
     не даёт."""
     named = [p for p in places if skill in p.skills]
     if named:
-        return f"стаж {_years(skill_years(named, today))}"
+        return f"стаж {years_text(skill_years(named, today))}"
     if any(skill in p.skills for p in projects):
         return "опыт есть в проектах, стаж не считается"
     return "стаж не привязан к местам работы"
@@ -114,19 +115,29 @@ def _place_lines(places) -> list[str]:
     return [
         line for p in places for line in _record_lines(
             f"{p.company}, {p.role}, {place_period(p)}",
-            [("Обязанность", p.responsibilities), ("Достижение", p.achievements)],
+            [("Обязанность", p.responsibilities), ("Достижение", p.achievements),
+             ("Навыки", _skill_names(p))],
         )
     ]
+
+
+def _skill_names(record) -> list[str]:
+    """Навыки записи одной строкой — под самой записью: заполняя место работы
+    на сайте, агент берёт их отсюда, а не разносит общий список наугад."""
+    return [", ".join(s.name for s in record.skills)] if record.skills else []
 
 
 def _project_lines(projects) -> list[str]:
     """Проекты целиком, как места работы, — и со ссылкой: формы её спрашивают."""
     return [
         line for p in projects for line in _record_lines(
-            f"{p.name}, {p.url}" if p.url else p.name, [("О проекте", p.about)]
+            f"{p.name}, {p.url}" if p.url else p.name,
+            [("О проекте", p.about), ("Навыки", _skill_names(p))],
         )
     ]
 
 
-def _years(years: int) -> str:
-    return f"{years}+ г."
+def years_text(years: int) -> str:
+    """Стаж словами — одной записью у анкеты агента и у блока письма. Меньше
+    года — словами: «0+ г.» модель пересказала бы как «0+ годами опыта»."""
+    return f"{years}+ г." if years else "меньше года"

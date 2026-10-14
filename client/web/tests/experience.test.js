@@ -81,21 +81,32 @@ describe('что из перечня мест работы уезжает на �
   const FRESH = { id: null, company: '', role: '', start_date: null, end_date: null };
 
   it('заполненные уезжают', () => {
-    expect(experienceGoing([FILLED])).toEqual({ going: [FILLED], trouble: '' });
+    expect(experienceGoing([FILLED])).toEqual({ going: [FILLED], trouble: '', held: [] });
   });
 
   it('свежая пустая карточка не уезжает и записи не отменяет', () => {
     // Её ещё нет в базе, пропустить её — значит ничего не потерять; а без
     // отсева мост отбил бы весь перечень, вместе с правками соседей.
-    expect(experienceGoing([FRESH, FILLED])).toEqual({ going: [FILLED], trouble: '' });
+    expect(experienceGoing([FRESH, FILLED])).toEqual({ going: [FILLED], trouble: '', held: [] });
+  });
+
+  it('свежая начатая и недозаполненная не уезжает, но о ней говорят', () => {
+    // Человек её правил: молча пропавшая, она выглядела бы сохранённой.
+    const begun = { ...FRESH, touched: true, company: 'Контур' };
+
+    const now = experienceGoing([begun, FILLED]);
+
+    expect(now.going).toEqual([FILLED]);
+    expect(now.held).toEqual([begun]);
+    expect(now.trouble).toContain('#1');
   });
 
   it('уже записанная карточка не отсеивается, чем бы её ни опустошили', () => {
     // Мост заменяет перечень целиком: вычеркнутая из посылки была бы стёрта из
-    // базы молча.
+    // базы молча. Не уезжает тогда ничего.
     const emptied = { ...FILLED, role: '' };
 
-    expect(experienceGoing([emptied]).going).toEqual([]);
+    expect(experienceGoing([emptied]).going).toBeNull();
   });
 
   it('заведённая в этот заход и уже уехавшая тоже не отсеивается', () => {

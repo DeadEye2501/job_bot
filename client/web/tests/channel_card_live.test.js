@@ -82,6 +82,7 @@ describe('живая карточка канала', () => {
     );
 
     expect([poll.disabled, poll.title]).toEqual([true, 'Идёт обход']);
+    expect(poll.classList.contains('blocked')).toBe(true);
     hearRound({ on: () => () => {} });
   });
 });

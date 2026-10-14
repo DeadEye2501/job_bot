@@ -75,6 +75,5 @@ async def apply_chosen(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome:
 
 
 async def _title(kit: AgentKit, vacancy_id: int) -> str:
-    async with kit.pipeline.session_factory() as session:
-        title = await session.scalar(select(Vacancy.title).where(Vacancy.id == vacancy_id))
+    title = await kit.read(lambda session: session.scalar(select(Vacancy.title).where(Vacancy.id == vacancy_id)))
     return title or "вакансия"

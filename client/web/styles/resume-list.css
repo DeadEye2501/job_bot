@@ -15,7 +15,10 @@
   margin: 0;
 }
 
+/* Обрезка многоточием — общая (`clipped-line.css`); сжаться во флексе название
+   может только с нулевой наименьшей шириной. */
 .resume-title {
+  min-width: 0;
   color: var(--text-primary);
   text-align: left;
 }

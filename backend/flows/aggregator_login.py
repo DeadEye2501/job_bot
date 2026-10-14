@@ -30,9 +30,8 @@ async def log_in(kit: AgentKit, source: Source) -> str:
         return "login_timeout"
     await run_on_site(kit, LoginJob(source), LOGIN_PROMPT, login_task(source.host),
                       *browser_tools(kit, None, None))
-    async with kit.pipeline.session_factory() as session:
-        if not await is_logged_in(session, source.id):
-            return "not_logged_in"
+    if not await kit.read(lambda session: is_logged_in(session, source.id)):
+        return "not_logged_in"
     # Вход подтверждён — ответ входа уже `ok`: неудачный перечень резюме пишет
     # свою причину в журнал, а вход от неё не становится несостоявшимся.
     # Остановки работы — истёкшее ожидание человека, лимит — идут насквозь,

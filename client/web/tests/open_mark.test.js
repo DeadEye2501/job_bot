@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { takeOpened } from '../state/open_mark.js';
+import { markOf, takeOpened } from '../state/open_mark.js';
 
 describe('отметка «открой эту запись»', () => {
   it('названная запись открывается', async () => {
@@ -32,5 +32,15 @@ describe('отметка «открой эту запись»', () => {
     takeOpened(null, () => (touched = true), () => (touched = true));
 
     expect(touched).toBe(false);
+  });
+});
+
+describe('отметка открытой записи', () => {
+  it('номер с местом', () => {
+    expect(markOf(5, { tab: 'people' })).toEqual({ tab: 'people', id: 5 });
+  });
+
+  it('закрытая карточка — пусто', () => {
+    expect(markOf(null, { tab: 'people' })).toBeNull();
   });
 });

@@ -199,8 +199,9 @@ async def test_a_chosen_resume_missing_on_the_site_stops_the_run_and_leaves_none
                                     position=1))
     kit = await kit_with([finish_step("resume_missing")])
 
+    # Вакансия на поддомене: весть называет сайт агрегатора, а не адрес вакансии.
     with pytest.raises(ResumeMissing) as stop:
-        await via_browser(kit, vacancy.id, Way("aggregator", PAGE, site.id))
+        await via_browser(kit, vacancy.id, Way("aggregator", "https://spb.site.test/vacancy/1", site.id))
 
     assert stop.value.site == "site.test"
 

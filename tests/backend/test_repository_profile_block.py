@@ -7,6 +7,7 @@
 
 from datetime import date
 
+from backend.models import Gender
 from backend.repository.profile_block import build_profile_block
 from tests.dbio import put
 from tests.factories import experience_row, profile_row, profile_skill_row, project_row
@@ -70,8 +71,17 @@ async def test_skills_are_grouped_by_category(session, session_factory):
 
     block = await build_profile_block(session)
 
-    assert "- языки: Python, Go" in block
+    assert "Навыки:\n- языки: Python, Go" in block
     assert "- базы: Postgres" in block
+
+
+async def test_the_gender_is_named_for_the_word_forms(session, session_factory):
+    """Пол — в блоке: письмо от имени кандидатки пишется в её роде."""
+    await put(session_factory, profile_row(gender=Gender.FEMALE))
+
+    block = await build_profile_block(session)
+
+    assert "Пол: женский" in block
 
 
 async def test_places_are_listed_newest_first_with_their_span(
@@ -151,7 +161,7 @@ async def test_the_years_count_from_the_earliest_place(session, session_factory)
 
     block = await build_profile_block(session)
 
-    assert "Опыт: 7+ лет в IT" in block
+    assert "Общий стаж: 7+ г." in block
 
 
 async def test_without_any_place_the_years_are_not_mentioned(
@@ -167,7 +177,7 @@ async def test_without_any_place_the_years_are_not_mentioned(
     block = await build_profile_block(session)
 
     assert "Роль: Разработчик" in block
-    assert "Опыт:" not in block
+    assert "стаж" not in block
 
 
 async def test_free_preferences_go_into_their_own_section(session, session_factory):
@@ -179,7 +189,10 @@ async def test_free_preferences_go_into_their_own_section(session, session_facto
 
     block = await build_profile_block(session)
 
-    assert block.endswith("Дополнительно:\nготов к переезду в Европу")
+    assert block.endswith(
+        "Пожелания кандидата (в письмо — только то, о чём спрашивает вакансия):\n"
+        "готов к переезду в Европу"
+    )
 
 
 async def test_projects_follow_the_places_with_their_first_point(session, session_factory):
@@ -222,4 +235,4 @@ async def test_an_empty_preferences_field_adds_no_section(session, session_facto
     block = await build_profile_block(session)
 
     assert "Роль: Разработчик" in block
-    assert "Дополнительно" not in block
+    assert "Пожелания кандидата" not in block

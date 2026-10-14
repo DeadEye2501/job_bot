@@ -9,7 +9,8 @@
   import RecordCard from './RecordCard.svelte';
   import StackField from './StackField.svelte';
 
-  let { record, known, open, ontoggle, onedit, onremove } = $props();
+  // `held` — карточку не сохранили из-за пустых обязательных полей: они метятся.
+  let { record, known, open, held, ontoggle, onedit, onremove } = $props();
 
   const title = $derived(cardTitle(record));
 
@@ -40,6 +41,7 @@
   <div class="field-row">
     <input
       class="input"
+      class:missing={held && !record.company}
       maxlength="255"
       placeholder="Компания"
       value={record.company}
@@ -54,6 +56,7 @@
     />
     <input
       class="input span-2"
+      class:missing={held && !record.role}
       maxlength="120"
       placeholder="Должность"
       value={record.role || ''}
@@ -61,7 +64,11 @@
     />
 
     <div class="date-pair span-2">
-      <DatePicker value={record.start_date} onpick={(iso) => pickDate('start_date', iso)} />
+      <DatePicker
+        value={record.start_date}
+        missing={held && !record.start_date}
+        onpick={(iso) => pickDate('start_date', iso)}
+      />
       <span class="date-dash">—</span>
       <DatePicker
         value={record.end_date}

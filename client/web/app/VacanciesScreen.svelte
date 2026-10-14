@@ -13,7 +13,7 @@
   import { contactAdding } from '$state/contact_adding.svelte.js';
   import { freshAnswer } from '$state/fresh.js';
   import { NEW_CARD } from '$state/new_card.js';
-  import { takeOpened } from '$state/open_mark.js';
+  import { markOf, takeOpened, tellOpened } from '$state/open_mark.js';
   import { companyTitle } from '$state/companies.js';
   import { personName } from '$state/people.js';
   import { labels, sameName } from '$state/picker.js';
@@ -34,8 +34,18 @@
   // `lockedTip` приходит сверху, а не спрашивается здесь: лампы состояния
   // опрашивает оболочка для нижней полосы, и второй опрос из карточки дал бы
   // две разные правды об одном.
-  let { ask, say, lockedTip, events, oncontacts, open, onopened, openFilter, onfiltered } =
-    $props();
+  let {
+    ask,
+    say,
+    lockedTip,
+    events,
+    oncontacts,
+    open,
+    onopened,
+    onchosen,
+    openFilter,
+    onfiltered,
+  } = $props();
 
   let loaded = $state(false);
   let rows = $state([]);
@@ -186,6 +196,8 @@
   // Какую вакансию открыть, придя со стороны — из мини-списка в карточке
   // канала, компании или человека.
   $effect(() => takeOpened(open, (id) => (opened = id), onopened));
+
+  $effect(() => tellOpened(markOf(opened), onchosen));
 
   // С каким отбором открыть список, придя из статистики. Поиск и открытая
   // карточка при этом снимаются: человек просил список этого статуса, а не

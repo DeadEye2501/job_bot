@@ -66,8 +66,7 @@ async def ask_person(kit: AgentKit, vacancy_id: int, items: list[ShownItem]) -> 
     """Пункты, какими их оставил человек, или `Dropped`, если он закончил или
     обход остановили: в обоих случаях ничего не уходит. Срок обрывает прогон
     из самого ожидания."""
-    async with kit.pipeline.session_factory() as session:
-        link = await vacancy_link(session, vacancy_id)
+    link = await kit.read(lambda session: vacancy_link(session, vacancy_id))
     answer = await kit.gate.ask("confirm", "", {"url": link, "items": items})
     if answer is None or answer.get("drop"):
         return Dropped()

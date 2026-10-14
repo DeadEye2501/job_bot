@@ -23,6 +23,7 @@ from backend.domain.taxonomy import (
     LEVEL_WHEN_UNTOLD,
     LEVELS_BY_SPELLING,
     NATIVE_LEVEL,
+    NATIVE_SPELLINGS,
     WORK_FORMATS,
 )
 from backend.domain.wording import spelled_alone
@@ -73,7 +74,7 @@ def _normalize_lang_level(value: object) -> str | None:
     # «Свободно.», «C1 (advanced)», «Upper Intermediate». Дефис и пробел
     # сводятся к одному, обрамление отбрасывается.
     plain = re.sub(r"[\s\-]+", " ", v.strip().strip(".,;:()").lower())
-    if plain in (NATIVE_LEVEL, "родной"):
+    if plain in NATIVE_SPELLINGS:
         return NATIVE_LEVEL
     # Обозначение шкалы ищется по сведённой строке, а слово — по исходной:
     # сведение выручает «В2» русскими буквами и оно же портит «свободно».
@@ -335,6 +336,7 @@ def _parse_cv_json(answer: str) -> ParsedCv | None:
         skills=_parsed_items(data.get("skills"), _parse_skill),
         experience=_parsed_items(data.get("experience"), _parse_experience),
         projects=_parsed_items(data.get("projects"), _parse_project),
+        text_language=str_or_none(data.get("text_language")),
     )
 
 
@@ -373,4 +375,4 @@ async def parse_cv(
     if parsed is None:
         log_unparseable(answer, logger, "parse_cv")
         return None
-    return with_native_language(grounded_in_cv(parsed, text), text)
+    return with_native_language(grounded_in_cv(parsed, text))

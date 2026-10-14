@@ -7,7 +7,7 @@
   import CompanyCard from './CompanyCard.svelte';
   import ContactsTab from './ContactsTab.svelte';
 
-  let { ask, say, events, open, onopened, onperson, onvacancy } = $props();
+  let { ask, say, events, open, onopened, onchosen, onperson, onvacancy } = $props();
 
   const list = pagedList({
     ask: (...args) => ask(...args),
@@ -33,6 +33,7 @@
   {events}
   {open}
   {onopened}
+  {onchosen}
 >
   {#snippet row(company, at)}
     <CompanyRow {company} selected={at.selected} onpick={at.pick} />

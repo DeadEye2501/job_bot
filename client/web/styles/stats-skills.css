@@ -44,9 +44,6 @@
 
 .stats-skill-bar {
   height: 5px;
-  background: var(--bg-tertiary);
-  border-radius: 2px;
-  overflow: hidden;
 }
 
 .stats-skill-bar-fill {

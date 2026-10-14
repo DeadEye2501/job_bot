@@ -19,7 +19,7 @@
   import { contactAdding } from '$state/contact_adding.svelte.js';
   import { watchContacts } from '$state/contacts_watch.js';
   import { NEW_CARD } from '$state/new_card.js';
-  import { takeOpened } from '$state/open_mark.js';
+  import { takeOpened, tellOpened } from '$state/open_mark.js';
   import { detailScrolled } from '$state/paging.js';
   import { round } from '$state/round.svelte.js';
   import { sourceList } from '$state/source_list.svelte.js';
@@ -35,6 +35,7 @@
     events,
     open,
     onopened,
+    onchosen,
     row,
     pane,
   } = $props();
@@ -55,6 +56,8 @@
 
   // Какой источник открыть, придя со стороны — из статистики.
   $effect(() => takeOpened(open, (id) => (opened = id), onopened));
+
+  $effect(() => tellOpened(opened, onchosen));
 
   const adding = contactAdding({
     list: {

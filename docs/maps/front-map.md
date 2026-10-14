@@ -14,13 +14,13 @@
 
 ## app — 31 файлов
 
-### app/AggregatorCard.svelte (223)
+### app/AggregatorCard.svelte (225)
 - —
 - принимает: ask, say, lockedTip, lock, events, aggregatorId, onvacancy, onclose, onchanged
 
-### app/AggregatorsList.svelte (60)
+### app/AggregatorsList.svelte (61)
 - `lock` — чем заперты действия агента: слова моста о водителе и браузере.
-- принимает: ask, say, lockedTip, events, open, onopened, onvacancy
+- принимает: ask, say, lockedTip, events, open, onopened, onchosen, onvacancy
 - берёт: ./AggregatorCard.svelte, ./SourcesTab.svelte
 
 ### app/BlacklistList.svelte (216)
@@ -37,34 +37,34 @@
 
 ### app/ChannelsList.svelte (46)
 - —
-- принимает: ask, say, lockedTip, events, open, onopened, onvacancy
+- принимает: ask, say, lockedTip, events, open, onopened, onchosen, onvacancy
 - берёт: ./ChannelCard.svelte, ./SourcesTab.svelte
 
-### app/CompaniesList.svelte (52)
+### app/CompaniesList.svelte (53)
 - Название подрезается здесь, а не в общем заведении: у человека подрезать нечего — его находят ещё и ником, и номером учётной записи.
-- принимает: ask, say, events, open, onopened, onperson, onvacancy
+- принимает: ask, say, events, open, onopened, onchosen, onperson, onvacancy
 - берёт: ./CompanyCard.svelte, ./ContactsTab.svelte
 
 ### app/CompanyCard.svelte (223)
 - Написания: под ними компания приходит в объявлениях. Потеряй карточка одно из них — следующая вакансия завела бы компанию заново.
 - принимает: ask, say, companyId, onperson, onvacancy, onclose, onchanged
 
-### app/ContactsScreen.svelte (90)
+### app/ContactsScreen.svelte (100)
 - —
-- принимает: ask, say, lockedTip, events, openCard, onopened, onvacancy
+- принимает: ask, say, lockedTip, events, openCard, onopened, onvacancy, tab, ontab, onchosen
 - берёт: ./AggregatorsList.svelte, ./BlacklistList.svelte, ./ChannelsList.svelte, ./CompaniesList.svelte, ./PeopleList.svelte
 
-### app/ContactsTab.svelte (68)
+### app/ContactsTab.svelte (70)
 - —
-- принимает: kind, words, list, save, say, events, open, onopened, row, pane
+- принимает: kind, words, list, save, say, events, open, onopened, onchosen, row, pane
 
 ### app/LogsScreen.svelte (197)
 - —
 - принимает: ask, events, say
 
-### app/PeopleList.svelte (49)
+### app/PeopleList.svelte (50)
 - Негодный ник отбивает мост, и его отказ приезжает плашкой — потому здесь и не проверяется ничего сверх общего заслона.
-- принимает: ask, say, events, open, onopened, oncompany, onvacancy
+- принимает: ask, say, events, open, onopened, onchosen, oncompany, onvacancy
 - берёт: ./ContactsTab.svelte, ./PersonCard.svelte
 
 ### app/PersonCard.svelte (231)
@@ -80,13 +80,13 @@
 - —
 - принимает: ask
 
-### app/ProfileRecords.svelte (132)
+### app/ProfileRecords.svelte (137)
 - —
 - принимает: load, save, kind, Card
 
-### app/ProfileScreen.svelte (45)
+### app/ProfileScreen.svelte (43)
 - —
-- принимает: ask
+- принимает: ask, tab, ontab
 - берёт: ./ProfileCv.svelte, ./ProfileRecords.svelte, ./ProfileSkills.svelte
 
 ### app/ProfileSkills.svelte (176)
@@ -98,13 +98,13 @@
 - принимает: ask, say
 - берёт: ./TelegramLogin.svelte
 
-### app/Shell.svelte (262)
+### app/Shell.svelte (272)
 - —
 - берёт: ./BottomBar.svelte, ./ContactsScreen.svelte, ./LogsScreen.svelte, ./ProfileScreen.svelte, ./SettingsScreen.svelte, ./StatsScreen.svelte, ./VacanciesScreen.svelte, ./WizardScreen.svelte
 
-### app/SourcesTab.svelte (137)
+### app/SourcesTab.svelte (140)
 - Общий выключатель поверх строк: выключенный, гасит обход всех источников рода, но положения строк хранит.
-- принимает: kind, words, source, openCreated, rereadOnRound, say, events, open, onopened, row, pane
+- принимает: kind, words, source, openCreated, rereadOnRound, say, events, open, onopened, onchosen, row, pane
 
 ### app/StatsScreen.svelte (124)
 - Числа считает бот, а не окно: пересчитать за тот же срок иначе нечем — пришлось бы уходить в другой раздел и возвращаться.
@@ -114,9 +114,9 @@
 - Окно пересоздаётся на смене шага: код и облачный пароль — разные секреты, и набранный код не должен доехать до поля пароля.
 - принимает: say, creds, relogin, ondone, onclose
 
-### app/VacanciesScreen.svelte (440)
+### app/VacanciesScreen.svelte (452)
 - —
-- принимает: ask, say, lockedTip, events, oncontacts, open, onopened, openFilter, onfiltered
+- принимает: ask, say, lockedTip, events, oncontacts, open, onopened, onchosen, openFilter, onfiltered
 - берёт: ./VacancyCard.svelte
 
 ### app/VacancyCard.svelte (460)
@@ -275,9 +275,9 @@
 - —
 - принимает: meta, actions
 
-### components/DatePicker.svelte (154)
+### components/DatePicker.svelte (157)
 - —
-- принимает: value, onpick, disabled, up
+- принимает: value, onpick, disabled, up, missing
 
 ### components/DelayedTextarea.svelte (32)
 - —
@@ -309,9 +309,9 @@
 - принимает: options, value, placeholder, onpick
 - берёт: ./DropButton.svelte, ./DropPanel.svelte
 
-### components/ExperienceCard.svelte (97)
+### components/ExperienceCard.svelte (104)
 - —
-- принимает: record, known, open, ontoggle, onedit, onremove
+- принимает: record, known, open, held, ontoggle, onedit, onremove
 - берёт: ./BulletList.svelte, ./DatePicker.svelte, ./RecordCard.svelte, ./StackField.svelte
 
 ### components/FilterGroup.svelte (12)
@@ -362,7 +362,7 @@
 - принимает: mail, onsave, onopen
 - берёт: ./MailPasswordHelp.svelte, ./SecretInput.svelte, ./SettingsSection.svelte
 
-### components/MenuItem.svelte (38)
+### components/MenuItem.svelte (42)
 - —
 - принимает: icon, label, danger, title, blocked, disabled, close, onpick
 
@@ -491,9 +491,9 @@
 - —
 - принимает: channels, messages, text
 
-### components/ProjectCard.svelte (40)
+### components/ProjectCard.svelte (42)
 - —
-- принимает: record, known, open, ontoggle, onedit, onremove
+- принимает: record, known, open, held, ontoggle, onedit, onremove
 - берёт: ./BulletList.svelte, ./RecordCard.svelte, ./StackField.svelte
 
 ### components/RawTextDialog.svelte (36)
@@ -620,7 +620,7 @@
 - Затемнения нет вовсе, но нажатие мимо список закрывает: он висит поверх окна, и оставленный открытым перекрывал бы правый край полосы.
 - принимает: count, open, loading, rows, ontoggle, onpick
 
-### components/VacancyActions.svelte (88)
+### components/VacancyActions.svelte (87)
 - Без скрининга пункт не нажимается вовсе, а не объясняет плашкой: смотреть нечего, и серого пункта для этого довольно.
 - принимает: blocks, screened, say, onsend, onrerun, onlinkhr, onlinkcompany, onraw, onscreening, onsource, ondelete
 - берёт: ./ActionsMenu.svelte, ./MenuItem.svelte
@@ -654,7 +654,7 @@
 - —
 - принимает: marks, dimmed
 
-## state — 71 файлов
+## state — 72 файлов
 
 ### state/aggregators.js (89)
 - * Где агрегатор ищет — подпись под именем. * * У «Поиска по сети» адреса нет — его место занимает то, где он ищет: пустое * место под именем читалось бы как недозаведённый агрегатор.
@@ -704,7 +704,7 @@
 - * Заводит действие, кончающее карточку. * * `note` — чем сказано о случившемся: «Канал удалён» и «Карточки слиты» человек * читает как вести о разном, и общее слово посылало бы его гадать. * * Список зовут прежде закрытия: закройся панель раньше, снесённая строка * осталась бы под ней до следующего чтения списка. * * Отказ не закрывает панель и молчит: плашку об отказе человек уже увидел, а * закрытая панель поверх неё читается как «сделано». * * `held(done)` — не кончилось ли дело вопросом вместо действия: агрегатор с * откликами мост сперва не сносит, а называет их число. Такой ответ, как и * отказ, панель не закрывает. * * Отвечает, случилось ли: слияние по этому ответу гасит своё окно выбора, а по * отказу оставляет его открытым — выбранное в нём ещё нужно.
 - отдаёт: cardFinish
 
-### state/card_links.js (25)
+### state/card_links.js (27)
 - * Три связи карточки: две внутрь и одна в подборщик. * * Пустая связь названа пустотой, а не пропущена: карточка ставит на её место * неподвижную подпись, и разбирать, чего в ответе нет, ей было бы нечем. * * Имя компании без привязки ведёт не в контакты, а в подборщик с этим самым * именем: связи нет, но разбор её узнал — человек нажимает и сразу видит * совпадения, вместо того чтобы набирать то же слово руками.
 - отдаёт: cardLinks
 
@@ -792,9 +792,9 @@
 - * Заводит запись, у которой в полёте не бывает двух снимков. * * `write` отвечает, а не бросает: отказ моста — обычное дело для анкеты, и все * трое зовущих ловят его у себя, каждый своими словами человеку. * * Отдаёт обещание, которое кончается вместе с отправкой снимка: на нём держится * и уход с вкладки — набранное должно успеть уехать. * * Кончается оно исходом последней уехавшей записи, а не своей: сведённый снимок * включает в себя все, что были до него, и «легло ли» — это про него.
 - отдаёт: oneWrite
 
-### state/open_mark.js (20)
-- * Принять отметку и погасить её. * * Отметку ставят соседние экраны: воронка каналов в статистике, карточка * вакансии, вкладка компании. Без отметки не трогают ничего — вкладку * открывают и просто так. * * Гасится она сразу, а не по закрытии карточки: непогашенная открыла бы её * заново, и человек, закрывший карточку, читал бы это как поломку.
-- отдаёт: takeOpened
+### state/open_mark.js (39)
+- * Отметка открытой записи — та же, что ставят соседние экраны; `where` — * где запись живёт (вкладка контактов). Закрытая карточка — пусто.
+- отдаёт: markOf, takeOpened, tellOpened
 
 ### state/outside.js (43)
 - * Ставит сторожа «нажали мимо» и отдаёт его снятие. * * Отдаётся снятие затем, что зовут это из эффекта: он и вернёт его окну. * * Узла может ещё не быть — разметка привязывает его после первого показа, — и * до тех пор мимо не нажимают ни разу: окошка на экране нет.
@@ -844,7 +844,7 @@
 - * Заводит поля поставщика. * * `kind` — чат или эмбеддинги: с ним спрашивают поставщика. `alive` — признак * жизни экрана (`alive.js`): ответ, пришедший после ухода, класть некуда.
 - отдаёт: providerForm
 
-### state/records.js (35)
+### state/records.js (39)
 - * Лежит ли запись уже в базе. * * Номера мало: его даёт мост, а вкладка себя после записи не перечитывает — * заведённая в этот заход запись живёт с пустым номером до конца визита, уже * будучи записанной. Отметку об уехавшей записи ставит сама вкладка, и без неё * опустошённое обязательное поле вычёркивало такую строку из посылки, а мост * стирал её молча вместе со всем, что в ней было.
 - отдаёт: recordsGoing
 
@@ -855,6 +855,10 @@
 ### state/search.js (25)
 - * Что из списка остаётся видно под набранное. * * Пустое набранное оставляет список целым: поле поиска стоит над уже открытым * списком, и до первого знака резать нечего. Одни пробелы — то же самое: их * набирают между словами и стирают последними, и схлопнутый на них список * мигал бы под руками. * * Регистр не различается — человек набирает как придётся, а значения приходят * как записаны. Вхождением, а не началом строки: имена приходят с приставками * («qwen/qwen3-4b», «@ник · компания»), и отбор по началу прятал бы строку от * того, кто набирает её собственное имя. * * `text` называет, где искать: у строки списка полей несколько, и по какому из * них её вспоминают, знает не этот файл, а тот, кто её показывает.
 - отдаёт: matching
+
+### state/section_memory.svelte.js (53)
+- * Память свежего окна: первые вкладки, ни одной открытой карточки.
+- отдаёт: heldMemory, sectionMemory, withCard, withTab
 
 ### state/sections.js (35)
 - * Разделы в том порядке, в каком они стоят в меню. Значок — лигатура шрифта * `Material Symbols Outlined`.
@@ -940,7 +944,7 @@
 - * Слово, согласованное с числом. * * «1 категории» человек читает как опечатку и перестаёт верить остальному на * экране. Числа 11–14 — исключение русского счёта и берут последнюю форму.
 - отдаёт: counted, plural, vacancyCount
 
-## styles — 122 файлов
+## styles — 123 файлов
 
 ### styles/accent-fill.css (20)
 - Залито акцентом — так помечено выбранное и главное: основная кнопка окна, зажатая пилюля срока или рода, выбранный день в календаре, текущий шаг мастера, уверенная оценка вакансии и счёт непрочитанного. Одним правилом на все места, а не своим в каждом: заливка здесь несёт один и тот же смысл «вот это», и разъедься её цвет или вес, соседние экраны стали бы помечать выбранное по-разному. Ввозится после оформления самих блоков: у их наведения та же весомость селектора, и выигрывает порядок.
@@ -1071,7 +1075,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 .choice-row[data-look='tile'] .choice.active:hover, .choice-row[data-look='chip'], .choice-row[data-look='chip'] .choice, .choice-row[data-look='chip'] .choice.active
 - берёт: --accent, --accent-chip-selected, --border, --surface-hover-firm, --surface-raised, --text-primary, --text-secondary
 
-### styles/clipped-line.css (46)
+### styles/clipped-line.css (47)
 - Строка в одну линию, обрезанная многоточием. Одним правилом на все места, где длинное значение не должно распирать свой столбец: имена в списках и карточках, подписи файлов, строки журнала, пилюли. Написанная в каждом файле оформления заново, эта тройка расходится молча — пропавший `white-space` даёт вторую строку и разъехавшуюся сетку, а пропавший `overflow` — обрезку без многоточия, по которой не видно, что значение длиннее показанного. Место, где строке отведена ширина, остаётся при самом блоке: `max-width`, `min-width: 0` и доля во флексе у каждого свои, и общими они не бывают. Хвост пилюли режется у самой подписи, а не у пилюли: обрезанная пилюля уносила бы вместе с хвостом и крестик, и длинную подпись стало бы нечем снять. Подписи бокового меню и имени категории третье объявление ничего не меняет: первая и так не переносится вслед за своей кнопкой, второе — поле ввода, где переноса не бывает вовсе. Держать их порознь ради этого значило бы писать ту же обрезку в третий и четвёртый раз.
 - селекторы (1): .chip-text,
 .hr-name,
@@ -1083,6 +1087,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 .logs-source,
 .logs-msg,
 .vac-mini-title,
+.resume-title,
 .hr-mini-name,
 .picker-name,
 .picker-sub,
@@ -1339,6 +1344,13 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 .menu-item.danger:hover .material-symbols-outlined, .menu-line
 - берёт: --border, --danger, --danger-hover-fg, --danger-tint, --text-primary, --text-secondary, --text-tertiary
 
+### styles/meter-track.css (14)
+- Подложка тонкой шкалы: полосы хода в нижней полосе, шкала навыка в статистике и счётчик отклика канала. Заливка внутри обрезается по скруглению. Одним правилом, а не своим в каждом файле: написанные порознь, шкалы одного окна расходятся скруглением и цветом подложки с первой же правки. Своё у каждой — высота, ширина и раскладка — остаётся в её файле.
+- селекторы (1): .progress-bar,
+.stats-skill-bar,
+.stats-ch-grid .stats-ch-conv-meter
+- берёт: --bg-tertiary
+
 ### styles/mini-list.css (97)
 - Нажимаемая строка внутри карточки контакта: вакансия и человек компании. Обе ведут отсюда наружу — к вакансии и к карточке человека, — и поэтому одеты одинаково: подсветка при наведении и имя, загорающееся акцентом, говорят, что по строке нажимают. Коробка вокруг них общая, в contact-card.css.
 - селекторы (14): .vacs-mini,
@@ -1476,7 +1488,8 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### styles/progress.css (61)
 - Ход обхода: две полосы и подпись рядом с ними.
 - селекторы (7): .bb-center .progress-wrap, .progress-bars, .progress-caption, .progress-bar, .progress-fill, .progress-bar[data-indeterminate='true'] .progress-fill, @keyframes slide
-- берёт: --accent, --bg-tertiary, --text-secondary
+- объявляет: --bars-shift, --bars-width
+- берёт: --accent, --bars-shift, --bars-width, --text-secondary
 
 ### styles/quiet-number.css (14)
 - Тихое число в хвосте строки: давность и уровень. Одним правилом, потому что читают его последним и одинаково — приглушённым, мельче соседей и моноширинными цифрами. Цифры моноширинные не для красоты: числа стоят одно под другим, и пропорциональные дёргали бы хвост строки от записи к записи.
@@ -1500,7 +1513,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 - селекторы (2): .remove-cross, .remove-cross:hover
 - берёт: --danger, --text-tertiary
 
-### styles/resume-list.css (26)
+### styles/resume-list.css (29)
 - Строка резюме в карточке агрегатора: кружок выбора и название-ссылка. Кружок — родной, в цвет акцента по общему правилу (`base.css`); подсветка названия под курсором — общая со ссылками шапки (`link-hover.css`).
 - селекторы (4): .resume-row, .resume-row input, .resume-title, .resume-rewrite
 - берёт: --text-primary
@@ -1596,22 +1609,22 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 - Вращение значка: им показано, что дело идёт и ответа ещё нет. Своим файлом, а не в оформлении каждого экрана: крутится значок в двух местах — кнопка пересчёта статистики и строка состояния шага мастера, — и объявлено вращение было дважды, под двумя именами. Скорость у них при этом разная, и это своё: у кнопки оборот быстрее, потому что и ждать её недолго.
 - селекторы (1): @keyframes spin
 
-### styles/stats-channels.css (141)
+### styles/stats-channels.css (138)
 - Карточка «Каналы»: воронка канала одиннадцатью колонками. Сеткой, а не таблицей: имя канала и колонки конверсии резиновые, числовые — узкие по содержимому, и только так все одиннадцать влезают в карточку без поперечной прокрутки. Группы «Ингест», «Воронка отклика» и «Конверсия» отделены тонкой чертой — без неё одиннадцать чисел читаются как один ряд.
 - селекторы (25): .stats-ch-grid, .stats-ch-grid > *, .stats-ch-grid .stats-ch-group, .stats-ch-grid .stats-ch-group, .stats-ch-grid .stats-ch-group.ingest, .stats-ch-grid .stats-ch-group.funnel, .stats-ch-grid .stats-ch-group.outcome, .stats-ch-grid .stats-ch-th, .stats-ch-grid .stats-ch-name-cell, .stats-ch-grid .stats-ch-th-name, .stats-ch-grid .stats-ch-sep-l, .stats-ch-grid .stats-ch-conv, .stats-ch-grid .stats-ch-conv-label, .stats-ch-grid .stats-ch-conv-meter, .stats-ch-grid .stats-ch-conv-meter-fill, .stats-ch-grid .stats-ch-row, .stats-ch-grid .stats-ch-row.stats-ch-opens, .stats-ch-grid .stats-ch-row.is-hover, .stats-ch-grid .v-dim, .stats-ch-grid .v-fit, .stats-ch-grid .v-sent, .stats-ch-grid .v-answ, .stats-ch-grid .v-invite, .stats-ch-grid .v-decline, .stats-ch-grid .stats-ch-last
-- берёт: --accent, --bg-tertiary, --border, --cols, --err, --info, --stats-group-funnel, --stats-group-ingest, --stats-group-outcome, --status-applied, --surface-raised, --text-primary, --text-secondary, --text-tertiary
+- берёт: --accent, --border, --cols, --err, --info, --stats-group-funnel, --stats-group-ingest, --stats-group-outcome, --status-applied, --surface-raised, --text-primary, --text-secondary, --text-tertiary
 
 ### styles/stats-responses.css (84)
 - Карточка «Ответы HR»: столбцы по дням недели и две метрики под ними. Столбцы сверху, метрики снизу за чертой: график — то, ради чего в карточку смотрят, а метрики его подписывают.
 - селекторы (11): .stats-resp-card, .stats-resp-chart, .stats-resp-bar-wrap, .stats-resp-bar-num, .stats-resp-bar, .stats-resp-bar.weekend, .stats-resp-bar-label, .stats-resp-stats, .stats-resp-stat-num, .stats-resp-stat-num.dim, .stats-resp-stat-label
 - берёт: --accent, --alert, --border, --text-primary, --text-secondary, --text-tertiary
 
-### styles/stats-skills.css (107)
+### styles/stats-skills.css (104)
 - Карточка «Скилы»: навыки вакансий тремя колонками с полосой частоты. Полоса, а не одно число: по ней видно, во сколько раз первый навык встречается чаще пятого, — а это и есть то, ради чего в карточку смотрят.
 - селекторы (15): .stats-skills-grid, .stats-skill-row, .stats-skill-row.first-in-col, .stats-skill-check, .stats-skill-name, .stats-skill-row:not(.mine) .stats-skill-name, .stats-skill-bar, .stats-skill-bar-fill, .stats-skill-row.mine .stats-skill-bar-fill,
 .stats-skills-legend .leg-mine, .stats-skill-row:not(.mine) .stats-skill-bar-fill,
 .stats-skills-legend .leg-other, .stats-skill-row.mine .stats-skill-bar-fill, .stats-skill-num, .stats-skills-legend, .stats-skills-legend span, .stats-skills-legend .leg-dot
-- берёт: --accent, --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
+- берёт: --accent, --border, --text-primary, --text-secondary, --text-tertiary
 
 ### styles/stats-status.css (61)
 - Карточка «Статусы»: счётчики двумя колонками и кольцо между ними. Само кольцо — в donut.css, цвет точки — в status-color.css.
@@ -1742,15 +1755,15 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 .wiz-body > .warning-card, .wiz-fields, .wiz-modes, .wiz-fields .help
 - берёт: --accent, --accent-chip-selected, --bg-secondary, --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
 
-## tests — 103 файлов
+## tests — 106 файлов
 
-### tests/aggregator_card_live.test.js (204)
+### tests/aggregator_card_live.test.js (223)
 - —
 
 ### tests/aggregators.test.js (118)
 - —
 
-### tests/aggregators_list_live.test.js (59)
+### tests/aggregators_list_live.test.js (60)
 - * Вкладка над мостом, у которого агрегаторов нет: ни всех, ни по запросу.
 
 ### tests/alive.test.js (79)
@@ -1815,13 +1828,13 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/card_save.test.js (50)
 - * Карточка, записывающая всё, что с ней сделали.
 
-### tests/channel_card_live.test.js (87)
+### tests/channel_card_live.test.js (88)
 - * Сколько раз спросили названный слот.
 
 ### tests/channels.test.js (140)
 - —
 
-### tests/channels_list_live.test.js (67)
+### tests/channels_list_live.test.js (68)
 - —
 
 ### tests/chat.test.js (157)
@@ -1852,7 +1865,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/events.test.js (205)
 - * Мост, отвечающий заготовленным, а на исходе — закрытой очередью.
 
-### tests/experience.test.js (118)
+### tests/experience.test.js (129)
 - —
 
 ### tests/flash.test.js (34)
@@ -1899,7 +1912,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/one_write.test.js (139)
 - * Запись, которая отвечает не сразу: ответ отдаёт вызывающий.
 
-### tests/open_mark.test.js (36)
+### tests/open_mark.test.js (46)
 - —
 
 ### tests/outside.test.js (122)
@@ -1914,7 +1927,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/people.test.js (208)
 - —
 
-### tests/people_list_live.test.js (70)
+### tests/people_list_live.test.js (71)
 - * Вкладка «HR» с мостом, отвечающим не раньше, чем ему позволят.
 
 ### tests/person_chat_live.test.js (69)
@@ -1936,7 +1949,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/profile_cv_live.test.js (192)
 - * Анкета, у которой мост отдаёт этот файл резюме и это фото.
 
-### tests/profile_experience_live.test.js (54)
+### tests/profile_experience_live.test.js (70)
 - * Завести место работы и заполнить три обязательных поля.
 
 ### tests/profile_projects_live.test.js (66)
@@ -1955,10 +1968,19 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 - * Вкладка вида `kind` с карточкой `Card` и перечнем `rows` от моста.
 - отдаёт: fill, recordsTab
 
+### tests/remembered_card_live.test.js (100)
+- —
+
 ### tests/round.test.js (66)
 - —
 
 ### tests/search.test.js (49)
+- —
+
+### tests/section_memory.test.js (33)
+- —
+
+### tests/section_tabs_live.test.js (68)
 - —
 
 ### tests/settings.test.js (478)
@@ -2017,7 +2039,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/vacancies.test.js (297)
 - —
 
-### tests/vacancies_screen_new_live.test.js (318)
+### tests/vacancies_screen_new_live.test.js (319)
 - * Мост, отвечающий тем же, чем отвечает настоящий. * * Заведение чужой карточки отказывает: так ведёт себя настоящий, когда имя * занято или связь оборвалась, — и это единственный способ увидеть, что * остаётся в черновике после неудачи.
 
 ### tests/vacancy_actions.test.js (185)

@@ -17,7 +17,9 @@
   //
   // `up` — раскрыть сетку вверх. Просит тот, под чьим полем места нет; по
   // умолчанию она раскрывается вниз, как её и ищут взглядом.
-  let { value, onpick, disabled, up } = $props();
+  //
+  // `missing` — обязательная дата пуста, и из-за неё запись не сохранили.
+  let { value, onpick, disabled, up, missing } = $props();
 
   const now = new Date();
   const today = dayIso(now);
@@ -97,6 +99,7 @@
   <input
     class="input mono input-date-text"
     class:invalid={validDate(text) === false}
+    class:missing
     type="text"
     placeholder="дд.мм.гггг"
     maxlength="10"

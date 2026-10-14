@@ -19,7 +19,7 @@ describe('что из перечня проектов уезжает на мос
   const FILLED = { id: 3, name: 'Бот' };
 
   it('свежий пустой не уезжает и записи соседей не отменяет', () => {
-    expect(projectsGoing([FRESH, FILLED])).toEqual({ going: [FILLED], trouble: '' });
+    expect(projectsGoing([FRESH, FILLED])).toEqual({ going: [FILLED], trouble: '', held: [] });
   });
 
   it('записанный, оставшийся без названия, назван своим номером', () => {

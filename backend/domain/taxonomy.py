@@ -28,7 +28,10 @@ GRADE_SPELLINGS: dict[str, tuple[str, ...]] = {
 """
 
 WORK_FORMAT_SPELLINGS: dict[str, tuple[str, ...]] = {
-    "office": ("офис", "onsite", "on-site", "on site"),
+    "office": (
+        "офис", "onsite", "on-site", "on site",
+        "in-office", "office-based", "in the office", "from the office",
+    ),
     "remote": (
         "удалён", "дистанционно", "remote", "distributed",
         "из дома", "work from home", "wfh",
@@ -65,6 +68,13 @@ CEFR_LEVELS: tuple[str, ...] = ("A1", "A2", "B1", "B2", "C1", "C2")
 
 NATIVE_LEVEL = "native"
 """Уровень родного языка. Шкала CEFR его не знает, а анкете он нужен."""
+
+NATIVE_SPELLINGS: tuple[str, ...] = (
+    "native", "native speaker", "родной", "родной язык",
+    "носитель", "носитель языка", "mother tongue",
+)
+"""Какими словами язык называют родным. Рядом с написаниями уровней по тому же
+доводу: разбор ответа модели читает их отсюда, а не своим перечнем."""
 
 LEVEL_SPELLINGS: dict[str, tuple[str, ...]] = {
     "C2": ("в совершенстве", "proficient", "proficiency", "bilingual"),

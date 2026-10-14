@@ -38,6 +38,7 @@ function tab() {
       events: { on: () => () => {} },
       open: null,
       onopened: () => {},
+      onchosen: () => {},
       oncompany: () => {},
       onvacancy: () => {},
     },

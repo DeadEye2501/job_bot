@@ -31,6 +31,14 @@ def test_two_signals_make_a_real_vacancy():
     )
 
 
+def test_a_phone_or_mail_is_a_contact_as_good_as_a_telegram_one():
+    """Контакт вне Telegram — такой же признак вакансии: «требуются
+    разнорабочие, тел. …» с описанием — вакансия, а не пустышка."""
+    assert not is_empty_vacancy(
+        parsed_vacancy(description="Разнорабочие на объект.", other_contacts=["+1 555 0100"])
+    )
+
+
 def test_a_preferred_only_stack_still_counts_as_a_signal():
     """Стек считается признаком, даже если он весь в желательной половине."""
     assert not is_empty_vacancy(

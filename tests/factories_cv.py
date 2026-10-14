@@ -76,6 +76,7 @@ def parsed_cv(**overrides) -> ParsedCv:
         "skills": [],
         "experience": [],
         "projects": [],
+        "text_language": None,
     }
     fields.update(overrides)
     return ParsedCv(**fields)

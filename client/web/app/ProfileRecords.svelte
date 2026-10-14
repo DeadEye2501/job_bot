@@ -15,6 +15,9 @@
 
   let leaving = $state(null);
   let trouble = $state('');
+  // Ключи задержанных при последней записи карточек: их пустые обязательные
+  // поля метятся красным.
+  let held = $state(new Set());
 
   let loaded = $state(false);
   let rows = $state([]);
@@ -45,9 +48,9 @@
 
   /** Отправить перечень целиком.
    *
-   * Что уедет и что сказать, если не уедет ничего, решает `kind.going`.
-   * Свой ключ и отметка об уехавшей записи на мост не уезжают: они про показ,
-   * не про запись.
+   * Что уедет, какие карточки задержаны и что о них сказать, решает
+   * `kind.going`. Свой ключ и отметки — об уехавшей и о тронутой записи — на
+   * мост не уезжают: они про показ, не про запись.
    *
    * Отметка ставится после удачи: номера свежим карточкам даёт мост, а вкладка
    * себя не перечитывает — без отметки заведённая в этот заход строка до конца
@@ -58,15 +61,16 @@
   async function save() {
     const now = kind.going(rows);
     trouble = now.trouble;
-    if (now.trouble) return;
+    held = new Set(now.held.map((one) => one.key));
+    if (now.going === null) return;
     const went = new Set(now.going.map((one) => one.key));
-    const done = await write(now.going.map(({ key, saved, ...one }) => one));
+    const done = await write(now.going.map(({ key, saved, touched, ...one }) => one));
     if (done === null || !alive.now) return;
     rows = rows.map((one) => (went.has(one.key) ? { ...one, saved: true } : one));
   }
 
   function edit(key, part) {
-    rows = rows.map((one) => (one.key === key ? { ...one, ...part } : one));
+    rows = rows.map((one) => (one.key === key ? { ...one, ...part, touched: true } : one));
     return save();
   }
 
@@ -109,6 +113,7 @@
       record={one}
       {known}
       open={!closed.has(one.key)}
+      held={held.has(one.key)}
       ontoggle={() => (closed = toggled(closed, one.key))}
       onedit={(part) => edit(one.key, part)}
       onremove={() => (leaving = one)}

@@ -21,6 +21,7 @@ from backend.applying.telegram_letter import (
     short_note,
 )
 from backend.domain.apply_order import Way
+from backend.llm.cover_letter import LetterPost
 from backend.domain.telegram_identity import telegram_peer
 from backend.models import ApplicationVia, Vacancy
 from backend.payloads import OutgoingMessage, ParsedVacancy
@@ -37,7 +38,7 @@ class _Errand:
     """Кому и о чём пишем: адресат, вакансия и то, что решает вид письма.
 
     Счёт прежних писем выбирает ветку — полное письмо или короткое, —
-    название и канал идут в текст.
+    название и пост — канал и исходный текст — идут модели письма.
     """
 
     vacancy_id: int
@@ -46,7 +47,7 @@ class _Errand:
     parsed: ParsedVacancy
     prior_count: int
     title: str
-    channel_ref: str | None
+    post: LetterPost
 
 
 async def via_telegram(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome:
@@ -87,15 +88,15 @@ async def _errand(kit: AgentKit, vacancy_id: int) -> _Errand | None:
         return _Errand(
             vacancy_id, v.hr.id, telegram_peer(v.hr), parsed_from_row(v), prior,
             (v.title or "").strip(),
-            format_channel_ref(v.channel.username if v.channel is not None else None),
+            LetterPost(format_channel_ref(v.channel.username if v.channel is not None else None),
+                       v.raw_text or ""),
         )
 
 
 async def _letter(kit: AgentKit, errand: _Errand) -> Letter | Missed:
     if errand.prior_count:
-        return Letter(short_note(errand.title, errand.channel_ref, errand.prior_count), None)
-    letter, refusal = await full_letter(
-        kit.pipeline, errand.parsed, errand.channel_ref, errand.vacancy_id)
+        return Letter(short_note(errand.title, errand.post.channel_ref, errand.prior_count), None)
+    letter, refusal = await full_letter(kit.pipeline, errand.parsed, errand.post, errand.vacancy_id)
     return letter if letter is not None else Missed(f"письмо не готово: {refusal}")
 
 

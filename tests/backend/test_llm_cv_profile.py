@@ -141,15 +141,18 @@ async def test_language_levels_come_back_uppercase():
     assert ("English", "B2") in [(x.language, x.level) for x in parsed.languages]
 
 
-@pytest.mark.parametrize("native", ["native", "родной"])
+@pytest.mark.parametrize(
+    "native",
+    ["native", "родной", "Native speaker", "родной язык", "носитель", "mother tongue"],
+)
 async def test_a_native_language_is_recognised_in_both_spellings(native):
-    """Родной язык распознаётся и по-русски, и по-английски."""
+    """Родной язык распознаётся, каким бы словом его ни назвали."""
     parsed = await parse_answer(json.dumps({
         "profile": CV_REQUIRED_PROFILE,
-        "languages": [{"language": "Русский", "level": native}],
-    }), text="Языки: русский")
+        "languages": [{"language": "Deutsch", "level": native}],
+    }), text=f"Языки: Deutsch — {native}")
 
-    assert parsed.languages[0].level == "native"
+    assert ("Deutsch", "native") in [(x.language, x.level) for x in parsed.languages]
 
 
 async def test_a_language_with_an_unknown_level_keeps_the_highest_one():
@@ -183,7 +186,7 @@ async def test_a_language_without_a_name_is_dropped():
         "languages": [{"language": "", "level": "A1"}],
     }), text="Иностранные языки: английский")
 
-    assert [x.language for x in parsed.languages] == ["Русский"]
+    assert parsed.languages == []
 
 
 async def test_a_repeated_language_keeps_the_first_spelling():
@@ -194,7 +197,7 @@ async def test_a_repeated_language_keeps_the_first_spelling():
             {"language": "Русский", "level": "native"},
             {"language": "русский", "level": "C1"},
         ],
-    }), text="Языки: русский")
+    }), text="Языки: русский — родной")
 
     assert [(x.language, x.level) for x in parsed.languages] == [("Русский", "native")]
 
@@ -225,7 +228,7 @@ async def test_a_language_that_is_not_an_object_is_dropped():
         "languages": ["English", None, {"language": "Deutsch", "level": "B2"}],
     }), text="Владение иностранными языками: English, Deutsch")
 
-    assert [x.language for x in parsed.languages] == ["Русский", "Deutsch"]
+    assert [x.language for x in parsed.languages] == ["Deutsch"]
 
 
 async def test_a_named_level_beats_a_missing_one_for_the_same_language():

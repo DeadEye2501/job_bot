@@ -14,7 +14,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 0 10px 0 28px;
+  padding: 0 12px;
   border: 1px solid var(--err);
   background: var(--err-fill);
   pointer-events: auto;

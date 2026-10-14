@@ -3,6 +3,8 @@
 // Чистые функции: карточка приходит доводом, наружу уходят отметки «куда
 // идти». Ни моста, ни разметки этот файл не знает.
 
+import { markOf } from './open_mark.js';
+
 /** Три связи карточки: две внутрь и одна в подборщик.
  *
  * Пустая связь названа пустотой, а не пропущена: карточка ставит на её место
@@ -18,8 +20,8 @@ export function cardLinks(card) {
   return {
     // Ключи вкладок те же, какими их знает раздел контактов (`sections.js`):
     // по ним он и выбирает, какую открыть.
-    hrCard: hr?.id === null || hr?.id === undefined ? null : { tab: 'people', id: hr.id },
-    companyCard: linked ? { tab: 'companies', id: card.company_id } : null,
+    hrCard: markOf(hr?.id ?? null, { tab: 'people' }),
+    companyCard: markOf(card.company_id ?? null, { tab: 'companies' }),
     companyPick: !linked && card.company_name ? card.company_name : null,
   };
 }

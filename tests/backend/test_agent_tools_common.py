@@ -168,6 +168,19 @@ async def test_a_fill_reports_its_login_calls_a_human_and_finishes(make_pipeline
     assert (await all_rows(session_factory, Aggregator))[0].is_logged_in is False
 
 
+async def test_a_fill_the_agent_could_not_finish_ends_as_failed(make_pipeline, session_factory):
+    """Застрявшему агенту есть что сказать, кроме «done»: иначе он объявил бы
+    успех на полузаполненном резюме."""
+    site = aggregator_row()
+    await put(session_factory, site)
+    job = FillJob(Source.of(site))
+
+    await tool(common_tools(kit_for(await make_pipeline()), job), "finish")(
+        result="failed", reason="сайт не сохраняет страницу")
+
+    assert job.outcome == Finished("failed", "сайт не сохраняет страницу")
+
+
 async def test_a_written_outcome_is_not_overwritten_by_a_later_finish(make_pipeline, session_factory):
     """Нехватка данных — итог заполнения; «done» следом сделало бы его успехом."""
     site = aggregator_row()

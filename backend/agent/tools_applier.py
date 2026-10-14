@@ -45,8 +45,7 @@ def applier_tools(kit: AgentKit, job: ApplyJob) -> list[Callable]:
 
     async def vacancy() -> str:
         """Своя вакансия: название, компания, источник, адрес страницы, контакты и текст."""
-        async with kit.pipeline.session_factory() as session:
-            return await describe_vacancy(session, job.vacancy_id) or "Вакансия удалена."
+        return await kit.read(lambda session: describe_vacancy(session, job.vacancy_id)) or "Вакансия удалена."
 
     # Под подтверждением письмо и ответы уже известны — их подтвердил человек, —
     # и агенту запись отдаётся без них: пересказ, который выбросили бы, не просят.
@@ -58,7 +57,7 @@ def _reported_record(kit: AgentKit, job: ApplyJob) -> Callable:
         via: str, target: str, letter: str = "", screening: list[ScreeningPair] | None = None,
         already_applied: bool = False,
     ) -> str:
-        """Записать отклик, который сайт подтвердил: aggregator или form, адрес страницы или формы, письмо, скрининг. В screening — каждый вопрос работодателя из формы и со страницы подтверждения вместе с данным ответом, по порядку; вопросов не было — пустой список. Повтор с тем же адресом дописывает скрининг."""
+        """Записать отклик, который сайт подтвердил: aggregator или form, адрес страницы или формы, письмо, скрининг. В screening — каждый вопрос работодателя из формы и со страницы подтверждения вместе с данным ответом, по порядку; вопросов не было — пустой список. Повтор с тем же адресом дописывает скрининг. already_applied — сайт уже показывал «вы откликнулись»: отклик пишется без письма и без отправки."""
         letter_text = None if already_applied else (letter or None)
         return await _write(kit, job, _Report(via, target, letter_text, _lines(screening or [])))
 
@@ -67,7 +66,7 @@ def _reported_record(kit: AgentKit, job: ApplyJob) -> Callable:
 
 def _confirmed_record(kit: AgentKit, job: ApplyJob) -> Callable:
     async def record_application(via: str, target: str, already_applied: bool = False) -> str:
-        """Записать отклик, который сайт подтвердил: aggregator или form, адрес страницы или формы. Письмо и ответы на вопросы приложение берёт из подтверждённого человеком. Повтор с тем же адресом дописывает вопросы со страницы подтверждения."""
+        """Записать отклик, который сайт подтвердил: aggregator или form, адрес страницы или формы. Письмо и ответы на вопросы приложение берёт из подтверждённого человеком. Повтор с тем же адресом дописывает вопросы со страницы подтверждения. already_applied — сайт уже показывал «вы откликнулись»: отклик пишется без письма и без отправки."""
         letter, pairs = _confirmed_sent(job)
         return await _write(kit, job, _Report(via, target, None if already_applied else letter, _lines(pairs)))
 

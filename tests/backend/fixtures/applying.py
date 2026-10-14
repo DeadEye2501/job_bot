@@ -152,19 +152,20 @@ def manual_case(make_bot, session_factory, tmp_path, monkeypatch):
 
 
 async def telegram_vacancy(session_factory, *, hr_user_id=None, status=VacancyStatus.NEW):
-    """Вакансия, на которую откликаются в Telegram: HR `hr_name` и сама вакансия."""
+    """Вакансия, на которую откликаются в Telegram: HR `hr_name` и сама вакансия
+    с текстом поста."""
     hr = hr_row(telegram_username="hr_name", telegram_user_id=hr_user_id)
     await put(session_factory, hr)
-    vacancy = vacancy_row(hr_id=hr.id, status=status)
+    vacancy = vacancy_row(hr_id=hr.id, status=status, raw_text="Ищем человека в команду.")
     await put(session_factory, vacancy)
     return vacancy
 
 
 def _model_writes_the_letter(monkeypatch) -> None:
-    """Модель письма отвечает готовым текстом."""
+    """Модель письма отвечает готовым текстом, в конце — текст поста, который ей дали."""
 
-    async def generate_cover_letter(block, parsed, client, model, *, channel_ref=None):
-        return "Здравствуйте! Откликаюсь на вакансию.", None
+    async def generate_cover_letter(block, parsed, client, model, *, post):
+        return f"Здравствуйте! Откликаюсь на вакансию. {post.text}", None
 
     monkeypatch.setattr("backend.applying.telegram_letter.generate_cover_letter", generate_cover_letter)
 

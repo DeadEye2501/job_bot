@@ -37,6 +37,7 @@ from backend.domain.taxonomy import (
     LEVEL_SPELLINGS,
     LEVELS_BY_SPELLING,
     NATIVE_LEVEL,
+    NATIVE_SPELLINGS,
     WORK_FORMAT_SPELLINGS,
 )
 from backend.domain.wording import spelled_alone
@@ -91,7 +92,7 @@ def _language_named_in(text: str, name: str) -> bool:
     соседским, а промпт просит модель писать имя в той же форме, что и резюме.
     Родному языку поблажки нет: его модель выводит из фамилии кандидата охотнее
     всего, а взамен выброшенного `cv_native.py` поставит язык, на котором текст
-    написан, — выведенный из самого текста, а не из имени.
+    написан.
     """
     root = language_root(name)
     return root is None or root.lower() in text
@@ -191,12 +192,13 @@ def _grounded_level(windows: list[str], level: str) -> str:
     Названный словом ищется словом: в тексте стоит «свободно», а не «C1», и
     спрашивать одну лишь шкалу значило бы объявить выдумкой честный перевод.
 
-    Родной уровень не спрашивается: его выводят из языка письма, и слова
-    «native» в резюме не бывает.
+    Родной спрашивается так же, своими словами: его модель выводит из фамилии
+    охотнее всего, а родным язык делает только слово резюме. Неподтверждённый
+    родной уступает написанному рядом уровню, и тогда родным станет язык
+    текста резюме.
     """
-    if level == NATIVE_LEVEL:
-        return level
-    named = (level.lower(), *LEVEL_SPELLINGS.get(level, ()))
+    spellings = NATIVE_SPELLINGS if level == NATIVE_LEVEL else LEVEL_SPELLINGS.get(level, ())
+    named = (level.lower(), *spellings)
     if any(_level_named_in(near, word) for near in windows for word in named):
         return level
     return _level_read_near(windows) or LEVEL_WHEN_UNTOLD
@@ -206,15 +208,18 @@ def _grounded_level(windows: list[str], level: str) -> str:
 # навыки» и «Skills» сюда не входят нарочно: так зовут общий список кандидата,
 # и по названию отличают своё от чужого.
 _STACK_WORDS = (
-    r"(?:\w+\s+)?(?:стек|стэк)|(?:\w+\s+)?технологии|technologies"
-    r"|tech\s+stack|stack|инструменты|tools|environment"
+    r"(?:\w+\s+)?(?:стек|стэк)(?:\s+\w+)?|(?:\w+\s+)?технолог\w*|technologies"
+    r"|tech\s+stack|stack|инструмент\w*|tools|environment"
+    r"|программ\w*(?:\s+и\s+сервис\w*)?|программное\s+обеспечение|software"
+    r"|оборудован\w*|equipment"
 )
 
 # Заголовком слово делает двоеточие после него либо своя строка. Одного слова
 # мало: «ООО Инновационные технологии безопасности» — имя работодателя, и оно
-# разрешало бы работе стек, которого в резюме нет.
+# разрешало бы работе стек, которого в резюме нет. «ПО» — только своей строкой:
+# с двоеточием посреди строки это предлог («Обязанности по:»).
 _STACK_HEADING_RE = re.compile(
-    rf"(?:{_STACK_WORDS})\s*:|^[\s•*-]*(?:{_STACK_WORDS})\s*$",
+    rf"(?<!\w)(?:{_STACK_WORDS})\s*:|^[\s•*-]*(?:{_STACK_WORDS}|по)\s*:?\s*$",
     re.MULTILINE,
 )
 

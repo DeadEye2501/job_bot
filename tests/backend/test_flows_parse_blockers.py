@@ -103,13 +103,13 @@ async def test_a_vacancy_is_not_deleted_by_a_verdict_nobody_asked_for(
     assert saved.skip_reason == "llm: это реклама курсов"
 
 
-async def test_all_three_questions_are_asked_when_nothing_blocks(parsing):
+async def test_every_fit_question_is_asked_when_nothing_blocks(parsing):
     """Прошедшую вакансию спрашивают по всем трём: роль, языки, предпочтения."""
     pipeline, vacancy = parsing
 
     await parse.parse_and_update_vacancy(pipeline, vacancy.id, "текст", "jobs")
 
-    assert pipeline.fit_asked == ["роль", "языки", "предпочтения"]
+    assert pipeline.fit_asked == ["роль", "языки", "место", "предпочтения"]
 
 
 async def test_a_refusal_from_the_second_question_stops_the_third(

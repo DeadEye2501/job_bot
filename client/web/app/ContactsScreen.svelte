@@ -9,6 +9,7 @@
   // спискам для этого не нужно.
 
   import TopTabs from '$components/TopTabs.svelte';
+  import { markOf } from '$state/open_mark.js';
   import { CONTACTS_TABS } from '$state/sections.js';
 
   import AggregatorsList from './AggregatorsList.svelte';
@@ -17,9 +18,10 @@
   import CompaniesList from './CompaniesList.svelte';
   import PeopleList from './PeopleList.svelte';
 
-  let { ask, say, lockedTip, events, openCard, onopened, onvacancy } = $props();
+  // Вкладку и открытую карточку держит оболочка (`sectionMemory`).
+  let { ask, say, lockedTip, events, openCard, onopened, onvacancy, tab, ontab, onchosen } =
+    $props();
 
-  let tab = $state(CONTACTS_TABS[0].key);
   let mark = $state(null);
 
   // Пришли со стороны — открываем ту вкладку, где названная карточка живёт:
@@ -33,15 +35,19 @@
 
   function go(one) {
     mark = one;
-    tab = one.tab;
+    ontab(one.tab);
   }
 
   // Отметка достаётся только своей вкладке: чужой номер соседний список принял
   // бы за свой и открыл бы карточку с тем же номером.
   const mine = (key) => (mark?.tab === key ? mark : null);
+
+  // Открытая карточка уходит наружу той же отметкой, какой приходит со стороны:
+  // вернувшись в раздел, её отдают обратно, и открывает её тот же путь.
+  const chose = (key) => (id) => onchosen(markOf(id, { tab: key }));
 </script>
 
-<TopTabs tabs={CONTACTS_TABS} active={tab} onpick={(key) => (tab = key)} />
+<TopTabs tabs={CONTACTS_TABS} active={tab} onpick={ontab} />
 
 <div class="screen-body" class:flush={tab !== 'blacklist'}>
   {#if tab === 'aggregators'}
@@ -53,6 +59,7 @@
       {onvacancy}
       open={mine('aggregators')}
       onopened={() => (mark = null)}
+      onchosen={chose('aggregators')}
     />
   {:else if tab === 'channels'}
     <ChannelsList
@@ -63,6 +70,7 @@
       {onvacancy}
       open={mine('channels')}
       onopened={() => (mark = null)}
+      onchosen={chose('channels')}
     />
   {:else if tab === 'companies'}
     <CompaniesList
@@ -72,6 +80,7 @@
       {onvacancy}
       open={mine('companies')}
       onopened={() => (mark = null)}
+      onchosen={chose('companies')}
       onperson={(id) => go({ tab: 'people', id })}
     />
   {:else if tab === 'people'}
@@ -82,6 +91,7 @@
       {onvacancy}
       open={mine('people')}
       onopened={() => (mark = null)}
+      onchosen={chose('people')}
       oncompany={(id) => go({ tab: 'companies', id })}
     />
   {:else}

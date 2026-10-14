@@ -353,7 +353,7 @@
   - `resume_url: str | None` = `None`
   - `outcome: Outcome | None` = `None`
   - `accepted: dict[tuple[str, str], dict]` = `field(default_factory=dict)`
-  - `page_checks: dict[str, int]` = `field(default_factory=dict)`
+  - `page_checks: dict[tuple[str, str], int]` = `field(default_factory=dict)`
   - `general: set[tuple[str, str]]` = `field(default_factory=set)`
   - `skipped: dict[str, list[str]]` = `field(default_factory=dict)`
 - `RESULTS` = `словарь из 5`
@@ -378,7 +378,7 @@
 ### `backend/agent/page_fields.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `_WAIT_MS` = `15000`
+- `WAIT_MS` = `15000`
 - `_RULES` = `"\n  const FIELD = 'input, select, textarea, [ro…`
 - `_FIELD_OF` = `'el => {' + _RULES + "\n  const target = (el.mat…`
 - `_INVENTORY` = `'() => {' + _RULES + '\n  const SKIP = [\'hidden…`
@@ -449,7 +449,6 @@
 ### `backend/agent/tools_browser.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `_WAIT_MS` = `15000`
 - `_SNAPSHOT_LIMIT` = `60000`
 - `_CUT_MARK` = `'\n… снимок обрезан: страница длиннее, чем помещ…`
 - `class _Ledger(NamedTuple)`
@@ -470,6 +469,10 @@
 
 - `CHECKS_ALLOWED` = `2`
 - `_ENOUGH` = `'отбито дважды: отправляй без письма, если поле …`
+
+### `backend/agent/tools_scan.py`
+
+- `logger` = `logging.getLogger(__name__)`
 
 ### `backend/agent/tools_seeker.py`
 
@@ -531,7 +534,7 @@
   - `parsed: ParsedVacancy`
   - `prior_count: int`
   - `title: str`
-  - `channel_ref: str | None`
+  - `post: LetterPost`
 
 ### `backend/applying/telegram_ban.py`
 
@@ -643,7 +646,7 @@
 - `logger` = `logging.getLogger(__name__)`
 - `HUMAN_TIMEOUT_NOTE` = `'Время ожидания истекло'`
 - `LIMIT_NOTE` = `'Исчерпан лимит подписки Claude Code — работа ос…`
-- `RESUME_MISSING_NOTE` = `'Выбранное резюме не найдено на {site} — переска…`
+- `RESUME_MISSING_NOTE` = `'Выбранное резюме не найдено на {site} — обновит…`
 - `AgentStop` = `Literal['human_timeout', 'limit', 'resume_missin…`
 - `WorkOutcome` = `Literal[slot.CycleOutcome, AgentStop]`
 
@@ -794,6 +797,7 @@
 - `WORK_FORMAT_LABELS_RU: dict[str, str]` = `словарь из 3`
 - `CEFR_LEVELS: tuple[str, ...]` = `набор из 6`
 - `NATIVE_LEVEL` = `'native'`
+- `NATIVE_SPELLINGS: tuple[str, ...]` = `набор из 7`
 - `LEVEL_SPELLINGS: dict[str, tuple[str, ...]]` = `словарь из 6`
 - `LEVELS_BY_SPELLING: tuple[tuple[str, str], ...]` = `tuple(sorted(((spelling.replace('-', ' '), level…`
 - `LEVEL_WHEN_UNTOLD: str` = `CEFR_LEVELS[-1]`
@@ -1015,6 +1019,7 @@
 - `class CandidateProfile`
   - `title: str | None` = `None`
   - `location: str | None` = `None`
+  - `citizenship: str | None` = `None`
   - `grades: list[str]` = `field(default_factory=list)`
   - `work_formats: list[str]` = `field(default_factory=list)`
   - `languages: list[CandidateLanguage]` = `field(default_factory=list)`
@@ -1032,8 +1037,11 @@
 
 - `logger` = `logging.getLogger(__name__)`
 - `GENERATE_COVER_LETTER_PROMPT` = `'Ты составляешь очень короткое сопроводительное …`
-- `_ATTACHMENT_RE` = `re.compile('\\bрезюме\\b|во\\s+вложении\\b|\\bCV…`
+- `_ATTACHMENT_RE` = `re.compile('\\b(?:мо[её]|прилагаю|прикладываю|от…`
 - `MAX_COVER_LETTER_TOKENS` = `2000`
+- `class LetterPost`
+  - `channel_ref: str | None` = `None`
+  - `text: str` = `''`
 
 ### `backend/llm/cv.py`
 
@@ -1046,8 +1054,8 @@
 
 - `logger` = `logging.getLogger(__name__)`
 - `_LEVEL_NEAR_CHARS` = `60`
-- `_STACK_WORDS` = `'(?:\\w+\\s+)?(?:стек|стэк)|(?:\\w+\\s+)?техноло…`
-- `_STACK_HEADING_RE` = `re.compile(f'(?:{_STACK_WORDS})\\s*:|^[\\s•*-]*(…`
+- `_STACK_WORDS` = `'(?:\\w+\\s+)?(?:стек|стэк)(?:\\s+\\w+)?|(?:\\w+…`
+- `_STACK_HEADING_RE` = `re.compile(f'(?<!\\w)(?:{_STACK_WORDS})\\s*:|^[\…`
 
 ### `backend/llm/cv_native.py`
 
@@ -1094,26 +1102,32 @@
 
 - `logger` = `logging.getLogger(__name__)`
 - `PURPOSE` = `'validate_language_fit'`
-- `LANGUAGE_FIT_PROMPT` = `'Ты проверяешь Telegram-пост о вакансии по ОДНОМ…`
+- `LANGUAGE_FIT_PROMPT` = `'Ты проверяешь объявление о вакансии по ОДНОМУ к…`
+
+### `backend/llm/fit_place.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `PURPOSE` = `'validate_place_fit'`
+- `PLACE_FIT_PROMPT` = `'Ты проверяешь объявление о вакансии по ОДНОМУ к…`
 
 ### `backend/llm/fit_preferences.py`
 
 - `logger` = `logging.getLogger(__name__)`
 - `PURPOSE` = `'validate_preferences_fit'`
-- `PREFERENCES_FIT_PROMPT` = `'Ты проверяешь Telegram-пост о вакансии по ОДНОМ…`
+- `PREFERENCES_FIT_PROMPT` = `'Ты проверяешь объявление о вакансии по ОДНОМУ к…`
 
 ### `backend/llm/fit_role.py`
 
 - `logger` = `logging.getLogger(__name__)`
 - `PURPOSE` = `'validate_role_fit'`
-- `ROLE_FIT_PROMPT` = `'Ты проверяешь Telegram-пост о вакансии по ОДНОМ…`
+- `ROLE_FIT_PROMPT` = `'Ты проверяешь объявление о вакансии по ОДНОМУ к…`
 
 ### `backend/llm/genre.py`
 
 - `logger` = `logging.getLogger(__name__)`
 - `MAX_GENRE_TOKENS` = `1200`
 - `ROOMIER_GENRE_TOKENS` = `2400`
-- `CLASSIFY_POST_GENRE_PROMPT` = `'Ты определяешь ЖАНР телеграм-поста из канала с …`
+- `CLASSIFY_POST_GENRE_PROMPT` = `'Ты определяешь ЖАНР поста о работе — из канала …`
 
 ### `backend/llm/hallucination.py`
 
@@ -1135,7 +1149,7 @@
 
 - `RESUME_MARK_LINE` = `', '.join((f'«{mark}»' for mark in sorted(RESUME…`
 - `SELF_OFFER_MARKERS` = `'\n'.join(('РУССКИЙ: «ищу работу», «ищу вакансию…`
-- `FACT_KINDS` = `'\n'.join(('- Технологии, инструменты, языки, фр…`
+- `FACT_KINDS` = `'\n'.join(('- Инструменты, оборудование, програм…`
 - `NOT_IN_THE_PROFILE` = `'нет в блоке кандидата ни дословно, ни по смыслу…`
 - `TONE_RULE` = `'Всё, что пишешь работодателю от имени человека,…`
 - `GENDER_RULE` = `'Родовые формы — по полю «Пол» анкеты; пол не ук…`
@@ -1144,18 +1158,20 @@
 - `ATTRIBUTION_RULES` = `'\n'.join(('- Атрибуция достижений: каждое дости…`
 - `FACTS_RULE` = `'Факты о человеке — только из анкеты; анкета и е…`
 - `EXAMPLE_SOURCE` = `'При прочих равных пример из места работы приори…`
+- `POST_REQUESTS` = `'Ответы на то, что вакансия просит написать в от…`
 - `LETTER_SHAPE` = `'Состав письма:\n1. Приветствие.\n2. Кто пишет: …`
 - `LETTER_RULES` = `'\n'.join((LETTER_SHAPE, 'Голос и факты:', TONE_…`
 - `_TEMPLATE_PLACEHOLDER_RE` = `re.compile('<[\\wА-Яа-яЁё][^>\\n]{0,40}>')`
 - `AGGREGATOR_HOSTS_LINE` = `', '.join(sorted(AGGREGATOR_HOSTS | AGGREGATOR_B…`
 - `GRADE_MARKERS` = `', '.join((f"«{grade}/{'/'.join(spellings)}»" fo…`
 - `FORMAT_MARKERS` = `', '.join((f"«{'/'.join((one, *(w for w in spell…`
-- `NOT_A_SKILL_SECTIONS: tuple[str, ...]` = `набор из 7`
+- `LEVEL_MARKERS` = `'; '.join((f"{level} — {', '.join(spellings)}" f…`
+- `NOT_A_SKILL_SECTIONS: tuple[str, ...]` = `набор из 6`
 - `NOT_A_SKILL_LINE` = `', '.join((f'«{one}»' for one in NOT_A_SKILL_SEC…`
 - `REQUIREMENT_WRAPPERS: tuple[str, ...]` = `набор из 10`
 - `WRAPPER_LINE` = `', '.join((f'«{one}»' for one in REQUIREMENT_WRA…`
-- `APPLY_CONTACTS` = `'Telegram (@username, t.me/...), email (jobs@acm…`
-- `GEO_LIMIT_MARKERS` = `'«Удалённо в РФ», «удалёнка только из России», «…`
+- `APPLY_CONTACTS` = `'Telegram (@username, t.me/...), email (jobs@exa…`
+- `GEO_LIMIT_MARKERS` = `'«удалённо только из страны A», «remote from <ре…`
 - `VACANCY_TEXT_CHARS` = `6000`
 
 ### `backend/llm/site_name.py`
@@ -1604,6 +1620,7 @@
   - `skills: list[ParsedCvSkill]`
   - `experience: list[ParsedCvExperience]`
   - `projects: list[ParsedCvProject]`
+  - `text_language: str | None`
 - `class Classification`
   - `status: VacancyStatus`
   - `explanation: str | None`
@@ -1705,7 +1722,7 @@
 
 ### `backend/repository/agent_profile.py`
 
-- `_GENDER` = `словарь из 2`
+- `GENDER_WORDS` = `словарь из 2`
 - `_PERIOD` = `словарь из 3`
 
 ### `backend/repository/aggregators.py`
@@ -2381,7 +2398,7 @@
 
 ### `tests/backend/test_llm_cv_response.py`
 
-- `MINIMAL_CV` = `json.dumps({'profile': CV_REQUIRED_PROFILE}, ens…`
+- `MINIMAL_CV` = `json.dumps({'profile': CV_REQUIRED_PROFILE, 'tex…`
 
 ### `tests/backend/test_llm_fill_review.py`
 
@@ -2392,6 +2409,10 @@
 
 - `_asked` = `partial(asked, validate_language_fit)`
 - `_check` = `partial(verdict, validate_language_fit)`
+
+### `tests/backend/test_llm_fit_place.py`
+
+- `_check` = `partial(verdict, validate_place_fit)`
 
 ### `tests/backend/test_llm_fit_validation.py`
 
