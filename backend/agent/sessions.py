@@ -5,7 +5,7 @@ import asyncio
 from adapters.agent_mcp import serve_tools
 from adapters.claude_code_agent import AgentEnd, AgentRun, run_agent
 from backend.agent.kit import AgentKit, RunSession, SessionPlan
-from backend.agent.stops import HumanTimeout
+from backend.agent.stops import HumanTimeout, LimitExhausted
 from backend.task_stop import put_out
 
 # Зависший процесс Claude Code иначе держал бы место прогона, а с ним и обход
@@ -38,6 +38,17 @@ async def run_guarded(kit: AgentKit, plan: SessionPlan) -> AgentEnd:
     if session in done:
         return session.result()
     return AgentEnd(False, "сессия агента превысила срок", False)
+
+
+async def run_to_limit(kit: AgentKit, plan: SessionPlan) -> AgentEnd:
+    """Сессия, после которой исчерпанный лимит модели обрывает всю работу.
+
+    Обход источника проверяет лимит позже, после разбора найденного, и зовёт
+    `run_guarded` сам."""
+    end = await run_guarded(kit, plan)
+    if end.limit_exhausted:
+        raise LimitExhausted
+    return end
 
 
 def live_session(model: str) -> RunSession:

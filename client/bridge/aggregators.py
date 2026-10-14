@@ -155,17 +155,22 @@ class Aggregators:
 
     def login(self, aggregator_id: int) -> dict:
         """Вход на сайт: видимый браузер, человек входит и закрывает окно, агент проверяет."""
-        return self._launch(aggregator_id, "login", "Вход проверен.", LOGIN_REFUSALS)
+        return self._launch(aggregator_id, "login", lambda bot: bot.login_aggregator(aggregator_id),
+                            "Вход проверен.", LOGIN_REFUSALS)
 
     def run_now(self, aggregator_id: int) -> dict:
         """Обойти один источник вне очереди."""
-        return self._launch(aggregator_id, "run_now", "Обход источника закончен.", AGGREGATOR_REFUSALS)
+        return self._launch(aggregator_id, "run_now", lambda bot: bot.run_aggregator_now(aggregator_id),
+                            "Обход источника закончен.", AGGREGATOR_REFUSALS)
 
-    def _launch(self, aggregator_id: int, action: str, done: str, refusals: dict) -> dict:
-        def start(bot):
-            work = bot.login_aggregator if action == "login" else bot.run_aggregator_now
-            return work(aggregator_id)
+    def scan(self, aggregator_id: int) -> dict:
+        """Перечислить резюме на сайте заново."""
+        return self._launch(aggregator_id, "scan", lambda bot: bot.scan_aggregator(aggregator_id),
+                            "Резюме обновлены.", LOGIN_REFUSALS)
 
+    def _launch(self, aggregator_id: int, action: str, start, done: str, refusals: dict) -> dict:
+        """Пустить работу бота на источнике. Зов бота приходит готовым: имя зова
+        пишется литералом у каждого действия, иначе шов имён моста его не видит."""
         return launched_on_bot(
             self._hub,
             start,

@@ -1,6 +1,7 @@
-"""Работа агента у бота с источниками: обход агрегаторов, вход на сайт и удаление источника."""
+"""Работа агента у бота с источниками: обход агрегаторов, вход на сайт, перечень резюме и удаление источника."""
 
 import logging
+from collections.abc import Awaitable, Callable
 from typing import Literal
 
 from adapters.browser import remove_profile
@@ -10,6 +11,7 @@ from backend.agent.kit import AgentKit
 from backend.bot import slot, work
 from backend.flows.aggregator_login import log_in
 from backend.flows.aggregator_round import seek_source
+from backend.flows.aggregator_scan import scan
 from backend.models import Aggregator
 from backend.repository import aggregators as repo
 
@@ -74,17 +76,30 @@ async def run_aggregator_now(bot, aggregator_id: int) -> AgentOutcome:
 
 
 async def login_aggregator(bot, aggregator_id: int) -> AgentOutcome:
-    """Вход: видимый браузер на главной, человек входит и закрывает окно, агент проверяет вход."""
+    """Вход: видимый браузер на главной, человек входит и закрывает окно, агент проверяет
+    вход и перечисляет резюме."""
+    return await _on_site(bot, aggregator_id, log_in, "aggregator login")
+
+
+async def scan_aggregator(bot, aggregator_id: int) -> AgentOutcome:
+    """Перечень резюме по кнопке окна."""
+    return await _on_site(bot, aggregator_id, scan, "aggregator scan")
+
+
+async def _on_site(
+    bot, aggregator_id: int, flow: Callable[[AgentKit, Source], Awaitable[str]], label: str
+) -> AgentOutcome:
+    """Работа на сайте агрегатора в месте прогона; у «Поиска по сети» сайта нет."""
     row = await _row(bot, aggregator_id)
     if row is None or row.host is None:
         return "missing"
     if (refusal := await _refused(bot, row)) is not None:
         return refusal
 
-    async def login(kit: AgentKit) -> str:
-        return await log_in(kit, Source.of(row))
+    async def on_site(kit: AgentKit) -> str:
+        return await flow(kit, Source.of(row))
 
-    return await work.in_slot(bot, login, f"aggregator login {aggregator_id}")
+    return await work.in_slot(bot, on_site, f"{label} {aggregator_id}")
 
 
 async def delete_aggregator(bot, aggregator_id: int) -> str:

@@ -325,6 +325,10 @@
 - `class LoginJob`
   - `source: Source`
   - `outcome: Outcome | None` = `None`
+- `class ScanJob`
+  - `source: Source`
+  - `reported: bool` = `False`
+  - `outcome: Outcome | None` = `None`
 - `class SeekJob`
   - `source: Source`
   - `limit: int`
@@ -343,7 +347,7 @@
   - `outcome: Outcome | None` = `None`
   - `confirmed: dict[tuple[str, str], dict]` = `field(default_factory=dict)`
   - `unscreened: dict[tuple[str, str, str], dict]` = `field(default_factory=dict)`
-- `RESULTS` = `словарь из 3`
+- `RESULTS` = `словарь из 4`
 - `HUMAN_KINDS` = `набор из 2`
 
 ### `backend/agent/kit.py`
@@ -391,6 +395,10 @@
 ### `backend/agent/prompts/login.py`
 
 - `LOGIN_PROMPT` = `'Твоя задача — понять, вошёл ли человек на этот …`
+
+### `backend/agent/prompts/scan.py`
+
+- `SCAN_PROMPT` = `'Твоя задача — перечислить резюме человека на эт…`
 
 ### `backend/agent/prompts/screening.py`
 
@@ -792,6 +800,10 @@
 - `logger` = `logging.getLogger(__name__)`
 
 ### `backend/flows/aggregator_round.py`
+
+- `logger` = `logging.getLogger(__name__)`
+
+### `backend/flows/aggregator_scan.py`
 
 - `logger` = `logging.getLogger(__name__)`
 
@@ -2474,6 +2486,6 @@
 
 - `class Sent`
   - `id: int`
-- `ANSWERS` = `словарь из 16`
+- `ANSWERS` = `словарь из 17`
 - `class UiBot`
   - `is_running_round` = `False`

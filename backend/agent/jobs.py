@@ -76,6 +76,17 @@ class LoginJob:
 
 
 @dataclass
+class ScanJob:
+    """Перечень резюме человека на сайте агрегатора. Способа отклика у неё нет:
+    сайт — её источник, как у входа. `reported` — список дошёл до базы: `done`
+    без него значит, что раздела резюме агент не нашёл."""
+
+    source: Source
+    reported: bool = False
+    outcome: Outcome | None = None
+
+
+@dataclass
 class SeekJob:
     """Поиск на источнике. `refused` — модель эмбеддингов молчала: сессия — сбой,
     что бы ни сказал агент."""
@@ -117,6 +128,7 @@ class ApplyJob:
 
 RESULTS = {
     LoginJob: frozenset({"done"}),
+    ScanJob: frozenset({"done"}),
     SeekJob: frozenset({"done", "failed"}),
     ApplyJob: frozenset({"vacancy_closed", "platform_closed", "not_fit"}),
 }
