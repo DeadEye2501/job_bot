@@ -26,7 +26,7 @@ async def log_in(kit: AgentKit, source: Source) -> str:
     if not await kit.browser.wait_closed(LIMIT_SEC):
         return "login_timeout"
     job = LoginJob(source)
-    tools = [*common_tools(kit, job), *browser_tools(kit, None)]
+    tools = [*common_tools(kit, job), *browser_tools(kit, None, None)]
     plan = SessionPlan(system_prompt(LOGIN_PROMPT, tools), login_task(source.host), tools,
                        web_search=False)
     if (await run_guarded(kit, plan)).limit_exhausted:

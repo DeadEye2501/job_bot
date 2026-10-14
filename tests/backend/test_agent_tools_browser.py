@@ -8,8 +8,8 @@ from tests.fakes.browser import FakeBrowser, FakePage
 VACANCY = "https://site.test/vacancy/1"
 
 
-def _tools(page, resume=None):
-    return browser_tools(kit_for(None, browser=FakeBrowser(page)), resume)
+def _tools(page, resume=None, photo=None):
+    return browser_tools(kit_for(None, browser=FakeBrowser(page)), resume, photo)
 
 
 def _item(selector, value, kind="text", url=VACANCY):
@@ -22,7 +22,7 @@ async def _strict(confirmed, outcome=None, fields=None):
     `fields` — что страница называет полями: селектор → (вид, группа)."""
     page = FakePage(fields=fields)
     job = apply_job(1, confirming=True, confirmed=confirmed, outcome=outcome)
-    tools = browser_tools(kit_for(None, browser=FakeBrowser(page)), None, job)
+    tools = browser_tools(kit_for(None, browser=FakeBrowser(page)), None, None, job)
     await tool(tools, "browser_open")(url=VACANCY)
     page.calls.clear()
     return page, tools
@@ -32,7 +32,7 @@ async def test_after_finishing_the_resume_is_not_attached(tmp_path):
     """Загрузка резюме тоже нажимает на странице — и после «Закончить» не проходит."""
     page = FakePage(choosers={"text=Загрузить"})
     job = apply_job(1, confirming=True, outcome=Dropped())
-    tools = browser_tools(kit_for(None, browser=FakeBrowser(page)), tmp_path / "cv.pdf", job)
+    tools = browser_tools(kit_for(None, browser=FakeBrowser(page)), tmp_path / "cv.pdf", None, job)
 
     answer = await tool(tools, "browser_attach_resume")(selector="text=Загрузить")
 
@@ -231,6 +231,27 @@ async def test_without_a_resume_there_is_nothing_to_attach():
     answer = await tool(_tools(page), "browser_attach_resume")(selector="text=Загрузить резюме")
 
     assert answer == "нет файла резюме"
+    assert page.calls == []
+
+
+async def test_the_photo_goes_from_its_own_file(tmp_path):
+    photo = tmp_path / "photo.jpg"
+    page = FakePage(choosers={"text=Загрузить фото"})
+
+    answer = await tool(_tools(page, photo=photo), "browser_attach_photo")(
+        selector="text=Загрузить фото")
+
+    assert answer.startswith("готово")
+    assert ("chooser", str(photo)) in page.calls
+
+
+async def test_without_a_photo_there_is_nothing_to_attach(tmp_path):
+    page = FakePage(choosers={"text=Загрузить фото"})
+
+    answer = await tool(_tools(page, resume=tmp_path / "cv.pdf"), "browser_attach_photo")(
+        selector="text=Загрузить фото")
+
+    assert answer == "нет фото"
     assert page.calls == []
 
 

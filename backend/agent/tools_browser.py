@@ -1,4 +1,4 @@
-"""Инструменты браузера для агента: открыть, снять, нажать, ввести, выбрать, приложить резюме."""
+"""Инструменты браузера для агента: открыть, снять, нажать, ввести, выбрать, приложить резюме и фото."""
 
 import logging
 from collections.abc import Awaitable, Callable
@@ -20,7 +20,9 @@ class _Refused(Exception):
     """Ввод, которого человек не подтверждал: на страницу он не попадает."""
 
 
-def browser_tools(kit: AgentKit, resume: Path | None, confirming: ApplyJob | None = None) -> list[Callable]:
+def browser_tools(
+    kit: AgentKit, resume: Path | None, photo: Path | None, confirming: ApplyJob | None = None
+) -> list[Callable]:
     """Инструменты над вкладкой агента. Ответ действия — «готово; адрес: …» или «не вышло: …».
 
     `confirming` — отклик под подтверждением: ввод, выбор и нажатия делают
@@ -48,18 +50,30 @@ def browser_tools(kit: AgentKit, resume: Path | None, confirming: ApplyJob | Non
         """Выбрать значение в выпадающем списке."""
         return await act(lambda page: select(page, selector, value))
 
+    async def browser_back() -> str:
+        """Вернуться на предыдущую страницу."""
+        return await act(lambda page: page.go_back())
+
+    return [browser_open, browser_snapshot, browser_click, browser_type,
+            browser_select, *_attach_tools(act, resume, photo), browser_back]
+
+
+def _attach_tools(act: Callable, resume: Path | None, photo: Path | None) -> list[Callable]:
+    """Приложить резюме и фото: нет файла — ответ агенту, и на странице ничего не нажато."""
+
     async def browser_attach_resume(selector: str) -> str:
         """Приложить резюме: селектор — кнопка или поле загрузки, видимые в снимке."""
         if resume is None:
             return "нет файла резюме"
         return await act(lambda page: _attach(page, selector, resume))
 
-    async def browser_back() -> str:
-        """Вернуться на предыдущую страницу."""
-        return await act(lambda page: page.go_back())
+    async def browser_attach_photo(selector: str) -> str:
+        """Приложить фото человека: селектор — кнопка или поле загрузки, видимые в снимке."""
+        if photo is None:
+            return "нет фото"
+        return await act(lambda page: _attach(page, selector, photo))
 
-    return [browser_open, browser_snapshot, browser_click, browser_type,
-            browser_select, browser_attach_resume, browser_back]
+    return [browser_attach_resume, browser_attach_photo]
 
 
 def _actions(kit: AgentKit, job: ApplyJob | None) -> tuple[Callable, Callable, Callable, Callable]:
@@ -199,7 +213,7 @@ async def _snapshot(kit: AgentKit) -> str:
     return seen if len(seen) <= _SNAPSHOT_LIMIT else seen[:_SNAPSHOT_LIMIT] + _CUT_MARK
 
 
-async def _attach(page, selector: str, resume: Path) -> None:
+async def _attach(page, selector: str, file: Path) -> None:
     """Поле файла обычно скрыто: нажимается названное и ловится окно выбора файла.
     Окно не открылось — путь кладётся в само поле, если селектор указывает на него."""
     from playwright.async_api import Error as PlaywrightError
@@ -208,9 +222,9 @@ async def _attach(page, selector: str, resume: Path) -> None:
         async with page.expect_file_chooser(timeout=_WAIT_MS) as chooser_info:
             await page.click(selector, timeout=_WAIT_MS)
         chooser = await chooser_info.value
-        await chooser.set_files(str(resume))
+        await chooser.set_files(str(file))
     except PlaywrightError:
-        await page.set_input_files(selector, str(resume), timeout=_WAIT_MS)
+        await page.set_input_files(selector, str(file), timeout=_WAIT_MS)
 
 
 def _first_line(error: Exception) -> str:

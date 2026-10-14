@@ -58,9 +58,10 @@ async def _apply_plan(kit: AgentKit, job: ApplyJob) -> SessionPlan | None:
         vacancy_text = await describe_vacancy(session, job.vacancy_id)
         if vacancy_text is None:
             return None
-        profile_text = await build_agent_profile(session, kit.today)
+        photo = kit.pipeline.photo_file()
+        profile_text = await build_agent_profile(session, kit.today, photo is not None)
     tools = [*common_tools(kit, job), *applier_tools(kit, job), *letter_tools(kit, job),
-             *browser_tools(kit, kit.pipeline.cv_file(), job if job.confirming else None)]
+             *browser_tools(kit, kit.pipeline.cv_file(), photo, job if job.confirming else None)]
     task = applier_task(job, vacancy_text, profile_text, kit.today)
     return SessionPlan(system_prompt(APPLIER_PROMPT, tools), task, tools, web_search=True)
 

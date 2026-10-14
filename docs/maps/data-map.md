@@ -1075,7 +1075,7 @@
 - `NOT_IN_THE_PROFILE` = `'нет в блоке кандидата ни дословно, ни по смыслу…`
 - `TONE_RULE` = `'Всё, что пишешь работодателю от имени человека,…`
 - `GENDER_RULE` = `'Родовые формы — по полю «Пол» анкеты; пол не ук…`
-- `LATIN_NAME_RULE` = `'Имя и фамилию пиши алфавитом текста, в котором …`
+- `LATIN_NAME_RULE` = `'Имя, фамилию и отчество пиши алфавитом текста, …`
 - `ATTRIBUTION_RULES` = `'\n'.join(('- Атрибуция достижений: каждое дости…`
 - `FACTS_RULE` = `'Факты о человеке — только из анкеты; анкета и е…`
 - `EXAMPLE_SOURCE` = `'При прочих равных пример из места работы приори…`
@@ -1645,6 +1645,7 @@
 ### `backend/repository/app_settings.py`
 
 - `CV_PATH_KEY` = `'cv_path'`
+- `PHOTO_PATH_KEY` = `'photo_path'`
 
 ### `backend/repository/applications.py`
 
@@ -1850,7 +1851,7 @@
 ### `backend/runtime_settings.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `_APP_DEFAULTS: dict[str, str]` = `словарь из 15`
+- `_APP_DEFAULTS: dict[str, str]` = `словарь из 16`
 - `AUTO_APPLY_MODES` = `набор из 3`
 - `LETTER_WRITERS` = `набор из 2`
 

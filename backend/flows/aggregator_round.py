@@ -70,7 +70,7 @@ async def _search(kit: AgentKit, job: SeekJob, queue: ParseQueue) -> AgentEnd:
 
 async def _seek_plan(kit: AgentKit, job: SeekJob, queue: ParseQueue) -> SessionPlan:
     source = job.source
-    tools = [*common_tools(kit, job), *seeker_tools(kit, job, queue), *browser_tools(kit, None)]
+    tools = [*common_tools(kit, job), *seeker_tools(kit, job, queue), *browser_tools(kit, None, None)]
     if source.host is not None:
         task = seeker_task(source.host, source.last_run_at, job.limit, kit.today)
         return SessionPlan(system_prompt(SEEKER_PROMPT, tools), task, tools, web_search=False)

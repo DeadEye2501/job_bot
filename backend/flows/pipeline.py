@@ -11,6 +11,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+from backend.bot.media import stored_media
 from backend.domain.dedup import EmbeddingCache
 from backend.flows.dm import DmHelpers
 from backend.flows.dm_backfill import DmHooks
@@ -288,6 +289,10 @@ class IngestionPipeline:
         """
         path = self.cv_path()
         return path if path is not None and path.is_file() else None
+
+    def photo_file(self) -> Path | None:
+        """Копия фото в каталоге медиа, если она там есть; иначе пусто."""
+        return stored_media(self.rs.photo_path)
 
 
     async def check_ghosting_timeouts(self) -> int:
