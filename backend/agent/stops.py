@@ -14,5 +14,14 @@ class LimitExhausted(Exception):
     """Исчерпан лимит подписки водителя — следующий шаг упёрся бы в то же."""
 
 
-RUN_STOPPERS = (HumanTimeout, LimitExhausted)
+class ResumeMissing(Exception):
+    """Сайт не предложил выбранное резюме: список на сайте устарел, и следующий
+    отклик на нём ушёл бы не тем резюме. `site` — хост сайта."""
+
+    def __init__(self, site: str):
+        super().__init__(site)
+        self.site = site
+
+
+RUN_STOPPERS = (HumanTimeout, LimitExhausted, ResumeMissing)
 """Общий `except Exception` шага пропускает их наверх, к `bot/work.agent_work`."""

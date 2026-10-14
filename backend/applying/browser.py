@@ -6,12 +6,15 @@ from backend.agent.kit import AgentKit, SessionPlan
 from backend.agent.prompts.applier import APPLIER_PROMPT, applier_task
 from backend.agent.prompts.frame import system_prompt
 from backend.agent.sessions import run_to_limit
+from backend.agent.stops import ResumeMissing
 from backend.agent.tools_applier import applier_tools
 from backend.agent.tools_browser import browser_tools
 from backend.agent.tools_common import common_tools
 from backend.agent.tools_letter import letter_tools
 from backend.applying.result import GONE, Dropped, Missed, Outcome, SiteClosed, Unfit
 from backend.domain.apply_order import Way
+from backend.domain.hosts import normalize_host
+from backend.repository.aggregator_resumes import chosen_resume, drop_chosen_resume
 from backend.repository.aggregators import web_search_id
 from backend.repository.vacancy_brief import describe_vacancy
 from backend.repository.vacancy_status import mark_vacancy_unfit
@@ -21,17 +24,27 @@ _NO_OUTCOME = "агент закончил без итога"
 
 async def via_browser(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome:
     """Одна сессия агента на способ. Лимит подписки снимает весь прогон: следующий
-    способ упёрся бы в него же."""
+    способ упёрся бы в него же.
+
+    Выбранного резюме сайт не предложил — его больше нет на сайте: оно
+    удаляется из базы (база — зеркало сайта), другое не отмечается, и прогон
+    снимается целиком — следующий отклик на этом сайте ушёл бы не тем резюме.
+    """
     rs = kit.pipeline.rs
     async with kit.pipeline.session_factory() as session:
         profile = way.aggregator_id or await web_search_id(session)
+        resume = await chosen_resume(session, way.aggregator_id) if way.aggregator_id else None
     job = ApplyJob(vacancy_id, way, profile, simulated=rs.send_locked, letter_writer=rs.letter_writer,
+                   resume=(resume.title, resume.url) if resume else None,
                    confirming=confirming(kit))
     plan = await _apply_plan(kit, job)
     if plan is None:
         return GONE
     await kit.browser.open_profile(job.profile_id, sending=not job.simulated)
     await run_to_limit(kit, plan)
+    if isinstance(job.outcome, Finished) and job.outcome.result == "resume_missing":
+        await kit.written(lambda session: drop_chosen_resume(session, way.aggregator_id))
+        raise ResumeMissing(normalize_host(way.target))
     outcome = _settle(job, way)
     if isinstance(outcome, Unfit):
         await _mark_unfit(kit, vacancy_id, outcome.reason)

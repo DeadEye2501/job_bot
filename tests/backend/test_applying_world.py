@@ -7,7 +7,7 @@ from backend.applying.world import learn, read_world, vacancy_facts, ways_in
 from backend.domain.apply_order import KnownSite
 from tests.dbio import put
 from tests.factories import hr_row, vacancy_row
-from tests.factories_aggregators import aggregator_row, world_of
+from tests.factories_aggregators import aggregator_resume_row, aggregator_row, world_of
 
 
 async def _facts(session_factory, **vacancy):
@@ -55,3 +55,16 @@ async def test_a_ban_in_the_store_closes_telegram(kit):
 async def test_a_past_ban_leaves_telegram_open(kit):
     await kit.pipeline.rs.set_app("flood_wait_until_ts", str(time.time() - 1))
     assert (await read_world(kit.pipeline.rs, kit.pipeline.session_factory)).telegram_open
+
+
+async def test_the_world_knows_which_sites_have_a_chosen_resume(kit, session_factory):
+    chosen = aggregator_row(host="chosen.test", is_logged_in=True)
+    bare = aggregator_row(host="bare.test", is_logged_in=True)
+    await put(session_factory, chosen, bare)
+    await put(session_factory,
+              aggregator_resume_row(chosen.id, url="https://chosen.test/r/1", is_chosen=True),
+              aggregator_resume_row(bare.id, url="https://bare.test/r/1"))
+
+    world = await read_world(kit.pipeline.rs, kit.pipeline.session_factory)
+
+    assert {s.host: s.resume_chosen for s in world.sites} == {"chosen.test": True, "bare.test": False}

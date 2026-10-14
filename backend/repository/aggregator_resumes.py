@@ -7,7 +7,7 @@
 угаданное резюме может оказаться резюме другой профессии.
 """
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Aggregator, AggregatorResume
@@ -65,9 +65,17 @@ async def choose_resume(session: AsyncSession, aggregator_id: int, resume_id: in
     )
 
 
-async def drop_resume(session: AsyncSession, resume_id: int) -> None:
-    """Удалить резюме, пропавшее с сайта. Другое вместо него не отмечается."""
-    await session.delete(await session.get(AggregatorResume, resume_id))
+async def drop_chosen_resume(session: AsyncSession, aggregator_id: int | None) -> None:
+    """Удалить отмеченное резюме сайта: его не оказалось на сайте. Другое
+    вместо него не отмечается.
+
+    Удаление — запросом по отметке: отмеченного нет (сняли посреди отклика)
+    или способ без агрегатора — удалять нечего, и это не ошибка.
+    """
+    await session.execute(
+        delete(AggregatorResume)
+        .where(AggregatorResume.aggregator_id == aggregator_id, AggregatorResume.is_chosen)
+    )
 
 
 async def chosen_resume(session: AsyncSession, aggregator_id: int) -> AggregatorResume | None:

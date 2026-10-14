@@ -24,6 +24,13 @@ def test_telegram_goes_first():
     assert ways[0] == Way("telegram", "@hr_name", None)
 
 
+def test_a_site_without_a_chosen_resume_offers_no_button_and_the_next_way_follows():
+    unchosen = KnownSite(1, "site.test", resume_chosen=False)
+    ways = apply_ways(_vacancy(contacts=["https://site.test/vacancy/1", "hr@company.test"]),
+                      _world(sites=[unchosen]))
+    assert [w.method for w in ways] == ["email"]
+
+
 def test_a_closed_telegram_is_not_offered():
     ways = apply_ways(_vacancy(hr_handle="@hr_name"), _world(telegram_open=False))
     assert ways == []

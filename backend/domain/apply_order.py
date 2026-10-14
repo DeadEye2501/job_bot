@@ -22,12 +22,14 @@ class Way:
 
 @dataclass(frozen=True)
 class KnownSite:
-    """Агрегатор человека; пустой хост — «Поиск по сети». Без входа его кнопка
-    не работает, но формой работодателя его страница всё равно не бывает."""
+    """Агрегатор человека; пустой хост — «Поиск по сети». Без входа или без
+    выбранного резюме его кнопка не работает, но формой работодателя его
+    страница всё равно не бывает."""
 
     id: int
     host: str | None
     logged_in: bool = True
+    resume_chosen: bool = True
 
 
 @dataclass(frozen=True)
@@ -69,10 +71,15 @@ def _telegram(vacancy: VacancyFacts, world: World) -> Way | None:
 
 
 def _button(vacancy: VacancyFacts, world: World) -> Way | None:
-    """Ссылка на вакансию на сайте залогиненного и не закрытого агрегатора."""
+    """Ссылка на вакансию на сайте агрегатора со входом, выбранным резюме и не закрытого.
+
+    Без выбранного резюме откликаться нечем: угаданное резюме могло бы оказаться
+    резюме другой профессии.
+    """
     for link in _links(vacancy):
         site = _owner(link, world.sites)
-        if site is not None and site.logged_in and site.id not in world.closed_sites:
+        if (site is not None and site.logged_in and site.resume_chosen
+                and site.id not in world.closed_sites):
             return Way(VIA_AGGREGATOR, link, site.id)
     return None
 

@@ -3,7 +3,7 @@
 from backend.models import Aggregator, AggregatorResume
 from backend.payloads import SeenResume
 from backend.repository.aggregator_resumes import (
-    choose_resume, chosen_resume, drop_resume, resumes_of, sync_resumes,
+    choose_resume, chosen_resume, drop_chosen_resume, resumes_of, sync_resumes,
 )
 from backend.repository.aggregators import delete_aggregator
 from tests.dbio import all_rows, only_row, put
@@ -120,12 +120,26 @@ async def test_choosing_on_one_site_keeps_the_mark_on_another(session, session_f
 
 async def test_a_dropped_resume_leaves_the_site_without_a_chosen_one(session, session_factory):
     site = await _site(session_factory)
-    gone = aggregator_resume_row(site, url="https://hh.ru/r/1", is_chosen=True)
-    await put(session_factory, gone,
-              aggregator_resume_row(site, title="Другое", url="https://hh.ru/r/2", position=1))
+    other = aggregator_row(host="other.test")
+    await put(session_factory, other)
+    await put(session_factory,
+              aggregator_resume_row(site, url="https://hh.ru/r/1", is_chosen=True),
+              aggregator_resume_row(site, title="Другое", url="https://hh.ru/r/2", position=1),
+              aggregator_resume_row(other.id, title="Чужое", url="https://other.test/r/1",
+                                    is_chosen=True))
     async with session.begin():
-        await drop_resume(session, gone.id)
+        await drop_chosen_resume(session, site)
     assert await _titles(session_factory, site) == [("Другое", False)]
+    assert await _titles(session_factory, other.id) == [("Чужое", True)]
+
+
+async def test_dropping_where_nothing_is_chosen_drops_nothing(session, session_factory):
+    site = await _site(session_factory)
+    await put(session_factory, aggregator_resume_row(site))
+    async with session.begin():
+        await drop_chosen_resume(session, site)
+        await drop_chosen_resume(session, None)
+    assert await _titles(session_factory, site) == [("Разработчик", False)]
 
 
 async def test_a_deleted_aggregator_takes_its_resumes_with_it(session, session_factory):

@@ -342,6 +342,7 @@
   - `profile_id: int`
   - `simulated: bool`
   - `letter_writer: str`
+  - `resume: tuple[str, str] | None` = `None`
   - `confirming: bool` = `False`
   - `letter_checks: int` = `0`
   - `outcome: Outcome | None` = `None`
@@ -416,7 +417,7 @@
 
 ### `backend/agent/stops.py`
 
-- `RUN_STOPPERS` = `набор из 2`
+- `RUN_STOPPERS` = `набор из 3`
 
 ### `backend/agent/tools_applier.py`
 
@@ -615,7 +616,8 @@
 - `logger` = `logging.getLogger(__name__)`
 - `HUMAN_TIMEOUT_NOTE` = `'Время ожидания истекло.'`
 - `LIMIT_NOTE` = `'Исчерпан лимит подписки Claude Code — работа ос…`
-- `AgentStop` = `Literal['human_timeout', 'limit']`
+- `RESUME_MISSING_NOTE` = `'Выбранное резюме не найдено на {site} — переска…`
+- `AgentStop` = `Literal['human_timeout', 'limit', 'resume_missin…`
 - `WorkOutcome` = `Literal[slot.CycleOutcome, AgentStop]`
 
 ### `backend/crypto.py`
@@ -645,6 +647,7 @@
   - `id: int`
   - `host: str | None`
   - `logged_in: bool` = `True`
+  - `resume_chosen: bool` = `True`
 - `class VacancyFacts`
   - `hr_handle: str | None`
   - `source_url: str | None`
@@ -2081,7 +2084,7 @@
 - `ATTACHMENT_MISSING` = `'Вложение не найдено.'`
 - `ATTACHMENT_NOT_OPENED` = `'Не удалось открыть вложение.'`
 - `LOGS_TOO_OFTEN` = `'Журнал спрашивают не чаще раза в секунду.'`
-- `AGENT_STOPS` = `словарь из 2`
+- `AGENT_STOPS` = `словарь из 3`
 - `RUN_REFUSALS` = `словарь из 3 и раскрытых`
 - `POLL_REFUSALS` = `словарь из 5 и раскрытых`
 - `RERUN_REFUSALS` = `словарь из 6 и раскрытых`
