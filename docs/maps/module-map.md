@@ -483,7 +483,7 @@ init
 
 - `def login_task(host: str) -> str` (3)
 
-### `backend/agent/prompts/scan.py` — 17 строк
+### `backend/agent/prompts/scan.py` — 18 строк
 
 Перечень резюме: какие резюме человека заведены на сайте агрегатора.
 
@@ -657,7 +657,7 @@ init
 Зависит от: `backend.agent.jobs`, `backend.agent.kit`, `backend.payloads`, `backend.repository.aggregator_resumes`
 
 - `def scan_tools(kit: AgentKit, job: ScanJob) -> list[Callable]` (21)
-  - `async def report_resumes(resumes: list[SeenResume], new_resume_url: str | None) -> str` (8)
+  - `async def report_resumes(resumes: list[SeenResume], many_resumes: bool, signs_found: str) -> str` (7)
 
 ### `backend/agent/tools_seeker.py` — 139 строк
 
@@ -2235,7 +2235,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def fire(hook, name: str, *args) -> None` (13)
 
-### `backend/payloads.py` — 491 строк ⚠ подошёл к 300
+### `backend/payloads.py` — 493 строк ⚠ подошёл к 300
 
 Свёртки значений, ходящих между слоями.
 
@@ -2264,7 +2264,7 @@ First-run bootstrap: ensure DB schema exists.
 - `class ChannelWithCount` (4)
 - `class SourceStats` (20)
 - `class ChannelDetail` (4)
-- `class SeenResume` (6)
+- `class SeenResume` (8)
 - `class FieldEntry(NamedTuple)` (11)
 - `class VacancyFilter` (53)
 
@@ -2300,14 +2300,14 @@ First-run bootstrap: ensure DB schema exists.
 - `def _skill_names(record) -> list[str]` (4)
 - `def _project_lines(projects) -> list[str]` (8)
 
-### `backend/repository/aggregator_resumes.py` — 85 строк
+### `backend/repository/aggregator_resumes.py` — 86 строк
 
 Резюме человека на сайте агрегатора — зеркало того, что сейчас на сайте.
 
 Зависит от: `backend.models`, `backend.payloads`
 
 - `async def resumes_of(session: AsyncSession, aggregator_id: int) -> list[AggregatorResume]` (7)
-- `async def sync_resumes(session: AsyncSession, aggregator_id: int, seen: list[SeenResume], can_add: bool) -> None` (24)
+- `async def sync_resumes(session: AsyncSession, aggregator_id: int, seen: list[SeenResume], can_add: bool) -> None` (25)
 - `async def choose_resume(session: AsyncSession, aggregator_id: int, resume_id: int) -> None` (14)
 - `async def drop_resume(session: AsyncSession, aggregator_id: int, url: str) -> None` (10)
 - `async def chosen_resume(session: AsyncSession, aggregator_id: int) -> AggregatorResume | None` (6)
@@ -5018,7 +5018,7 @@ Runtime settings layer.
 - `async def _name_of_created(session_factory, chat: LlmProviderConfig | None) -> str` (4)
 - `def _image(body: bytes=_ICON) -> httpx.Response` (2)
 
-### `tests/backend/test_flows_aggregator_scan.py` — 84 строк
+### `tests/backend/test_flows_aggregator_scan.py` — 97 строк
 
 Сканирование резюме: агент перечисляет резюме сайта, список в базе приводится к увиденному.
 
@@ -5026,7 +5026,7 @@ Runtime settings layer.
 
 Тестов: 8
 
-- `async def _can_add_after(make_pipeline, session_factory, new_resume_url: str | None) -> bool` (8)
+- `async def _can_add_after(make_pipeline, session_factory, resumes: list[tuple], many_resumes: bool) -> bool` (6)
 
 ### `tests/backend/test_flows_aggregator_seek.py` — 224 строк
 
@@ -5763,14 +5763,15 @@ Runtime settings layer.
 Тестов: 10
 
 
-### `tests/backend/test_repository_aggregator_resumes.py` — 148 строк
+### `tests/backend/test_repository_aggregator_resumes.py` — 163 строк
 
 Резюме агрегатора в базе: сверка со сканом, отметка «откликаться этим», удаление.
 
 Зависит от: `backend.models`, `backend.payloads`, `backend.repository.aggregator_resumes`, `backend.repository.aggregators`, `tests.dbio`, `tests.factories_aggregators`
 
-Тестов: 11
+Тестов: 12
 
+- `def _seen(title: str, url: str, editor_url: str | None=None) -> SeenResume` (3)
 - `async def _site(session_factory) -> int` (4)
 
 ### `tests/backend/test_repository_aggregators.py` — 110 строк
@@ -7267,7 +7268,7 @@ Runtime settings layer.
 - `def parsed_cv_project(**overrides) -> ParsedCvProject` (3)
 - `def parsed_cv(**overrides) -> ParsedCv` (12)
 
-### `tests/fakes/agent.py` — 175 строк
+### `tests/fakes/agent.py` — 178 строк
 
 Набор сессии агента без браузера, водителя и человека.
 
@@ -7289,8 +7290,8 @@ Runtime settings layer.
   - `async def step(tools)` (2)
 - `def login_step(logged_in: bool)` (6)
   - `async def step(tools)` (3)
-- `def resumes_step(resumes: list[tuple[str, str]], new_resume_url: str | None=None)` (8)
-  - `async def step(tools)` (4)
+- `def resumes_step(resumes: list[tuple], many_resumes: bool=True, signs_found: str='список «Мои резюме»')` (11)
+  - `async def step(tools)` (6)
 - `def silent_gate(limit_sec: float=3600.0) -> HumanGate` (3)
 - `def answering_gate(answer: Callable[[dict], dict | None], limit_sec: float=3600.0) -> tuple[HumanGate, list]` (14)
   - `def needed(kind, host, payload)` (5)

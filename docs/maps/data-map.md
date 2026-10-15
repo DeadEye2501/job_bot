@@ -1691,6 +1691,7 @@
 - `class SeenResume`
   - `title: str`
   - `url: str`
+  - `editor_url: str | None`
 - `class FieldEntry(NamedTuple)`
   - `selector: str`
   - `label: str`

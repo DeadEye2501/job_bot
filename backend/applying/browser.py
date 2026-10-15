@@ -43,7 +43,7 @@ async def via_browser(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome:
         profile = site.id if site else await web_search_id(session)
         resume = await chosen_resume(session, site.id) if site else None
     job = ApplyJob(vacancy_id, way, profile, simulated=rs.send_locked, letter_writer=rs.letter_writer,
-                   language=language, resume=SeenResume(resume.title, resume.url) if resume else None,
+                   language=language, resume=SeenResume(resume.title, resume.url, resume.editor_url) if resume else None,
                    confirming=confirming(kit))
     plan = _apply_plan(kit, job, vacancy_text, profile_text)
     await kit.browser.open_profile(job.profile_id, sending=not job.simulated)
