@@ -160,6 +160,20 @@ class FillJob:
     general: set[tuple[str, str]] = field(default_factory=set)
     skipped: dict[str, list[str]] = field(default_factory=dict)
 
+    def off_target(self, url: str) -> bool:
+        """Открыто не то резюме. Перезапись идёт только внутри редактора своего
+        резюме, а редакторы прочих резюме закрыты и ей, и созданию нового:
+        правка не того резюме хуже любой ошибки. Решается здесь одним местом на
+        всё, что меняет резюме, — раскладку и вложения."""
+        if self.editor_url and not _within(url, self.editor_url):
+            return True
+        return any(_within(url, other) for other in self.other_editors)
+
+
+def _within(url: str, place: str) -> bool:
+    """Страница — это место или его продолжение: подстраница, шаг, якорь."""
+    return url == place or (url.startswith(place) and url[len(place)] in "/?&#")
+
 
 RESULTS = {
     LoginJob: frozenset({"done"}),

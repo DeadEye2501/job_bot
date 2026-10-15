@@ -72,23 +72,31 @@ def browser_tools(
         return await act(lambda page: page.go_back())
 
     return [browser_open, browser_snapshot, browser_click, browser_type,
-            browser_select, *_attach_tools(act, resume, photo), browser_back]
+            browser_select, *_attach_tools(act, resume, photo, strict), browser_back]
 
 
-def _attach_tools(act: Callable, resume: Path | None, photo: Path | None) -> list[Callable]:
-    """Приложить резюме и фото: нет файла — ответ агенту, и на странице ничего не нажато."""
+def _attach_tools(act: Callable, resume: Path | None, photo: Path | None,
+                  job: ApplyJob | FillJob | None) -> list[Callable]:
+    """Приложить резюме и фото: нет файла — ответ агенту, и на странице ничего не нажато.
+    Вложение меняет резюме так же, как ввод, и при заполнении проходит ту же
+    проверку, что раскладка: на странице не того резюме файл не прикладывается."""
+
+    async def attach(page, selector: str, file: Path) -> None:
+        if isinstance(job, FillJob) and job.off_target(page.url):
+            raise _Refused("это страница другого резюме")
+        await _attach(page, selector, file)
 
     async def browser_attach_resume(selector: str) -> str:
         """Приложить резюме: селектор — кнопка или поле загрузки, видимые в снимке."""
         if resume is None:
             return "нет файла резюме"
-        return await act(lambda page: _attach(page, selector, resume))
+        return await act(lambda page: attach(page, selector, resume))
 
     async def browser_attach_photo(selector: str) -> str:
         """Приложить фото человека: селектор — кнопка или поле загрузки, видимые в снимке."""
         if photo is None:
             return "нет фото"
-        return await act(lambda page: _attach(page, selector, photo))
+        return await act(lambda page: attach(page, selector, photo))
 
     return [browser_attach_resume, browser_attach_photo]
 
