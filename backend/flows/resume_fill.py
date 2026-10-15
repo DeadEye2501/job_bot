@@ -60,27 +60,42 @@ async def fill(kit: AgentKit, source: Source, resume_id: int | None) -> str:
     scanned = await scan(kit, source)
     if scanned != "ok":
         return scanned
-    await _mark_filled(kit, source.id, resume_url, {row.url for row in rows})
-    return "ok"
+    return await _settle(kit, source.id, resume_url, {row.url for row in rows})
 
 
-async def _mark_filled(kit: AgentKit, aggregator_id: int, resume_url: str | None, before: set[str]) -> None:
-    """Отметить заполненное: резюме по его прежней ссылке, иначе — единственная
-    ссылка, которой до заполнения не было. Перезапись может сменить ссылку, а
-    при нескольких новых какая из них заполнена, не знает никто — отметку
-    тогда ставит человек."""
+def _verdict(before: set[str], after: set[str], resume_url: str | None) -> tuple[str, str | None]:
+    """Исход по спискам ссылок до и после и ссылка заполненного резюме.
 
-    async def mark(session) -> None:
+    Сделанное сверяется с нажатым: перезапись не заводит резюме, создание
+    заводит ровно одно. Перезапись вправе сменить ссылку резюме — тогда на
+    месте прежней ровно одна новая, а число резюме прежнее.
+    """
+    new = after - before
+    if resume_url is None:
+        if len(new) == 1:
+            return "ok", next(iter(new))
+        return ("many_created" if new else "not_created"), None
+    if len(after) > len(before):
+        return "extra_resume", None
+    if resume_url in after:
+        return "ok", resume_url
+    return ("ok", next(iter(new))) if len(new) == 1 else ("resume_lost", None)
+
+
+async def _settle(kit: AgentKit, aggregator_id: int, resume_url: str | None, before: set[str]) -> str:
+    """Сверить список после работы с нажатым и отметить заполненное — только
+    при успехе: откликаться не тем резюме хуже, чем не откликаться."""
+
+    async def settle(session) -> str:
         rows = await resumes_of(session, aggregator_id)
-        same = [row for row in rows if row.url == resume_url]
-        new = [row for row in rows if row.url not in before]
-        filled = same or (new if len(new) == 1 else [])
-        if not filled:
-            logger.warning("заполнение резюме: какое резюме заполнено, по перечню сайта не понять")
-            return
-        await choose_resume(session, aggregator_id, filled[0].id)
+        outcome, filled = _verdict(before, {row.url for row in rows}, resume_url)
+        if outcome != "ok":
+            logger.warning("заполнение резюме: список после работы не сошёлся с нажатым — %s", outcome)
+            return outcome
+        await choose_resume(session, aggregator_id, next(row.id for row in rows if row.url == filled))
+        return outcome
 
-    await kit.written(mark)
+    return await kit.written(settle)
 
 
 def _summary(job: FillJob) -> None:

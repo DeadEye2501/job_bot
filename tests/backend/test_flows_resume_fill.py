@@ -2,6 +2,8 @@
 
 import logging
 
+import pytest
+
 from backend.agent.jobs import Source
 from backend.flows.resume_fill import fill
 from backend.models import Aggregator, ProfileLanguage
@@ -12,6 +14,8 @@ from tests.fakes.agent import finish_step, resumes_step, scripted_kit
 
 FIRST = "https://hh.ru/resume/1"
 SECOND = "https://hh.ru/resume/2"
+THIRD = "https://hh.ru/resume/3"
+FOURTH = "https://hh.ru/resume/4"
 FIRST_EDITOR = "https://hh.ru/resume/1/edit"
 
 
@@ -134,22 +138,33 @@ async def test_a_resume_relinked_by_the_overwrite_is_found_as_the_only_new_link(
         finish_step(), resumes_step([("Швея", "https://hh.ru/resume/9"), ("Повар", SECOND)]),
     ])
 
-    await fill(kit, Source.of(site), first.id)
+    assert await fill(kit, Source.of(site), first.id) == "ok"
 
     assert await _marks(session_factory, site.id) == {"Швея": True, "Повар": False}
 
 
-async def test_two_new_links_leave_the_mark_alone(make_pipeline, session_factory):
-    site, _ = await _site(session_factory)
-    kit = scripted_kit(await make_pipeline(), [finish_step(), resumes_step([
-        ("Швея", FIRST), ("Повар", SECOND),
-        ("Кондитер", "https://hh.ru/resume/3"), ("Пекарь", "https://hh.ru/resume/4"),
-    ])])
+@pytest.mark.parametrize(
+    ("overwrite", "after", "outcome"),
+    [
+        pytest.param(True, [("Швея", FIRST), ("Повар", SECOND), ("Кондитер", THIRD)], "extra_resume",
+                     id="перезапись завела новое"),
+        pytest.param(True, [("Повар", SECOND)], "resume_lost", id="перезаписанное пропало без замены"),
+        pytest.param(False, [("Швея", FIRST), ("Повар", SECOND)], "not_created", id="новое не появилось"),
+        pytest.param(False, [("Швея", FIRST), ("Повар", SECOND), ("Кондитер", THIRD), ("Пекарь", FOURTH)],
+                     "many_created", id="новых два"),
+    ],
+)
+async def test_a_list_that_does_not_match_the_button_is_an_error_and_marks_nothing(
+    make_pipeline, session_factory, overwrite, after, outcome
+):
+    """Список после работы не сошёлся с нажатым — ошибка, и отметка остаётся
+    у прежнего резюме: откликаться не тем хуже, чем не откликаться."""
+    site, first = await _site(session_factory)
+    kit = scripted_kit(await make_pipeline(), [finish_step(), resumes_step(after)])
 
-    await fill(kit, Source.of(site), None)
+    assert await fill(kit, Source.of(site), first.id if overwrite else None) == outcome
 
-    marks = await _marks(session_factory, site.id)
-    assert marks["Кондитер"] is False and marks["Пекарь"] is False and marks["Повар"] is True
+    assert {title for title, chosen in (await resume_marks(session_factory, site.id)) if chosen} == {"Повар"}
 
 
 async def test_overwriting_a_resume_without_its_editor_is_refused_before_the_agent(
