@@ -10,6 +10,11 @@ from tests.dbio import all_rows, only_row, put, resume_marks
 from tests.factories_aggregators import aggregator_resume_row, aggregator_row
 
 
+def _seen(title: str, url: str, editor_url: str | None = None) -> SeenResume:
+    """Резюме, каким его прислал перечень; редактор — только там, где о нём речь."""
+    return SeenResume(title, url, editor_url)
+
+
 async def _site(session_factory) -> int:
     row = aggregator_row()
     await put(session_factory, row)
@@ -19,8 +24,8 @@ async def _site(session_factory) -> int:
 async def test_the_first_scan_adds_every_resume_unchosen_in_site_order(session, session_factory):
     site = await _site(session_factory)
     async with session.begin():
-        await sync_resumes(session, site, [SeenResume("Дизайнер", "https://hh.ru/r/2"),
-                                           SeenResume("Повар", "https://hh.ru/r/1")], can_add=True)
+        await sync_resumes(session, site, [_seen("Дизайнер", "https://hh.ru/r/2"),
+                                           _seen("Повар", "https://hh.ru/r/1")], can_add=True)
     assert await resume_marks(session_factory, site) == [("Дизайнер", False), ("Повар", False)]
     assert (await only_row(session_factory, Aggregator)).can_add_resume is True
 
@@ -32,7 +37,7 @@ async def test_a_resume_with_the_same_link_stays_the_same_record_with_its_mark(
     kept = aggregator_resume_row(site, title="Старое", url="https://hh.ru/r/1", is_chosen=True)
     await put(session_factory, kept)
     async with session.begin():
-        await sync_resumes(session, site, [SeenResume("Новое имя", "https://hh.ru/r/1")],
+        await sync_resumes(session, site, [_seen("Новое имя", "https://hh.ru/r/1")],
                            can_add=False)
     row = await only_row(session_factory, AggregatorResume)
     assert (row.id, row.title, row.is_chosen) == (kept.id, "Новое имя", True)
@@ -47,8 +52,8 @@ async def test_a_vanished_resume_takes_its_mark_and_another_is_not_chosen(
               aggregator_resume_row(site, title="Ушло", url="https://hh.ru/r/1", is_chosen=True),
               aggregator_resume_row(site, title="Осталось", url="https://hh.ru/r/2", position=1))
     async with session.begin():
-        await sync_resumes(session, site, [SeenResume("Осталось", "https://hh.ru/r/2"),
-                                           SeenResume("Пришло", "https://hh.ru/r/3")],
+        await sync_resumes(session, site, [_seen("Осталось", "https://hh.ru/r/2"),
+                                           _seen("Пришло", "https://hh.ru/r/3")],
                            can_add=True)
     assert await resume_marks(session_factory, site) == [("Осталось", False), ("Пришло", False)]
     async with session_factory() as fresh:
@@ -61,18 +66,28 @@ async def test_known_resumes_follow_the_site_when_it_reorders_them(session, sess
               aggregator_resume_row(site, title="Первое", url="https://hh.ru/r/1", position=0),
               aggregator_resume_row(site, title="Второе", url="https://hh.ru/r/2", position=1))
     async with session.begin():
-        await sync_resumes(session, site, [SeenResume("Второе", "https://hh.ru/r/2"),
-                                           SeenResume("Первое", "https://hh.ru/r/1")],
+        await sync_resumes(session, site, [_seen("Второе", "https://hh.ru/r/2"),
+                                           _seen("Первое", "https://hh.ru/r/1")],
                            can_add=True)
     assert await resume_marks(session_factory, site) == [("Второе", False), ("Первое", False)]
+
+
+async def test_the_editor_of_a_known_resume_follows_the_site(session, session_factory):
+    """Редактор узнанного по ссылке резюме переписывается: сайт мог сменить адрес правки."""
+    site = await _site(session_factory)
+    await put(session_factory, aggregator_resume_row(site, url="https://hh.ru/r/1"))
+    async with session.begin():
+        await sync_resumes(session, site, [_seen("Повар", "https://hh.ru/r/1", "https://hh.ru/r/1/edit")],
+                           can_add=True)
+    assert (await only_row(session_factory, AggregatorResume)).editor_url == "https://hh.ru/r/1/edit"
 
 
 async def test_a_link_reported_twice_is_one_resume_at_its_first_place(session, session_factory):
     site = await _site(session_factory)
     async with session.begin():
-        await sync_resumes(session, site, [SeenResume("Первое", "https://hh.ru/r/1"),
-                                           SeenResume("Второе", "https://hh.ru/r/2"),
-                                           SeenResume("Повтор", "https://hh.ru/r/1")],
+        await sync_resumes(session, site, [_seen("Первое", "https://hh.ru/r/1"),
+                                           _seen("Второе", "https://hh.ru/r/2"),
+                                           _seen("Повтор", "https://hh.ru/r/1")],
                            can_add=True)
     assert await resume_marks(session_factory, site) == [("Первое", False), ("Второе", False)]
 
