@@ -141,10 +141,10 @@ describe('живая нижняя полоса', () => {
     await settled();
 
     handlers.ingestion_started();
-    handlers.progress_update({ stage: 'site', label: 'Вход на site.test…', current: 0, total: 0 });
+    handlers.progress_update({ stage: 'site', label: 'site.test: вход', current: 0, total: 0 });
     await settled();
 
-    expect(document.querySelector('.progress-caption').textContent).toBe('Вход на site.test…');
+    expect(document.querySelector('.progress-caption').textContent).toBe('site.test: вход');
   });
 
   it('ступень отклика видна подписью', async () => {

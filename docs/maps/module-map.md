@@ -806,7 +806,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def alembic_config() -> Config` (10)
 - `def ensure_schema() -> None` (9)
 
-### `backend/bot/aggregators.py` — 153 строк
+### `backend/bot/aggregators.py` — 155 строк
 
 Работа агента у бота с источниками: обход агрегаторов, вход на сайт, перечень и заполнение резюме, удаление источника.
 
@@ -822,7 +822,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def scan_aggregator(bot, aggregator_id: int) -> AgentOutcome` (3)
 - `async def fill_resume(bot, aggregator_id: int, resume_id: int) -> AgentOutcome` (4)
 - `async def create_resume(bot, aggregator_id: int) -> AgentOutcome` (4)
-- `async def _on_site(bot, aggregator_id: int, flow: Callable[[AgentKit, Source], Awaitable[str]], doing: str) -> AgentOutcome` (19)
+- `async def _on_site(bot, aggregator_id: int, flow: Callable[[AgentKit, Source], Awaitable[str]], doing: str) -> AgentOutcome` (21)
   - `async def on_site(kit: AgentKit) -> str` (2)
 - `async def delete_aggregator(bot, aggregator_id: int) -> str` (10)
 - `async def _row(bot, aggregator_id: int) -> Aggregator | None` (3)
