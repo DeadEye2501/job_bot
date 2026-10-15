@@ -349,7 +349,7 @@ async def test_work_on_a_site_names_itself_to_the_window(make_bot, sites, agent)
 
     await aggregators.scan_aggregator(bot, sites.id)
 
-    assert steps[0] == ("site", "Перечень резюме на site.test…", 0, 0)
+    assert steps[0] == ("site", "site.test: перечень резюме", 0, 0)
 
 
 async def test_a_scan_while_the_slot_is_taken_is_refused(make_bot, sites, agent):
