@@ -27,10 +27,10 @@
     STARTING,
     applyNote,
     bar,
-    caption,
     countlessNote,
     humanText,
     recoverNote,
+    sweepNote,
     updateNote,
   } from '$state/progress.js';
   import { round } from '$state/round.svelte.js';
@@ -88,9 +88,10 @@
   let mode = $state(OFF);
   let channels = $state(NOTHING_YET.channels);
   let messages = $state(NOTHING_YET.messages);
-  // Работа без счёта — прогон одной вакансии: полосам показать нечего, а
-  // сказать есть что, и говорит она за них обеих.
-  let single = $state('');
+  // Подпись работы, которая говорит за себя сама, а не счётом обхода
+  // источников — прогон одной вакансии, отклики, скачивание; пусто — подпись
+  // считают полосы.
+  let single = $state(null);
   // Сколько вакансий возьмёт «отклик на все новые» — число считает мост той же
   // выборкой, что и сам прогон.
   let newCount = $state(0);
@@ -100,7 +101,11 @@
 
   const locked = $derived(!allAlive(health));
   const lockedTip = $derived(blockedTip(health));
-  const captionText = $derived(single || caption(channels, messages));
+  const note = $derived(single ?? sweepNote(channels, messages));
+  // Плашка человека встаёт на место полос. Полосы и подписи по их бокам
+  // показываются вместе, по одному условию: подписи плашке не нужны.
+  const plateShown = $derived(round.human && !unfolded);
+  const barsShown = $derived(round.running && !plateShown);
   // Обновиться во время прогона нельзя — проверить можно всегда.
   const updateLocked = $derived(newer !== null && round.running);
   // Копия из исходников проверяет как exe, а качать ей нечего: подменить
@@ -253,12 +258,16 @@
     }
     // Агрегатор обходится той же полосой, что канал: источник за источником, и
     // подпись его — имя сайта со счётом найденного.
+    // Новый источник гасит счёт сообщений: прежний канал кончается вестью
+    // «итог из итога», и до первой вести нового его счёт стоял бы рядом с чужим
+    // именем.
     if (step.stage === 'channel' || step.stage === 'aggregator') {
-      single = '';
+      single = null;
       channels = { ...step };
+      messages = NOTHING_YET.messages;
     }
     if (step.stage === 'message') {
-      single = '';
+      single = null;
       messages = { current: step.current, total: step.total };
     }
   }
@@ -311,10 +320,13 @@
         state={health ? (health[key] ? 'ok' : 'err') : 'unknown'}
       />
     {/each}
+    {#if barsShown}
+      <span class="progress-what">{note.what}</span>
+    {/if}
   </div>
 
   <div class="bb-center">
-    {#if round.human && !unfolded}
+    {#if plateShown}
       <HumanPlate
         text={humanText(round.human)}
         confirm={confirming}
@@ -322,16 +334,18 @@
         onreveal={reveal}
         ondone={done}
       />
-    {:else if round.running}
+    {:else if barsShown}
       <ProgressBars
         channels={bar(channels.current, channels.total)}
         messages={bar(messages.current, messages.total)}
-        text={captionText}
       />
     {/if}
   </div>
 
   <div class="bb-right">
+    {#if barsShown}
+      <span class="progress-count">{note.count}</span>
+    {/if}
     {#if app}
       <SignalButton
         icon="autorenew"

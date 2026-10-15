@@ -13,7 +13,7 @@ from backend.notify import fire
 
 logger = logging.getLogger(__name__)
 
-_LABEL = "Обновление"
+_LABEL = "Скачивание обновления"
 
 DownloadOutcome = Literal[slot.CycleOutcome, update_download.UpdateOutcome, "handoff_failed"]
 """Чем кончилось скачивание: исходы места прогона, свои — нет новее, не сошлось, —

@@ -430,7 +430,7 @@ async def recover_orphan_vacancies(pipeline) -> int:
     processed = 0
     for idx, r in enumerate(taken, start=1):
         pipeline.emit_progress(
-            "recover", r.username or "", idx - 1, len(taken)
+            "recover", "Разбор отложенных", idx - 1, len(taken)
         )
         if not r.raw_text:
             continue

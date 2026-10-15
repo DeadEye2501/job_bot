@@ -20,6 +20,11 @@ import { settled } from './settled.js';
 
 afterEach(cleanup);
 
+/** Подписи по бокам полос: что идёт — слева, счёт — справа. */
+function sides() {
+  return ['.progress-what', '.progress-count'].map((one) => document.querySelector(one).textContent);
+}
+
 describe('живая нижняя полоса', () => {
   it('разбор вставленного объявления называет себя под полосами', async () => {
     // Ступень эта счёта не имеет — полосы бегут пустыми, — и своё имя говорит
@@ -103,15 +108,15 @@ describe('живая нижняя полоса', () => {
     expect(methods).toContain('system.human_done');
   });
 
-  it('ход обхода агрегатора идёт полосой каналов, со счётом в скобках', async () => {
+  it('ход обхода агрегатора идёт полосой каналов: слева сайт, справа найденное', async () => {
     const { handlers } = bar({ db: true, tg: true, chat: true, embed: true });
     await settled();
 
     handlers.ingestion_started();
-    handlers.progress_update({ stage: 'aggregator', label: 'hh.ru — найдено', current: 3, total: 10 });
+    handlers.progress_update({ stage: 'aggregator', label: 'Обход hh.ru', current: 3, total: 10 });
     await settled();
 
-    expect(document.querySelector('.progress-caption').textContent).toContain('hh.ru — найдено (3/10)');
+    expect(sides()).toEqual(['Обход hh.ru', 'Найдено 3 из 10']);
   });
 
   it('до первой вести о ходе подпись говорит, что идёт работа', async () => {
@@ -121,7 +126,7 @@ describe('живая нижняя полоса', () => {
     handlers.ingestion_started();
     await settled();
 
-    expect(document.querySelector('.progress-caption').textContent).toBe('Идёт работа…');
+    expect(sides()).toEqual(['Идёт работа…', '']);
   });
 
   it('дочитывание отложенных вакансий идёт полосой со счётом', async () => {
@@ -129,10 +134,10 @@ describe('живая нижняя полоса', () => {
     await settled();
 
     handlers.ingestion_started();
-    handlers.progress_update({ stage: 'recover', label: 'jobs', current: 1, total: 4 });
+    handlers.progress_update({ stage: 'recover', label: 'Разбор отложенных', current: 1, total: 4 });
     await settled();
 
-    expect(document.querySelector('.progress-caption').textContent).toBe('Отложенные вакансии (2/4)');
+    expect(sides()).toEqual(['Разбор отложенных', 'Вакансия 2 из 4']);
     expect(document.querySelector('.progress-fill').getAttribute('style')).toContain('width: 25%');
   });
 
@@ -141,27 +146,50 @@ describe('живая нижняя полоса', () => {
     await settled();
 
     handlers.ingestion_started();
-    handlers.progress_update({ stage: 'site', label: 'site.test: вход', current: 0, total: 0 });
+    handlers.progress_update({ stage: 'site', label: 'Вход на HeadHunter', current: 0, total: 0 });
     await settled();
 
-    expect(document.querySelector('.progress-caption').textContent).toBe('site.test: вход');
+    expect(sides()).toEqual(['Вход на HeadHunter', '']);
   });
 
-  it('ступень отклика видна подписью', async () => {
-    expect(applyNote({ label: 'Python-разработчик', current: 0, total: 3 }))
-      .toBe('Python-разработчик — отклик (1/3)');
+  it('ступень отклика — словами бота и место вакансии в очереди', async () => {
+    expect(applyNote({ label: 'Отклик на HeadHunter', current: 0, total: 3 }))
+      .toEqual({ what: 'Отклик на HeadHunter', count: 'Вакансия 1 из 3' });
   });
 
-  it('ход откликов виден под полосами', async () => {
+  it('ход откликов виден рядом с полосами', async () => {
     const { handlers } = bar({ db: true, tg: true, chat: true, embed: true });
     await settled();
 
     handlers.ingestion_started();
-    handlers.progress_update({ stage: 'apply', label: 'Python-разработчик', current: 1, total: 3 });
+    handlers.progress_update({ stage: 'apply', label: 'Отклик на @jobs', current: 1, total: 3 });
     await settled();
 
-    expect(document.querySelector('.progress-caption').textContent)
-      .toContain('Python-разработчик — отклик (2/3)');
+    expect(sides()).toEqual(['Отклик на @jobs', 'Вакансия 2 из 3']);
+  });
+
+  it('новый канал не носит счёт сообщений прежнего', async () => {
+    const { handlers } = bar({ db: true, tg: true, chat: true, embed: true });
+    await settled();
+
+    handlers.ingestion_started();
+    handlers.progress_update({ stage: 'channel', label: 'Обход @a', current: 0, total: 2 });
+    handlers.progress_update({ stage: 'message', label: '@a', current: 50, total: 50 });
+    handlers.progress_update({ stage: 'channel', label: 'Обход @b', current: 1, total: 2 });
+    await settled();
+
+    expect(sides()).toEqual(['Обход @b', 'Канал 2 из 2']);
+  });
+
+  it('подписи стоят в краях полосы окна: слева от полос и справа от них', async () => {
+    const { handlers } = bar({ db: true, tg: true, chat: true, embed: true });
+    await settled();
+
+    handlers.ingestion_started();
+    await settled();
+
+    expect(document.querySelector('.bb-left .progress-what')).not.toBeNull();
+    expect(document.querySelector('.bb-right').firstElementChild.classList).toContain('progress-count');
   });
 
   it('слово обхода показывается плашкой', async () => {
@@ -364,10 +392,10 @@ describe('значок обновления', () => {
     await settled();
 
     handlers.ingestion_started();
-    handlers.progress_update({ stage: 'update', label: 'Обновление', current: 1048576, total: 2097152 });
+    handlers.progress_update({ stage: 'update', label: 'Скачивание обновления', current: 1048576, total: 2097152 });
     await settled();
 
-    expect(document.querySelector('.progress-caption').textContent).toBe('Обновление — 1 из 2 МБ');
+    expect(sides()).toEqual(['Скачивание обновления', '1 из 2 МБ']);
     expect(document.querySelector('.progress-fill').getAttribute('style')).toContain('width: 50%');
   });
 
@@ -378,10 +406,10 @@ describe('значок обновления', () => {
     await settled();
 
     handlers.ingestion_started();
-    handlers.progress_update({ stage: 'update', label: 'Обновление', current: 99000000, total: 99000000 });
+    handlers.progress_update({ stage: 'update', label: 'Скачивание обновления', current: 99000000, total: 99000000 });
     await settled();
 
-    expect(document.querySelector('.progress-caption').textContent).toBe('Обновление — 94 из 94 МБ');
+    expect(sides()).toEqual(['Скачивание обновления', '94 из 94 МБ']);
   });
 
   it('у запертого значка подсказки нет: обещать то, что не нажмётся, незачем', async () => {

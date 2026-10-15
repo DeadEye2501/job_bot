@@ -11,7 +11,7 @@ from backend.applying import run
 from backend.applying.email import via_email
 from backend.applying.result import Dropped
 from backend.applying.telegram import via_telegram
-from backend.models import Application, Vacancy, VacancyStatus
+from backend.models import Application, Message, Vacancy, VacancyStatus
 from tests.backend.fixtures.applying import MAIL, TG
 from tests.dbio import all_rows, only_row
 from tests.fakes.agent import answering_gate, edited, finished, under_confirmation
@@ -40,8 +40,8 @@ async def test_a_telegram_letter_goes_and_is_recorded_as_the_person_left_it(tele
     assert await via_telegram(kit, vacancy.id, TG) == "applied"
 
     ((_, text, _),) = sent
-    (row,) = await all_rows(kit.pipeline.session_factory, Application)
-    assert text == row.letter == "Правленое письмо"
+    (row,) = await all_rows(kit.pipeline.session_factory, Message)
+    assert text == row.text == "Правленое письмо"
     ((item,),) = [one["items"] for one in asked]
     assert item["label"] == "Текст" and item["kind"] == "letter" and item["value"] and item["error"] == ""
     # Пустое письмо Telegram не примет: обязательно оно всегда.

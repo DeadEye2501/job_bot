@@ -1,7 +1,10 @@
-// Ход обхода, переведённый в подписи и в доли полос: строка хода, слово запора
+// Ход обхода, переведённый в подписи и в доли полос: подпись хода, слово запора
 // на время обхода, заполнение полос.
 //
-// Чистые функции: вести приходят доводами, наружу уходят строка и число.
+// Подпись хода — две части по бокам полос: `what` слева — что делаем и с чем,
+// словами бота, `count` справа — где он в счёте. Пустой `count` — счёта нет.
+//
+// Чистые функции: вести приходят доводами, наружу уходят подписи и числа.
 
 import { fillPercent } from './chosen.js';
 import { MB } from './units.js';
@@ -11,16 +14,15 @@ import { MB } from './units.js';
 export const RUNNING = 'Идёт обход';
 
 const NO_TOTAL = '…';
-const NO_MESSAGES = '—';
 const RERUN = 'Прогон вакансии…';
 
 /** Подпись начатой работы, о которой ещё ничего не известно.
  *
- * Первая весть о ходе приходит не сразу: до неё полосы уже бегут, и подпись под
- * ними обязана сказать, что бот занят. Слово общее: работ, занимающих место
- * прогона, много, и какая началась, скажет её первая весть.
+ * Первая весть о ходе приходит не сразу: до неё полосы уже бегут, и подпись
+ * рядом с ними обязана сказать, что бот занят. Слово общее: работ, занимающих
+ * место прогона, много, и какая началась, скажет её первая весть.
  */
-export const STARTING = 'Идёт работа…';
+export const STARTING = { what: 'Идёт работа…', count: '' };
 
 /** Что требуется от человека — словами плашки, что встаёт на место полос. */
 export function humanText(need) {
@@ -28,18 +30,32 @@ export function humanText(need) {
   return need.kind === 'captcha' ? 'Требуется пройти капчу' : `Требуется войти на ${need.host}`;
 }
 
-/** Подпись под полосами: где сейчас обход по каналам и по сообщениям.
+/** Подпись обхода источников: какой канал или сайт и где в счёте.
  *
- * Обе половины называются всегда. Пропади одна — полоса двигалась бы
- * необъяснимо: человек видит движение и не знает, что именно движется.
- *
- * Имя канала приходит не всегда — источник мог его не прислать, — и тогда
- * половина называется просто «Каналы». Пока итога нет вовсе, на её месте стоит
- * многоточие: «(0/0)» читается как «делать нечего», и человек решает, что
+ * Подпись источника приходит не всегда — между каналами её нет, — и тогда
+ * обход называется просто «Обход каналов». Счёт — самый мелкий из известных: идут
+ * сообщения канала — их, иначе источники. Пока итога нет вовсе, на месте счёта
+ * многоточие: «0 из 0» читается как «делать нечего», и человек решает, что
  * обход завис.
+ *
+ * Сайт агрегатора считает найденное, а не пройденное: число — сколько уже
+ * найдено, а не какое по счёту.
  */
-export function caption(channels, messages) {
-  return `${channelPart(channels)}, ${messagePart(messages)}`;
+export function sweepNote(channels, messages) {
+  return { what: channels.label || 'Обход каналов', count: sweepCount(channels, messages) };
+}
+
+function sweepCount(channels, messages) {
+  if (messages.total > 0) return `Сообщение ${place(messages)}`;
+  if (!(channels.total > 0)) return NO_TOTAL;
+  if (channels.stage === 'aggregator') return `Найдено ${Math.max(0, channels.current)} из ${channels.total}`;
+  return `Канал ${place(channels)}`;
+}
+
+/** Место в очереди, считая с единицы: весть о ходе приходит до работы над
+ *  элементом с его номером от нуля, а последняя — с итогом вместо номера. */
+function place({ current, total }) {
+  return `${Math.min(Math.max(0, current) + 1, total)} из ${total}`;
 }
 
 /** Состояние полосы целиком: сколько заполнено и знаем ли мы итог.
@@ -71,36 +87,26 @@ export const COUNTLESS_STAGES = new Set(['rerun', 'pasted', 'site']);
  * одну из них.
  */
 export function countlessNote(label, spare = RERUN) {
-  return label || spare;
+  return { what: label || spare, count: '' };
 }
 
-/** Подпись ступени откликов: вакансия и её место в очереди, считая с единицы. */
-export function applyNote({ label, current, total }) {
-  return `${label} — отклик (${current + 1}/${total})`;
+/** Подпись ступени откликов: откуда вакансия — словами бота — и её место в
+ *  очереди. */
+export function applyNote(step) {
+  return { what: step.label, count: `Вакансия ${place(step)}` };
 }
 
-/** Подпись дочитывания отложенных вакансий: которая по счёту, считая с единицы.
+/** Подпись дочитывания отложенных вакансий: которая по счёту.
  *  Без итога — общее слово: так ступень отчитывается о своём конце. */
-export function recoverNote({ current, total }) {
-  if (!total) return STARTING;
-  return `Отложенные вакансии (${current + 1}/${total})`;
+export function recoverNote(step) {
+  if (!step.total) return STARTING;
+  return { what: step.label, count: `Вакансия ${place(step)}` };
 }
 
 /** Подпись скачивания обновления: ход приходит байтами, человеку — мегабайты.
  *  Пока размер неизвестен — до ответа GitHub, — одно имя ступени. Оба числа
  *  округляются одним правилом: иначе докачанный файл читался бы недокачанным. */
 export function updateNote({ label, current, total }) {
-  if (!total) return `${label}…`;
-  return `${label} — ${Math.round(current / MB)} из ${Math.round(total / MB)} МБ`;
-}
-
-function channelPart({ label, current, total }) {
-  if (label) return `${label} (${Math.max(0, current)}/${Math.max(0, total)})`;
-  if (!total || total <= 0) return NO_TOTAL;
-  return `Каналы (${Math.max(0, current)}/${total})`;
-}
-
-function messagePart({ current, total }) {
-  if (!total || total <= 0) return `Сообщение (${NO_MESSAGES})`;
-  return `Сообщение (${Math.max(0, current)}/${total})`;
+  if (!total) return { what: label, count: '' };
+  return { what: label, count: `${Math.round(current / MB)} из ${Math.round(total / MB)} МБ` };
 }

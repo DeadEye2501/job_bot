@@ -188,7 +188,7 @@ async def test_each_accepted_page_moves_the_progress_in_the_window(make_pipeline
 
     await submit(text="Текст", url=PAGE, published="", contacts=[])
 
-    assert steps == [("aggregator", "HeadHunter — найдено", 1, 5)]
+    assert steps == [("aggregator", "Обход HeadHunter", 1, 5)]
 
 
 BARRED_PAGE = "https://jobs.barred.test/vacancy/1"

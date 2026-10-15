@@ -81,24 +81,24 @@ async def run_aggregator_now(bot, aggregator_id: int) -> AgentOutcome:
 async def login_aggregator(bot, aggregator_id: int) -> AgentOutcome:
     """Вход: видимый браузер на главной, человек входит и закрывает окно, агент проверяет
     вход и перечисляет резюме."""
-    return await _on_site(bot, aggregator_id, log_in, "вход")
+    return await _on_site(bot, aggregator_id, log_in, "Вход на {name}")
 
 
 async def scan_aggregator(bot, aggregator_id: int) -> AgentOutcome:
     """Перечень резюме по кнопке окна."""
-    return await _on_site(bot, aggregator_id, scan, "перечень резюме")
+    return await _on_site(bot, aggregator_id, scan, "Перечень резюме")
 
 
 async def fill_resume(bot, aggregator_id: int, resume_id: int) -> AgentOutcome:
     """Перезаписать резюме по анкете — по кнопке в его строке."""
     return await _on_site(bot, aggregator_id, lambda kit, source: fill(kit, source, resume_id),
-                          "заполнение резюме")
+                          "Заполнение резюме")
 
 
 async def create_resume(bot, aggregator_id: int) -> AgentOutcome:
     """Завести новое резюме по анкете — по пункту меню карточки."""
     return await _on_site(bot, aggregator_id, lambda kit, source: fill(kit, source, None),
-                          "новое резюме")
+                          "Новое резюме")
 
 
 async def _on_site(
@@ -106,10 +106,9 @@ async def _on_site(
 ) -> AgentOutcome:
     """Работа на сайте агрегатора в месте прогона; у «Поиска по сети» сайта нет.
 
-    `doing` — что делается, в два-три слова: счёта у такой работы нет, и
-    подпись под полосами — единственное, что говорит человеку, чем занят бот.
-    Подпись короткая: она стоит в одном блоке с полосами и длинная тянула бы
-    их от середины.
+    `doing` — подпись у полос: «что делаем и с чем», в два слова; `{name}` в
+    ней — имя агрегатора. Счёта у такой работы нет, и подпись — единственное,
+    что говорит человеку, чем занят бот.
     """
     row = await _row(bot, aggregator_id)
     if row is None or row.host is None:
@@ -120,7 +119,7 @@ async def _on_site(
     async def on_site(kit: AgentKit) -> str:
         return await flow(kit, Source.of(row))
 
-    label = f"{row.host}: {doing}"
+    label = doing.format(name=row.name)
     return await work.in_slot(bot, on_site, label, ("site", label, 0, 0))
 
 

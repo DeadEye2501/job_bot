@@ -242,7 +242,7 @@ async def test_the_window_is_told_where_the_walk_is(walking, session_factory):
 
     await walking.poll_active_channels()
 
-    assert heard[:2] == [("channel", "@first", 0, 2), ("channel", "@second", 1, 2)]
+    assert heard[:2] == [("channel", "Обход @first", 0, 2), ("channel", "Обход @second", 1, 2)]
 
 
 async def test_both_bars_are_cleared_when_the_walk_ends(walking, session_factory):
