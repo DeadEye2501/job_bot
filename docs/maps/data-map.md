@@ -347,7 +347,8 @@
 ### `backend/agent/page_fields.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `WAIT_MS` = `15000`
+- `WAIT_MS` = `1000`
+- `LONG_WAIT_MS` = `5000`
 - `_RULES` = `"\n  const FIELD = 'input, select, textarea, [ro…`
 - `_FIELD_OF` = `'el => {' + _RULES + "\n  const target = (el.mat…`
 - `_INVENTORY` = `'() => {' + _RULES + '\n  const SKIP = [\'hidden…`
