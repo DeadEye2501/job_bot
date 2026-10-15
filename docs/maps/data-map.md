@@ -403,6 +403,11 @@
   - `today: date`
   - `languages: list[str]`
 
+### `backend/agent/prompts/site_guides.py`
+
+- `_GEEKJOB` = `'Правка резюме — одна длинная страница с кнопкой…`
+- `SITE_GUIDES` = `словарь из 1`
+
 ### `backend/agent/sessions.py`
 
 - `SESSION_LIMIT_SEC` = `3 * 3600`
@@ -2338,6 +2343,11 @@
 ### `tests/backend/test_agent_sessions.py`
 
 - `PLAN` = `SessionPlan(system_prompt='', task='', tools=[],…`
+
+### `tests/backend/test_agent_site_guides.py`
+
+- `GUIDE` = `'Раздел заказов — в меню слева.'`
+- `TASKS` = `словарь из 4`
 
 ### `tests/backend/test_agent_tools_browser_typing.py`
 
