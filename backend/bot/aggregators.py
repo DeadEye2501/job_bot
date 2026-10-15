@@ -20,14 +20,12 @@ logger = logging.getLogger(__name__)
 
 AgentOutcome = Literal[
     work.WorkOutcome, "missing", "locked", "blacklisted",
-    "not_logged_in", "login_timeout", "required_missing", "no_resume", "no_editor",
-    "no_new_resume", "extra_resume", "resume_lost", "not_created", "many_created",
+    "not_logged_in", "login_timeout", "required_missing", "no_resume", "no_new_resume", "extra_resume", "resume_lost", "not_created", "many_created",
 ]
 """Чем кончилось действие агента: исходы места прогона и свои — у источника
 (в отсеве), у входа (не вошёл, окно не закрыто) и у заполнения резюме (не
-хватило данных для обязательных полей, резюме на сайте уже нет, у резюме нет
-адреса правки, сайт не даёт завести ещё одно, список после работы не сошёлся
-с нажатым)."""
+хватило данных для обязательных полей, резюме на сайте уже нет, сайт не даёт
+завести ещё одно, список после работы не сошёлся с нажатым)."""
 
 
 def aggregators_available(bot) -> str | None:

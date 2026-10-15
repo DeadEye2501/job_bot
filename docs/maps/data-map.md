@@ -319,8 +319,7 @@
   - `unscreened: dict[tuple[str, str, str], dict]` = `field(default_factory=dict)`
 - `class FillJob`
   - `source: Source`
-  - `editor_url: str | None` = `None`
-  - `other_editors: frozenset[str]` = `frozenset()`
+  - `resume_url: str | None` = `None`
   - `outcome: Outcome | None` = `None`
   - `accepted: dict[tuple[str, str], dict]` = `field(default_factory=dict)`
   - `page_checks: dict[tuple[str, str], int]` = `field(default_factory=dict)`
@@ -437,8 +436,6 @@
 - `_ENOUGH` = `'проверок больше нет на этой странице: впиши эти…`
 - `_ONE_FIELD` = `'одно поле — один пункт: собери всё, что идёт в …`
 - `_NO_REASON` = `'поле общее: нужно обоснование, почему узкие пол…`
-- `_OFF_TARGET_EDIT` = `'это страница другого резюме — открой редактор р…`
-- `_OFF_TARGET_NEW` = `'это страница другого резюме — открой создание н…`
 - `class LayoutItem(ConfirmItem)`
   - `fallback_reason: str`
 
@@ -1281,7 +1278,6 @@
   - `aggregator_id: Mapped[int]` = `mapped_column(ForeignKey('aggregator.id'))`
   - `title: Mapped[str]`
   - `url: Mapped[str]`
-  - `editor_url: Mapped[str | None]`
   - `position: Mapped[int]`
   - `is_chosen: Mapped[bool]` = `mapped_column(server_default=expression.false())`
 - `class HR(IdMixin, Base)`
@@ -1694,7 +1690,6 @@
 - `class SeenResume`
   - `title: str`
   - `url: str`
-  - `editor_url: str | None`
 - `class FieldEntry(NamedTuple)`
   - `selector: str`
   - `label: str`
@@ -2175,7 +2170,7 @@
 - `WAY_UNKNOWN` = `'Этим способом на вакансию не откликнуться'`
 - `AGGREGATOR_REFUSALS` = `словарь из 5 и раскрытых`
 - `LOGIN_REFUSALS` = `словарь из 2 и раскрытых`
-- `FILL_REFUSALS` = `словарь из 8 и раскрытых`
+- `FILL_REFUSALS` = `словарь из 7 и раскрытых`
 - `RESUME_FILLED` = `'Резюме заполнено'`
 - `APPLY_VIA_REFUSALS` = `словарь из 7 и раскрытых`
 - `APPLY_ALL_REFUSALS` = `словарь из 3 и раскрытых`
@@ -2404,7 +2399,6 @@
 - `SECOND` = `'https://hh.ru/resume/2'`
 - `THIRD` = `'https://hh.ru/resume/3'`
 - `FOURTH` = `'https://hh.ru/resume/4'`
-- `FIRST_EDITOR` = `'https://hh.ru/resume/1/edit'`
 
 ### `tests/backend/test_llm_cv_response.py`
 

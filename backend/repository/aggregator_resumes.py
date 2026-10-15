@@ -28,8 +28,8 @@ async def sync_resumes(
 ) -> None:
     """Привести список резюме к увиденному на сайте; резюме узнаётся по ссылке.
 
-    Совпавшее остаётся той же записью: название, редактор и место
-    переписываются, отметка цела. Новое добавляется без отметки, пропавшее удаляется вместе
+    Совпавшее остаётся той же записью: название и место переписываются,
+    отметка цела. Новое добавляется без отметки, пропавшее удаляется вместе
     со своей. Ссылка, названная дважды, — одно резюме на первом своём месте.
     """
     known = {row.url: row for row in await resumes_of(session, aggregator_id)}
@@ -40,11 +40,10 @@ async def sync_resumes(
         row = known.pop(item.url, None)
         if row is None:
             session.add(AggregatorResume(
-                aggregator_id=aggregator_id, title=item.title, url=item.url,
-                editor_url=item.editor_url, position=position,
+                aggregator_id=aggregator_id, title=item.title, url=item.url, position=position
             ))
         else:
-            row.title, row.editor_url, row.position = item.title, item.editor_url, position
+            row.title, row.position = item.title, position
     for row in known.values():
         await session.delete(row)
     (await session.get(Aggregator, aggregator_id)).can_add_resume = can_add

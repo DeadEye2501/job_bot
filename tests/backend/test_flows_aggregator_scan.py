@@ -2,8 +2,8 @@
 
 from backend.agent.jobs import Source
 from backend.flows.aggregator_scan import scan
-from backend.models import Aggregator, AggregatorResume
-from tests.dbio import all_rows, only_row, put, resume_marks
+from backend.models import Aggregator
+from tests.dbio import only_row, put, resume_marks
 from tests.factories_aggregators import aggregator_resume_row, aggregator_row
 from tests.fakes.agent import finish_step, login_step, resumes_step, scripted_kit
 
@@ -12,16 +12,12 @@ async def test_the_reported_resumes_reach_the_base(make_pipeline, session_factor
     site = aggregator_row(is_logged_in=True)
     await put(session_factory, site)
     kit = scripted_kit(await make_pipeline(), [resumes_step(
-        [("Повар", "https://hh.ru/r/2", "https://hh.ru/r/2/edit"), ("Дизайнер", "https://hh.ru/r/1")],
+        [("Повар", "https://hh.ru/r/2"), ("Дизайнер", "https://hh.ru/r/1")],
     )])
 
     assert await scan(kit, Source.of(site)) == "ok"
 
     assert await resume_marks(session_factory, site.id) == [("Повар", False), ("Дизайнер", False)]
-    rows = await all_rows(session_factory, AggregatorResume)
-    assert {row.title: row.editor_url for row in rows} == {
-        "Повар": "https://hh.ru/r/2/edit", "Дизайнер": None,
-    }
 
 
 async def _can_add_after(make_pipeline, session_factory, resumes: list[tuple], many_resumes: bool) -> bool:

@@ -25,10 +25,7 @@ async def fill(kit: AgentKit, source: Source, resume_id: int | None) -> str:
     """Перезаписать резюме `resume_id` или завести новое (пусто).
 
     Ответ — `ok`, `no_resume` (перезаписываемого резюме у сайта нет — агент не
-    запускается), `no_editor` (у резюме нет адреса правки — агент не
-    запускается: правка, найденная поиском по сайту, может оказаться
-    созданием нового),
-    `required_missing` (обязательному полю не хватило данных: перечня и
+    запускается), `required_missing` (обязательному полю не хватило данных: перечня и
     отметки нет), `no_new_resume` (сайт не даёт завести ещё одно — флаг
     агрегатора «нельзя»), `error` (агент не довёл работу до конца) или ответ
     перечня, если он не удался. Заполненное резюме становится отмеченным: это
@@ -38,15 +35,12 @@ async def fill(kit: AgentKit, source: Source, resume_id: int | None) -> str:
     target = next((row for row in rows if row.id == resume_id), None)
     if resume_id is not None and target is None:
         return "no_resume"
-    if target is not None and not target.editor_url:
-        return "no_editor"
     resume_url = target.url if target else None
     await kit.browser.open_profile(source.id)
-    job = FillJob(source, target.editor_url if target else None,
-                  frozenset(row.editor_url for row in rows if row.editor_url and row is not target))
+    job = FillJob(source, resume_url)
     files = (kit.pipeline.cv_file(), kit.pipeline.photo_file())
     language = await kit.read(read_user_language)
-    end = await run_on_site(kit, job, FILL_PROMPT, fill_task(source.host, job.editor_url, language),
+    end = await run_on_site(kit, job, FILL_PROMPT, fill_task(source.host, resume_url, language),
                             *fill_tools(kit, job), *browser_tools(kit, *files, job))
     result = job.outcome.result if isinstance(job.outcome, Finished) else None
     if result == "required_missing":

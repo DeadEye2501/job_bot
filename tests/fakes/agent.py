@@ -96,14 +96,11 @@ def login_step(logged_in: bool):
 
 
 def resumes_step(resumes: list[tuple], many_resumes: bool = True, signs_found: str = "список «Мои резюме»"):
-    """Шаг сценария: агент перечисляет резюме сайта (название, ссылка и редактор —
-    пусто, если не нашёл), говорит, даёт ли сайт несколько резюме и по каким
-    признакам, и кончает сессию."""
+    """Шаг сценария: агент перечисляет резюме сайта (название, ссылка), говорит,
+    даёт ли сайт несколько резюме и по каким признакам, и кончает сессию."""
     async def step(tools):
-        await tools["report_resumes"](
-            resumes=[SeenResume(title, url, editor[0] if editor else None) for title, url, *editor in resumes],
-            many_resumes=many_resumes, signs_found=signs_found,
-        )
+        await tools["report_resumes"](resumes=[SeenResume(title, url) for title, url in resumes],
+                                      many_resumes=many_resumes, signs_found=signs_found)
         await tools["finish"](result="done")
     return step
 

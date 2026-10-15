@@ -24,7 +24,7 @@ def scan_tools(kit: AgentKit, job: ScanJob) -> list[Callable]:
     """
 
     async def report_resumes(resumes: list[SeenResume], many_resumes: bool, signs_found: str) -> str:
-        """Резюме человека на сайте в порядке сайта: название, ссылка на страницу резюме и editor_url — адрес правки именно этого резюме (null, если не нашёл). many_resumes — даёт ли сайт держать несколько резюме; signs_found — какие признаки этого нашёл и где, словами."""
+        """Резюме человека на сайте в порядке сайта: название и ссылка на страницу резюме. many_resumes — даёт ли сайт держать несколько резюме; signs_found — какие признаки этого нашёл и где, словами."""
         logger.info("перечень резюме на %s: резюме %d, можно ещё одно — %s (%s)",
                     job.source.host, len(resumes), "да" if many_resumes else "нет", signs_found)
         await kit.written(lambda session: sync_resumes(session, job.source.id, resumes, many_resumes))

@@ -16,16 +16,14 @@ FIRST = "https://hh.ru/resume/1"
 SECOND = "https://hh.ru/resume/2"
 THIRD = "https://hh.ru/resume/3"
 FOURTH = "https://hh.ru/resume/4"
-FIRST_EDITOR = "https://hh.ru/resume/1/edit"
 
 
 async def _site(session_factory):
     site = aggregator_row(is_logged_in=True, can_add_resume=True)
     await put(session_factory, site)
-    first = aggregator_resume_row(site.id, title="Швея", url=FIRST, editor_url=FIRST_EDITOR)
+    first = aggregator_resume_row(site.id, title="Швея", url=FIRST)
     await put(session_factory, first,
-              aggregator_resume_row(site.id, title="Повар", url=SECOND, editor_url=SECOND + "/edit",
-                                    position=1, is_chosen=True))
+              aggregator_resume_row(site.id, title="Повар", url=SECOND, position=1, is_chosen=True))
     return site, first
 
 
@@ -111,7 +109,7 @@ async def test_the_fill_works_in_the_profile_of_its_site_able_to_save(make_pipel
     await fill(kit, Source.of(site), first.id)
 
     assert seen == [(("profile", site.id), True)]
-    assert FIRST_EDITOR in kit.run_session.plans[0].task
+    assert FIRST in kit.run_session.plans[0].task
 
 
 async def test_the_resume_is_written_in_the_language_of_the_person(make_pipeline, session_factory):
@@ -180,21 +178,6 @@ async def test_a_list_that_does_not_match_the_button_is_an_error_and_marks_nothi
     assert await fill(kit, Source.of(site), first.id if overwrite else None) == outcome
 
     assert {title for title, chosen in (await resume_marks(session_factory, site.id)) if chosen} == {"Повар"}
-
-
-async def test_overwriting_a_resume_without_its_editor_is_refused_before_the_agent(
-    make_pipeline, session_factory
-):
-    """Без адреса правки агенту пришлось бы искать её по сайту, а найденное
-    поиском может оказаться созданием нового резюме."""
-    site = aggregator_row(is_logged_in=True)
-    await put(session_factory, site)
-    bare = aggregator_resume_row(site.id, title="Швея", url=FIRST)
-    await put(session_factory, bare)
-    kit = scripted_kit(await make_pipeline(), [])
-
-    assert await fill(kit, Source.of(site), bare.id) == "no_editor"
-    assert kit.run_session.plans == []
 
 
 async def test_a_creation_the_site_refuses_marks_the_site_and_scans_nothing(
