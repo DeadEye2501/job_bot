@@ -27,6 +27,7 @@ from backend.llm.answers import (
     read_with_a_second_try,
     str_or_none,
 )
+from backend.llm.candidate import in_user_language
 from backend.llm.external import external_block
 from backend.llm.hallucination import breaks_reason_style
 from backend.llm.rules import VACANCY_TEXT_CHARS
@@ -70,7 +71,7 @@ reason ОБЯЗАТЕЛЕН для обоих вердиктов.
 - Для fit — 1 предложение с опорой на присланный текст.
 - reason ОБЯЗАН ссылаться на КОНКРЕТНЫЕ слова, фразы или факты, ФИЗИЧЕСКИ ПРИСУТСТВУЮЩИЕ в присланном тексте. Не можешь процитировать место, подтверждающее блокер, — ставь "fit". Лучше fit-ошибка (человек отфильтрует руками), чем выдуманная причина отказа.
 - ЗАПРЕЩЕНО копировать reason из примеров: они показывают формат и логику, а слова бери из присланного текста.
-- Язык reason — ТОТ ЖЕ, что у исходного поста (русский пост → русский reason; English post → English reason).
+- Язык reason — язык пользователя: {USER_LANGUAGE}, каким бы ни был язык поста. Слова поста, на которые ссылаешься, приводи как в посте, в кавычках. В примерах язык пользователя — русский.
 """ + ONLY_JSON
 
 VERDICT_SCOPE = """Ты отвечаешь ровно на один вопрос — тот, что описан ниже. Других критериев у тебя нет.
@@ -128,7 +129,7 @@ def text_fit_question(purpose: str, prompt_for: Callable) -> Callable:
     ) -> tuple[FitValidation | None, str | None]:
         logger.debug("%s: title=%r", purpose, parsed.title)
         return await ask_fit(
-            FitQuestion(purpose=purpose, prompt=prompt_for(profile)),
+            FitQuestion(purpose=purpose, prompt=in_user_language(prompt_for(profile), profile.user_language)),
             vacancy_text(raw_text), client, model,
         )
 

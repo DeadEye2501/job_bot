@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass, field
 
-from backend.domain.taxonomy import NATIVE_LEVEL
+from backend.domain.language_choice import FALLBACK_LANGUAGE, person_language
 from backend.models import Gender, Profile
 from backend.models import ProfileLanguage
 from backend.models import ProfileSkill
@@ -44,15 +44,14 @@ class CandidateProfile:
     languages: list[CandidateLanguage] = field(default_factory=list)
     free_preferences: str | None = None
     known_skills: list[ProfileSkill] = field(default_factory=list)
+    user_language: str = FALLBACK_LANGUAGE
+    """Язык, на котором писать самому человеку. Решает его не модуль модели, а
+    `domain/language_choice`; сюда он приходит готовым."""
 
 
-def user_language(languages: list[CandidateLanguage]) -> str:
-    """Язык человека: первый родной в его списке, без родного — английский.
-
-    На нём делается всё, что приложение пишет от имени человека, кроме
-    обращений к работодателю: их язык задаёт вакансия.
-    """
-    return next((lang.name for lang in languages if lang.level == NATIVE_LEVEL), "English")
+def in_user_language(prompt: str, language: str) -> str:
+    """Наставление с готовым языком человека на месте `{USER_LANGUAGE}`."""
+    return prompt.replace("{USER_LANGUAGE}", language)
 
 
 def format_languages(languages: list[CandidateLanguage] | None) -> str:
@@ -127,4 +126,5 @@ def build_candidate_profile(
         work_formats=list(profile.work_format or []),
         languages=candidate_languages(languages),
         free_preferences=profile.free_preferences,
+        user_language=person_language(candidate_languages(languages)),
     )

@@ -41,6 +41,7 @@ datas = [
     ('alembic/versions/c4d7e2a915b3_one_apply_trail.py', 'alembic/versions'),
     ('alembic/versions/6cc10045aeb6_projects.py', 'alembic/versions'),
     ('alembic/versions/f3b8d1c2a7e4_resume_autofill.py', 'alembic/versions'),
+    ('alembic/versions/a7c2e9d41b06_vacancy_language.py', 'alembic/versions'),
     # Драйвер Playwright — node и его пакет: без них браузер агента не стартует.
     *collect_data_files('playwright'),
 ]

@@ -1,6 +1,5 @@
 """Разбор объявления о вакансии в структурированные поля."""
 
-
 import logging
 import re
 from dataclasses import replace
@@ -21,7 +20,7 @@ from backend.llm.answers import (
     read_with_a_second_try,
     str_or_none,
 )
-from backend.llm.candidate import format_known_skills
+from backend.llm.candidate import CandidateProfile, format_known_skills, in_user_language
 from backend.llm.rules import (
     WRAPPER_LINE,
     VACANCY_TEXT_CHARS,
@@ -82,12 +81,13 @@ PARSE_VACANCY_PROMPT = """Ты разбираешь текст объявлен�
   "grade": """ + _GRADE_VALUES + """,
   "salary": "string | null",
   "remote": """ + _FORMAT_VALUES + """,
-  "location": "string | null"
+  "location": "string | null",
+  "language": "string | null"
 }
 
 Семантика полей:
 - title: основная роль/должность как в посте ("Senior Frontend Developer", "UX/UI дизайнер", "Marketing Manager", "Флорист"). Без эмодзи, без скобок с названием компании. Ролей несколько у одного нанимателя — первая названная; остальные назови в description.
-- description: развёрнутое саммари вакансии ВСЕГДА НА РУССКОМ ЯЗЫКЕ, каким бы ни был язык поста (English post → русское саммари; Deutsch → русское саммари), 3-6 предложений, своими словами. Цель — дать читателю достаточно контекста, чтобы он понимал суть позиции, не открывая исходный пост. Покрывай по возможности: тип роли и грейд, домен/индустрию или продукт компании, ключевые задачи и зону ответственности, важные инструменты/материалы/стек (особенно нестандартные для роли), формат работы и гео-ограничения, любые заметные особенности (масштаб, размер команды, специфика проекта). НЕ навязывай тех-вокабуляр, если вакансия не техническая — используй язык домена самой вакансии (IT, дизайн, маркетинг, торговля, общепит, образование, медицина, ручной труд, искусство, спорт и т.п.). Не цитируй дословно, не выдумывай факты, которых нет в тексте. Не повторяй то, что уже есть в других полях JSON в виде голого перечисления (стек, зарплата, формат) — упоминай их только как часть связного рассказа. Если пост не описывает конкретную открытую вакансию (реклама, дайджест, мем, анонс митапа, обрывок, ПОСТ СОИСКАТЕЛЯ) — null.
+- description: развёрнутое саммари вакансии ВСЕГДА НА ЯЗЫКЕ ПОЛЬЗОВАТЕЛЯ — {USER_LANGUAGE}, каким бы ни был язык поста, 3-6 предложений, своими словами. Цель — дать читателю достаточно контекста, чтобы он понимал суть позиции, не открывая исходный пост. Покрывай по возможности: тип роли и грейд, домен/индустрию или продукт компании, ключевые задачи и зону ответственности, важные инструменты/материалы/стек (особенно нестандартные для роли), формат работы и гео-ограничения, любые заметные особенности (масштаб, размер команды, специфика проекта). НЕ навязывай тех-вокабуляр, если вакансия не техническая — используй словарь домена самой вакансии (IT, дизайн, маркетинг, торговля, общепит, образование, медицина, ручной труд, искусство, спорт и т.п.). Не цитируй дословно, не выдумывай факты, которых нет в тексте. Не повторяй то, что уже есть в других полях JSON в виде голого перечисления (стек, зарплата, формат) — упоминай их только как часть связного рассказа. Если пост не описывает конкретную открытую вакансию (реклама, дайджест, мем, анонс митапа, обрывок, ПОСТ СОИСКАТЕЛЯ) — null.
 - company_name: реальное название компании если упомянуто, иначе null. Не заполняй обобщённые "стартап", "ИП", "ООО", "кадровое агентство (КА)".
 - company_website: корпоративный сайт компании-работодателя если упомянут в посте. Формат — URL целиком ("https://techcorp.com") или домен ("techcorp.com"). Это ИМЕННО сайт компании-работодателя. НЕЛЬЗЯ записывать сюда: ссылки на канал публикации (t.me/...), ссылки на HR (@username, t.me/username), ссылки на общие хосты — job-площадки, соцсети, мессенджеры, хостинги анкет и сокращатели ({AGGREGATOR_HOSTS} и т.п.), ссылки на чаты/сообщества, телеграм-боты для отклика. Если корпоративный сайт не упомянут — null.
 - hr_contact: одна строка вида "@username" или "t.me/username" — контакт того, кому слать резюме. Если в посте несколько ссылок — выбирай тот, что обозначен как контакт HR/рекрутёра ("писать @anna", "резюме — @ivan"). Ссылки на сам канал публикации игнорируй. ВАЖНО: сюда идёт ТОЛЬКО Telegram-контакт. Email/форма/job-площадка/careers-сайт сюда НЕ ПОПАДАЮТ — они идут в other_contacts. Если за подписью ссылки стоит её адрес в круглых скобках («писать Анне (https://t.me/anna_hr)») — сюда идёт ТОЛЬКО адрес из скобок, без подписи перед ним. null если Telegram-контакта в посте нет. Telegram-бот для отклика (имя кончается на bot) — не hr_contact, а other_contacts; второй и следующие Telegram-контакты — тоже в other_contacts. Почта, форма и careers-сайт сюда не идут ни при каких условиях — даже когда Telegram-контакта в посте нет вовсе: пустое поле лучше чужой записи, по ней собеседник не разыскивается.
@@ -122,8 +122,8 @@ PARSE_VACANCY_PROMPT = """Ты разбираешь текст объявлен�
   Правила формата:
   - Если в тексте указан город — пиши "Страна/Город". Страну сам выводи из города.
   - Если указана только страна/регион без города — пиши только страну.
-  - Страна и город — ВСЕГДА ПО-РУССКИ, каким бы ни был язык поста: "Germany, Berlin" → "Германия/Берлин", "USA, New York" → "США/Нью-Йорк", "Brazil, São Paulo" → "Бразилия/Сан-Паулу". Регион внутри страны (область, штат, провинция) в поле не пишется: только страна, а при названном городе — страна и город. Место — не цитата из поста, а значение колонки, по которой идут отбор и статистика: напиши одно и то же место двумя языками, и оно посчитается двумя разными.
-  - Не используй сокращений и не используй полных официальных названий — бери общеупотребимую русскую форму: "Россия" (НЕ "РФ", НЕ "Российская Федерация"), "США" (НЕ "Соединённые Штаты Америки"), "Великобритания" (НЕ "Соединённое Королевство"), "Германия" (НЕ "Федеративная Республика Германия").
+  - Страна и город — ВСЕГДА НА ЯЗЫКЕ ПОЛЬЗОВАТЕЛЯ ({USER_LANGUAGE}), каким бы ни был язык поста; при русском: "Germany, Berlin" → "Германия/Берлин", "USA, New York" → "США/Нью-Йорк", "Brazil, São Paulo" → "Бразилия/Сан-Паулу". Регион внутри страны (область, штат, провинция) в поле не пишется: только страна, а при названном городе — страна и город. Место — не цитата из поста, а значение колонки, по которой идут отбор и статистика: напиши одно и то же место двумя языками, и оно посчитается двумя разными.
+  - Не используй сокращений и не используй полных официальных названий — бери общеупотребимую форму этого языка; при русском: "Россия" (НЕ "РФ", НЕ "Российская Федерация"), "США" (НЕ "Соединённые Штаты Америки"), "Великобритания" (НЕ "Соединённое Королевство"), "Германия" (НЕ "Федеративная Республика Германия").
   - Каждое слово страны/города — С ЗАГЛАВНОЙ БУКВЫ ("Россия/Москва", "США/Сан-Франциско", "Сербия/Нови-Сад", "Япония/Токио").
   Когда что заполнять:
   - Офис/гибрид — указывай локацию офиса ("Германия/Берлин", "Япония/Осака", "Канада").
@@ -131,6 +131,7 @@ PARSE_VACANCY_PROMPT = """Ты разбираешь текст объявлен�
   - Мест несколько — страна, если все в одной стране; иначе null.
   - Remote БЕЗ географических ограничений ("можно из любой страны", "worldwide", "remote из любой точки мира") — location=null.
   - Местоположение не упомянуто вообще — null.
+- language: язык текста поста, названием на нём самом («Español», «Русский», «English»); пост на двух языках — язык его основной части.
 
 ИЗВЕСТНЫЕ СКИЛЫ КАНДИДАТА (формат: имя — алиасы через запятую; сверяй с ним написание значений stack):
 {KNOWN_SKILLS_BLOCK}
@@ -141,11 +142,11 @@ PARSE_VACANCY_PROMPT = """Ты разбираешь текст объявлен�
 - Только то, что есть в тексте. Не выдумывай.
 - Если поле невозможно извлечь — null (или [] для stack_required / stack_preferred).
 - title обязателен для вакансии; у поста, который вакансией не является, все поля null, включая title.
-- Никогда не переводи значения enum-полей (grade, remote) на русский.
+- Никогда не переводи значения enum-полей (grade, remote) ни на какой язык.
 - """ + ONLY_JSON + """
 
-Примеры:
-Текст (английский пост, всё под "Tools" — обязательное; description и location по-русски, каким бы ни был язык поста): "Senior Marketing Manager @AcmeMarketing\\n\\nWe're looking for a strong marketer for our SaaS team. Tools: HubSpot, Google Analytics, Mailchimp, Notion. 5+ years experience.\\nSalary: €4500-6000\\nRemote, EU only.\\nSite: https://acme.io\\nContact: @anna_hr"
+Примеры (в них язык пользователя — русский; поле language в ответах примеров опущено ради краткости, а в твоём ответе оно обязательно — язык текста поста):
+Текст (английский пост, всё под "Tools" — обязательное; description и location на языке пользователя, каким бы ни был язык поста): "Senior Marketing Manager @AcmeMarketing\\n\\nWe're looking for a strong marketer for our SaaS team. Tools: HubSpot, Google Analytics, Mailchimp, Notion. 5+ years experience.\\nSalary: €4500-6000\\nRemote, EU only.\\nSite: https://acme.io\\nContact: @anna_hr"
 Ответ: {"title": "Senior Marketing Manager", "description": "Senior-маркетолог в SaaS-команду AcmeMarketing. От кандидата ждут более пяти лет опыта в маркетинге и уверенной работы с HubSpot, Google Analytics, Mailchimp и Notion. Формат полностью удалённый, но с ограничением: кандидат должен находиться в ЕС. Зарплатная вилка указана в евро, отклик идёт через Telegram-контакт HR.", "company_name": "AcmeMarketing", "company_website": "https://acme.io", "hr_contact": "@anna_hr", "other_contacts": [], "stack_required": ["HubSpot", "Google Analytics", "Mailchimp", "Notion"], "stack_preferred": [], "grade": "senior", "salary": "€4500-6000", "remote": "remote", "location": "ЕС"}
 
 Текст (русский пост, всё под "Инструменты" — обязательное; нетехнический домен): "💐 Senior Флорист @BloomCo\\n\\nИщем опытного флориста в студию. Инструменты: секаторы, флористическая лента, оазис, упаковочные материалы. Опыт 5+ лет.\\nЗП: $1500-2200\\nОфис, Лион.\\nСайт: https://bloomco.fr\\nКонтакт: @anna_hr"
@@ -157,7 +158,7 @@ PARSE_VACANCY_PROMPT = """Ты разбираешь текст объявлен�
 Текст (явное смешанное распределение: блок "Требования:" — required, блок "Будет плюсом:" — preferred): "Бренд-менеджер. Требования: ведение бренд-стратегии, работа с подрядчиками, отчётность. Будет плюсом: опыт с Notion, Miro, английский язык. Удалёнка. @hr_acme"
 Ответ: {"title": "Бренд-менеджер", "description": "Бренд-менеджер с обязанностями по ведению бренд-стратегии, работе с подрядчиками и регулярной отчётности. Дополнительными плюсами будут навыки в Notion, Miro и английский язык. Формат работы полностью удалённый. Отклик через Telegram-контакт HR.", "company_name": null, "company_website": null, "hr_contact": "@hr_acme", "other_contacts": [], "stack_required": ["Ведение Бренд-Стратегии", "Работа С Подрядчиками", "Отчётность"], "stack_preferred": ["Notion", "Miro", "Английский Язык"], "grade": null, "salary": null, "remote": "remote", "location": null}
 
-Текст (английский пост, фронтенд-вакансия; React и Next.js — разные инструменты, и обе строки остаются, хотя у кандидата Next.js стоит алиасом React; description всё равно русский): "Frontend Engineer for a product team. Stack: TypeScript, React, Next.js, Tailwind, Docker. Remote."
+Текст (английский пост, фронтенд-вакансия; React и Next.js — разные инструменты, и обе строки остаются, хотя у кандидата Next.js стоит алиасом React; description всё равно на языке пользователя): "Frontend Engineer for a product team. Stack: TypeScript, React, Next.js, Tailwind, Docker. Remote."
 Ответ: {"title": "Frontend Engineer", "description": "Frontend-инженер в продуктовую команду. Основа стека — TypeScript и React поверх Next.js, Tailwind для вёрстки и Docker для окружения. Формат полностью удалённый, географических ограничений в посте нет. Telegram-контакта в посте тоже нет.", "company_name": null, "company_website": null, "hr_contact": null, "other_contacts": [], "stack_required": ["TypeScript", "React", "Next.js", "Tailwind", "Docker"], "stack_preferred": [], "grade": null, "salary": null, "remote": "remote", "location": null}
 
 Текст (нон-IT: три инструмента одного пакета — три отдельные строки; список известных скилов кандидата на это не влияет, даже если все три стоят там алиасами скила "Adobe Suite"): "Senior графический дизайнер в студию. Что нужно: Photoshop, Illustrator, InDesign, типографика. Удалёнка. @hr_studio"
@@ -172,7 +173,7 @@ PARSE_VACANCY_PROMPT = """Ты разбираешь текст объявлен�
 Текст (удалёнка С ограничением по гео — обязательно фиксируй ограничение в location, страну пиши общеупотребимо; набор скилов под "Что нужно:" → required): "Customer Success Manager\\nЛокация: удалённо только из Польши\\nКомпания: КА https://example.com\\nЧто нужно: ведение клиентов, отчётность, Intercom. Резюме @hr_contact"
 Ответ: {"title": "Customer Success Manager", "description": "Customer Success Manager в команду через кадровое агентство. Обязанности — ведение клиентов, регулярная отчётность, работа в Intercom. Формат удалённый, но только для находящихся в Польше — важное гео-ограничение для кандидата. Отклик через Telegram-контакт рекрутёра.", "company_name": null, "company_website": null, "hr_contact": "@hr_contact", "other_contacts": [], "stack_required": ["Ведение Клиентов", "Отчётность", "Intercom"], "stack_preferred": [], "grade": null, "salary": null, "remote": "remote", "location": "Польша"}
 
-Текст (английский пост, зарубежный город → 'Страна/Город' всё равно по-русски; набор скилов под "Tools:" → required): "Senior Product Designer at Acme Berlin. Hybrid, 2 days in the office. Tools: Figma, Sketch. CV to jobs@acme.de"
+Текст (английский пост, зарубежный город → 'Страна/Город' всё равно на языке пользователя; набор скилов под "Tools:" → required): "Senior Product Designer at Acme Berlin. Hybrid, 2 days in the office. Tools: Figma, Sketch. CV to jobs@acme.de"
 Ответ: {"title": "Senior Product Designer", "description": "Senior product designer в берлинский офис Acme. Основные инструменты — Figma и Sketch. Формат гибридный, с обязательными двумя днями в офисе в Берлине. Telegram-контакта нет, отклик идёт через корпоративную почту.", "company_name": "Acme", "company_website": null, "hr_contact": null, "other_contacts": ["jobs@acme.de"], "stack_required": ["Figma", "Sketch"], "stack_preferred": [], "grade": "senior", "salary": null, "remote": "hybrid", "location": "Германия/Берлин"}
 
 Текст (один скилл — отдельной строкой "nice to have" → preferred; остальные под "Требования:" → required): "Senior SMM-менеджер. Требования: ведение соцсетей бренда, контент-план, аналитика. Nice to have: Canva. Удалёнка. @hr_anna"
@@ -392,14 +393,15 @@ def _vacancy_of(data: dict, title: str) -> ParsedVacancy:
         salary=_text_field("salary"),
         remote=normalize_enum(data.get("remote"), WORK_FORMATS),
         location=_text_field("location"),
+        language=_text_field("language"),
     )
 
 
-def _parse_request(text: str, known_skills, max_tokens: int) -> ChatRequest:
+def _parse_request(text: str, profile: CandidateProfile, max_tokens: int) -> ChatRequest:
     """Что спросить у модели: правила разбора и сам пост как данные."""
-    system_prompt = PARSE_VACANCY_PROMPT.replace(
-        "{KNOWN_SKILLS_BLOCK}", format_known_skills(known_skills)
-    ).replace("{AGGREGATOR_HOSTS}", AGGREGATOR_HOSTS_LINE)
+    system_prompt = in_user_language(PARSE_VACANCY_PROMPT.replace(
+        "{KNOWN_SKILLS_BLOCK}", format_known_skills(profile.known_skills)
+    ).replace("{AGGREGATOR_HOSTS}", AGGREGATOR_HOSTS_LINE), profile.user_language)
     user_content = external_block(
         text,
         "текст объявления о вакансии",
@@ -462,7 +464,7 @@ async def parse_vacancy(
     model: str,
     channel_username: str | None = None,
     *,
-    known_skills=None,
+    profile: CandidateProfile = CandidateProfile(),
 ) -> tuple[ParsedVacancy | None, str | None]:
     """Разбор объявления либо причина, по которой спросить не вышло.
 
@@ -483,7 +485,7 @@ async def parse_vacancy(
     logger.debug("parse_vacancy: %d chars channel=@%s", len(text), channel_username or "?")
     parsed, trouble = await read_with_a_second_try(
         lambda room: chat(
-            client, model, _parse_request(text, known_skills, room), logger
+            client, model, _parse_request(text, profile, room), logger
         ),
         parsed_vacancy_from_json,
         (MAX_PARSE_TOKENS, ROOMIER_PARSE_TOKENS),

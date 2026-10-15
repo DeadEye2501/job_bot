@@ -14,6 +14,7 @@ from backend.domain.hosts import normalize_host
 from backend.models import Company
 from backend.incoming import str_list
 from backend.repository.companies_card import add_company_spellings, create_company
+from backend.repository.profile_languages import read_user_language
 from backend.repository.companies_keys import (
     hosts_compatible,
     normalize_company_name,
@@ -402,9 +403,10 @@ def _log_no_match(parsed: _Parsed, shortlist, reasoning: str | None) -> None:
 
 
 async def _llm_arbitrate(
-    lm_client: Any, lm_model: str, parsed: _Parsed, shortlist
+    lm_client: Any, lm_model: str, parsed: _Parsed, shown: tuple[list, str]
 ) -> tuple[Company | None, dict]:
-    """Спросить модель, кто из показанных — та же компания.
+    """Спросить модель, кто из показанных — та же компания; `shown` — короткий
+    список и язык пояснения, решённый `domain/language_choice`.
 
     Отдаёт найденного и приписку к протоколу, а не правит протокол сам: чем
     кончилось дело, решает зовущий, а приписка ложится при любом исходе.
@@ -413,14 +415,11 @@ async def _llm_arbitrate(
     слоя модели внутри тела: репозиторий не должен зависеть от него на
     импорте, а нужен он только здесь и только когда до арбитра дошло.
     """
-    from backend.llm.company import dedupe_company_with_llm
+    from backend.llm.company import CompanyAsk, dedupe_company_with_llm
 
+    shortlist, language = shown
     matched_id, reasoning = await dedupe_company_with_llm(
-        lm_client,
-        lm_model,
-        parsed_name=parsed.raw_name,
-        parsed_website=parsed.website,
-        candidates=shortlist,
+        lm_client, lm_model, CompanyAsk(parsed.raw_name, parsed.website, shortlist, language),
     )
     patch: dict = {
         "candidates": [
@@ -471,7 +470,8 @@ async def find_or_create_company(
     if parsed.norm and lm_client is not None and lm_model:
         shortlist = _llm_shortlist(norms, parsed)
         if shortlist:
-            match, patch = await _llm_arbitrate(lm_client, lm_model, parsed, shortlist)
+            shown = (shortlist, await read_user_language(session))
+            match, patch = await _llm_arbitrate(lm_client, lm_model, parsed, shown)
             decision.update(patch)
             if match is not None:
                 return _accept_company_match(

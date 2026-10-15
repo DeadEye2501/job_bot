@@ -69,6 +69,8 @@ class Vacancy(IdMixin, CreatedAtMixin, Base):
     salary_currency: Mapped[str | None]
     remote: Mapped[str | None]
     location: Mapped[str | None]
+    # Язык текста поста — его называет разбор; по нему решается язык отклика.
+    language: Mapped[str | None]
     score: Mapped[int | None]
     skip_reason: Mapped[str | None]
     source_url: Mapped[str | None]

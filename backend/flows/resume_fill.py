@@ -15,9 +15,8 @@ from backend.agent.tools_browser import browser_tools
 from backend.agent.tools_fill import fill_tools
 from backend.agent.sessions import end_reason, run_on_site
 from backend.flows.aggregator_scan import scan
-from backend.llm.candidate import candidate_languages, user_language
 from backend.repository.aggregator_resumes import choose_resume, resumes_of
-from backend.repository.profile_languages import list_profile_languages
+from backend.repository.profile_languages import read_user_language
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +37,7 @@ async def fill(kit: AgentKit, source: Source, resume_id: int | None) -> str:
     await kit.browser.open_profile(source.id)
     job = FillJob(source, resume_url)
     files = (kit.pipeline.cv_file(), kit.pipeline.photo_file())
-    language = user_language(candidate_languages(await kit.read(list_profile_languages)))
+    language = await kit.read(read_user_language)
     end = await run_on_site(kit, job, FILL_PROMPT, fill_task(source.host, resume_url, language),
                             *fill_tools(kit, job), *browser_tools(kit, *files, job))
     result = job.outcome.result if isinstance(job.outcome, Finished) else None

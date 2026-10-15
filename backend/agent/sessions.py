@@ -1,6 +1,7 @@
 """Сессия агента под надзором: сервер, водитель, срок человека и общий срок."""
 
 import asyncio
+from dataclasses import replace
 
 from adapters.agent_mcp import serve_tools
 from adapters.claude_code_agent import AgentEnd, AgentRun, run_agent
@@ -9,6 +10,8 @@ from backend.agent.kit import AgentKit, RunSession, SessionPlan
 from backend.agent.prompts.frame import system_prompt
 from backend.agent.stops import HumanTimeout, LimitExhausted
 from backend.agent.tools_common import common_tools
+from backend.llm.candidate import in_user_language
+from backend.repository.profile_languages import read_user_language
 from backend.task_stop import put_out
 
 # Зависший процесс Claude Code иначе держал бы место прогона, а с ним и обход
@@ -20,7 +23,12 @@ SESSION_LIMIT_SEC = 3 * 3600
 
 async def run_guarded(kit: AgentKit, plan: SessionPlan) -> AgentEnd:
     """Сессия наперегонки со сроками. Отмена снаружи гасит сессию и ждёт её конца:
-    агент не успеет записать отклик после остановки."""
+    агент не успеет записать отклик после остановки.
+
+    Язык человека вписывается в рамку здесь: сюда приходит каждая сессия, а
+    собирают рамку синхронно, без базы."""
+    language = await kit.read(read_user_language)
+    plan = replace(plan, system_prompt=in_user_language(plan.system_prompt, language))
     session = asyncio.create_task(kit.run_session(plan))
     expiry = asyncio.create_task(kit.gate.expired.wait())
     try:

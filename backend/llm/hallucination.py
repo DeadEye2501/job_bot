@@ -43,11 +43,8 @@ _CEFR_LEVEL_RE = re.compile(
 
 
 _GENERIC_HALLUCINATION_MARKERS: tuple[tuple[re.Pattern[str], re.Pattern[str]], ...] = (
-    # Любой CEFR-уровень (A1/A2/B1/B2/C1/C2/Upper-Intermediate/Advanced/Fluent)
-    # в reason — должен быть и в тексте. Применимо к любому языку.
-    # Раньше A1/A2/B1 были исключены — это пропускало галлюцинации вида
-    # «требуется английский B1» когда ни «B1», ни «английск» в посте нет.
-    (_CEFR_LEVEL_RE, _CEFR_LEVEL_RE),
+    # Уровень языка сюда не входит: он спрашивается всегда, и с цитатами тоже
+    # (см. `looks_hallucinated`).
     # «ежедневные митинги/созвоны/standups» / «daily standup/meeting/sync»
     (
         re.compile(
@@ -104,7 +101,7 @@ _REASON_STYLE_VIOLATIONS: tuple[re.Pattern[str], ...] = (
         re.IGNORECASE,
     ),
 
-    # То же по-английски: модель отвечает на языке вакансии, и без этих
+    # То же по-английски: обоснование пишется на языке человека, и без этих
     # образцов заслон на англоязычном отказе молча выключался бы целиком.
     # «candidate has only B1», «candidate only has middle», «candidate has just A2»
     re.compile(
@@ -244,6 +241,20 @@ def _build_profile_hallucination_markers(
     return tuple(markers)
 
 
+_QUOTE_RE = re.compile(r"«([^»]+)»")
+"""Цитата поста в обосновании — в ёлочках: так её велит приводить наставление."""
+
+
+_SAME_SIGNS = str.maketrans({"ё": "е", "—": "-", "–": "-", "…": "..."})
+"""Знаки, которые модель в цитате пишет иначе, чем пост, не меняя слов."""
+
+
+def _flat(text: str) -> str:
+    """Текст для сверки цитаты: без регистра, с пробелами, сведёнными к одному,
+    и с одним написанием для ё/е, тире и многоточия."""
+    return " ".join(text.casefold().translate(_SAME_SIGNS).split())
+
+
 def looks_hallucinated(
     reason: str,
     raw_text: str,
@@ -251,19 +262,31 @@ def looks_hallucinated(
 ) -> str | None:
     """Обоснование ссылается на то, чего в объявлении нет; отдаёт примету.
 
-    Приметы двух родов: общие, не зависящие от кандидата, и построенные по
-    языкам его анкеты. Обе спрашивают одно: сказанное в обосновании есть в
-    самом посте или выдумано.
+    Первой спрашивается цитата: обоснование пишется на языке человека, а слова
+    поста приводит в кавычках как есть. Цитата, которой в посте нет, —
+    выдумка. Затем уровень языка: шкала одна на все языки, и уровень в
+    обосновании без уровня в посте выдуман, с цитатами или без. Найденная
+    цитата — опора, и словесные приметы ниже уже не спрашиваются: они знают
+    только русские обороты, и русское обоснование к посту на другом языке не
+    нашло бы в нём своего названия языка.
+
+    Без цитат остаются приметы двух родов: общие, не зависящие от кандидата, и
+    построенные по языкам его анкеты.
 
     Осторожна нарочно: пустая примета значит «не поймали», и вердикт модели
     остаётся как есть.
     """
     if not reason:
         return None
-    for reason_re, text_re in _GENERIC_HALLUCINATION_MARKERS:
-        if reason_re.search(reason) and not text_re.search(raw_text):
-            return reason_re.pattern
-    for reason_re, text_re in _build_profile_hallucination_markers(profile):
+    quotes = [_flat(q) for q in _QUOTE_RE.findall(reason)]
+    missing = next((q for q in quotes if q not in _flat(raw_text)), None)
+    if missing is not None:
+        return f"цитата «{missing}» не из поста"
+    if _CEFR_LEVEL_RE.search(reason) and not _CEFR_LEVEL_RE.search(raw_text):
+        return _CEFR_LEVEL_RE.pattern
+    if quotes:
+        return None
+    for reason_re, text_re in (*_GENERIC_HALLUCINATION_MARKERS, *_build_profile_hallucination_markers(profile)):
         if reason_re.search(reason) and not text_re.search(raw_text):
             return reason_re.pattern
     return None

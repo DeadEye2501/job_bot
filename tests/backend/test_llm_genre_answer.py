@@ -10,12 +10,12 @@
 import httpx
 
 from backend.llm.genre import classify_post_genre
-from tests.fakes.llm import CHAT, chat_json, chat_response, provider
+from tests.fakes.llm import CHAT, chat_json, chat_response, messages_of, provider
 
 
 async def _asked(answer: httpx.Response, text: str = "Ищем в команду"):
     """Спросить у подставного провайдера жанр присланного поста."""
-    return await classify_post_genre(text, provider({CHAT: answer}), "qwen")
+    return await classify_post_genre(text, provider({CHAT: answer}), "qwen", "Русский")
 
 
 async def test_a_judged_post_comes_back_with_its_reason():
@@ -70,7 +70,16 @@ async def test_an_unreadable_answer_is_not_a_trouble():
 
 async def test_an_empty_post_is_not_asked_about():
     """У пустого текста жанра не спрашивают: спрашивать не о чем."""
-    genre, trouble = await classify_post_genre("", provider({}), "qwen")
+    genre, trouble = await classify_post_genre("", provider({}), "qwen", "Русский")
 
     assert genre is None
     assert trouble is None
+
+
+async def test_the_reason_is_asked_in_the_user_language():
+    """Обоснование читает человек — и пишется на его языке, а не на языке поста."""
+    client = provider({CHAT: chat_json({"is_vacancy": True, "reason": "«Ищем в команду»"})})
+
+    await classify_post_genre("Ищем в команду", client, "qwen", "Қазақша")
+
+    assert "язык пользователя: Қазақша" in messages_of(client.sent[0])["system"]

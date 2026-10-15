@@ -8,9 +8,10 @@
 
 import pytest
 
+from backend.models import ProfileLanguage
 from backend.repository.companies_matching import find_or_create_company
 from tests.dbio import put
-from tests.factories import company_row
+from tests.factories import company_row, profile_row
 
 
 class Arbiter:
@@ -21,16 +22,15 @@ class Arbiter:
         self._reasoning = reasoning
         self.calls: list[dict] = []
 
-    async def __call__(
-        self, client, model, *, parsed_name, parsed_website, candidates
-    ):
+    async def __call__(self, client, model, ask):
         self.calls.append(
             {
                 "client": client,
                 "model": model,
-                "parsed_name": parsed_name,
-                "parsed_website": parsed_website,
-                "candidate_names": [c.name for c in candidates],
+                "parsed_name": ask.parsed_name,
+                "parsed_website": ask.parsed_website,
+                "candidate_names": [c.name for c in ask.candidates],
+                "language": ask.language,
             }
         )
         return self._matched_id, self._reasoning
@@ -92,6 +92,19 @@ async def test_a_similar_name_is_taken_to_the_arbiter(
     assert decision["stage"] == "llm_match"
     assert decision["llm_reasoning"] == "одна и та же компания"
     assert fake.calls[0]["candidate_names"] == ["Сбербанк"]
+
+
+async def test_the_arbiter_explains_in_the_person_language(session, session_factory, arbiter):
+    """Пояснение арбитра читает человек: язык ему решает приложение по анкете."""
+    person = profile_row()
+    await put(session_factory, person)
+    await put(session_factory, ProfileLanguage(profile_id=person.id, language="Қазақша", level="native"))
+    await put(session_factory, company_row(name="Сбербанк", website=None))
+    fake = arbiter()
+
+    await resolve(session, "Сбербанк Тех", fake)
+
+    assert fake.calls[0]["language"] == "Қазақша"
 
 
 async def test_a_name_far_from_everything_never_reaches_the_arbiter(

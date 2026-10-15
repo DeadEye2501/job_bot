@@ -8,6 +8,7 @@ from backend.flows.batches import report_failures
 from backend.llm.hr_reply import classify_hr_reply
 from backend.models import VacancyStatus
 from backend.payloads import PendingReply
+from backend.repository.profile_languages import read_user_language
 from backend.repository.vacancy_status import apply_classification
 from backend.notify import fire
 
@@ -66,8 +67,10 @@ async def classify_and_apply(
     нечего.
     """
     vacancy_id, msg_id, status = target
+    async with session_factory() as session:
+        language = await read_user_language(session)
     verdict, trouble = await classify_hr_reply(
-        text, status, lm_client, lm_chat_model
+        text, status, lm_client, lm_chat_model, language=language
     )
     if trouble is not None:
         logger.warning(

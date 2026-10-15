@@ -28,9 +28,6 @@ async def apply_chosen_way(bot, vacancy_id: int, way: Way) -> ApplyOutcome:
             return "missing"
 
     async def apply(kit: AgentKit) -> str:
-        # Анкета в памяти конвейера свежа после оборота, а нажать можно и до
-        # первого: письмо без неё не сочинить.
-        await bot.ingestion.reload_resources()
         outcome = await run.apply_chosen(kit, vacancy_id, way)
         if outcome == "applied":
             return "ok"
@@ -49,7 +46,6 @@ async def apply_all_new(bot) -> work.WorkOutcome:
     """
 
     async def apply(kit: AgentKit) -> str:
-        await bot.ingestion.reload_resources()
         await run.apply_vacancies(kit, await new_to_apply(bot.session_factory))
         return "ok"
 

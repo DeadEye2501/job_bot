@@ -9,7 +9,8 @@ from adapters.claude_code_agent import AgentEnd
 from backend.agent.kit import AgentKit, SessionPlan
 from backend.agent.prompts.frame import system_prompt
 from backend.agent.prompts.seeker import (
-    SEEKER_PROMPT, WEB_SEEKER_PROMPT, blacklisted_sites, seeker_task, web_seeker_task,
+    SEEKER_PROMPT, WEB_SEEKER_PROMPT, blacklisted_sites, search_languages_line, seeker_task,
+    web_seeker_task,
 )
 from backend.agent.sessions import end_reason, run_guarded
 from backend.agent.stops import RUN_STOPPERS, LimitExhausted
@@ -19,6 +20,7 @@ from backend.agent.tools_seeker import seeker_tools
 from backend.flows.handover import hand_over
 from backend.flows.parse_queue import ParseQueue
 from backend.repository.aggregators import barred_hosts, list_aggregators, mark_run
+from backend.repository.profile_languages import read_search_languages
 from backend.telegram_time import utc_now
 
 logger = logging.getLogger(__name__)
@@ -71,14 +73,15 @@ async def _search(kit: AgentKit, job: SeekJob, queue: ParseQueue) -> AgentEnd:
 async def _seek_plan(kit: AgentKit, job: SeekJob, queue: ParseQueue) -> SessionPlan:
     source = job.source
     tools = [*common_tools(kit, job), *seeker_tools(kit, job, queue), *browser_tools(kit, None, None)]
+    languages = search_languages_line(await kit.read(read_search_languages))
     if source.host is not None:
-        task = seeker_task(source.host, source.last_run_at, job.limit, kit.today)
+        task = "\n".join([seeker_task(source.host, source.last_run_at, job.limit, kit.today), languages])
         return SessionPlan(system_prompt(SEEKER_PROMPT, tools), task, tools, web_search=False)
     async with kit.pipeline.session_factory() as session:
         hosts = [a.host for a in await list_aggregators(session) if a.host]
         barred = sorted(await barred_hosts(session))
     task = "\n".join([web_seeker_task(hosts, source.last_run_at, job.limit, kit.today),
-                      blacklisted_sites(barred)])
+                      languages, blacklisted_sites(barred)])
     return SessionPlan(system_prompt(WEB_SEEKER_PROMPT, tools), task, tools, web_search=True)
 
 

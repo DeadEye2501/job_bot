@@ -18,18 +18,6 @@ async def test_a_manual_telegram_application_goes_through_the_same_applier(manua
     assert (await only_row(bot.session_factory, Vacancy)).status is VacancyStatus.APPLIED
 
 
-async def test_a_manual_application_reads_the_profile_before_the_letter(manual_case):
-    """До первого оборота анкета в памяти конвейера пуста — письмо без неё не сочинить."""
-    bot, vacancy = await manual_case()
-    bot.ingestion.profile_block = ""
-
-    async def reload_resources():
-        bot.ingestion.profile_block = "Иван Петров, Python-разработчик"
-
-    bot.ingestion.reload_resources = reload_resources
-    assert await apply_chosen_way(bot, vacancy.id, TG) == "ok"
-
-
 async def test_a_manual_application_finished_in_the_window_has_its_own_word(manual_case):
     """Человек закончил, а не провалился: ручной отклик отвечает своим словом."""
     bot, vacancy = await manual_case()

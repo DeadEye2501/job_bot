@@ -14,7 +14,11 @@ from functools import partial
 
 import pytest
 
+from backend.llm.candidate import CandidateProfile
 from backend.llm.fit import _parse_fit_validation
+from backend.llm.fit_languages import validate_language_fit
+from backend.llm.fit_place import validate_place_fit
+from backend.llm.fit_preferences import validate_preferences_fit
 from backend.llm.fit_role import validate_role_fit
 from tests.backend.fixtures.fit import asked, verdict
 from tests.factories import parsed_vacancy
@@ -266,3 +270,22 @@ async def test_a_reason_naming_the_requirement_is_left_alone():
 
     assert got.verdict == "reject"
     assert got.reason == "нужен C1, это выше нашего уровня"
+
+
+@pytest.mark.parametrize(
+    "check",
+    [
+        pytest.param(validate_role_fit, id="роль"),
+        pytest.param(validate_language_fit, id="языки"),
+        pytest.param(validate_place_fit, id="место"),
+        pytest.param(validate_preferences_fit, id="предпочтения"),
+    ],
+)
+async def test_every_reason_is_asked_in_the_user_language(check):
+    """Обоснование отказа читает человек — и пишется на его языке, который
+    приходит готовым, каким бы ни был язык поста."""
+    client = provider({CHAT: fit_answer("fit", "годится")})
+
+    await asked(check, client, profile=CandidateProfile(user_language="Қазақша"))
+
+    assert "язык пользователя: Қазақша" in messages_of(client.sent[0])["system"]

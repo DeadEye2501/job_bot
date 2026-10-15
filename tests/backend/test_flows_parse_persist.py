@@ -237,11 +237,11 @@ async def test_the_company_arbiter_is_asked_with_the_base_left_free(
     pipeline.parsed = replace(pipeline.parsed, company_name="Акме Софтвер")
     written: list[str] = []
 
-    async def arbiter(client, model, *, parsed_name, parsed_website, candidates):
+    async def arbiter(client, model, ask):
         async with session_factory() as another:
             another.add(app_setting_row("чужая запись", "пока думает арбитр"))
             await another.commit()
-        written.append(parsed_name)
+        written.append(ask.parsed_name)
         return None, "не та компания"
 
     monkeypatch.setattr("backend.llm.company.dedupe_company_with_llm", arbiter)

@@ -119,6 +119,48 @@ async def test_a_reason_backed_by_the_post_survives():
     assert got.reason == "вакансия подразумевает английский язык"
 
 
+async def test_a_reason_quoting_a_post_in_another_language_survives():
+    """Обоснование пишется на языке человека, а слова поста приводит в кавычках
+    как есть: найденная в посте цитата подкрепляет отказ, на каком бы языке ни
+    было остальное обоснование."""
+    reason = "Требуется английский язык: «English is a must»."
+    client = provider({CHAT: fit_answer("reject", reason)})
+    profile = CandidateProfile(languages=[CandidateLanguage(name="Английский", level="A2")])
+
+    got = await _check(client, raw_text="Backend developer. English is a must.", profile=profile)
+
+    assert got.verdict == "reject" and got.reason == reason
+
+
+async def test_a_quote_missing_from_the_post_flips_the_verdict():
+    """Цитата, которой в посте нет, — выдумка, на каком бы языке она ни была."""
+    client = provider({CHAT: fit_answer("reject", "Работа идёт на языке: «Deutsch fließend»")})
+
+    got = await _check(client, raw_text="Backend developer, remote team.", profile=CandidateProfile())
+
+    assert got.verdict == "fit" and got.reason is None
+
+
+async def test_a_true_quote_does_not_cover_an_invented_level():
+    """Честная цитата не прикрывает уровень, которого в посте нет."""
+    client = provider({CHAT: fit_answer("reject", "Требуется «English required» на уровне C1")})
+
+    got = await _check(client, raw_text="Backend developer. English required.", profile=CandidateProfile())
+
+    assert got.verdict == "fit" and got.reason is None
+
+
+async def test_a_quote_differing_only_in_signs_is_still_found():
+    """Ё вместо е и длинное тире вместо дефиса цитату выдумкой не делают."""
+    reason = "Язык обязателен: «Немецкий еще обязателен — без него никак»"
+    client = provider({CHAT: fit_answer("reject", reason)})
+
+    got = await _check(client, raw_text="Ищем повара. Немецкий ещё обязателен - без него никак.",
+                       profile=CandidateProfile())
+
+    assert got.verdict == "reject" and got.reason == reason
+
+
 async def test_a_fitting_verdict_is_never_second_guessed():
     """Вердикт «подходит» на выдуманность не проверяют.
 

@@ -38,7 +38,8 @@ def test_every_role_hears_each_voice_rule_once(role, rule):
 
 @pytest.mark.parametrize("role", ROLES)
 def test_no_slot_is_left_unfilled(role):
-    assert "{" not in system_prompt(role, [])
+    """Пустым остаётся только место языка человека: его вписывает сессия, читая анкету."""
+    assert "{" not in system_prompt(role, []).replace("{USER_LANGUAGE}", "")
 
 
 @pytest.mark.parametrize("role", ROLES)
@@ -71,7 +72,7 @@ def test_the_login_check_knows_the_site():
 def _task(vacancy_text="Текст вакансии", profile_text="Анкета", method=ApplicationVia.FORM.value,
           **job) -> str:
     fields = dict(way=Way(method, "https://site.test/form", None), simulated=False, letter_writer="app",
-                  confirming=False, resume=None)
+                  confirming=False, resume=None, language="Русский")
     fields.update(job)
     return applier_task(SimpleNamespace(**fields), vacancy_text, profile_text, TODAY)
 
@@ -104,7 +105,7 @@ def test_every_method_has_its_name_and_its_simulation(via):
 
 def test_the_applier_prompt_is_clean_too():
     built = system_prompt(APPLIER_PROMPT, [])
-    assert "{" not in built
+    assert "{" not in built.replace("{USER_LANGUAGE}", "")
     for value in person_fields().values():
         assert value not in built
 

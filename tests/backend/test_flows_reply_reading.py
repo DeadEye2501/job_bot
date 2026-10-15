@@ -53,7 +53,7 @@ async def reading(make_pipeline, session_factory, monkeypatch):
     # же способом отвечает разбор вакансии, и по той же причине.
     pipeline.trouble = None
 
-    async def classify_hr_reply(text, status, client, model):
+    async def classify_hr_reply(text, status, client, model, *, language):
         pipeline.asked.append((text, status))
         if isinstance(pipeline.verdict, Exception):
             raise pipeline.verdict

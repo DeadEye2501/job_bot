@@ -43,6 +43,7 @@ DIRECT_PARSED_FIELDS = (
     "salary",
     "remote",
     "location",
+    "language",
 )
 """Прямые поля разбора: у модели они лежат один в один, без пересчёта, и имя
 у вакансии то же самое.
@@ -270,6 +271,9 @@ class ParsedVacancy:
     salary: str | None
     remote: str | None
     location: str | None
+    # Язык текста поста, названием на нём самом. По нему
+    # `domain/language_choice` решает язык отклика.
+    language: str | None
 
     @property
     def stack(self) -> list[str]:

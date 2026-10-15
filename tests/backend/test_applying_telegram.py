@@ -2,9 +2,11 @@
 
 import time
 
+from sqlalchemy import select
+
 from backend.applying.result import Missed, TelegramClosed
 from backend.applying.telegram import via_telegram
-from backend.models import Application, ApplicationVia, Message, VacancyEvent
+from backend.models import Application, ApplicationVia, Message, Profile, Vacancy, VacancyEvent
 from tests.backend.fixtures.applying import TG
 from tests.dbio import all_rows, put
 from tests.factories import days_ago, message_row
@@ -59,11 +61,37 @@ async def test_a_letter_with_the_file_gets_no_link_line(telegram_case):
     assert "Резюме:" not in text
 
 
-async def test_a_second_vacancy_of_the_same_hr_gets_a_short_note(telegram_case):
+async def test_a_second_vacancy_of_the_same_hr_gets_a_letter_without_the_resume(telegram_case):
+    """Письмо вдогон пишет та же модель, зная о прежнем письме: отклик целиком
+    идёт на языке вакансии, а резюме у HR уже есть."""
     kit, vacancy, sent = await telegram_case(prior_letter=True)
     await via_telegram(kit, vacancy.id, TG)
     _, text, attachment = sent[-1]
-    assert attachment is None and text.startswith("Ещё одна ваша вакансия")
+    assert attachment is None and "Писем до: 1" in text
+
+
+async def test_the_letter_goes_in_the_language_of_the_vacancy(telegram_case):
+    """Язык письма решает приложение — язык вакансии, — а не модель по тексту поста."""
+    kit, vacancy, sent = await telegram_case()
+    async with kit.pipeline.session_factory() as session:
+        (await session.get(Vacancy, vacancy.id)).language = "Español"
+        await session.commit()
+    await via_telegram(kit, vacancy.id, TG)
+    ((_, text, _),) = sent
+    assert "Язык: Español" in text
+
+
+async def test_the_letter_model_gets_the_whole_profile(telegram_case):
+    """На просьбу поста письмо отвечает из анкеты — значит, анкету модель видит
+    целиком, со ссылками и латинским написанием имени."""
+    kit, vacancy, sent = await telegram_case()
+    async with kit.pipeline.session_factory() as session:
+        profile = (await session.scalars(select(Profile))).one()
+        profile.github_url, profile.first_name_latin = "https://github.com/someone", "Ivan"
+        await session.commit()
+    await via_telegram(kit, vacancy.id, TG)
+    ((_, text, _),) = sent
+    assert "https://github.com/someone" in text and "Ivan" in text
 
 
 async def test_a_rerun_writes_the_full_letter_again(telegram_case):

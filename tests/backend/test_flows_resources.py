@@ -91,20 +91,6 @@ async def test_the_candidate_slice_is_rebuilt(make_pipeline, session_factory):
     ]
 
 
-async def test_the_letter_block_is_rebuilt(make_pipeline, session_factory):
-    """Блок сведений о кандидате для письма собирается заново.
-
-    Он подмешивается в отклик; без перезагрузки письма уходили бы с
-    прошлогодним описанием.
-    """
-    await put(session_factory, profile_row(title="Python-разработчик"))
-    pipeline = await make_pipeline()
-
-    await pipeline.reload_resources()
-
-    assert "Python-разработчик" in pipeline.profile_block
-
-
 async def test_an_empty_base_leaves_empty_caches(make_pipeline):
     """На пустой базе кэши остаются пустыми, а не ломаются.
 

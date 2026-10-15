@@ -31,7 +31,6 @@ from backend.repository.blacklist_marks import load_active_blacklist_patterns
 from backend.repository.profile import get_profile
 from backend.repository.profile_languages import list_profile_languages
 from backend.repository.profile_skills import list_skills
-from backend.repository.profile_block import build_profile_block
 
 
 logger = logging.getLogger(__name__)
@@ -51,8 +50,6 @@ def _declare_caches(pipeline) -> None:
     (`domain/dedup.EmbeddingCache`): `reload_resources` его не трогает вовсе,
     он наполняется по требованию и сам помнит, наполнялся ли.
     """
-    # Текстовый блок «Информация о кандидате» для cover-letter prompt'а.
-    pipeline.profile_block = ""
     pipeline.embeddings = EmbeddingCache()
     pipeline.skills_cache = []
     # Срез данных профиля для LLM-валидатора.
@@ -148,7 +145,6 @@ class IngestionPipeline:
 
     # Поля ставят объявления выше, а объявлены они здесь: присвоение по
     # чужому полю (`pipeline.skills_cache = ...`) тип не записывает.
-    profile_block: str
     skills_cache: list[ProfileSkill]
     profile_cache: CandidateProfile
     blacklist_patterns: list[str]
@@ -242,7 +238,7 @@ class IngestionPipeline:
 
 
     async def reload_resources(self) -> None:
-        # Кэши skills/blacklist/profile/languages/profile_block обновляются
+        # Кэши skills/blacklist/profile/languages обновляются
         # ровно один раз — в начале каждого poll-цикла. Если юзер редактирует
         # профиль через UI между циклами, изменения подхватятся ТОЛЬКО на
         # следующем `poll_active_changes`. Это намеренно: cache invalidation
@@ -259,15 +255,13 @@ class IngestionPipeline:
                 candidate.build_candidate_profile(profile, languages),
                 known_skills=self.skills_cache,
             )
-            self.profile_block = await build_profile_block(session)
         logger.info(
             "loaded resources: %d skills, %d blacklist patterns, "
-            "profile_title=%r, %d languages, profile_block=%d chars",
+            "profile_title=%r, %d languages",
             len(self.skills_cache),
             len(self.blacklist_patterns),
             self.profile_cache.title,
             len(self.profile_cache.languages),
-            len(self.profile_block),
         )
 
     def cv_path(self):
