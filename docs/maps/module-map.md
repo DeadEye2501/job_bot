@@ -351,7 +351,7 @@ init
 - `def upgrade() -> None` (331)
 - `def downgrade() -> None` (44)
 
-## backend — 209 модулей
+## backend — 210 модулей
 
 ### `backend/agent/__init__.py` — 1 строк
 
@@ -451,19 +451,19 @@ init
 Зависит от: —
 
 
-### `backend/agent/prompts/applier.py` — 96 строк
+### `backend/agent/prompts/applier.py` — 99 строк
 
 Откликатель: отклик на одну вакансию одним способом.
 
-Зависит от: `backend.agent.prompts.screening`, `backend.domain.apply_order`, `backend.llm.rules`, `backend.runtime_settings`
+Зависит от: `backend.agent.prompts.screening`, `backend.agent.prompts.site_guides`, `backend.domain.apply_order`, `backend.llm.rules`, `backend.runtime_settings`
 
-- `def applier_task(job, vacancy_text: str, profile_text: str, today: date) -> str` (22)
+- `def applier_task(job, vacancy_text: str, profile_text: str, today: date) -> str` (23)
 
-### `backend/agent/prompts/fill.py` — 95 строк
+### `backend/agent/prompts/fill.py` — 96 строк
 
 Заполнение резюме на сайте агрегатора по анкете человека.
 
-Зависит от: `backend.llm.rules`
+Зависит от: `backend.agent.prompts.site_guides`, `backend.llm.rules`
 
 - `def fill_task(host: str, resume_url: str | None, language: str) -> str` (7)
 - `def _overwrite(resume_url: str) -> str` (20)
@@ -476,19 +476,19 @@ init
 
 - `def system_prompt(role_prompt: str, tools: list[Callable]) -> str` (11)
 
-### `backend/agent/prompts/login.py` — 15 строк
+### `backend/agent/prompts/login.py` — 17 строк
 
 Проверка входа: вошёл ли человек на сайт агрегатора.
 
-Зависит от: —
+Зависит от: `backend.agent.prompts.site_guides`
 
 - `def login_task(host: str) -> str` (3)
 
-### `backend/agent/prompts/scan.py` — 16 строк
+### `backend/agent/prompts/scan.py` — 18 строк
 
 Перечень резюме: какие резюме человека заведены на сайте агрегатора.
 
-Зависит от: —
+Зависит от: `backend.agent.prompts.site_guides`
 
 - `def scan_task(host: str) -> str` (3)
 
@@ -510,6 +510,14 @@ init
 - `def web_seeker_task(aggregator_hosts: list[str], barred_hosts: list[str], bounds: SeekBounds) -> str` (8)
 - `def _bounds(bounds: SeekBounds) -> list[str]` (7)
 - `def _since(last_run: datetime | None) -> str` (4)
+
+### `backend/agent/prompts/site_guides.py` — 23 строк
+
+Инструкции сайтов: устройство агрегатора, которого общее наставление не знает,
+
+Зависит от: —
+
+- `def guide_lines(host: str | None) -> list[str]` (6)
 
 ### `backend/agent/sessions.py` — 93 строк
 
@@ -3928,7 +3936,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 340 модулей
+## tests — 341 модулей
 
 ### `tests/adapters/test_agent_mcp.py` — 85 строк
 
@@ -4399,6 +4407,17 @@ Runtime settings layer.
 
 Тестов: 5
 
+
+### `tests/backend/test_agent_site_guides.py` — 60 строк
+
+Инструкции сайтов: задание работы на сайте несёт устройство этого сайта.
+
+Зависит от: `backend.agent.prompts`, `backend.agent.prompts.applier`, `backend.agent.prompts.fill`, `backend.agent.prompts.login`, `backend.agent.prompts.scan`, `backend.domain.apply_order`, `backend.models`, `tests.fakes.agent`
+
+Тестов: 5
+
+- `def _guide(monkeypatch)` (2)
+- `def _apply(target: str) -> str` (4)
 
 ### `tests/backend/test_agent_tools_applier.py` — 156 строк
 

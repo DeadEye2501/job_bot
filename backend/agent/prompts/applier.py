@@ -1,8 +1,10 @@
 """Откликатель: отклик на одну вакансию одним способом."""
 
 from datetime import date
+from urllib.parse import urlsplit
 
 from backend.agent.prompts.screening import SCREENING_RULES
+from backend.agent.prompts.site_guides import guide_lines
 from backend.llm.rules import LETTER_SHAPE, PERSONAL_FIELD_RULES
 from backend.domain.apply_order import VIA_AGGREGATOR, VIA_FORM
 from backend.runtime_settings import LETTER_WRITERS
@@ -93,4 +95,5 @@ def applier_task(job, vacancy_text: str, profile_text: str, today: date) -> str:
         lines.append(_CONFIRMING)
     if job.simulated:
         lines.append(_SIMULATION)
+    lines.extend(guide_lines(urlsplit(job.way.target).hostname))
     return "\n".join(lines)

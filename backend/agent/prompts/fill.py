@@ -1,5 +1,6 @@
 """Заполнение резюме на сайте агрегатора по анкете человека."""
 
+from backend.agent.prompts.site_guides import guide_lines
 from backend.llm.rules import PERSONAL_FIELD_RULES
 
 FILL_PROMPT = """Твоя задача — заполнить резюме человека на этом сайте по его анкете, каждую часть анкеты — в самое подходящее место. Анкету даёт инструмент profile.
@@ -49,7 +50,7 @@ def fill_task(host: str, resume_url: str | None, language: str) -> str:
     говорит прямо: правка не того резюме хуже любой ошибки, а привязать её
     проверку в коде не к чему."""
     return "\n".join([f"Сайт: https://{host}/", _overwrite(resume_url) if resume_url else _CREATE,
-                      _SECTIONS, f"Язык резюме: {language}."])
+                      _SECTIONS, f"Язык резюме: {language}.", *guide_lines(host)])
 
 
 _SECTIONS = (
