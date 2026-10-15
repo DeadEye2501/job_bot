@@ -49,9 +49,12 @@ class _Locator:
     async def count(self):
         return 0 if self._selector in self._page.failures else 1
 
-    async def evaluate(self, _script, **_options):
-        """Что за поле под селектором — как его называет страница."""
+    async def evaluate(self, script, **_options):
+        """Что за поле под селектором — как его называет страница; редактируемых
+        блоков у подделки нет."""
         self._page.fail_if_asked(self._selector)
+        if "isContentEditable" in script:
+            return False
         return list(self._page.fields.get(self._selector, ("", "", False)))
 
 
@@ -93,6 +96,10 @@ class FakePage:
     async def fill(self, selector, text, **_options):
         self.fail_if_asked(selector)
         self.calls.append(("fill", selector, text))
+
+    async def press(self, selector, key, **_options):
+        self.fail_if_asked(selector)
+        self.calls.append(("press", selector, key))
 
     async def select_option(self, selector, value, **_options):
         self.fail_if_asked(selector)

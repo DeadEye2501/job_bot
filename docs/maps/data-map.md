@@ -367,6 +367,10 @@
 ### `backend/agent/prompts/fill.py`
 
 - `FILL_PROMPT` = `'Твоя задача — заполнить резюме человека на этом…`
+- `_SECTIONS` = `'Резюме бывает разложено на несколько разделов и…`
+- `_CREATE_BUTTONS` = `'«Создать резюме», «Новое резюме», «Добавить рез…`
+- `_COPY_BUTTONS` = `'«Дублировать», «Создать копию», «Сохранить как …`
+- `_CREATE` = `f'Заведи новое резюме кнопкой или ссылкой создан…`
 
 ### `backend/agent/prompts/frame.py`
 
@@ -425,6 +429,7 @@
 - `logger` = `logging.getLogger(__name__)`
 - `_SNAPSHOT_LIMIT` = `60000`
 - `_CUT_MARK` = `'\n… снимок обрезан: страница длиннее, чем помещ…`
+- `_KEYS` = `набор из 3`
 - `class _Ledger(NamedTuple)`
   - `items: dict[tuple[str, str], dict]`
   - `accepted_by: str`
@@ -2333,6 +2338,10 @@
 ### `tests/backend/test_agent_sessions.py`
 
 - `PLAN` = `SessionPlan(system_prompt='', task='', tools=[],…`
+
+### `tests/backend/test_agent_tools_browser_typing.py`
+
+- `EDITOR` = `'\n<div id=about contenteditable=true>старый тек…`
 
 ### `tests/backend/test_agent_tools_fill.py`
 

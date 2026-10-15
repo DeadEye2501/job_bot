@@ -15,6 +15,10 @@ logger = logging.getLogger(__name__)
 _SNAPSHOT_LIMIT = 60_000
 _CUT_MARK = "\n… снимок обрезан: страница длиннее, чем помещается в ответ."
 
+_KEYS = ("Enter", "Tab", "Escape")
+"""Клавиши, которые агенту можно нажать: подтвердить вписанное, перейти дальше,
+закрыть список. Сочетания вроде «выделить всё» стёрли бы принятое."""
+
 
 class _Refused(Exception):
     """Ввод, которого не принимали: на страницу он не попадает."""
@@ -45,7 +49,7 @@ def browser_tools(
     `strict` — ввод, выбор и нажатия делают только принятое: отклик под
     подтверждением (после «Закончить» — ничего) или заполнение резюме.
     """
-    act, fill, select, click = _actions(kit, strict)
+    act, fill, select, click, press = _actions(kit, strict)
 
     async def browser_open(url: str) -> str:
         """Открыть адрес во вкладке."""
@@ -63,6 +67,10 @@ def browser_tools(
         """Ввести текст в поле, заменив прежний."""
         return await act(lambda page: fill(page, selector, text))
 
+    async def browser_press(selector: str, key: str) -> str:
+        """Нажать клавишу в поле: Enter, Tab или Escape — когда сайт принимает вписанное (метку, тег, подсказку) только по клавише."""
+        return await act(lambda page: press(page, selector, key))
+
     async def browser_select(selector: str, value: str) -> str:
         """Выбрать значение в родном списке (select). Самодельный список — browser_click по полю, затем по варианту."""
         return await act(lambda page: select(page, selector, value))
@@ -72,7 +80,7 @@ def browser_tools(
         return await act(lambda page: page.go_back())
 
     return [browser_open, browser_snapshot, browser_click, browser_type,
-            browser_select, *_attach_tools(act, resume, photo), browser_back]
+            browser_select, browser_press, *_attach_tools(act, resume, photo), browser_back]
 
 
 def _attach_tools(act: Callable, resume: Path | None, photo: Path | None) -> list[Callable]:
@@ -93,19 +101,20 @@ def _attach_tools(act: Callable, resume: Path | None, photo: Path | None) -> lis
     return [browser_attach_resume, browser_attach_photo]
 
 
-def _actions(kit: AgentKit, job: ApplyJob | FillJob | None) -> tuple[Callable, Callable, Callable, Callable]:
-    """Действие над страницей и ввод, выбор, нажатие — обычные или под подтверждением.
+def _actions(kit: AgentKit, job: ApplyJob | FillJob | None) -> tuple[Callable, ...]:
+    """Действие над страницей и ввод, выбор, нажатие, клавиша — обычные или под
+    подтверждением.
 
     После «Закончить» не проходит ни одно действие — решается здесь, один раз на
     все инструменты: и «Отправить», и нажатие при загрузке резюме.
     """
-    fill, select, click = _plain() if job is None else _strict(job)
+    fill, select, click, press = _plain() if job is None else _strict(job)
     held = _going if job is None else lambda: _not_finished(job)
 
     async def act(action: Callable[..., Awaitable]) -> str:
         return await _act(kit, action, held)
 
-    return act, fill, select, click
+    return act, fill, select, click, press
 
 
 async def _act(kit: AgentKit, action: Callable[..., Awaitable], held: Callable[[], None]) -> str:
@@ -126,11 +135,21 @@ async def _act(kit: AgentKit, action: Callable[..., Awaitable], held: Callable[[
     return f"готово; адрес: {page.url}"
 
 
-def _plain() -> tuple[Callable, Callable, Callable]:
-    """Ввод, выбор и нажатие как есть."""
+def _plain() -> tuple[Callable, Callable, Callable, Callable]:
+    """Ввод, выбор, нажатие и клавиша как есть."""
 
-    def fill(page, selector, text):
-        return page.fill(selector, text, timeout=WAIT_MS)
+    async def fill(page, selector, text):
+        field = page.locator(selector).first
+        if not await field.evaluate("e => e.isContentEditable", timeout=WAIT_MS):
+            await page.fill(selector, text, timeout=WAIT_MS)
+            return
+        # Редактор форматированного текста держит текст в своей модели и
+        # обновляет её по клавишам: прямое заполнение блока он не видит, и
+        # при сохранении остаётся старый текст.
+        await field.click(timeout=WAIT_MS)
+        await page.keyboard.press("Control+A")
+        await page.keyboard.press("Delete")
+        await field.press_sequentially(text, timeout=WAIT_MS)
 
     def select(page, selector, value):
         return page.select_option(selector, value, timeout=WAIT_MS)
@@ -138,21 +157,31 @@ def _plain() -> tuple[Callable, Callable, Callable]:
     def click(page, selector):
         return page.click(selector, timeout=WAIT_MS)
 
-    return fill, select, click
+    def press(page, selector, key):
+        if key not in _KEYS:
+            raise _Refused(f"нажать можно только {', '.join(_KEYS)}")
+        return page.press(selector, key, timeout=WAIT_MS)
+
+    return fill, select, click, press
 
 
-def _strict(job: ApplyJob | FillJob) -> tuple[Callable, Callable, Callable]:
-    """Ввод, выбор и нажатие только принятого: подтверждённого человеком или
-    принятого в раскладке (`_ledger`).
+def _strict(job: ApplyJob | FillJob) -> tuple[Callable, Callable, Callable, Callable]:
+    """Ввод, выбор, нажатие и клавиша только принятого: подтверждённого человеком
+    или принятого в раскладке (`_ledger`).
 
     Текст — только принятый и только в своё поле. Вариант списка выбирает
     агент, ближайший к принятому тексту, но поле должно быть принято.
     Нажатие на принятую галочку ставит принятую отметку, а не переключает её:
     повторное нажатие отметку не снимет. Нажатия не по полям — резюме,
-    «Отправить», переходы — как есть.
+    «Отправить», переходы — как есть. Клавиша — только в принятом поле: ею
+    фиксируют вписанное, и в чужом поле она отправила бы непринятое.
     """
-    plain_fill, plain_select, plain_click = _plain()
+    plain_fill, plain_select, plain_click, plain_press = _plain()
     ledger = _ledger(job)
+
+    async def press(page, selector, key):
+        _accepted_field(ledger, page, selector)
+        await plain_press(page, selector, key)
 
     async def fill(page, selector, text):
         item = _accepted_field(ledger, page, selector)
@@ -173,7 +202,7 @@ def _strict(job: ApplyJob | FillJob) -> tuple[Callable, Callable, Callable]:
             await _refuse_unaccepted_choice(ledger, page, selector)
         await plain_click(page, selector)
 
-    return fill, select, click
+    return fill, select, click, press
 
 
 async def _refuse_unaccepted_choice(ledger: _Ledger, page, selector: str) -> None:

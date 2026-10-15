@@ -42,6 +42,34 @@ async def test_after_finishing_the_resume_is_not_attached(tmp_path):
     assert answer.startswith("не вышло") and page.calls == []
 
 
+async def test_a_key_is_pressed_in_the_named_field():
+    """Метку тега или подсказку сайт принимает только по клавише."""
+    page = FakePage()
+
+    answer = await tool(_tools(page), "browser_press")(selector="#tags", key="Enter")
+
+    assert answer.startswith("готово") and page.calls[-1] == ("press", "#tags", "Enter")
+
+
+async def test_only_keys_that_confirm_or_move_on_are_pressed():
+    """Сочетания вроде «выделить всё» стёрли бы вписанное: клавиш три."""
+    page = FakePage()
+
+    answer = await tool(_tools(page), "browser_press")(selector="#tags", key="Control+A")
+
+    assert answer.startswith("не вышло") and page.calls == []
+
+
+async def test_under_strict_input_a_key_goes_only_to_an_accepted_field():
+    page, tools = await _strict(_item("#tags", "Python"))
+
+    refused = await tool(tools, "browser_press")(selector="#other", key="Enter")
+    accepted = await tool(tools, "browser_press")(selector="#tags", key="Enter")
+
+    assert refused.startswith("не вышло") and accepted.startswith("готово")
+    assert page.calls == [("press", "#tags", "Enter")]
+
+
 async def test_after_finishing_nothing_reaches_the_page():
     """Человек закончил — «Отправить» не нажимается, что бы агент ни решил."""
     page, tools = await _strict(_item("#name", "Иван"), outcome=Dropped())
