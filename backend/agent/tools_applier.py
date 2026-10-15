@@ -93,8 +93,7 @@ def _entry(job: ApplyJob, report: _Report) -> ApplicationEntry:
     return ApplicationEntry(
         vacancy_id=job.vacancy_id, aggregator_id=job.way.aggregator_id,
         via=ApplicationVia(report.via), target=report.target, letter=report.letter,
-        letter_by=job.letter_writer if report.letter else None,
-        screening=report.screening, simulated=job.simulated,
+        screening=report.screening,
     )
 
 
@@ -106,13 +105,13 @@ def _lines(screening: list[ScreeningPair]) -> list[tuple[bool, str]]:
 def _confirmed_sent(job: ApplyJob) -> tuple[str | None, list[ScreeningPair]]:
     """Письмо и скрининг под подтверждением — то, что ушло, а не пересказ агента.
 
-    Письмо — последний подтверждённый текстовый пункт без подписи; скрининг —
-    пункты с подписью, ещё не легшие в запись.
+    Письмо — последний подтверждённый пункт-письмо; скрининг — прочие пункты,
+    ещё не легшие в запись.
     """
     letter = next((item["value"] for item in reversed(job.confirmed.values())
-                   if not item["label"] and item["kind"] == "text"), "")
+                   if item["kind"] == "letter"), "")
     pairs = [{"question": item["label"], "answer": _answer(item)}
-             for item in job.unscreened.values() if item["label"]]
+             for item in job.unscreened.values() if item["kind"] != "letter"]
     return letter or None, pairs
 
 

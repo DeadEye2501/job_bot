@@ -19,3 +19,10 @@
   flex-direction: column;
   gap: 2px;
 }
+
+/* Высота по тексту, а не по виду пункта: короткий ответ не занимает места
+   письма, а письмо видно на восемь строк и дальше прокручивается. */
+.confirm-item .textarea {
+  field-sizing: content;
+  max-height: calc(8lh + 14px);
+}

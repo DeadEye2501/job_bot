@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from backend.applying.result import Missed, TelegramClosed
 from backend.applying.telegram import via_telegram
-from backend.models import Application, ApplicationVia, Message, Profile, Vacancy, VacancyEvent
+from backend.models import Application, ApplicationVia, Message, Profile, Vacancy
 from tests.backend.fixtures.applying import TG
 from tests.dbio import all_rows, put
 from tests.factories import days_ago, message_row
@@ -129,9 +129,7 @@ async def test_simulation_records_without_sending(telegram_case):
     kit, vacancy, sent = await telegram_case(simulated=True)
     assert await via_telegram(kit, vacancy.id, TG) == "applied"
     assert sent == [] and await all_rows(kit.pipeline.session_factory, Message) == []
-    (event,) = [e for e in await all_rows(kit.pipeline.session_factory, VacancyEvent)
-                if e.kind == "applied"]
-    assert event.payload["simulated"] is True
+    assert len(await all_rows(kit.pipeline.session_factory, Application)) == 1
 
 
 async def test_the_letter_is_delivered_to_the_hr_account_and_kept_in_the_chat(telegram_case):

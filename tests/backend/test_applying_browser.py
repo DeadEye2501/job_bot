@@ -7,7 +7,7 @@ from backend.applying.browser import via_browser
 from backend.applying.result import Dropped, Missed, SiteClosed, Unfit
 from backend.domain.apply_order import Way
 from backend.models import (
-    AggregatorResume, Vacancy, VacancyEvent, VacancyStatus, VacancyStatusHistory,
+    AggregatorResume, Vacancy, VacancyStatus, VacancyStatusHistory,
 )
 from tests.backend.fixtures.applying import FORM, PAGE
 from tests.dbio import all_rows, only_row, put
@@ -141,9 +141,8 @@ async def test_the_applier_is_told_how_to_call_a_person(board, kit_with):
     assert 'need_human с kind="captcha"' in plan.system_prompt
 
 
-async def test_a_simulated_application_is_told_not_to_send_and_is_marked(board, kit_with, session_factory):
-    """Последнюю кнопку формы код не знает: «не отправлять» агенту говорит задание,
-    а отклик записывается с пометкой симуляции."""
+async def test_a_simulated_application_is_told_not_to_send(board, kit_with):
+    """Последнюю кнопку формы код не знает: «не отправлять» агенту говорит задание."""
     site, vacancy = await board()
     kit = await kit_with([record_step(PAGE, via="aggregator")], send_locked=True)
 
@@ -151,8 +150,6 @@ async def test_a_simulated_application_is_told_not_to_send_and_is_marked(board, 
 
     (plan,) = kit.run_session.plans
     assert "Режим симуляции" in plan.task and kit.browser.sending is False
-    (event,) = [e for e in await all_rows(session_factory, VacancyEvent) if e.kind == "applied"]
-    assert event.payload["simulated"] is True
 
 
 async def test_a_real_application_opens_the_browser_able_to_send(board, kit_with):

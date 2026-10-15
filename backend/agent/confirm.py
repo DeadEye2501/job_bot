@@ -18,12 +18,13 @@ from backend.repository.vacancy_contacts import vacancy_link
 # По этому типу MCP строит схему пункта для агента. Не пара скрининга: поле,
 # которое анкете нечем заполнить, приходит пустым, и пустое значение законно.
 class ConfirmItem(TypedDict):
-    """Пункт окна подтверждения: подпись поля (у письма пусто), вид, значение,
+    """Пункт окна подтверждения: подпись поля, вид (письмо — своим видом: оно
+    ложится в отклик письмом, а не парой скрининга), значение,
     ошибка поля с сайта при повторном показе и селектор поля на странице (у
     письма Telegram и почты страницы нет — пусто)."""
 
     label: str
-    kind: Literal["text", "choice", "check"]
+    kind: Literal["text", "letter", "choice", "check"]
     value: str
     error: str
     selector: str
@@ -38,10 +39,10 @@ class ShownItem(ConfirmItem):
     required: bool
 
 
-def text_item(label: str, value: str) -> ShownItem:
+def text_item(label: str, kind: Literal["text", "letter"], value: str) -> ShownItem:
     """Пункт письма или его темы: правится текстом, страницы у него нет; пустым
     не уходит ни письмо, ни тема."""
-    return {"label": label, "kind": "text", "value": value, "error": "", "selector": "", "required": True}
+    return {"label": label, "kind": kind, "value": value, "error": "", "selector": "", "required": True}
 
 
 def is_checked(item: ConfirmItem) -> bool:

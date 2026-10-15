@@ -16,7 +16,7 @@ const LINK = 'https://t.me/jobs/42';
 
 function items() {
   return [
-    { label: '', kind: 'text', value: 'Здравствуйте', error: '', selector: '' },
+    { label: 'Текст', kind: 'letter', value: 'Здравствуйте', error: '', selector: '' },
     { label: 'Имя', kind: 'text', value: 'Иван', error: 'Только латиница', selector: '#name' },
     { label: 'Город', kind: 'choice', value: 'Москва', error: '', selector: '#city' },
     { label: 'Согласие', kind: 'check', value: 'true', error: '', selector: '#agree' },
@@ -52,11 +52,11 @@ describe('окно подтверждения отправки', () => {
     expect(fields()).toHaveLength(5);
   });
 
-  it('пункты по видам: письмо без подписи, поле, список текстом, галочка', async () => {
+  it('пункты по видам: текст письма, поле, список текстом, галочка — у каждого подпись', async () => {
     await waiting();
     const [letter, name, city, agree] = fields();
 
-    expect(letter.querySelector('.confirm-item-label')).toBeNull();
+    expect(letter.querySelector('.confirm-item-label').textContent.trim()).toBe('Текст');
     expect(letter.querySelector('textarea').value).toBe('Здравствуйте');
     expect(name.querySelector('.confirm-item-label').textContent.trim()).toBe('Имя');
     expect(city.querySelector('textarea, input').value).toBe('Москва');

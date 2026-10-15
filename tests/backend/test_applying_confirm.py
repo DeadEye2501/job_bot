@@ -35,7 +35,7 @@ async def _confirming(kit, answer, *, limit=3600.0):
 
 async def test_a_telegram_letter_goes_and_is_recorded_as_the_person_left_it(telegram_case):
     kit, vacancy, sent = await telegram_case()
-    kit, asked = await _confirming(kit, edited({"": "Правленое письмо"}))
+    kit, asked = await _confirming(kit, edited({"Текст": "Правленое письмо"}))
 
     assert await via_telegram(kit, vacancy.id, TG) == "applied"
 
@@ -43,7 +43,7 @@ async def test_a_telegram_letter_goes_and_is_recorded_as_the_person_left_it(tele
     (row,) = await all_rows(kit.pipeline.session_factory, Application)
     assert text == row.letter == "Правленое письмо"
     ((item,),) = [one["items"] for one in asked]
-    assert item["label"] == "" and item["kind"] == "text" and item["value"] and item["error"] == ""
+    assert item["label"] == "Текст" and item["kind"] == "letter" and item["value"] and item["error"] == ""
     # Пустое письмо Telegram не примет: обязательно оно всегда.
     assert item["required"] is True
 
@@ -91,14 +91,14 @@ async def test_a_stop_while_the_letter_waits_sends_nothing(telegram_case):
 
 async def test_a_mail_goes_with_the_subject_and_body_the_person_left(mail_case):
     kit, vacancy, outbox = await mail_case()
-    kit, asked = await _confirming(kit, edited({"Тема": "Новая тема", "": "Новое тело"}))
+    kit, asked = await _confirming(kit, edited({"Тема": "Новая тема", "Текст": "Новое тело"}))
 
     assert await via_email(kit, vacancy.id, MAIL) == "applied"
 
     (mail,) = outbox
     (row,) = await all_rows(kit.pipeline.session_factory, Application)
     assert (mail.subject, mail.body, row.letter) == ("Новая тема", "Новое тело", "Новое тело")
-    assert [item["label"] for item in asked[0]["items"]] == ["Тема", ""]
+    assert [item["label"] for item in asked[0]["items"]] == ["Тема", "Текст"]
 
 
 async def test_a_finished_mail_is_not_sent(mail_case):

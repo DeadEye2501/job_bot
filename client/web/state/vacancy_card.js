@@ -43,43 +43,6 @@ function skipNote(raw) {
   return ended(known.word + text.slice(known.starts.length));
 }
 
-// Сторона привязки: имя, номер или слова о пустоте. Имена запекаются в
-// событие, но у давних записей их нет — по номеру привязку хотя бы найдут.
-function linkSide(name, id, blank) {
-  if (name) return name;
-  return id === null || id === undefined ? blank : `#${id}`;
-}
-
-function linkNote(what, payload, blank) {
-  const was = linkSide(payload.previous_name, payload.previous_id, blank);
-  const now = linkSide(payload.new_name, payload.new_id, blank);
-  return `${what}: ${was} → ${now}.`;
-}
-
-// Способы отклика словами — в той форме, в какой они встают после «Отклик …».
-// Коды приходят с бэкенда (`ApplicationVia`).
-const VIA = {
-  telegram: 'в Telegram',
-  aggregator: 'на сайте агрегатора',
-  form: 'формой работодателя',
-  email: 'письмом',
-};
-
-/** Способ отклика словами; незнакомый код называется сам собой — коды заводит
- *  бэкенд, и новый приедет раньше, чем окно про него узнает. */
-function viaWords(method) {
-  return VIA[method] || method;
-}
-
-// Кто писал письмо отклика: по этой строке сравнивают два способа на живых
-// откликах (настройка `letter_writer`).
-const WRITER = { app: 'приложение', agent: 'агент' };
-
-function appliedNote(payload) {
-  const simulated = payload.simulated ? ' (симуляция)' : '';
-  return `Отклик ${viaWords(payload.via)}${simulated}; письмо: ${WRITER[payload.letter_by] || 'без письма'}.`;
-}
-
 // Подписи событий по роду. Таблицей, а не цепочкой сравнений: каждый новый род
 // удлинял бы одну функцию.
 const EVENT_TEXT = {
@@ -87,12 +50,9 @@ const EVENT_TEXT = {
     `Поступила из канала ${atHandle(payload.channel) || 'неизвестного канала'}.`,
   created_by_hand: () => 'Вакансия добавлена вручную.',
   parsed: (payload) => skipNote(payload.skip_reason) || 'Без замечаний.',
-  linked_hr: (payload) => linkNote('HR', payload, 'не привязан'),
-  linked_company: (payload) => linkNote('Компания', payload, 'не привязана'),
   // «Поиск по сети» — способ поиска, а не место: «Найдена на Поиск по сети»
   // читалось бы как ошибка.
   found: (payload) => (payload.web_search ? 'Найдена в сети.' : `Найдена на ${payload.source}.`),
-  applied: appliedNote,
 };
 
 // Чем подписано событие. Незнакомый род называется сам собой: роды заводит

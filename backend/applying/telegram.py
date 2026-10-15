@@ -53,7 +53,7 @@ async def via_telegram(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome:
     letter = await _letter(kit, errand)
     if isinstance(letter, Missed):
         return letter
-    kept = await confirmed(kit, vacancy_id, [text_item("", letter.text)])
+    kept = await confirmed(kit, vacancy_id, [text_item("Текст", "letter", letter.text)])
     if isinstance(kept, Dropped):
         return kept
     letter = replace(letter, text=kept[0]["value"])
@@ -126,7 +126,6 @@ async def _record(kit: AgentKit, errand: _Errand, way: Way, letter: Letter,
             stored.vacancy_id = errand.vacancy_id
         await record_application(session, ApplicationEntry(
             vacancy_id=errand.vacancy_id, aggregator_id=None, via=ApplicationVia.TELEGRAM,
-            target=way.target, letter=letter.text, letter_by="app", screening=[],
-            simulated=kit.pipeline.rs.send_locked))
+            target=way.target, letter=letter.text, screening=[]))
         await session.commit()
     kit.pipeline.fire_vacancies_changed()

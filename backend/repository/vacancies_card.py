@@ -3,7 +3,6 @@
 import logging
 
 from dataclasses import dataclass
-from typing import Any, Callable
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,7 +12,6 @@ from backend.models import Company, HR, Vacancy, VacancyEvent, VacancyStatusHist
 from backend.payloads import VacancyDetail
 
 from backend.repository.applications import has_screening
-from backend.repository.vacancies_life import add_vacancy_event
 from backend.repository.vacancy_contacts import list_contacts
 
 logger = logging.getLogger(__name__)
@@ -126,88 +124,37 @@ class _Link:
     """Чем перепривязка вакансии к одному предмету отличается от другой.
 
     Сам распорядок у них общий: не изменилось — молчим, не существует —
-    отказ, а состоявшаяся перепривязка попадает в ленту с именами до и
-    после. Различаются колонка, таблица, род записи в ленте и то, как у
-    предмета спросить имя.
+    отказ. В историю вакансии перепривязка не ложится: там только смены
+    статуса. Различаются колонка и таблица.
     """
 
     column: str
     model: type
-    kind: str
-    display: Callable[[Any], str | None]
-    # Имя действия, а не рода записи в ленте: текст отказа мост
-    # показывает пользователю подсказкой как есть.
+    # Имя действия: текст отказа мост показывает пользователю подсказкой как есть.
     operation: str
 
 
-_HR_LINK = _Link(
-    column="hr_id",
-    model=HR,
-    kind="linked_hr",
-    display=lambda hr: hr.name or hr.telegram_username,
-    operation="set_vacancy_hr",
-)
+_HR_LINK = _Link(column="hr_id", model=HR, operation="set_vacancy_hr")
 
 
-_COMPANY_LINK = _Link(
-    column="company_id",
-    model=Company,
-    kind="linked_company",
-    display=lambda company: company.name,
-    operation="set_vacancy_company",
-)
-
-
-async def _link_name(
-    session: AsyncSession, link: _Link, row_id: int | None
-) -> str | None:
-    """Как назвать привязанный предмет в ленте; пусто — назвать нечем.
-
-    Имя записывается в саму строку ленты, а не берётся по ссылке при показе:
-    предмет могут переименовать или снести, и тогда прошлая запись ленты
-    осталась бы без объяснения, что именно поменяли.
-    """
-    if row_id is None:
-        return None
-    row = await session.get(link.model, row_id)
-    return link.display(row) if row is not None else None
+_COMPANY_LINK = _Link(column="company_id", model=Company, operation="set_vacancy_company")
 
 
 async def _relink(
     session: AsyncSession, vacancy_id: int, new_id: int | None, link: _Link
 ) -> bool:
-    """Перепривязать вакансию к предмету. False — вакансии нет вовсе.
-
-    Совпадение с прежним значением возвращает успех, ничего не записав:
-    иначе лента карточки полнилась бы строками «ничего не изменилось».
-    """
+    """Перепривязать вакансию к предмету. False — вакансии нет вовсе."""
     vacancy = await session.get(Vacancy, vacancy_id)
     if vacancy is None:
         return False
     previous_id = getattr(vacancy, link.column)
-    target = None
-    if new_id is not None:
-        target = await session.get(link.model, new_id)
-        if target is None:
-            raise ValueError(
-                f"{link.operation}: {link.model.__name__} {new_id} does not exist"
-            )
+    if new_id is not None and await session.get(link.model, new_id) is None:
+        raise ValueError(
+            f"{link.operation}: {link.model.__name__} {new_id} does not exist"
+        )
     if previous_id == new_id:
         return True
-    # До присвоения: чтение по промаху карты объектов сбрасывает висящие правки.
-    previous_name = await _link_name(session, link, previous_id)
     setattr(vacancy, link.column, new_id)
-    await add_vacancy_event(
-        session,
-        vacancy_id,
-        kind=link.kind,
-        payload={
-            "previous_id": previous_id,
-            "previous_name": previous_name,
-            "new_id": new_id,
-            "new_name": link.display(target) if target is not None else None,
-        },
-    )
     await session.flush()
     logger.info(
         "vacancy %d: %s %s -> %s", vacancy_id, link.column, previous_id, new_id
