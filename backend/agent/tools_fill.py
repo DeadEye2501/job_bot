@@ -65,7 +65,7 @@ def fill_tools(kit: AgentKit, job: FillJob) -> list[Callable]:
                         "не хватает данных для обязательных полей")
 
     async def report_no_new_resume(reason: str) -> str:
-        """Сайт не даёт завести ещё одно резюме: ничего не заполняется, человеку — ошибка."""
+        """Сайт не даёт завести ещё одно резюме; reason — почему, словами. Создание останавливается."""
         return _stopped(job, Finished("no_new_resume", reason), "сайт не даёт завести ещё одно резюме")
 
     if job.editor_url:
