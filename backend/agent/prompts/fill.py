@@ -48,5 +48,5 @@ def fill_task(host: str, editor_url: str | None, language: str) -> str:
             if editor_url else
             "Заведи на сайте новое резюме и заполни его; название резюме — «Должность» из анкеты."
             " Существующие резюме не открывай для правки. Сайт не даёт завести ещё одно резюме —"
-            " report_no_new_resume с причиной, ничего не заполняя.")
+            " report_no_new_resume, ничего не заполняя.")
     return f"Сайт: https://{host}/\n{what}\nЯзык резюме: {language}."
