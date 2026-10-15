@@ -8,7 +8,7 @@ from typing import NamedTuple
 from backend.agent.confirm import is_checked
 from backend.agent.jobs import ApplyJob, Dropped, FillJob
 from backend.agent.kit import AgentKit
-from backend.agent.page_fields import WAIT_MS, field_or_none, page_field
+from backend.agent.page_fields import LONG_WAIT_MS, WAIT_MS, field_or_none, page_field
 
 logger = logging.getLogger(__name__)
 
@@ -149,7 +149,7 @@ def _plain() -> tuple[Callable, Callable, Callable, Callable]:
         await field.click(timeout=WAIT_MS)
         await page.keyboard.press("Control+A")
         await page.keyboard.press("Delete")
-        await field.press_sequentially(text, timeout=WAIT_MS)
+        await field.press_sequentially(text, timeout=LONG_WAIT_MS)
 
     def select(page, selector, value):
         return page.select_option(selector, value, timeout=WAIT_MS)
@@ -252,7 +252,7 @@ async def _snapshot(kit: AgentKit) -> str:
 
     page = await kit.browser.page()
     try:
-        tree = await page.locator("body").aria_snapshot(timeout=WAIT_MS)
+        tree = await page.locator("body").aria_snapshot(timeout=LONG_WAIT_MS)
         title = await page.title()
     except PlaywrightError as error:
         logger.info("снимок страницы не снят: %s", _first_line(error))
@@ -267,7 +267,7 @@ async def _attach(page, selector: str, file: Path) -> None:
     from playwright.async_api import Error as PlaywrightError
 
     try:
-        async with page.expect_file_chooser(timeout=WAIT_MS) as chooser_info:
+        async with page.expect_file_chooser(timeout=LONG_WAIT_MS) as chooser_info:
             await page.click(selector, timeout=WAIT_MS)
         chooser = await chooser_info.value
         await chooser.set_files(str(file))

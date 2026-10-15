@@ -433,7 +433,7 @@ init
   - `async def read(self, query: Callable[[AsyncSession], Awaitable[T]]) -> T` (4)
   - `async def profile_text(self, session: AsyncSession) -> str` (4)
 
-### `backend/agent/page_fields.py` — 168 строк
+### `backend/agent/page_fields.py` — 172 строк
 
 Поля страницы глазами браузера.
 
@@ -3936,7 +3936,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 341 модулей
+## tests — 342 модулей
 
 ### `tests/adapters/test_agent_mcp.py` — 85 строк
 
@@ -4446,6 +4446,15 @@ Runtime settings layer.
 ### `tests/backend/test_agent_tools_browser_typing.py` — 33 строк
 
 Ввод в редактор форматированного текста: набор с клавиатуры, а не прямое заполнение.
+
+Зависит от: `backend.agent.tools_browser`, `tests.backend.fixtures.real_page`, `tests.fakes.agent`, `tests.fakes.browser`
+
+Тестов: 1
+
+
+### `tests/backend/test_agent_tools_browser_waits.py` — 23 строк
+
+Сколько агент ждёт элемент, которого на странице нет.
 
 Зависит от: `backend.agent.tools_browser`, `tests.backend.fixtures.real_page`, `tests.fakes.agent`, `tests.fakes.browser`
 
