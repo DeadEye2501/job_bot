@@ -6,7 +6,6 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Application, ApplicationVia, Screening
-from backend.repository.vacancies_life import add_vacancy_event
 from backend.repository.vacancy_status import mark_vacancy_applied
 from backend.telegram_time import utc_now
 
@@ -20,21 +19,21 @@ _EXPLANATION = {
 
 @dataclass(frozen=True)
 class ApplicationEntry:
-    """Состоявшийся отклик. `letter_by` — значение из `LETTER_WRITERS`, если письмо было;
-    `screening` — пары «наша ли реплика, текст» по порядку."""
+    """Состоявшийся отклик. `screening` — пары «наша ли реплика, текст» по порядку."""
 
     vacancy_id: int
     aggregator_id: int | None
     via: ApplicationVia
     target: str
     letter: str | None
-    letter_by: str | None
     screening: list[tuple[bool, str]]
-    simulated: bool
 
 
 async def record_application(session: AsyncSession, entry: ApplicationEntry) -> int:
-    """Записать состоявшийся отклик: каждый — своя строка, статус и событие.
+    """Записать состоявшийся отклик: каждый — своя строка и переход в Applied.
+
+    В истории вакансии отклик виден только сменой статуса: событие рядом с ней
+    повторяло бы ту же строку.
 
     Отклик на тот же адрес — прогон заново или ручной отклик на отказ — такой же
     отклик, как первый. Вопросы со страницы подтверждения в той же сессии агента
@@ -50,10 +49,6 @@ async def record_application(session: AsyncSession, entry: ApplicationEntry) -> 
     await session.flush()
     await append_screening(session, row.id, entry.screening)
     await mark_vacancy_applied(session, entry.vacancy_id, _EXPLANATION[entry.via])
-    await add_vacancy_event(session, entry.vacancy_id, "applied", {
-        "via": entry.via.value, "target": entry.target,
-        "simulated": entry.simulated, "letter_by": entry.letter_by,
-    })
     return row.id
 
 

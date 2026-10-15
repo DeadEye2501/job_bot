@@ -1,9 +1,8 @@
 """Следствия привязки вакансии к HR и компании и её удаления.
 
-Привязка не просто меняет поле: каждая смена оставляет событие в ленте
-обработки, и в событии записаны обе стороны — что было и что стало. Удаление
-же выборочное: история и события вакансии стираются вместе с ней, а переписка
-остаётся, потеряв только ссылку.
+Привязка меняет только поле: история вакансии — это смены статуса, и привязка
+в неё не ложится. Удаление же выборочное: история и события вакансии стираются
+вместе с ней, а переписка остаётся, потеряв только ссылку.
 """
 
 import pytest
@@ -56,10 +55,10 @@ async def test_linking_an_unknown_hr_is_refused_loudly(session, session_factory)
         await set_vacancy_hr(session, vacancy.id, 10_000)
 
 
-async def test_linking_an_hr_records_both_sides_in_the_timeline(
+async def test_linking_an_hr_changes_the_field_and_not_the_history(
     session, session_factory
 ):
-    """Привязка HR меняет поле и оставляет в ленте событие с обеими сторонами."""
+    """Привязка HR — не смена статуса: поле меняется, в историю вакансии ничего не ложится."""
     hr = hr_row(name="Мария")
     await put(session_factory, hr)
     vacancy = vacancy_row(hr_id=None)
@@ -69,47 +68,10 @@ async def test_linking_an_hr_records_both_sides_in_the_timeline(
 
     card = await get_vacancy_detail(session, vacancy.id)
     assert card.vacancy.hr_id == hr.id
-    assert [e.kind for e in card.events] == ["linked_hr"]
-    assert card.events[0].payload == {
-        "previous_id": None,
-        "previous_name": None,
-        "new_id": hr.id,
-        "new_name": "Мария",
-    }
+    assert card.events == []
 
 
-async def test_an_hr_without_a_name_is_recorded_by_username(session, session_factory):
-    """У HR без имени в событие попадает ник — иначе лента показала бы пустоту."""
-    hr = hr_row(name=None, telegram_username="maria_hr")
-    await put(session_factory, hr)
-    vacancy = vacancy_row(hr_id=None)
-    await put(session_factory, vacancy)
-
-    await set_vacancy_hr(session, vacancy.id, hr.id)
-
-    card = await get_vacancy_detail(session, vacancy.id)
-    assert card.events[0].payload["new_name"] == "maria_hr"
-
-
-async def test_relinking_carries_the_previous_hr_into_the_event(
-    session, session_factory
-):
-    """Перепривязка записывает в событие и прежнего HR, и нового."""
-    was = hr_row(name="Мария")
-    now = hr_row(name="Ольга")
-    await put(session_factory, was, now)
-    vacancy = vacancy_row(hr_id=was.id)
-    await put(session_factory, vacancy)
-
-    await set_vacancy_hr(session, vacancy.id, now.id)
-
-    card = await get_vacancy_detail(session, vacancy.id)
-    assert card.events[0].payload["previous_name"] == "Мария"
-    assert card.events[0].payload["new_name"] == "Ольга"
-
-
-async def test_unlinking_leaves_an_event_with_no_new_side(session, session_factory):
-    """Отвязка тоже событие: прежняя сторона названа, новой нет."""
+async def test_unlinking_an_hr_clears_the_field(session, session_factory):
     hr = hr_row(name="Мария")
     await put(session_factory, hr)
     vacancy = vacancy_row(hr_id=hr.id)
@@ -118,36 +80,13 @@ async def test_unlinking_leaves_an_event_with_no_new_side(session, session_facto
     assert await set_vacancy_hr(session, vacancy.id, None) is True
 
     card = await get_vacancy_detail(session, vacancy.id)
-    assert card.vacancy.hr_id is None
-    assert card.events[0].payload["previous_name"] == "Мария"
-    assert card.events[0].payload["new_id"] is None
+    assert card.vacancy.hr_id is None and card.events == []
 
 
-async def test_relinking_to_the_same_hr_adds_no_second_event(
+async def test_linking_a_company_changes_the_field_and_not_the_history(
     session, session_factory
 ):
-    """Повторная привязка того же HR ленту не засоряет.
-
-    Экран шлёт привязку и тогда, когда пользователь выбрал того же HR, что
-    уже стоял. Без проверки на равенство лента набивалась бы событиями «с
-    Марии на Марию».
-    """
-    hr = hr_row(name="Мария")
-    await put(session_factory, hr)
-    vacancy = vacancy_row(hr_id=None)
-    await put(session_factory, vacancy)
-
-    assert await set_vacancy_hr(session, vacancy.id, hr.id) is True
-    assert await set_vacancy_hr(session, vacancy.id, hr.id) is True
-
-    card = await get_vacancy_detail(session, vacancy.id)
-    assert len(card.events) == 1
-
-
-async def test_linking_a_company_records_both_sides_in_the_timeline(
-    session, session_factory
-):
-    """Привязка компании меняет поле и оставляет своё событие с обеими сторонами."""
+    """Привязка компании — тоже не смена статуса: в историю вакансии ничего не ложится."""
     was = company_row(name="Контур")
     now = company_row(name="Ромашка")
     await put(session_factory, was, now)
@@ -158,13 +97,7 @@ async def test_linking_a_company_records_both_sides_in_the_timeline(
 
     card = await get_vacancy_detail(session, vacancy.id)
     assert card.vacancy.company_id == now.id
-    assert [e.kind for e in card.events] == ["linked_company"]
-    assert card.events[0].payload == {
-        "previous_id": was.id,
-        "previous_name": "Контур",
-        "new_id": now.id,
-        "new_name": "Ромашка",
-    }
+    assert card.events == []
 
 
 async def test_linking_an_unknown_company_is_refused_loudly(session, session_factory):
@@ -174,22 +107,6 @@ async def test_linking_an_unknown_company_is_refused_loudly(session, session_fac
 
     with pytest.raises(ValueError, match="does not exist"):
         await set_vacancy_company(session, vacancy.id, 10_000)
-
-
-async def test_relinking_to_the_same_company_adds_no_second_event(
-    session, session_factory
-):
-    """Повторная привязка той же компании ленту не засоряет."""
-    company = company_row(name="Контур")
-    await put(session_factory, company)
-    vacancy = vacancy_row(company_id=None)
-    await put(session_factory, vacancy)
-
-    assert await set_vacancy_company(session, vacancy.id, company.id) is True
-    assert await set_vacancy_company(session, vacancy.id, company.id) is True
-
-    card = await get_vacancy_detail(session, vacancy.id)
-    assert len(card.events) == 1
 
 
 async def test_deleting_a_missing_vacancy_reports_failure(session, session_factory):

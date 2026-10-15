@@ -20,8 +20,8 @@ from tests.factories_aggregators import application_row, screening_row
 
 def _entry(vacancy_id, **over) -> ApplicationEntry:
     fields = dict(vacancy_id=vacancy_id, aggregator_id=None, via=ApplicationVia.FORM,
-                  target="https://site.test/form", letter="Письмо", letter_by="app",
-                  screening=[(False, "Вопрос"), (True, "Ответ")], simulated=False)
+                  target="https://site.test/form", letter="Письмо",
+                  screening=[(False, "Вопрос"), (True, "Ответ")])
     fields.update(over)
     return ApplicationEntry(**fields)
 
@@ -43,17 +43,15 @@ async def test_a_new_vacancy_gets_applied_with_its_screening(session, session_fa
     ]
 
 
-async def test_an_application_leaves_one_applied_event(session_factory):
+async def test_an_application_shows_in_the_history_only_as_its_status(session, session_factory):
+    """В истории вакансии — смены статуса: отклик — это переход в Applied, а не
+    второе событие рядом с ним."""
     row = vacancy_row(status=VacancyStatus.DECLINE)
     await put(session_factory, row)
-    async with session_factory() as session:
-        async with session.begin():
-            await record_application(session, ApplicationEntry(
-                vacancy_id=row.id, aggregator_id=None, via=ApplicationVia.EMAIL,
-                target="hr@company.test", letter="Письмо", letter_by="app",
-                screening=[], simulated=False))
-    (event,) = [e for e in await all_rows(session_factory, VacancyEvent)]
-    assert event.kind == "applied" and event.payload["via"] == "email"
+
+    await _record(session, _entry(row.id, via=ApplicationVia.EMAIL))
+
+    assert await all_rows(session_factory, VacancyEvent) == []
     assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.APPLIED
 
 
@@ -70,19 +68,6 @@ async def test_a_new_application_to_the_same_address_is_its_own(session, session
 
     assert again != first and len(await all_rows(session_factory, Application)) == 2
     assert (await only_row(session_factory, Vacancy)).status is VacancyStatus.APPLIED
-    assert [e.kind for e in await all_rows(session_factory, VacancyEvent)] == ["applied", "applied"]
-
-
-async def test_the_feed_says_how_and_who_wrote_the_letter(session, session_factory):
-    vacancy = vacancy_row()
-    await put(session_factory, vacancy)
-
-    await _record(session, _entry(vacancy.id, simulated=True, letter_by="agent"))
-
-    (event,) = [e for e in await all_rows(session_factory, VacancyEvent)
-                if e.kind == "applied"]
-    assert event.payload == {"via": "form", "target": "https://site.test/form",
-                             "simulated": True, "letter_by": "agent"}
 
 
 async def test_the_screening_of_a_vacancy_goes_application_by_application(session, session_factory):

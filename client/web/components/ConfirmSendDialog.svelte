@@ -36,11 +36,9 @@
               {item.label}{#if item.required}<span class="confirm-item-required">*</span>{/if}
             </label>
           {:else}
-            {#if item.label}
-              <div class="field-caption confirm-item-label">
-                {item.label}{#if item.required}<span class="confirm-item-required">*</span>{/if}
-              </div>
-            {/if}
+            <div class="field-caption confirm-item-label">
+              {item.label}{#if item.required}<span class="confirm-item-required">*</span>{/if}
+            </div>
             {#if item.kind === 'choice'}
               <input
                 class="input"
@@ -52,7 +50,6 @@
               <textarea
                 class="textarea"
                 class:missing={item.error}
-                rows={item.label ? 2 : 8}
                 value={item.value}
                 oninput={(event) => onedit(at, event.currentTarget.value)}
               ></textarea>

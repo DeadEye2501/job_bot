@@ -8,7 +8,7 @@ import pytest
 
 from backend.applying.email import via_email
 from backend.applying.result import Missed
-from backend.models import Application, ApplicationVia, VacancyEvent
+from backend.models import Application, ApplicationVia
 from tests.backend.fixtures.applying import MAIL
 from tests.dbio import all_rows
 from tests.waiting import wait_until
@@ -35,9 +35,7 @@ async def test_a_refused_letter_is_missed_and_not_recorded(mail_case):
 async def test_simulation_records_without_sending(mail_case):
     kit, vacancy, outbox = await mail_case(simulated=True)
     assert await via_email(kit, vacancy.id, MAIL) == "applied" and outbox == []
-    (event,) = [e for e in await all_rows(kit.pipeline.session_factory, VacancyEvent)
-                if e.kind == "applied"]
-    assert event.payload["simulated"] is True
+    assert len(await all_rows(kit.pipeline.session_factory, Application)) == 1
 
 
 async def test_without_mail_settings_the_way_is_missed(mail_case):

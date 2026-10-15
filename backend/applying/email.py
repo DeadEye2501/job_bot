@@ -44,8 +44,8 @@ async def via_email(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome:
     if letter is None:
         return Missed(f"письмо не написано: {'; '.join(issues)}")
     # Тема тоже уходит работодателю: подтверждается вместе с письмом.
-    kept = await confirmed(kit, vacancy_id, [text_item("Тема", letter.subject),
-                                             text_item("", resume.under(letter.body))])
+    kept = await confirmed(kit, vacancy_id, [text_item("Тема", "text", letter.subject),
+                                             text_item("Текст", "letter", resume.under(letter.body))])
     if isinstance(kept, Dropped):
         return kept
     # Тема — одной строкой: перевод строки в заголовке письмо не соберёт.
@@ -67,4 +67,4 @@ async def _send_and_record(kit: AgentKit, vacancy_id: int, account: MailAccountC
             return Missed(f"сервер почты не принял письмо: {error}")
     return await delivered(record_and_announce(kit, ApplicationEntry(
         vacancy_id=vacancy_id, aggregator_id=None, via=ApplicationVia.EMAIL, target=mail.to,
-        letter=mail.body, letter_by="app", screening=[], simulated=simulated)), vacancy_id)
+        letter=mail.body, screening=[])), vacancy_id)

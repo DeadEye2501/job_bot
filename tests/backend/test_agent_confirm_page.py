@@ -37,8 +37,9 @@ async def test_the_window_knows_which_fields_the_page_requires(make_pipeline, se
 
 async def test_the_letter_written_is_the_one_confirmed(make_pipeline, session_factory):
     """Человек поправил письмо — в запись ложится правленое, а не пересказ агента."""
-    job, tools, _ = await _applier(make_pipeline, session_factory, edited({"": "Правленое письмо"}))
-    await tool(tools, "need_human")(kind="confirm", items=[page_item("#letter", "Исходное", label="")])
+    job, tools, _ = await _applier(make_pipeline, session_factory, edited({"Сопроводительное": "Правленое письмо"}))
+    await tool(tools, "need_human")(kind="confirm", items=[
+        page_item("#letter", "Исходное", label="Сопроводительное", kind="letter")])
 
     await tool(tools, "record_application")(via="aggregator", target=PAGE)
 
@@ -126,7 +127,7 @@ async def test_the_screening_written_is_what_was_confirmed(make_pipeline, sessio
         page_item("#years", "Четыре года", label="Опыт?"),
         page_item("#remote", "true", label="Готовы к удалёнке?", kind="check"),
         page_item("#relocate", "false", label="Готовы к переезду?", kind="check"),
-        page_item("#letter", "Здравствуйте", label=""),
+        page_item("#letter", "Здравствуйте", label="Сопроводительное", kind="letter"),
     ])
 
     await tool(tools, "record_application")(via="aggregator", target=PAGE)
