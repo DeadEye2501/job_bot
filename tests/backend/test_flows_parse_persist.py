@@ -16,7 +16,9 @@
 import logging
 from dataclasses import replace
 
+from backend.domain.language_choice import CandidateLanguage
 from backend.flows import parse
+from backend.llm.candidate import CandidateProfile
 
 from backend.models import HR, Company, Vacancy, VacancyEvent, VacancyStatus
 from backend.payloads import FitValidation
@@ -251,6 +253,29 @@ async def test_the_company_arbiter_is_asked_with_the_base_left_free(
     )
 
     assert written == ["Акме Софтвер"]
+
+
+async def test_the_arbiter_explains_in_the_language_of_the_turn(parsing, session_factory, monkeypatch):
+    """Язык пояснения арбитра — тот же снимок анкеты, по которому в этом
+    обороте пишутся пересказ вакансии и причины: два источника одного языка
+    расходились бы внутри одного разбора."""
+    pipeline, vacancy = parsing
+    pipeline.profile_cache = CandidateProfile(languages=[CandidateLanguage("Қазақша", "native")])
+    await put(session_factory, company_row(name="Акме Софт"))
+    pipeline.parsed = replace(pipeline.parsed, company_name="Акме Софтвер")
+    asked: list[str] = []
+
+    async def arbiter(client, model, ask):
+        asked.append(ask.language)
+        return None, "не та компания"
+
+    monkeypatch.setattr("backend.llm.company.dedupe_company_with_llm", arbiter)
+
+    await parse.parse_and_update_vacancy(
+        pipeline, vacancy.id, "текст", "jobs", allow_delete=False
+    )
+
+    assert asked == ["Қазақша"]
 
 
 async def test_a_write_that_failed_is_not_reported_as_a_finished_parse(

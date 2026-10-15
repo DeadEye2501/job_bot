@@ -10,7 +10,7 @@ from backend.agent.kit import AgentKit, RunSession, SessionPlan
 from backend.agent.prompts.frame import system_prompt
 from backend.agent.stops import HumanTimeout, LimitExhausted
 from backend.agent.tools_common import common_tools
-from backend.llm.candidate import in_user_language
+from backend.llm.rules import in_user_language
 from backend.repository.profile_languages import read_user_language
 from backend.task_stop import put_out
 

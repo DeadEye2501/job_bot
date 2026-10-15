@@ -11,7 +11,7 @@
 
 
 from backend.llm.candidate import CandidateProfile, format_text
-from backend.llm.fit import ANSWER_RULES, VERDICT_SCOPE, text_fit_question
+from backend.llm.fit import ANSWER_RULES, VERDICT_SCOPE, fit_question
 
 PURPOSE = "validate_preferences_fit"
 
@@ -54,5 +54,5 @@ def _prompt_for(profile: CandidateProfile) -> str:
     return PREFERENCES_FIT_PROMPT.replace("{FREE_PREFERENCES}", format_text(profile.free_preferences))
 
 
-validate_preferences_fit = text_fit_question(PURPOSE, _prompt_for)
+validate_preferences_fit = fit_question(PURPOSE, _prompt_for)
 """Нарушены ли записанные словами предпочтения и, если не спросилось, почему."""

@@ -13,7 +13,10 @@
 
 from functools import partial
 
-from backend.llm.candidate import CandidateLanguage, CandidateProfile
+import pytest
+
+from backend.domain.language_choice import CandidateLanguage
+from backend.llm.candidate import CandidateProfile
 from backend.llm.fit_languages import validate_language_fit
 from tests.backend.fixtures.fit import asked, verdict
 from tests.factories import parsed_vacancy
@@ -157,6 +160,57 @@ async def test_a_quote_differing_only_in_signs_is_still_found():
 
     got = await _check(client, raw_text="Ищем повара. Немецкий ещё обязателен - без него никак.",
                        profile=CandidateProfile())
+
+    assert got.verdict == "reject" and got.reason == reason
+
+
+@pytest.mark.parametrize(
+    ("quote", "raw_text"),
+    [
+        pytest.param("We’re hiring", "We're hiring. English is a must.", id="кривой апостроф"),
+        pytest.param("full‑time", "Cook, full-time. English is a must.", id="неразрывный дефис"),
+        pytest.param("pay − weekly", "Cook. Pay - weekly. English is a must.", id="знак минуса"),
+        pytest.param("English is a must", "Cook. Eng­lish is a must.", id="мягкий перенос в посте"),
+        pytest.param("знание «Excel» обязательно", 'Повар, знание "Excel" обязательно.', id="вложенные кавычки"),
+        pytest.param("Requirements: English", "Requirements:\n• English", id="маркер списка"),
+        pytest.param("English … a must", "Cook. English is a must.", id="пропуск внутри цитаты"),
+    ],
+)
+async def test_typography_does_not_make_a_true_quote_invented(quote, raw_text):
+    """Цитата, отличающаяся от поста одной типографикой или пропуском, найдена."""
+    reason = f"Язык обязателен: «{quote}»"
+    client = provider({CHAT: fit_answer("reject", reason)})
+
+    got = await _check(client, raw_text=raw_text, profile=CandidateProfile())
+
+    assert got.verdict == "reject" and got.reason == reason
+
+
+@pytest.mark.parametrize(
+    "quote",
+    [
+        pytest.param("English … daily calls", id="выдуманная часть"),
+        pytest.param("a must … English", id="части не в том порядке"),
+        pytest.param("…", id="одно многоточие"),
+    ],
+)
+async def test_a_quote_with_a_gap_is_found_only_as_written(quote):
+    """Пропуск в цитате не прячет выдумку: каждая часть сверяется с постом, и
+    в том порядке, в каком стоит; цитата из одного пропуска не цитата."""
+    client = provider({CHAT: fit_answer("reject", f"Язык обязателен: «{quote}»")})
+
+    got = await _check(client, raw_text="Cook. English is a must.", profile=CandidateProfile())
+
+    assert got.verdict == "fit" and got.reason is None
+
+
+async def test_a_level_word_in_the_person_language_is_not_taken_for_an_invented_one():
+    """Слово уровня на языке человека — пересказ слов поста, а не уровень шкалы:
+    честный отказ по посту на другом языке остаётся отказом."""
+    reason = "Fluent German is required: «Deutsch fließend»"
+    client = provider({CHAT: fit_answer("reject", reason)})
+
+    got = await _check(client, raw_text="Koch gesucht. Deutsch fließend.", profile=CandidateProfile())
 
     assert got.verdict == "reject" and got.reason == reason
 

@@ -5,9 +5,13 @@ import logging
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.domain.language_choice import person_language, reply_language, search_languages
-from backend.llm.candidate import candidate_languages
-from backend.models import ProfileLanguage
+from backend.domain.language_choice import (
+    candidate_languages,
+    person_language,
+    reply_language,
+    search_languages,
+)
+from backend.models import ProfileLanguage, Vacancy
 
 logger = logging.getLogger(__name__)
 
@@ -32,9 +36,14 @@ async def read_search_languages(session: AsyncSession) -> list[str]:
     return search_languages(candidate_languages(await list_profile_languages(session)))
 
 
-async def read_reply_language(session: AsyncSession, vacancy_language: str | None) -> str:
-    """Язык отклика на вакансию с этим языком — решение `domain/language_choice`."""
-    return reply_language(vacancy_language, await read_user_language(session))
+async def read_reply_language(session: AsyncSession, vacancy_id: int) -> str:
+    """Язык отклика на вакансию — решение `domain/language_choice`.
+
+    Вакансии нет — язык человека: отклика на неё не будет, и откуда пропажа,
+    зовущий узнаёт сам, читая вакансию.
+    """
+    vacancy = await session.get(Vacancy, vacancy_id)
+    return reply_language(vacancy.language if vacancy else None, await read_user_language(session))
 
 
 async def replace_profile_languages(

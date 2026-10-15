@@ -5,7 +5,7 @@ import asyncio
 
 from backend.flows.auto_gate import status_open_for_auto
 from backend.flows.batches import report_failures
-from backend.llm.hr_reply import classify_hr_reply
+from backend.llm.hr_reply import HrReplyAsk, classify_hr_reply
 from backend.models import VacancyStatus
 from backend.payloads import PendingReply
 from backend.repository.profile_languages import read_user_language
@@ -70,7 +70,7 @@ async def classify_and_apply(
     async with session_factory() as session:
         language = await read_user_language(session)
     verdict, trouble = await classify_hr_reply(
-        text, status, lm_client, lm_chat_model, language=language
+        HrReplyAsk(text, status, language), lm_client, lm_chat_model
     )
     if trouble is not None:
         logger.warning(

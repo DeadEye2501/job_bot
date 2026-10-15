@@ -30,6 +30,7 @@
     caption,
     countlessNote,
     humanText,
+    recoverNote,
     updateNote,
   } from '$state/progress.js';
   import { round } from '$state/round.svelte.js';
@@ -239,6 +240,12 @@
     if (COUNTLESS_STAGES.has(step.stage)) single = countlessNote(step.label);
     // Отклики идут вакансия за вакансией после поиска: подпись — какая и где в очереди.
     if (step.stage === 'apply') single = applyNote(step);
+    // Отложенные вакансии дочитываются в начале оборота: счёт известен, и полоса
+    // заполняется по нему, как при скачивании.
+    if (step.stage === 'recover') {
+      single = recoverNote(step);
+      messages = { current: step.current, total: step.total };
+    }
     // Скачивание обновления — одна верхняя полоса байтами, подпись мегабайтами.
     if (step.stage === 'update') {
       single = updateNote(step);

@@ -24,14 +24,15 @@ async def test_the_first_letter_goes_with_the_resume(telegram_case):
 
 async def test_without_a_file_the_letter_goes_with_the_resume_link(telegram_case):
     """Строку дописывает код после модели и её проверки: проверка, отбивающая
-    слово «резюме», её не видит."""
+    слово «резюме», её не видит. Строка — голый адрес: подпись на одном языке
+    письму на другом была бы чужой."""
     kit, vacancy, sent = await telegram_case(resume="https://hh.ru/resume/1")
 
     assert await via_telegram(kit, vacancy.id, TG) == "applied"
 
     ((_, text, attachment),) = sent
     assert attachment is None
-    assert text.splitlines()[-1] == "Резюме: https://hh.ru/resume/1"
+    assert text.splitlines()[-1] == "https://hh.ru/resume/1"
 
 
 async def test_without_a_file_or_link_the_letter_is_not_sent(telegram_case):

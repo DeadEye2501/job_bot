@@ -339,6 +339,19 @@ async def test_a_scan_by_hand_reaches_the_base(make_bot, sites, agent, session_f
         assert [r.title for r in await resumes_of(session, sites.id)] == ["Повар"]
 
 
+async def test_work_on_a_site_names_itself_to_the_window(make_bot, sites, agent):
+    """Счёта у работы на сайте нет, и окно узнаёт о ней по подписи с хостом:
+    иначе полоса бежала бы под словом, не говорящим, чем занят бот."""
+    bot = await make_bot()
+    agent(bot, [resumes_step([("Повар", "https://site.test/r/1")])])
+    steps: list[tuple] = []
+    bot.on_progress = lambda *step: steps.append(step)
+
+    await aggregators.scan_aggregator(bot, sites.id)
+
+    assert steps[0] == ("site", "Перечень резюме на site.test…", 0, 0)
+
+
 async def test_a_scan_while_the_slot_is_taken_is_refused(make_bot, sites, agent):
     bot = await make_bot()
     agent(bot, [_hold(asyncio.Event())])

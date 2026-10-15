@@ -19,6 +19,7 @@ from backend.domain.sentence import closed_sentence
 from backend.domain.skill_names import skill_key
 from backend.domain.spellings import dedupe_first_wins
 from backend.domain.taxonomy import (
+    CEFR_LEVELS,
     GRADES,
     LEVEL_WHEN_UNTOLD,
     LEVELS_BY_SPELLING,
@@ -59,6 +60,8 @@ from backend.payloads import (
 
 logger = logging.getLogger(__name__)
 
+_CEFR_CODE_RE = re.compile(r"\b(" + "|".join(level.lower() for level in CEFR_LEVELS) + r")\b")
+
 
 def _normalize_lang_level(value: object) -> str | None:
     """Уровень по шкале; пусто — сказанного не понять.
@@ -78,7 +81,7 @@ def _normalize_lang_level(value: object) -> str | None:
         return NATIVE_LEVEL
     # Обозначение шкалы ищется по сведённой строке, а слово — по исходной:
     # сведение выручает «В2» русскими буквами и оно же портит «свободно».
-    by_scale = re.search(r"\b([abc][12])\b", fold_homoglyphs(plain))
+    by_scale = _CEFR_CODE_RE.search(fold_homoglyphs(plain))
     if by_scale is not None:
         return by_scale.group(1).upper()
     for spelling, level in LEVELS_BY_SPELLING:

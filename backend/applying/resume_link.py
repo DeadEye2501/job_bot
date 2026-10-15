@@ -22,8 +22,10 @@ class LetterResume:
 
         Строку дописывает код, а не модель: модель адреса не набирает, а
         проверка письма, отбивающая слово «резюме», идёт до этой строки.
+        Строка — голый адрес: письмо пишется на языке вакансии, и подпись на
+        любом одном языке была бы в нём чужой.
         """
-        return f"{body}\n\nРезюме: {self.link}" if self.link else body
+        return f"{body}\n\n{self.link}" if self.link else body
 
 
 async def resume_for_letter(pipeline) -> LetterResume | None:

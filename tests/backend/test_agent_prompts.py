@@ -9,7 +9,7 @@ from backend.agent.prompts.applier import APPLIER_PROMPT, applier_task
 from backend.agent.prompts.frame import system_prompt
 from backend.agent.prompts.login import LOGIN_PROMPT, login_task
 from backend.agent.prompts.seeker import (
-    SEEKER_PROMPT, WEB_SEEKER_PROMPT, seeker_task, web_seeker_task,
+    SEEKER_PROMPT, WEB_SEEKER_PROMPT, SeekBounds, seeker_task, web_seeker_task,
 )
 from backend.domain.apply_order import Way
 from backend.llm.rules import FACT_KINDS, GENDER_RULE, LATIN_NAME_RULE, TONE_RULE
@@ -51,18 +51,21 @@ def test_a_prompt_carries_nothing_about_the_person(role):
 
 
 def test_the_seeker_task_names_its_source_and_bounds():
-    task = seeker_task("site.test", datetime(2026, 10, 1, 9, 30, tzinfo=timezone.utc), 20, TODAY)
+    task = seeker_task("site.test", SeekBounds(datetime(2026, 10, 1, 9, 30, tzinfo=timezone.utc), 20, TODAY,
+                                               ["Español", "English"]))
     assert "site.test" in task and "20" in task and "2026-10-09" in task
     assert "2026-10-01 09:30" in task
+    assert "Español, English" in task
 
 
 def test_a_first_run_says_so():
-    assert "первый обход" in seeker_task("site.test", None, 20, TODAY)
+    assert "первый обход" in seeker_task("site.test", SeekBounds(None, 20, TODAY, ["English"]))
 
 
 def test_the_web_seeker_is_told_which_sites_to_leave_alone():
-    task = web_seeker_task(["board-a.test", "board-b.test"], None, 5, TODAY)
-    assert "board-a.test" in task and "board-b.test" in task
+    task = web_seeker_task(["board-a.test", "board-b.test"], ["barred.test"], SeekBounds(None, 5, TODAY, ["English"]))
+    assert "board-a.test" in task and "board-b.test" in task and "barred.test" in task
+    assert "English" in task
 
 
 def test_the_login_check_knows_the_site():

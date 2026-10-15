@@ -11,7 +11,7 @@
 
 
 from backend.llm.candidate import CandidateProfile, format_text
-from backend.llm.fit import ANSWER_RULES, VERDICT_SCOPE, text_fit_question
+from backend.llm.fit import ANSWER_RULES, VERDICT_SCOPE, fit_question
 
 PURPOSE = "validate_place_fit"
 
@@ -92,5 +92,5 @@ def _prompt_for(profile: CandidateProfile) -> str:
     )
 
 
-validate_place_fit = text_fit_question(PURPOSE, _prompt_for)
+validate_place_fit = fit_question(PURPOSE, _prompt_for)
 """Может ли кандидат работать там, где требует вакансия, и, если не спросилось, почему."""

@@ -20,12 +20,13 @@ from backend.llm.answers import (
     read_with_a_second_try,
     str_or_none,
 )
-from backend.llm.candidate import in_user_language
 from backend.llm.external import external_block
 from backend.llm.rules import (
+    REASON_LANGUAGE_RULE,
     RESUME_MARK_LINE,
     SELF_OFFER_MARKERS,
     VACANCY_TEXT_CHARS,
+    in_user_language,
 )
 from backend.payloads import PostGenre
 
@@ -55,7 +56,7 @@ CLASSIFY_POST_GENRE_PROMPT = """Ты определяешь ЖАНР поста 
 Верни ТОЛЬКО JSON-объект:
 {"is_vacancy": true | false, "reason": "..."}
 
-reason обязателен при любом ответе: 1 предложение с цитатой из присланного текста, доказывающей направление. Для true — слова нанимателя («ищем в команду», «обязанности», «требования»); для false — слова автора о себе или примета жанра («#cv», «ищу работу», «дайджест»). Язык reason — язык пользователя: {USER_LANGUAGE}, каким бы ни был язык поста; цитата — как в посте. Нет ни слов автора о себе, ни приметы другого жанра — ответ true: открытая роль с условиями или контактом — вакансия, даже короткая.
+reason обязателен при любом ответе: 1 предложение с цитатой из присланного текста, доказывающей направление. Для true — слова нанимателя («ищем в команду», «обязанности», «требования»); для false — слова автора о себе или примета жанра («#cv», «ищу работу», «дайджест»). """ + REASON_LANGUAGE_RULE + """ Нет ни слов автора о себе, ни приметы другого жанра — ответ true: открытая роль с условиями или контактом — вакансия, даже короткая.
 
 Примеры (в них язык пользователя — русский):
 

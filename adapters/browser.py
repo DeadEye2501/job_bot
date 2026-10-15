@@ -174,11 +174,7 @@ class BrowserHost:
         self._context = await self._playwright.chromium.launch_persistent_context(
             str(BROWSER_DIR / str(self._profile_id)),
             headless=False,
-            channel=self._browser.channel,
-            executable_path=str(self._browser.executable) if self._browser.executable else None,
-            # Запросы сервис-воркера идут мимо перехвата: при удержании их нет вовсе.
-            service_workers="allow" if self._sending else "block",
-            **(_PERSON_LAUNCH if self._as_person else {}),
+            **context_options(self._browser, sending=self._sending, as_person=self._as_person),
         )
         if not self._sending:
             await self._context.route("**/*", hold_sending)
@@ -242,6 +238,23 @@ _PERSON_LAUNCH = {
     "ignore_default_args": ["--enable-automation"],
     "chromium_sandbox": True,
 }
+
+
+def context_options(browser: InstalledBrowser, *, sending: bool, as_person: bool) -> dict:
+    """С чем запускается браузер агента.
+
+    Загрузки запрещены всегда, и запрещены самим браузером, а не словами агенту:
+    файл с чужого сайта на диске человека — риск, который наставление не
+    закрывает, а скачивать агенту нечего — свои файлы он прикладывает сам.
+    Запросы сервис-воркера идут мимо перехвата: при удержании их нет вовсе.
+    """
+    return {
+        "channel": browser.channel,
+        "executable_path": str(browser.executable) if browser.executable else None,
+        "service_workers": "allow" if sending else "block",
+        "accept_downloads": False,
+        **(_PERSON_LAUNCH if as_person else {}),
+    }
 
 # `navigator.webdriver` выставляет само подключение Playwright, и по нему вход
 # Google отказывает («браузер небезопасен»). Прячется скриптом страницы, а не

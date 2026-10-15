@@ -8,12 +8,8 @@
 
 import pytest
 
-from backend.llm.candidate import (
-    CandidateLanguage,
-    format_known_skills,
-    format_languages,
-    format_text,
-)
+from backend.domain.language_choice import CandidateLanguage
+from backend.llm.candidate import format_known_skills, format_languages, format_text
 
 
 def test_languages_are_listed_with_their_levels():

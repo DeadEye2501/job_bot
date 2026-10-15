@@ -37,7 +37,12 @@ def _client(letter: str, *, finish_reason: str = "stop", factcheck=None):
     )
 
 
-async def _written(*args, **kwargs):
+def _post(channel_ref=None, text="", earlier=0, language="English") -> LetterPost:
+    """Пост без канала, текста и прежних писем — то, о чём проверка не спрашивает."""
+    return LetterPost(channel_ref, text, earlier, language)
+
+
+async def _written(*args, post=None, **kwargs):
     """Сочинить письмо и отдать один текст.
 
     Причину, по которой сочинить не вышло, смотрит отдельная проверка: у
@@ -45,7 +50,7 @@ async def _written(*args, **kwargs):
     `[0]` два десятка раз. Так же устроены и соседи — разбор вакансии и вердикт
     о пригодности.
     """
-    text, _trouble = await generate_cover_letter(*args, **kwargs)
+    text, _trouble = await generate_cover_letter(*args, post=post or _post(), **kwargs)
     return text
 
 
@@ -61,7 +66,7 @@ async def test_a_silent_provider_is_told_apart_from_a_rejected_letter(prepared):
     client = provider({CHAT: prepared})
 
     text, trouble = await generate_cover_letter(
-        "профиль", parsed_vacancy(), client, "qwen"
+        "профиль", parsed_vacancy(), client, "qwen", post=_post()
     )
 
     assert text is None
@@ -74,7 +79,7 @@ async def test_the_letter_is_asked_in_the_given_language_and_knows_earlier_lette
     client = _client("Hola! Me interesa su vacante. Hablemos.")
 
     await _written("профиль", parsed_vacancy(), client, "qwen",
-                   post=LetterPost(text="Buscamos cocinero", earlier=2, language="Español"))
+                   post=_post(text="Buscamos cocinero", earlier=2, language="Español"))
 
     system = messages_of(client.sent[0])["system"]
     assert "на языке: Español" in system and "этому HR о других его вакансиях: 2" in system
@@ -85,7 +90,7 @@ async def test_a_rejected_letter_is_not_a_provider_trouble():
     client = _client("Здравствуйте! Прикладываю резюме и жду ответа.")
 
     text, trouble = await generate_cover_letter(
-        "профиль", parsed_vacancy(), client, "qwen"
+        "профиль", parsed_vacancy(), client, "qwen", post=_post()
     )
 
     assert text is None
@@ -122,7 +127,7 @@ async def test_the_vacancy_reaches_the_model_as_data():
     )
 
     await _written(
-        "профиль", vacancy, client, "qwen", post=LetterPost("@pyjobs")
+        "профиль", vacancy, client, "qwen", post=_post("@pyjobs")
     )
 
     user = messages_of(client.sent[0])["user"]
@@ -172,7 +177,7 @@ async def test_the_placeholders_of_the_prompt_are_filled_in():
         parsed_vacancy(title="Ведущий питонист"),
         client,
         "qwen",
-        post=LetterPost("@pyjobs"),
+        post=_post("@pyjobs"),
     )
 
     assert got =="Здравствуйте! Пишу про Ведущий питонист из @pyjobs."
@@ -192,7 +197,7 @@ async def test_the_vacancy_the_letter_speaks_of_is_named_apart():
         parsed_vacancy(title="Ведущий питонист"),
         client,
         "qwen",
-        post=LetterPost("@pyjobs"),
+        post=_post("@pyjobs"),
     )
 
     checked = data_block(client.sent[1])
@@ -232,7 +237,7 @@ async def test_a_letter_about_a_channel_we_cannot_name_is_refused():
         parsed_vacancy(title="Ведущий питонист"),
         client,
         "qwen",
-        post=LetterPost(None),
+        post=_post(None),
     )
 
     assert got is None
@@ -357,7 +362,7 @@ async def test_the_writer_sees_the_vacancy_text_with_its_requests():
     client = _client("Здравствуйте! Стаж 3 года. Давайте обсудим детали.")
 
     await _written("профиль", parsed_vacancy(), client, "qwen",
-                   post=LetterPost(text="В отклике укажите ваш стаж."))
+                   post=_post(text="В отклике укажите ваш стаж."))
 
     assert "В отклике укажите ваш стаж." in messages_of(client.sent[0])["user"]
 

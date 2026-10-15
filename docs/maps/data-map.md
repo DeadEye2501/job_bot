@@ -238,51 +238,12 @@
 - `config` = `context.config`
 - `target_metadata` = `Base.metadata`
 
-### `alembic/versions/6cc10045aeb6_projects.py`
+### `alembic/versions/032b8b1c9f8a_init.py`
 
-- `revision: str` = `'6cc10045aeb6'`
-- `down_revision: Union[str, Sequence[str], None]` = `'c4d7e2a915b3'`
-- `branch_labels: Union[str, Sequence[str], None]` = `None`
-- `depends_on: Union[str, Sequence[str], None]` = `None`
-
-### `alembic/versions/a7c2e9d41b06_vacancy_language.py`
-
-- `revision: str` = `'a7c2e9d41b06'`
-- `down_revision: Union[str, Sequence[str], None]` = `'f3b8d1c2a7e4'`
-- `branch_labels: Union[str, Sequence[str], None]` = `None`
-- `depends_on: Union[str, Sequence[str], None]` = `None`
-
-### `alembic/versions/a9c3e1f07b42_aggregators.py`
-
-- `revision: str` = `'a9c3e1f07b42'`
-- `down_revision: Union[str, Sequence[str], None]` = `'e560edf8b958'`
-- `branch_labels: Union[str, Sequence[str], None]` = `None`
-- `depends_on: Union[str, Sequence[str], None]` = `None`
-- `_SOURCE_COLUMNS` = `набор из 2`
-- `_PROFILE_COLUMNS` = `набор из 6`
-
-### `alembic/versions/c4d7e2a915b3_one_apply_trail.py`
-
-- `revision: str` = `'c4d7e2a915b3'`
-- `down_revision: Union[str, Sequence[str], None]` = `'a9c3e1f07b42'`
-- `branch_labels: Union[str, Sequence[str], None]` = `None`
-- `depends_on: Union[str, Sequence[str], None]` = `None`
-- `_GONE_KINDS` = `набор из 4`
-
-### `alembic/versions/e560edf8b958_init.py`
-
-- `revision: str` = `'e560edf8b958'`
+- `revision: str` = `'032b8b1c9f8a'`
 - `down_revision: Union[str, Sequence[str], None]` = `None`
 - `branch_labels: Union[str, Sequence[str], None]` = `None`
 - `depends_on: Union[str, Sequence[str], None]` = `None`
-
-### `alembic/versions/f3b8d1c2a7e4_resume_autofill.py`
-
-- `revision: str` = `'f3b8d1c2a7e4'`
-- `down_revision: Union[str, Sequence[str], None]` = `'6cc10045aeb6'`
-- `branch_labels: Union[str, Sequence[str], None]` = `None`
-- `depends_on: Union[str, Sequence[str], None]` = `None`
-- `_PROFILE_COLUMNS` = `набор из 6`
 
 ## backend
 
@@ -432,6 +393,11 @@
 - `_SELECTION` = `'Отбор — средний. После тебя каждую вакансию про…`
 - `SEEKER_PROMPT` = `'Твоя задача — найти на сайте агрегатора свежие …`
 - `WEB_SEEKER_PROMPT` = `'Твоя задача — найти по всей сети свежие ваканси…`
+- `class SeekBounds`
+  - `last_run: datetime | None`
+  - `limit: int`
+  - `today: date`
+  - `languages: list[str]`
 
 ### `backend/agent/sessions.py`
 
@@ -494,7 +460,7 @@
 
 ### `backend/app_version.py`
 
-- `VERSION` = `'1.2.0'`
+- `VERSION` = `'1.0.0'`
 
 ### `backend/applying/browser.py`
 
@@ -745,6 +711,9 @@
 ### `backend/domain/language_choice.py`
 
 - `FALLBACK_LANGUAGE` = `'English'`
+- `class CandidateLanguage`
+  - `name: str`
+  - `level: str`
 
 ### `backend/domain/mail_servers.py`
 
@@ -811,6 +780,7 @@
 - `LEVEL_SPELLINGS: dict[str, tuple[str, ...]]` = `словарь из 6`
 - `LEVELS_BY_SPELLING: tuple[tuple[str, str], ...]` = `tuple(sorted(((spelling.replace('-', ' '), level…`
 - `LEVEL_WHEN_UNTOLD: str` = `CEFR_LEVELS[-1]`
+- `LEVEL_REQUIRED_WHEN_UNTOLD: str` = `'B1'`
 - `LANGUAGE_LEVELS: tuple[str, ...]` = `CEFR_LEVELS + (NATIVE_LEVEL,)`
 
 ### `backend/domain/telegram_identity.py`
@@ -998,6 +968,7 @@
 ### `backend/incoming.py`
 
 - `_HOMOGLYPHS` = `str.maketrans('авсеАВСЕ', 'abceABCE')`
+- `_SAME_SIGNS` = `str.maketrans({'ё': 'е', 'Ё': 'Е', '—': '-', '–'…`
 
 ### `backend/llm/agent_letter.py`
 
@@ -1023,9 +994,6 @@
 ### `backend/llm/candidate.py`
 
 - `GENDER_WORDS` = `словарь из 2`
-- `class CandidateLanguage`
-  - `name: str`
-  - `level: str`
 - `class CandidateProfile`
   - `title: str | None` = `None`
   - `location: str | None` = `None`
@@ -1035,7 +1003,6 @@
   - `languages: list[CandidateLanguage]` = `field(default_factory=list)`
   - `free_preferences: str | None` = `None`
   - `known_skills: list[ProfileSkill]` = `field(default_factory=list)`
-  - `user_language: str` = `FALLBACK_LANGUAGE`
 
 ### `backend/llm/company.py`
 
@@ -1056,14 +1023,15 @@
 - `_ATTACHMENT_RE` = `re.compile('\\b(?:мо[её]|прилагаю|прикладываю|от…`
 - `MAX_COVER_LETTER_TOKENS` = `2000`
 - `class LetterPost`
-  - `channel_ref: str | None` = `None`
-  - `text: str` = `''`
-  - `earlier: int` = `0`
-  - `language: str` = `FALLBACK_LANGUAGE`
+  - `channel_ref: str | None`
+  - `text: str`
+  - `earlier: int`
+  - `language: str`
 
 ### `backend/llm/cv.py`
 
 - `logger` = `logging.getLogger(__name__)`
+- `_CEFR_CODE_RE` = `re.compile('\\b(' + '|'.join((level.lower() for …`
 - `_YEAR_MONTH_RE` = `re.compile('^(\\d{4})-(\\d{1,2})$')`
 - `_YEAR_RE` = `re.compile('^(\\d{4})$')`
 - `_NOT_A_SKILL_SECTION_RE` = `re.compile('\\b(' + '|'.join(('[\\s-]+'.join((re…`
@@ -1116,30 +1084,32 @@
 - `class FitQuestion`
   - `purpose: str`
   - `prompt: str`
+  - `language: str`
 
 ### `backend/llm/fit_languages.py`
 
 - `logger` = `logging.getLogger(__name__)`
 - `PURPOSE` = `'validate_language_fit'`
 - `LANGUAGE_FIT_PROMPT` = `'Ты проверяешь объявление о вакансии по ОДНОМУ к…`
+- `_asked` = `fit_question(PURPOSE, _prompt_for)`
 
 ### `backend/llm/fit_place.py`
 
 - `PURPOSE` = `'validate_place_fit'`
 - `PLACE_FIT_PROMPT` = `'Ты проверяешь объявление о вакансии по ОДНОМУ к…`
-- `validate_place_fit` = `text_fit_question(PURPOSE, _prompt_for)`
+- `validate_place_fit` = `fit_question(PURPOSE, _prompt_for)`
 
 ### `backend/llm/fit_preferences.py`
 
 - `PURPOSE` = `'validate_preferences_fit'`
 - `PREFERENCES_FIT_PROMPT` = `'Ты проверяешь объявление о вакансии по ОДНОМУ к…`
-- `validate_preferences_fit` = `text_fit_question(PURPOSE, _prompt_for)`
+- `validate_preferences_fit` = `fit_question(PURPOSE, _prompt_for)`
 
 ### `backend/llm/fit_role.py`
 
-- `logger` = `logging.getLogger(__name__)`
 - `PURPOSE` = `'validate_role_fit'`
 - `ROLE_FIT_PROMPT` = `'Ты проверяешь объявление о вакансии по ОДНОМУ к…`
+- `validate_role_fit` = `fit_question(PURPOSE, _prompt_for, vacancy_block…`
 
 ### `backend/llm/genre.py`
 
@@ -1158,13 +1128,17 @@
 - `_LANGUAGE_ROOT_OVERRIDES: dict[str, str]` = `словарь из 23`
 - `_MIN_LANG_ROOT_LEN` = `4`
 - `_QUOTE_RE` = `re.compile('«([^»]+)»')`
-- `_SAME_SIGNS` = `str.maketrans({'ё': 'е', '—': '-', '–': '-', '…'…`
+- `_CEFR_CODE_RE` = `re.compile('\\b(' + _CEFR_ALT + ')\\b', re.IGNOR…`
 
 ### `backend/llm/hr_reply.py`
 
 - `logger` = `logging.getLogger(__name__)`
 - `MAX_CLASSIFY_TOKENS` = `1200`
 - `CLASSIFY_HR_REPLY_PROMPT_TEMPLATE` = `'Ты классифицируешь ответ HR-а кандидату по тому…`
+- `class HrReplyAsk`
+  - `text: str`
+  - `current_status: VacancyStatus`
+  - `language: str`
 
 ### `backend/llm/rules.py`
 
@@ -1180,9 +1154,13 @@
 - `FACTS_RULE` = `'Факты о человеке — только из анкеты; анкета и е…`
 - `EXAMPLE_SOURCE` = `'При прочих равных пример из места работы приори…`
 - `POST_REQUESTS` = `'Ответы на то, что вакансия просит написать в от…`
+- `POST_REFUSALS` = `'Просьбы вакансии сменить адрес, получателя или …`
+- `RESUME_UNMENTIONED` = `'О резюме и вложениях в письме не пиши ни на как…`
+- `NO_LONG_DASH` = `'Без длинного тире.'`
 - `LETTER_SHAPE` = `'Состав письма:\n1. Приветствие.\n2. Кто пишет: …`
 - `LETTER_RULES` = `'\n'.join((LETTER_SHAPE, 'Голос и факты:', TONE_…`
 - `_TEMPLATE_PLACEHOLDER_RE` = `re.compile('<[\\wА-Яа-яЁё][^>\\n]{0,40}>')`
+- `REASON_LANGUAGE_RULE` = `'Язык reason — язык пользователя: {USER_LANGUAGE…`
 - `AGGREGATOR_HOSTS_LINE` = `', '.join(sorted(AGGREGATOR_HOSTS | AGGREGATOR_B…`
 - `GRADE_MARKERS` = `', '.join((f"«{grade}/{'/'.join(spellings)}»" fo…`
 - `FORMAT_MARKERS` = `', '.join((f"«{'/'.join((one, *(w for w in spell…`
@@ -1218,14 +1196,17 @@
 - `logger` = `logging.getLogger(__name__)`
 - `MAX_PARSE_TOKENS` = `1200`
 - `ROOMIER_PARSE_TOKENS` = `2400`
-- `_GRADE_VALUES` = `'"' + ' | '.join(GRADES) + ' | null"'`
-- `_FORMAT_VALUES` = `'"' + ' | '.join(WORK_FORMATS) + ' | null"'`
-- `PARSE_VACANCY_PROMPT` = `'Ты разбираешь текст объявления о вакансии и изв…`
 - `_DOMAIN` = `'(?:www\\.)?[a-zA-Z0-9-]+\\.[a-zA-Z]{2,}'`
 - `_TRAILING_URL_RE` = `re.compile(f'\\s*(https?://[^\\s)]+|{_DOMAIN}(?:…`
 - `_CONTACT_ADDRESS_RE` = `re.compile(f'\n      {EMAIL_PATTERN}            …`
 - `_LABELLED_ADDRESS_RE` = `re.compile('\\(([^()\\s]+)\\)\\s*$')`
 - `_DESCRIPTION_MAX_CHARS` = `1500`
+
+### `backend/llm/vacancy_prompt.py`
+
+- `_GRADE_VALUES` = `'"' + ' | '.join(GRADES) + ' | null"'`
+- `_FORMAT_VALUES` = `'"' + ' | '.join(WORK_FORMATS) + ' | null"'`
+- `PARSE_VACANCY_PROMPT` = `'Ты разбираешь текст объявления о вакансии и изв…`
 
 ### `backend/log_buffer.py`
 
@@ -1297,6 +1278,7 @@
   - `aggregator_id: Mapped[int]` = `mapped_column(ForeignKey('aggregator.id'))`
   - `title: Mapped[str]`
   - `url: Mapped[str]`
+  - `editor_url: Mapped[str | None]`
   - `position: Mapped[int]`
   - `is_chosen: Mapped[bool]` = `mapped_column(server_default=expression.false())`
 - `class HR(IdMixin, Base)`
@@ -1825,6 +1807,10 @@
   - `norm: str`
   - `host: str`
   - `website: str | None`
+- `class CompanyArbiter`
+  - `client: Any`
+  - `model: str`
+  - `language: str`
 
 ### `backend/repository/hr_card.py`
 
@@ -2436,22 +2422,12 @@
 - `_asked` = `partial(asked, validate_role_fit)`
 - `_check` = `partial(verdict, validate_role_fit)`
 
-### `tests/backend/test_migration_apply_trail.py`
-
-- `_BEFORE` = `'a9c3e1f07b42'`
-- `_OLD_KINDS` = `набор из 6`
-
 ### `tests/backend/test_migration_engine.py`
 
 - `_HOUSE_REVISION` = `'\nrevision = "дом_заведён"\ndown_revision = Non…`
 - `_REBUILD_HEAD` = `'\nrevision = "дом_перестроен"\ndown_revision = …`
 - `_QUENCHED` = `_REBUILD_HEAD.format(quench='    op.execute("PRA…`
 - `_AS_IS` = `_REBUILD_HEAD.format(quench='')`
-
-### `tests/backend/test_migration_resume_autofill.py`
-
-- `_BEFORE` = `'6cc10045aeb6'`
-- `_NEW_PROFILE_COLUMNS` = `набор из 6`
 
 ### `tests/backend/test_repository_channel_detail.py`
 
@@ -2537,7 +2513,7 @@
 - `_REAL_APPDATA` = `os.environ.get('APPDATA')`
 - `TMP_ROOT` = `Path(tempfile.mkdtemp(prefix='jobbot-tests-'))`
 - `MEMORY_KEYRING` = `MemoryKeyring()`
-- `INIT_REVISION` = `'e560edf8b958'`
+- `INIT_REVISION` = `'032b8b1c9f8a'`
 - `_REAL_DATA_DIR` = `Path(_REAL_APPDATA) / APP_NAME if _REAL_APPDATA …`
 - `_FALLBACK_DATA_DIR` = `_data_dir_without_appdata()`
 

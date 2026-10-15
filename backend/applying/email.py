@@ -18,6 +18,7 @@ from backend.llm.agent_letter import write_letter
 from backend.models import ApplicationVia
 from backend.repository.applications import ApplicationEntry
 from backend.repository.mail_account import get_mail_account
+from backend.repository.profile_languages import read_reply_language
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,8 @@ async def via_email(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome:
         return Missed("почта для откликов не настроена")
     if resume is None:
         return Missed("нет ни файла резюме, ни ссылки на него")
-    ask = await letter_ask(kit, vacancy_id, None)
+    language = await kit.read(lambda session: read_reply_language(session, vacancy_id))
+    ask = await letter_ask(kit, vacancy_id, language, None)
     if ask is None:
         return GONE
     letter, issues = await write_letter(ask, kit.pipeline.lm_client, kit.pipeline.lm_chat_model)

@@ -83,7 +83,7 @@ async def _errand(kit: AgentKit, vacancy_id: int) -> _Errand | None:
         return _Errand(
             vacancy_id, v.hr.id, telegram_peer(v.hr), parsed_from_row(v),
             LetterPost(format_channel_ref(v.channel.username if v.channel is not None else None),
-                       v.raw_text or "", prior, await read_reply_language(session, v.language)),
+                       v.raw_text or "", prior, await read_reply_language(session, v.id)),
         )
 
 

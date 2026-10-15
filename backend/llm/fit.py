@@ -27,10 +27,9 @@ from backend.llm.answers import (
     read_with_a_second_try,
     str_or_none,
 )
-from backend.llm.candidate import in_user_language
 from backend.llm.external import external_block
 from backend.llm.hallucination import breaks_reason_style
-from backend.llm.rules import VACANCY_TEXT_CHARS
+from backend.llm.rules import REASON_LANGUAGE_RULE, VACANCY_TEXT_CHARS, in_user_language
 
 # Бюджет токенов на вердикт пригодности — тот же, что у соседей по причине,
 # описанной в `hr_reply.MAX_CLASSIFY_TOKENS`: рассуждающая модель тратит их на
@@ -71,7 +70,7 @@ reason ОБЯЗАТЕЛЕН для обоих вердиктов.
 - Для fit — 1 предложение с опорой на присланный текст.
 - reason ОБЯЗАН ссылаться на КОНКРЕТНЫЕ слова, фразы или факты, ФИЗИЧЕСКИ ПРИСУТСТВУЮЩИЕ в присланном тексте. Не можешь процитировать место, подтверждающее блокер, — ставь "fit". Лучше fit-ошибка (человек отфильтрует руками), чем выдуманная причина отказа.
 - ЗАПРЕЩЕНО копировать reason из примеров: они показывают формат и логику, а слова бери из присланного текста.
-- Язык reason — язык пользователя: {USER_LANGUAGE}, каким бы ни был язык поста. Слова поста, на которые ссылаешься, приводи как в посте, в кавычках. В примерах язык пользователя — русский.
+- """ + REASON_LANGUAGE_RULE + """ В примерах язык пользователя — русский.
 """ + ONLY_JSON
 
 VERDICT_SCOPE = """Ты отвечаешь ровно на один вопрос — тот, что описан ниже. Других критериев у тебя нет.
@@ -81,14 +80,19 @@ VERDICT_SCOPE = """Ты отвечаешь ровно на один вопрос
 
 @dataclass(frozen=True)
 class FitQuestion:
-    """Один вопрос о пригодности: чем спрашивать и как звать его в журнале.
+    """Один вопрос о пригодности: чем спрашивать, как звать его в журнале и на
+    каком языке писать обоснование.
 
     Имя зова едет и в запрос к провайдеру, и в записи журнала: по нему в
-    логах видно, который из них ответил несуразицей.
+    логах видно, который из них ответил несуразицей. Язык подставляется в
+    наставление при запросе, одним местом на все зовы: место для него стоит в
+    общих правилах ответа, и зов, собранный без подстановки, отдал бы модели
+    голую заглушку.
     """
 
     purpose: str
     prompt: str
+    language: str
 
 
 def vacancy_block(parsed: ParsedVacancy, raw_text: str) -> str:
@@ -111,16 +115,22 @@ def vacancy_block(parsed: ParsedVacancy, raw_text: str) -> str:
     )
 
 
-def vacancy_text(raw_text: str) -> str:
-    """Одна вакансия текстом, без разобранных полей."""
+def vacancy_text(parsed: ParsedVacancy, raw_text: str) -> str:
+    """Одна вакансия текстом: разобранные поля не показываются вовсе.
+
+    Принимает разобранное наравне с `vacancy_block`, чтобы зов выбирал, что
+    показать модели, одним доводом, а не своим телом.
+    """
     return "Оригинальный текст вакансии:\n" f"{raw_text[:VACANCY_TEXT_CHARS]}"
 
 
-def text_fit_question(purpose: str, prompt_for: Callable) -> Callable:
-    """Зов о пригодности, которому нужен только текст поста и своё наставление.
+def fit_question(purpose: str, prompt_for: Callable, about: Callable = vacancy_text) -> Callable:
+    """Зов о пригодности: цель, наставление и то, что модель видит о вакансии.
 
-    Зовы такого вида отличаются лишь целью и наставлением (`prompt_for` строит
-    его из профиля кандидата), поэтому и собираются здесь одним телом.
+    Зовы отличаются лишь целью, наставлением (`prompt_for` строит его из
+    профиля кандидата) и видом вакансии (`about`: текст или текст с полями),
+    поэтому и собираются здесь одним телом — с языком обоснования из того же
+    профиля.
     """
 
     async def validate(
@@ -129,8 +139,8 @@ def text_fit_question(purpose: str, prompt_for: Callable) -> Callable:
     ) -> tuple[FitValidation | None, str | None]:
         logger.debug("%s: title=%r", purpose, parsed.title)
         return await ask_fit(
-            FitQuestion(purpose=purpose, prompt=in_user_language(prompt_for(profile), profile.user_language)),
-            vacancy_text(raw_text), client, model,
+            FitQuestion(purpose=purpose, prompt=prompt_for(profile), language=profile.user_language),
+            about(parsed, raw_text), client, model,
         )
 
     return validate
@@ -159,7 +169,7 @@ def _request(question: FitQuestion, about: str, max_tokens: int) -> ChatRequest:
     return ChatRequest(
         purpose=question.purpose,
         messages=[
-            {"role": "system", "content": question.prompt},
+            {"role": "system", "content": in_user_language(question.prompt, question.language)},
             {"role": "user", "content": user_msg},
         ],
         max_tokens=max_tokens,

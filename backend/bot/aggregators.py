@@ -80,30 +80,34 @@ async def run_aggregator_now(bot, aggregator_id: int) -> AgentOutcome:
 async def login_aggregator(bot, aggregator_id: int) -> AgentOutcome:
     """Вход: видимый браузер на главной, человек входит и закрывает окно, агент проверяет
     вход и перечисляет резюме."""
-    return await _on_site(bot, aggregator_id, log_in, "aggregator login")
+    return await _on_site(bot, aggregator_id, log_in, "Вход на")
 
 
 async def scan_aggregator(bot, aggregator_id: int) -> AgentOutcome:
     """Перечень резюме по кнопке окна."""
-    return await _on_site(bot, aggregator_id, scan, "aggregator scan")
+    return await _on_site(bot, aggregator_id, scan, "Перечень резюме на")
 
 
 async def fill_resume(bot, aggregator_id: int, resume_id: int) -> AgentOutcome:
     """Перезаписать резюме по анкете — по кнопке в его строке."""
     return await _on_site(bot, aggregator_id, lambda kit, source: fill(kit, source, resume_id),
-                          "resume fill")
+                          "Заполнение резюме на")
 
 
 async def create_resume(bot, aggregator_id: int) -> AgentOutcome:
     """Завести новое резюме по анкете — по пункту меню карточки."""
     return await _on_site(bot, aggregator_id, lambda kit, source: fill(kit, source, None),
-                          "resume create")
+                          "Новое резюме на")
 
 
 async def _on_site(
-    bot, aggregator_id: int, flow: Callable[[AgentKit, Source], Awaitable[str]], label: str
+    bot, aggregator_id: int, flow: Callable[[AgentKit, Source], Awaitable[str]], doing: str
 ) -> AgentOutcome:
-    """Работа на сайте агрегатора в месте прогона; у «Поиска по сети» сайта нет."""
+    """Работа на сайте агрегатора в месте прогона; у «Поиска по сети» сайта нет.
+
+    `doing` — что делается, словами окна: счёта у такой работы нет, и подпись
+    под полосами — единственное, что говорит человеку, чем занят бот.
+    """
     row = await _row(bot, aggregator_id)
     if row is None or row.host is None:
         return "missing"
@@ -113,7 +117,8 @@ async def _on_site(
     async def on_site(kit: AgentKit) -> str:
         return await flow(kit, Source.of(row))
 
-    return await work.in_slot(bot, on_site, f"{label} {aggregator_id}")
+    label = f"{doing} {row.host}"
+    return await work.in_slot(bot, on_site, label, ("site", f"{label}…", 0, 0))
 
 
 async def delete_aggregator(bot, aggregator_id: int) -> str:

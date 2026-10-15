@@ -2,6 +2,7 @@
 
 
 import logging
+from dataclasses import dataclass
 
 import httpx
 
@@ -13,6 +14,7 @@ from backend.payloads import Classification
 
 from backend.llm.answers import ONLY_JSON, json_object, log_unparseable, str_or_none
 from backend.llm.external import external_block
+from backend.llm.rules import in_user_language
 
 logger = logging.getLogger(__name__)
 
@@ -63,81 +65,81 @@ CLASSIFY_HR_REPLY_PROMPT_TEMPLATE = """Ты классифицируешь от�
 
 [CURRENT=Applied, ALLOWED=Answered, Invitation, Test, Offer, Decline]
 Текст: "К сожалению, на текущий момент мы выбрали другого кандидата. Спасибо за интерес!"
-Ответ: {{"status": "Decline", "explanation": "HR сообщает, что выбран другой кандидат — это вежливый отказ."}}
+Ответ: {"status": "Decline", "explanation": "HR сообщает, что выбран другой кандидат — это вежливый отказ."}
 
 [CURRENT=Applied, ALLOWED=Answered, Invitation, Test, Offer, Decline]
 Текст: "Привет! Наш CTO готов созвониться завтра в 15:00, удобно?"
-Ответ: {{"status": "Invitation", "explanation": "HR приглашает на созвон с CTO с конкретным временем."}}
+Ответ: {"status": "Invitation", "explanation": "HR приглашает на созвон с CTO с конкретным временем."}
 
 [CURRENT=Applied, ALLOWED=Answered, Invitation, Test, Offer, Decline]
 Текст: "Прикладываю тестовое задание. Срок выполнения — 5 дней."
-Ответ: {{"status": "Test", "explanation": "HR прислал тестовое задание со сроком."}}
+Ответ: {"status": "Test", "explanation": "HR прислал тестовое задание со сроком."}
 
 [CURRENT=Applied, ALLOWED=Answered, Invitation, Test, Offer, Decline]
 Текст: "Спасибо за отклик! Передал ваше резюме на рассмотрение, ответим в течение недели."
-Ответ: {{"status": "Answered", "explanation": "HR подтвердил получение отклика без конкретного решения."}}
+Ответ: {"status": "Answered", "explanation": "HR подтвердил получение отклика без конкретного решения."}
 
 [CURRENT=Applied, ALLOWED=Answered, Invitation, Test, Offer, Decline]
 Текст: "Здравствуйте! Прежде чем двигаться дальше: есть ли действующая медкнижка, работали ли с пароконвектоматом, какой график вам удобен?"
-Ответ: {{"status": "Answered", "explanation": "HR задаёт скрининговые вопросы про опыт и ожидания — это первичное знакомство, не тестовое задание."}}
+Ответ: {"status": "Answered", "explanation": "HR задаёт скрининговые вопросы про опыт и ожидания — это первичное знакомство, не тестовое задание."}
 
 [CURRENT=Applied, ALLOWED=Answered, Invitation, Test, Offer, Decline]
 Текст: "Привет! Ответьте, пожалуйста, на вопросы из вакансии: 1) опыт ведения складского учёта 2) есть ли права категории C 3) готовность к переезду в город B1 4) ожидания по оплате."
-Ответ: {{"status": "Answered", "explanation": "HR просит ответить на квалификационный опросник из вакансии — это скрининг, не тестовое задание."}}
+Ответ: {"status": "Answered", "explanation": "HR просит ответить на квалификационный опросник из вакансии — это скрининг, не тестовое задание."}
 
 [CURRENT=Applied, ALLOWED=Answered, Invitation, Test, Offer, Decline]
 Текст: "Готовы предложить вам позицию ведущего флориста с зарплатой 1800$ нетто, график 5/2, выход 15 ноября."
-Ответ: {{"status": "Offer", "explanation": "HR делает оффер с указанной позицией, зарплатой, графиком и датой выхода."}}
+Ответ: {"status": "Offer", "explanation": "HR делает оффер с указанной позицией, зарплатой, графиком и датой выхода."}
 
 [CURRENT=Test, ALLOWED=In Progress, Offer, Decline]
 Текст: "Спасибо за решение, передал команде, вернёмся с фидбеком в течение нескольких дней."
-Ответ: {{"status": "In Progress", "explanation": "HR подтвердил получение тестового и взял время на ревью — мяч на стороне HR."}}
+Ответ: {"status": "In Progress", "explanation": "HR подтвердил получение тестового и взял время на ревью — мяч на стороне HR."}
 
 [CURRENT=Invitation, ALLOWED=In Progress, Offer, Decline]
 Текст: "Спасибо за интервью, нам было интересно. Обсудим с командой и вернёмся с решением."
-Ответ: {{"status": "In Progress", "explanation": "HR поблагодарил за собеседование и взял время на принятие решения."}}
+Ответ: {"status": "In Progress", "explanation": "HR поблагодарил за собеседование и взял время на принятие решения."}
 
 [CURRENT=In Progress, ALLOWED=Invitation, Test, Offer, Decline]
 Текст: "Давайте назначим финальное интервью с CTO на пятницу в 16:00."
-Ответ: {{"status": "Invitation", "explanation": "HR назначает финальное интервью с CTO с конкретным временем."}}
+Ответ: {"status": "Invitation", "explanation": "HR назначает финальное интервью с CTO с конкретным временем."}
 
 [CURRENT=In Progress, ALLOWED=Invitation, Test, Offer, Decline]
 Текст: "Спасибо, ещё немного подождите, обсуждаем."
-Ответ: {{"status": "In Progress", "explanation": "HR просит подождать — нет смены этапа, no-op."}}
+Ответ: {"status": "In Progress", "explanation": "HR просит подождать — нет смены этапа, no-op."}
 
 [CURRENT=Test, ALLOWED=In Progress, Offer, Decline]
 Текст: "К сожалению, по результатам тестового задания решили не двигаться дальше."
-Ответ: {{"status": "Decline", "explanation": "HR отказал по результатам тестового задания."}}
+Ответ: {"status": "Decline", "explanation": "HR отказал по результатам тестового задания."}
 
 [CURRENT=Answered, ALLOWED=Invitation, Test, Offer, Decline]
 Текст: "Коллеги вернулись с положительной обратной связью. Однако на позицию, на которую вы претендовали, уже есть финалисты. Предлагаю оставаться на связи, есть вероятность, что будем расширять команду, я буду держать в курсе."
-Ответ: {{"status": "Decline", "explanation": "HR хвалит отзыв команды, но на позицию уже есть финалисты — дальше по этой вакансии кандидата не ведут."}}
+Ответ: {"status": "Decline", "explanation": "HR хвалит отзыв команды, но на позицию уже есть финалисты — дальше по этой вакансии кандидата не ведут."}
 
 [CURRENT=Test, ALLOWED=In Progress, Offer, Decline]
 Текст: "Тестовое посмотрели, всё хорошо. Но у нас заморозили набор до нового квартала — как откроют бюджет, вернёмся к вам по этой же позиции."
-Ответ: {{"status": "Decline", "explanation": "HR доволен тестовым, но набор заморожен до нового квартала — пауза найма означает вежливый отказ."}}
+Ответ: {"status": "Decline", "explanation": "HR доволен тестовым, но набор заморожен до нового квартала — пауза найма означает вежливый отказ."}
 
 [CURRENT=Applied, ALLOWED=Answered, Invitation, Test, Offer, Decline]
 Текст: "Hi! Unfortunately we've decided to move forward with another candidate. Best of luck with your search!"
-Ответ: {{"status": "Decline", "explanation": "HR сообщает, что выбрали другого кандидата, — вежливый отказ."}}
+Ответ: {"status": "Decline", "explanation": "HR сообщает, что выбрали другого кандидата, — вежливый отказ."}
 
 [CURRENT=Applied, ALLOWED=Answered, Invitation, Test, Offer, Decline]
 Текст: "Could we hop on a quick 30-min call tomorrow at 4pm CET to chat about the role?"
-Ответ: {{"status": "Invitation", "explanation": "HR зовёт на получасовой вводный созвон в конкретное время."}}
+Ответ: {"status": "Invitation", "explanation": "HR зовёт на получасовой вводный созвон в конкретное время."}
 
 [CURRENT=Test, ALLOWED=In Progress, Offer, Decline]
 Текст: "Got the assignment, looks great at first glance — we'll review internally and reach out by Friday."
-Ответ: {{"status": "In Progress", "explanation": "HR получил тестовое и обещал ответ к пятнице — мяч на стороне HR."}}
+Ответ: {"status": "In Progress", "explanation": "HR получил тестовое и обещал ответ к пятнице — мяч на стороне HR."}
 
 [CURRENT=Applied, ALLOWED=Answered, Invitation, Test, Offer, Decline]
 Текст: "We'd like to offer you the Lead Florist position at €3200/month, full-time, starting Nov 15. Please confirm."
-Ответ: {{"status": "Offer", "explanation": "HR делает оффер с позицией, зарплатой, графиком и датой выхода."}}
+Ответ: {"status": "Offer", "explanation": "HR делает оффер с позицией, зарплатой, графиком и датой выхода."}
 
 [CURRENT=Applied, ALLOWED=Answered, Invitation, Test, Offer, Decline]
 Текст: "Hätten Sie Lust auf ein 30-minütiges Gespräch morgen um 14:00 Uhr CET, um die Stelle zu besprechen?"
-Ответ: {{"status": "Invitation", "explanation": "HR зовёт на получасовой разговор о вакансии в конкретное время."}}
+Ответ: {"status": "Invitation", "explanation": "HR зовёт на получасовой разговор о вакансии в конкретное время."}
 
-Формат ответа строго: {{"status": "...", "explanation": "..."}}
+Формат ответа строго: {"status": "...", "explanation": "..."}
 """ + ONLY_JSON + """ Никаких пояснений вне поля explanation."""
 
 
@@ -190,14 +192,24 @@ def _as_line(allowed: set[VacancyStatus]) -> str:
     return ", ".join(s.value for s in sorted(allowed, key=lambda s: s.value))
 
 
-def _classify_request(
-    text: str, current_status: VacancyStatus, allowed_str: str, language: str
-) -> ChatRequest:
+@dataclass(frozen=True)
+class HrReplyAsk:
+    """Что разбирать: пачку писем HR, нынешний статус вакансии и язык
+    пояснения — язык человека, решённый `domain/language_choice`: пояснение к
+    смене статуса читает он."""
+
+    text: str
+    current_status: VacancyStatus
+    language: str
+
+
+def _classify_request(ask: HrReplyAsk, text: str, allowed_str: str) -> ChatRequest:
     """Что спросить у модели: правила разбора и сама переписка как данные."""
-    system_prompt = CLASSIFY_HR_REPLY_PROMPT_TEMPLATE.format(
-        CURRENT_STATUS=current_status.value,
-        ALLOWED_NEXT=allowed_str,
-        USER_LANGUAGE=language,
+    system_prompt = in_user_language(
+        CLASSIFY_HR_REPLY_PROMPT_TEMPLATE
+        .replace("{CURRENT_STATUS}", ask.current_status.value)
+        .replace("{ALLOWED_NEXT}", allowed_str),
+        ask.language,
     )
     user_content = external_block(
         text,
@@ -215,16 +227,9 @@ def _classify_request(
 
 
 async def classify_hr_reply(
-    text: str,
-    current_status: VacancyStatus,
-    client: httpx.AsyncClient,
-    model: str,
-    *,
-    language: str,
+    ask: HrReplyAsk, client: httpx.AsyncClient, model: str,
 ) -> tuple[Classification | None, str | None]:
     """Классифицирует burst HR-сообщений с учётом текущего статуса вакансии.
-
-    `language` — язык человека: пояснение к смене статуса читает он.
 
     Отвечает парой: вердикт и причина, по которой спросить не вышло. Пустой
     вердикт с пустой причиной значит «модель ответила, а вердикта в ответе
@@ -243,18 +248,18 @@ async def classify_hr_reply(
     терминальны, и приглашение, записанное отказом из недоговорённого ответа,
     человек уже не увидит.
     """
-    if not text:
+    if not ask.text:
         return None, None
-    allowed = _allowed_next(current_status)
+    allowed = _allowed_next(ask.current_status)
     allowed_str = _as_line(allowed)
     # Обрезается начало, а не конец: решает последняя реплика, а первые в
     # пачке — «здравствуйте» и «спасибо».
-    text = text[-4000:]
+    text = ask.text[-4000:]
     logger.debug(
         "classify_hr_reply: %d chars, current=%s, allowed=%s",
-        len(text), current_status.value, allowed_str,
+        len(text), ask.current_status.value, allowed_str,
     )
-    request = _classify_request(text, current_status, allowed_str, language)
+    request = _classify_request(ask, text, allowed_str)
     reply = await chat(client, model, request, logger)
     if reply.text is None:
         return None, reply.error
