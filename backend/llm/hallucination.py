@@ -10,6 +10,7 @@
 import re
 
 from backend.domain.taxonomy import CEFR_LEVELS, GRADES
+from backend.incoming import fold_signs
 from backend.llm.candidate import CandidateProfile
 
 # Уровни языка и грейды приметам нужны перечислением через «или». Собираются
@@ -244,15 +245,29 @@ def _build_profile_hallucination_markers(
 _QUOTE_RE = re.compile(r"«([^»]+)»")
 """Цитата поста в обосновании — в ёлочках: так её велит приводить наставление."""
 
-
-_SAME_SIGNS = str.maketrans({"ё": "е", "—": "-", "–": "-", "…": "..."})
-"""Знаки, которые модель в цитате пишет иначе, чем пост, не меняя слов."""
+_CEFR_CODE_RE = re.compile(r"\b(" + _CEFR_ALT + r")\b", re.IGNORECASE)
+"""Уровень шкалы в обосновании. Слова уровня («fluent», «advanced») здесь не
+ищутся: обоснование пишется на языке человека, и такое слово — пересказ слов
+поста на другом языке, а не уровень, которого в посте нет."""
 
 
 def _flat(text: str) -> str:
     """Текст для сверки цитаты: без регистра, с пробелами, сведёнными к одному,
-    и с одним написанием для ё/е, тире и многоточия."""
-    return " ".join(text.casefold().translate(_SAME_SIGNS).split())
+    и с одним написанием знаков (`incoming.fold_signs`)."""
+    return " ".join(fold_signs(text.casefold()).split())
+
+
+def _quote_found(quote: str, post: str) -> bool:
+    """Есть ли цитата в посте. Пропуск «…» делит её на части, и они ищутся в
+    том порядке, в каком стоят; цитата из одних пропусков ничего не цитирует."""
+    parts = [part.strip() for part in _flat(quote).split("...") if part.strip()]
+    at = 0
+    for part in parts:
+        at = post.find(part, at)
+        if at < 0:
+            return False
+        at += len(part)
+    return bool(parts)
 
 
 def looks_hallucinated(
@@ -264,7 +279,7 @@ def looks_hallucinated(
 
     Первой спрашивается цитата: обоснование пишется на языке человека, а слова
     поста приводит в кавычках как есть. Цитата, которой в посте нет, —
-    выдумка. Затем уровень языка: шкала одна на все языки, и уровень в
+    выдумка. Затем уровень языка: шкала одна на все языки, и уровень шкалы в
     обосновании без уровня в посте выдуман, с цитатами или без. Найденная
     цитата — опора, и словесные приметы ниже уже не спрашиваются: они знают
     только русские обороты, и русское обоснование к посту на другом языке не
@@ -278,12 +293,13 @@ def looks_hallucinated(
     """
     if not reason:
         return None
-    quotes = [_flat(q) for q in _QUOTE_RE.findall(reason)]
-    missing = next((q for q in quotes if q not in _flat(raw_text)), None)
+    quotes = _QUOTE_RE.findall(reason)
+    post = _flat(raw_text)
+    missing = next((q for q in quotes if not _quote_found(q, post)), None)
     if missing is not None:
         return f"цитата «{missing}» не из поста"
-    if _CEFR_LEVEL_RE.search(reason) and not _CEFR_LEVEL_RE.search(raw_text):
-        return _CEFR_LEVEL_RE.pattern
+    if _CEFR_CODE_RE.search(reason) and not _CEFR_LEVEL_RE.search(raw_text):
+        return _CEFR_CODE_RE.pattern
     if quotes:
         return None
     for reason_re, text_re in (*_GENERIC_HALLUCINATION_MARKERS, *_build_profile_hallucination_markers(profile)):

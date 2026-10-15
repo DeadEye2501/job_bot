@@ -13,7 +13,7 @@ from backend.agent.tools_common import common_tools
 from backend.agent.tools_letter import letter_tools
 from backend.applying.result import GONE, Dropped, Missed, Outcome, SiteClosed, Unfit
 from backend.domain.apply_order import Way
-from backend.models import Aggregator, Vacancy
+from backend.models import Aggregator
 from backend.payloads import SeenResume
 from backend.repository.aggregator_resumes import chosen_resume, drop_resume
 from backend.repository.aggregators import web_search_id
@@ -34,19 +34,18 @@ async def via_browser(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome:
     """
     rs = kit.pipeline.rs
     async with kit.pipeline.session_factory() as session:
-        vacancy = await session.get(Vacancy, vacancy_id)
-        if vacancy is None:
+        vacancy_text = await describe_vacancy(session, vacancy_id)
+        if vacancy_text is None:
             return GONE
-        language = await read_reply_language(session, vacancy.language)
+        language = await read_reply_language(session, vacancy_id)
+        profile_text = await kit.profile_text(session)
         site = await session.get(Aggregator, way.aggregator_id) if way.aggregator_id else None
         profile = site.id if site else await web_search_id(session)
         resume = await chosen_resume(session, site.id) if site else None
     job = ApplyJob(vacancy_id, way, profile, simulated=rs.send_locked, letter_writer=rs.letter_writer,
                    language=language, resume=SeenResume(resume.title, resume.url) if resume else None,
                    confirming=confirming(kit))
-    plan = await _apply_plan(kit, job)
-    if plan is None:
-        return GONE
+    plan = _apply_plan(kit, job, vacancy_text, profile_text)
     await kit.browser.open_profile(job.profile_id, sending=not job.simulated)
     await run_to_limit(kit, plan)
     if isinstance(job.outcome, Finished) and job.outcome.result == "resume_missing":
@@ -65,17 +64,12 @@ async def _mark_unfit(kit: AgentKit, vacancy_id: int, reason: str) -> None:
     kit.pipeline.fire_vacancies_changed()
 
 
-async def _apply_plan(kit: AgentKit, job: ApplyJob) -> SessionPlan | None:
-    """План откликателя; удалённая вакансия — пусто.
+def _apply_plan(kit: AgentKit, job: ApplyJob, vacancy_text: str, profile_text: str) -> SessionPlan:
+    """План откликателя.
 
     Поиск в сети — для курса валют в анкете и вакансии.
     """
-    async with kit.pipeline.session_factory() as session:
-        vacancy_text = await describe_vacancy(session, job.vacancy_id)
-        if vacancy_text is None:
-            return None
-        profile_text = await kit.profile_text(session)
-    tools = [*common_tools(kit, job), *applier_tools(kit, job), *letter_tools(kit, job),
+    tools =[*common_tools(kit, job), *applier_tools(kit, job), *letter_tools(kit, job),
              *browser_tools(kit, kit.pipeline.cv_file(), kit.pipeline.photo_file(),
                             job if job.confirming else None)]
     task = applier_task(job, vacancy_text, profile_text, kit.today)

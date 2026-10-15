@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass, field
 
-from backend.domain.language_choice import FALLBACK_LANGUAGE, person_language
+from backend.domain.language_choice import CandidateLanguage, candidate_languages, person_language
 from backend.models import Gender, Profile
 from backend.models import ProfileLanguage
 from backend.models import ProfileSkill
@@ -12,14 +12,6 @@ from backend.incoming import str_list
 
 GENDER_WORDS = {Gender.MALE: "мужской", Gender.FEMALE: "женский"}
 """Пол словом — для анкеты агента и блока письма: род письма берётся отсюда."""
-
-
-@dataclass(frozen=True)
-class CandidateLanguage:
-    """Один язык кандидата с CEFR-уровнем (или 'native')."""
-
-    name: str
-    level: str  # "A1" | "A2" | "B1" | "B2" | "C1" | "C2" | "native"
 
 
 @dataclass(frozen=True)
@@ -44,14 +36,12 @@ class CandidateProfile:
     languages: list[CandidateLanguage] = field(default_factory=list)
     free_preferences: str | None = None
     known_skills: list[ProfileSkill] = field(default_factory=list)
-    user_language: str = FALLBACK_LANGUAGE
-    """Язык, на котором писать самому человеку. Решает его не модуль модели, а
-    `domain/language_choice`; сюда он приходит готовым."""
 
-
-def in_user_language(prompt: str, language: str) -> str:
-    """Наставление с готовым языком человека на месте `{USER_LANGUAGE}`."""
-    return prompt.replace("{USER_LANGUAGE}", language)
+    @property
+    def user_language(self) -> str:
+        """Язык, на котором писать самому человеку, — по его же языкам: решает
+        `domain/language_choice`, а не модуль модели."""
+        return person_language(self.languages)
 
 
 def format_languages(languages: list[CandidateLanguage] | None) -> str:
@@ -101,11 +91,6 @@ def format_known_skills(skills) -> str:
     return "\n".join(lines) if lines else "—"
 
 
-def candidate_languages(rows: list[ProfileLanguage]) -> list[CandidateLanguage]:
-    """Языки анкеты в том виде, в каком их пишет `format_languages`."""
-    return [CandidateLanguage(name=row.language, level=row.level) for row in rows]
-
-
 def build_candidate_profile(
     profile: Profile | None,
     languages: list[ProfileLanguage],
@@ -126,5 +111,4 @@ def build_candidate_profile(
         work_formats=list(profile.work_format or []),
         languages=candidate_languages(languages),
         free_preferences=profile.free_preferences,
-        user_language=person_language(candidate_languages(languages)),
     )

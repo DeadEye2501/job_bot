@@ -8,10 +8,9 @@
 
 import pytest
 
-from backend.models import ProfileLanguage
-from backend.repository.companies_matching import find_or_create_company
+from backend.repository.companies_matching import CompanyArbiter, find_or_create_company
 from tests.dbio import put
-from tests.factories import company_row, profile_row
+from tests.factories import company_row
 
 
 class Arbiter:
@@ -53,13 +52,12 @@ def arbiter(monkeypatch):
     return install
 
 
-async def resolve(session, name, arbiter_fake=None, **kwargs):
+async def resolve(session, name, arbiter_fake=None, *, language="Русский", **kwargs):
     """Свести имя к компании, обращаясь к арбитру, если он подставлен."""
     return await find_or_create_company(
         session,
         name,
-        lm_client=object() if arbiter_fake is not None else None,
-        lm_model="qwen" if arbiter_fake is not None else None,
+        arbiter=CompanyArbiter(object(), "qwen", language) if arbiter_fake is not None else None,
         **kwargs,
     )
 
@@ -94,15 +92,13 @@ async def test_a_similar_name_is_taken_to_the_arbiter(
     assert fake.calls[0]["candidate_names"] == ["Сбербанк"]
 
 
-async def test_the_arbiter_explains_in_the_person_language(session, session_factory, arbiter):
-    """Пояснение арбитра читает человек: язык ему решает приложение по анкете."""
-    person = profile_row()
-    await put(session_factory, person)
-    await put(session_factory, ProfileLanguage(profile_id=person.id, language="Қазақша", level="native"))
+async def test_the_arbiter_explains_in_the_language_it_is_given(session, session_factory, arbiter):
+    """Пояснение арбитра читает человек: язык приходит готовым от зовущего, а
+    не решается сведением заново."""
     await put(session_factory, company_row(name="Сбербанк", website=None))
     fake = arbiter()
 
-    await resolve(session, "Сбербанк Тех", fake)
+    await resolve(session, "Сбербанк Тех", fake, language="Қазақша")
 
     assert fake.calls[0]["language"] == "Қазақша"
 

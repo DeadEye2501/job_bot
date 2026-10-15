@@ -4,12 +4,37 @@
 язык дважды» сама собой — сверять список построчно незачем.
 """
 
+import pytest
+
+from backend.models import ProfileLanguage
 from backend.repository.profile_languages import (
     list_profile_languages,
+    read_reply_language,
     replace_profile_languages,
 )
 from tests.dbio import put
-from tests.factories import profile_row
+from tests.factories import profile_row, vacancy_row
+
+
+@pytest.mark.parametrize(
+    ("vacancy_language", "expected"),
+    [
+        pytest.param("Español", "Español", id="язык вакансии известен"),
+        pytest.param(None, "Қазақша", id="неизвестен — язык человека"),
+    ],
+)
+async def test_the_reply_language_comes_from_the_vacancy_and_the_person(
+    session, session_factory, vacancy_language, expected
+):
+    """Язык отклика решает приложение по вакансии и анкете: язык вакансии, а
+    неизвестен он — родной язык человека."""
+    person = profile_row()
+    await put(session_factory, person)
+    await put(session_factory, ProfileLanguage(profile_id=person.id, language="Қазақша", level="native"))
+    vacancy = vacancy_row(language=vacancy_language)
+    await put(session_factory, vacancy)
+
+    assert await read_reply_language(session, vacancy.id) == expected
 
 
 async def test_an_empty_database_has_no_languages(session):

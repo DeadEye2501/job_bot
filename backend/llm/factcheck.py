@@ -76,7 +76,7 @@ FACT_CHECK_COVER_LETTER_PROMPT = """Ты — фактчекер сопровод
 """ + ONLY_JSON
 
 
-def _factcheck_request(profile_block: str, letter: str, about: str) -> ChatRequest:
+def _factcheck_request(profile_text: str, letter: str, about: str) -> ChatRequest:
     """Что спросить у модели: анкета как источник правды, вакансия и письмо.
 
     Вакансия названа отдельным полем нарочно: её название и канал письмо
@@ -85,7 +85,7 @@ def _factcheck_request(profile_block: str, letter: str, about: str) -> ChatReque
     """
     user_msg = external_block(
         "Информация о кандидате (источник правды):\n"
-        f"{profile_block}\n\n"
+        f"{profile_text}\n\n"
         f"О вакансии (заведомо не claim о кандидате):\n{about or '—'}\n\n"
         f"Текст письма:\n{letter}",
         "данные для сверки",
@@ -133,7 +133,7 @@ def _verdict_of(obj: dict, elapsed: float) -> tuple[bool, list[str]]:
 
 
 async def factcheck_cover_letter(
-    profile_block: str,
+    profile_text: str,
     letter: str,
     client: httpx.AsyncClient,
     model: str,
@@ -141,7 +141,7 @@ async def factcheck_cover_letter(
     about: str = "",
 ) -> tuple[bool, list[str]]:
     """Возвращает (ok, issues). ok=True, если все факты в письме покрыты
-    profile_block.
+    анкетой `profile_text`.
 
     Открывается наружу при **любой** беде — сетевой ошибке, невалидном JSON,
     оборванном ответе, — чтобы временный сбой модели не блокировал отправку:
@@ -153,7 +153,7 @@ async def factcheck_cover_letter(
     сверка ловила бы в нём «непокрытые профилем факты» и отбивала годные
     письма.
     """
-    request = _factcheck_request(profile_block, letter, about)
+    request = _factcheck_request(profile_text, letter, about)
     # Время засекается после сборки запроса: в отладочной строке ниже
     # называется срок ответа модели, а не наша склейка текста.
     t0 = time.monotonic()

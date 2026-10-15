@@ -27,7 +27,7 @@
 - —
 - принимает: ask, say, events
 
-### app/BottomBar.svelte (385)
+### app/BottomBar.svelte (392)
 - Полоса даёт переключателю подсказку только запертому — почему заперт; отпертый называет режим под курсором сам.
 - принимает: ask, say, events, onlocked, oncontact, app
 
@@ -828,9 +828,9 @@
 - * Грейды, какими их выбирают в анкете. Значения едут на мост и совпадают с * перечнем `backend/domain/taxonomy.py`.
 - отдаёт: CURRENCIES, GENDERS, GRADES, LANG_LEVELS, SALARY_PERIODS, WORK_FORMATS, blankProfile, cvNote, cvOpenable, fileSize, langRow, named, profileSheet, updatedNote
 
-### state/progress.js (97)
+### state/progress.js (106)
 - * Чем заперто то, что занимает место прогона, пока он идёт: мост второй прогон * не пустит.
-- отдаёт: COUNTLESS_STAGES, RUNNING, STARTING, applyNote, bar, caption, countlessNote, humanText, updateNote
+- отдаёт: COUNTLESS_STAGES, RUNNING, STARTING, applyNote, bar, caption, countlessNote, humanText, recoverNote, updateNote
 
 ### state/projects.js (45)
 - * Какие обязательные поля проекта пусты: обязательно одно название, как требует мост.
@@ -1790,7 +1790,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/blacklist_menu_item_live.test.js (67)
 - * Пункт с записанным за ним следом нажатий.
 
-### tests/bottom_bar_live.test.js (389)
+### tests/bottom_bar_live.test.js (422)
 - —
 
 ### tests/bottom_bar_stub.js (51)

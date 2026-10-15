@@ -2,8 +2,12 @@
 
 import pytest
 
-from backend.domain.language_choice import person_language, reply_language, search_languages
-from backend.llm.candidate import CandidateLanguage
+from backend.domain.language_choice import (
+    CandidateLanguage,
+    person_language,
+    reply_language,
+    search_languages,
+)
 
 
 @pytest.mark.parametrize(

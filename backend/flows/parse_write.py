@@ -14,7 +14,7 @@ from backend.models import HR
 from backend.models import Vacancy
 from backend.models import VacancyStatus
 from backend.payloads import DIRECT_PARSED_FIELDS, ParsedVacancy
-from backend.repository.companies_matching import find_or_create_company
+from backend.repository.companies_matching import CompanyArbiter, find_or_create_company
 from backend.repository.hr_identify import find_or_create_hr
 from backend.repository.vacancies_life import add_vacancy_event
 from backend.repository.vacancy_contacts import replace_parsed_contacts
@@ -168,8 +168,8 @@ async def _resolve_company(pipeline, parsed) -> tuple[int | None, dict | None]:
             session,
             parsed.company_name,
             website=parsed.company_website,
-            lm_client=pipeline.lm_client,
-            lm_model=pipeline.lm_chat_model,
+            arbiter=CompanyArbiter(pipeline.lm_client, pipeline.lm_chat_model,
+                                   pipeline.profile_cache.user_language),
         )
         company_id = company.id if company is not None else None
         await session.commit()

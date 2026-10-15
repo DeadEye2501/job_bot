@@ -14,7 +14,6 @@ from backend.domain.hosts import normalize_host
 from backend.models import Company
 from backend.incoming import str_list
 from backend.repository.companies_card import add_company_spellings, create_company
-from backend.repository.profile_languages import read_user_language
 from backend.repository.companies_keys import (
     hosts_compatible,
     normalize_company_name,
@@ -402,11 +401,20 @@ def _log_no_match(parsed: _Parsed, shortlist, reasoning: str | None) -> None:
     )
 
 
+@dataclass(frozen=True)
+class CompanyArbiter:
+    """Кого спрашивать о сведении и на каком языке он поясняет решение — языке
+    человека, решённом `domain/language_choice`: пояснение читает он."""
+
+    client: Any
+    model: str
+    language: str
+
+
 async def _llm_arbitrate(
-    lm_client: Any, lm_model: str, parsed: _Parsed, shown: tuple[list, str]
+    arbiter: CompanyArbiter, parsed: _Parsed, shortlist: list[Company]
 ) -> tuple[Company | None, dict]:
-    """Спросить модель, кто из показанных — та же компания; `shown` — короткий
-    список и язык пояснения, решённый `domain/language_choice`.
+    """Спросить модель, кто из короткого списка — та же компания.
 
     Отдаёт найденного и приписку к протоколу, а не правит протокол сам: чем
     кончилось дело, решает зовущий, а приписка ложится при любом исходе.
@@ -417,9 +425,9 @@ async def _llm_arbitrate(
     """
     from backend.llm.company import CompanyAsk, dedupe_company_with_llm
 
-    shortlist, language = shown
     matched_id, reasoning = await dedupe_company_with_llm(
-        lm_client, lm_model, CompanyAsk(parsed.raw_name, parsed.website, shortlist, language),
+        arbiter.client, arbiter.model,
+        CompanyAsk(parsed.raw_name, parsed.website, shortlist, arbiter.language),
     )
     patch: dict = {
         "candidates": [
@@ -446,13 +454,12 @@ async def find_or_create_company(
     name: str,
     *,
     website: str | None = None,
-    lm_client: Any = None,
-    lm_model: str | None = None,
+    arbiter: CompanyArbiter | None = None,
 ) -> tuple[Company | None, dict]:
     """Свести разобранную пару «имя и сайт» с компанией или завести новую.
 
     Ступени идут по силе сигнала: правила, арбитр из языковой модели по
-    короткому списку похожих, заведение. Без клиента модели арбитр
+    короткому списку похожих, заведение. Без арбитра его ступень
     пропускается; протокол описан у `_new_decision`.
     """
     decision = _new_decision()
@@ -467,11 +474,10 @@ async def find_or_create_company(
         matched, stage = ruled
         return _accept_company_match(matched, raw_name, website, decision, stage)
 
-    if parsed.norm and lm_client is not None and lm_model:
+    if parsed.norm and arbiter is not None and arbiter.client is not None and arbiter.model:
         shortlist = _llm_shortlist(norms, parsed)
         if shortlist:
-            shown = (shortlist, await read_user_language(session))
-            match, patch = await _llm_arbitrate(lm_client, lm_model, parsed, shown)
+            match, patch = await _llm_arbitrate(arbiter, parsed, shortlist)
             decision.update(patch)
             if match is not None:
                 return _accept_company_match(

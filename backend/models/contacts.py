@@ -66,6 +66,9 @@ class AggregatorResume(IdMixin, Base):
     aggregator_id: Mapped[int] = mapped_column(ForeignKey("aggregator.id"))
     title: Mapped[str]
     url: Mapped[str]
+    # Адрес правки именно этого резюме: страница резюме и его редактор на
+    # сайтах разные, и перезапись начинается с редактора, а не с поиска по сайту.
+    editor_url: Mapped[str | None]
     position: Mapped[int]
     is_chosen: Mapped[bool] = mapped_column(server_default=expression.false())
 

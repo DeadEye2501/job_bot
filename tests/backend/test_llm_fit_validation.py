@@ -14,6 +14,7 @@ from functools import partial
 
 import pytest
 
+from backend.domain.language_choice import CandidateLanguage
 from backend.llm.candidate import CandidateProfile
 from backend.llm.fit import _parse_fit_validation
 from backend.llm.fit_languages import validate_language_fit
@@ -286,6 +287,6 @@ async def test_every_reason_is_asked_in_the_user_language(check):
     приходит готовым, каким бы ни был язык поста."""
     client = provider({CHAT: fit_answer("fit", "годится")})
 
-    await asked(check, client, profile=CandidateProfile(user_language="Қазақша"))
+    await asked(check, client, profile=CandidateProfile(languages=[CandidateLanguage("Қазақша", "native")]))
 
     assert "язык пользователя: Қазақша" in messages_of(client.sent[0])["system"]

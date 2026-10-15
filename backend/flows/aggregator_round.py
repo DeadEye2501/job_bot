@@ -9,8 +9,7 @@ from adapters.claude_code_agent import AgentEnd
 from backend.agent.kit import AgentKit, SessionPlan
 from backend.agent.prompts.frame import system_prompt
 from backend.agent.prompts.seeker import (
-    SEEKER_PROMPT, WEB_SEEKER_PROMPT, blacklisted_sites, search_languages_line, seeker_task,
-    web_seeker_task,
+    SEEKER_PROMPT, WEB_SEEKER_PROMPT, SeekBounds, seeker_task, web_seeker_task,
 )
 from backend.agent.sessions import end_reason, run_guarded
 from backend.agent.stops import RUN_STOPPERS, LimitExhausted
@@ -73,15 +72,14 @@ async def _search(kit: AgentKit, job: SeekJob, queue: ParseQueue) -> AgentEnd:
 async def _seek_plan(kit: AgentKit, job: SeekJob, queue: ParseQueue) -> SessionPlan:
     source = job.source
     tools = [*common_tools(kit, job), *seeker_tools(kit, job, queue), *browser_tools(kit, None, None)]
-    languages = search_languages_line(await kit.read(read_search_languages))
+    bounds = SeekBounds(source.last_run_at, job.limit, kit.today, await kit.read(read_search_languages))
     if source.host is not None:
-        task = "\n".join([seeker_task(source.host, source.last_run_at, job.limit, kit.today), languages])
+        task = seeker_task(source.host, bounds)
         return SessionPlan(system_prompt(SEEKER_PROMPT, tools), task, tools, web_search=False)
     async with kit.pipeline.session_factory() as session:
         hosts = [a.host for a in await list_aggregators(session) if a.host]
         barred = sorted(await barred_hosts(session))
-    task = "\n".join([web_seeker_task(hosts, source.last_run_at, job.limit, kit.today),
-                      languages, blacklisted_sites(barred)])
+    task = web_seeker_task(hosts, barred, bounds)
     return SessionPlan(system_prompt(WEB_SEEKER_PROMPT, tools), task, tools, web_search=True)
 
 

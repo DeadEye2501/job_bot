@@ -66,7 +66,7 @@ MCP-сервер инструментов одной сессии агента: 
 - `def _children() -> list[tuple[int, str]]` (13)
 - `def _snapshot() -> list[tuple[int, int, str]]` (16)
 
-### `adapters/browser.py` — 280 строк
+### `adapters/browser.py` — 293 строк
 
 Браузер человека на движке Chromium под управлением Playwright.
 
@@ -80,7 +80,7 @@ MCP-сервер инструментов одной сессии агента: 
 - `def _by_path(name: str, relative: str) -> InstalledBrowser | None` (3)
 - `def _opera() -> InstalledBrowser | None` (10)
 - `def remove_profile(profile_id: int) -> None` (8)
-- `class BrowserHost` (136)
+- `class BrowserHost` (132)
   - `async def open_profile(self, profile_id: int, sending: bool=True, as_person: bool=False) -> None` (20)
   - `async def page(self)` (8)
   - `async def show(self) -> None` (2)
@@ -88,10 +88,11 @@ MCP-сервер инструментов одной сессии агента: 
   - `async def clear_cache(self) -> None` (4)
   - `async def wait_closed(self, limit_sec: float) -> bool` (11)
   - `async def close(self) -> None` (7)
-  - `async def _launch(self) -> None` (40)
+  - `async def _launch(self) -> None` (36)
   - `async def _place(self, on_screen: bool) -> None` (10)
   - `def _forget_context(self, closed) -> None` (4)
   - `async def _close_context(self) -> None` (4)
+- `def context_options(browser: InstalledBrowser, *, sending: bool, as_person: bool) -> dict` (15)
 - `async def hold_sending(route) -> None` (13)
 - `def _is_captcha(url: str) -> bool` (8)
 - `def _accept_dialogs(page) -> None` (4)
@@ -328,7 +329,7 @@ Claude через установленный Claude Code по подписке: 
 
 - `def page_client(timeout_sec: float, user_agent: str) -> httpx.AsyncClient` (7)
 
-## alembic — 7 модулей
+## alembic — 2 модулей
 
 ### `alembic/env.py` — 77 строк
 
@@ -341,62 +342,16 @@ Claude через установленный Claude Code по подписке: 
 - `async def run_async_migrations() -> None` (14)
 - `def run_migrations_online() -> None` (2)
 
-### `alembic/versions/6cc10045aeb6_projects.py` — 43 строк
-
-projects
-
-Зависит от: `alembic`
-
-- `def upgrade() -> None` (19)
-- `def downgrade() -> None` (3)
-
-### `alembic/versions/a7c2e9d41b06_vacancy_language.py` — 29 строк
-
-vacancy language
-
-Зависит от: `alembic`
-
-- `def upgrade() -> None` (2)
-- `def downgrade() -> None` (6)
-
-### `alembic/versions/a9c3e1f07b42_aggregators.py` — 144 строк
-
-aggregators
-
-Зависит от: `alembic`
-
-- `def _source_columns(table: str) -> None` (8)
-- `def upgrade() -> None` (83)
-- `def downgrade() -> None` (24)
-
-### `alembic/versions/c4d7e2a915b3_one_apply_trail.py` — 30 строк
-
-one apply trail
-
-Зависит от: `alembic`
-
-- `def upgrade() -> None` (4)
-- `def downgrade() -> None` (2)
-
-### `alembic/versions/e560edf8b958_init.py` — 272 строк
+### `alembic/versions/032b8b1c9f8a_init.py` — 400 строк ⚠ подошёл к 300
 
 init
 
 Зависит от: `alembic`
 
-- `def upgrade() -> None` (221)
-- `def downgrade() -> None` (28)
+- `def upgrade() -> None` (332)
+- `def downgrade() -> None` (44)
 
-### `alembic/versions/f3b8d1c2a7e4_resume_autofill.py` — 61 строк
-
-resume autofill
-
-Зависит от: `alembic`
-
-- `def upgrade() -> None` (22)
-- `def downgrade() -> None` (14)
-
-## backend — 208 модулей
+## backend — 209 модулей
 
 ### `backend/agent/__init__.py` — 1 строк
 
@@ -543,24 +498,23 @@ resume autofill
 Зависит от: `backend.llm.rules`
 
 
-### `backend/agent/prompts/seeker.py` — 74 строк
+### `backend/agent/prompts/seeker.py` — 78 строк
 
 Искатели вакансий: на сайте агрегатора и по всей сети.
 
 Зависит от: —
 
-- `def seeker_task(host: str, last_run: datetime | None, limit: int, today: date) -> str` (3)
-- `def web_seeker_task(aggregator_hosts: list[str], last_run: datetime | None, limit: int, today: date) -> str` (8)
-- `def search_languages_line(languages: list[str]) -> str` (3)
-- `def blacklisted_sites(hosts: list[str]) -> str` (3)
-- `def _bounds(last_run: datetime | None, limit: int, today: date) -> list[str]` (7)
+- `class SeekBounds` (9)
+- `def seeker_task(host: str, bounds: SeekBounds) -> str` (3)
+- `def web_seeker_task(aggregator_hosts: list[str], barred_hosts: list[str], bounds: SeekBounds) -> str` (8)
+- `def _bounds(bounds: SeekBounds) -> list[str]` (7)
 - `def _since(last_run: datetime | None) -> str` (4)
 
 ### `backend/agent/sessions.py` — 93 строк
 
 Сессия агента под надзором: сервер, водитель, срок человека и общий срок.
 
-Зависит от: `adapters.agent_mcp`, `adapters.claude_code_agent`, `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.prompts.frame`, `backend.agent.stops`, `backend.agent.tools_common`, `backend.llm.candidate`, `backend.repository.profile_languages`, `backend.task_stop`
+Зависит от: `adapters.agent_mcp`, `adapters.claude_code_agent`, `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.prompts.frame`, `backend.agent.stops`, `backend.agent.tools_common`, `backend.llm.rules`, `backend.repository.profile_languages`, `backend.task_stop`
 
 - `async def run_guarded(kit: AgentKit, plan: SessionPlan) -> AgentEnd` (28)
 - `async def run_to_limit(kit: AgentKit, plan: SessionPlan) -> AgentEnd` (9)
@@ -684,15 +638,15 @@ resume autofill
 - `def _why(reason: str, field: str | None) -> str` (2)
 - `def _answer(accepted: int, refused: dict[str, str]) -> str` (4)
 
-### `backend/agent/tools_letter.py` — 64 строк
+### `backend/agent/tools_letter.py` — 62 строк
 
 Инструмент письма для отклика: пишет приложение или сверяется письмо агента.
 
-Зависит от: `backend.agent.jobs`, `backend.agent.kit`, `backend.llm.agent_letter`, `backend.models`, `backend.repository.profile_languages`
+Зависит от: `backend.agent.jobs`, `backend.agent.kit`, `backend.llm.agent_letter`, `backend.models`
 
 - `def letter_tools(kit: AgentKit, job: ApplyJob) -> list[Callable]` (17)
   - `async def letter(limit: int=0, subject: str='', body: str='') -> str` (12)
-- `async def letter_ask(kit: AgentKit, vacancy_id: int, limit: int | None) -> LetterAsk | None` (11)
+- `async def letter_ask(kit: AgentKit, vacancy_id: int, language: str, limit: int | None) -> LetterAsk | None` (10)
 - `async def _written(kit: AgentKit, job: ApplyJob, ask: LetterAsk) -> str` (7)
 - `async def _checked(kit: AgentKit, job: ApplyJob, ask: LetterAsk, own: Letter) -> str` (6)
 
@@ -740,24 +694,24 @@ resume autofill
 Зависит от: —
 
 
-### `backend/applying/browser.py` — 100 строк
+### `backend/applying/browser.py` — 94 строк
 
 Браузерный способ: сессия агента на кнопку агрегатора или форму работодателя.
 
 Зависит от: `backend.agent.confirm`, `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.prompts.applier`, `backend.agent.prompts.frame`, `backend.agent.sessions`, `backend.agent.stops`, `backend.agent.tools_applier`, `backend.agent.tools_browser`, `backend.agent.tools_common`, `backend.agent.tools_letter`, `backend.applying.result`, `backend.domain.apply_order`, `backend.models`, `backend.payloads`, `backend.repository.aggregator_resumes`, `backend.repository.aggregators`, `backend.repository.profile_languages`, `backend.repository.vacancy_brief`, `backend.repository.vacancy_status`
 
-- `async def via_browser(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome` (32)
+- `async def via_browser(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome` (31)
 - `async def _mark_unfit(kit: AgentKit, vacancy_id: int, reason: str) -> None` (5)
-- `async def _apply_plan(kit: AgentKit, job: ApplyJob) -> SessionPlan | None` (15)
+- `def _apply_plan(kit: AgentKit, job: ApplyJob, vacancy_text: str, profile_text: str) -> SessionPlan` (10)
 - `def _settle(job: ApplyJob, way: Way) -> Outcome` (16)
 
-### `backend/applying/email.py` — 68 строк
+### `backend/applying/email.py` — 70 строк
 
 Отклик письмом без агента: модель приложения пишет, сервер почты принимает,
 
-Зависит от: `adapters`, `adapters.smtp_mail`, `backend.agent.confirm`, `backend.agent.kit`, `backend.agent.tools_applier`, `backend.agent.tools_letter`, `backend.applying.result`, `backend.applying.resume_link`, `backend.domain.apply_order`, `backend.llm.agent_letter`, `backend.models`, `backend.repository.applications`, `backend.repository.mail_account`
+Зависит от: `adapters`, `adapters.smtp_mail`, `backend.agent.confirm`, `backend.agent.kit`, `backend.agent.tools_applier`, `backend.agent.tools_letter`, `backend.applying.result`, `backend.applying.resume_link`, `backend.domain.apply_order`, `backend.llm.agent_letter`, `backend.models`, `backend.repository.applications`, `backend.repository.mail_account`, `backend.repository.profile_languages`
 
-- `async def via_email(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome` (28)
+- `async def via_email(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome` (29)
 - `async def _send_and_record(kit: AgentKit, vacancy_id: int, account: MailAccountConfig, mail: OutgoingMail) -> Outcome` (14)
 
 ### `backend/applying/result.py` — 64 строк
@@ -772,14 +726,14 @@ resume autofill
 - `class Unfit` (7)
 - `async def delivered(record: Awaitable, vacancy_id: int) -> Outcome` (11)
 
-### `backend/applying/resume_link.py` — 38 строк
+### `backend/applying/resume_link.py` — 40 строк
 
 Резюме к письму: файл, а нет файла — ссылка на резюме из анкеты.
 
 Зависит от: `backend.repository.profile`
 
-- `class LetterResume` (13)
-  - `def under(self, body: str) -> str` (7)
+- `class LetterResume` (15)
+  - `def under(self, body: str) -> str` (9)
 - `async def resume_for_letter(pipeline) -> LetterResume | None` (10)
 
 ### `backend/applying/run.py` — 79 строк
@@ -849,7 +803,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def alembic_config() -> Config` (10)
 - `def ensure_schema() -> None` (9)
 
-### `backend/bot/aggregators.py` — 145 строк
+### `backend/bot/aggregators.py` — 150 строк
 
 Работа агента у бота с источниками: обход агрегаторов, вход на сайт, перечень и заполнение резюме, удаление источника.
 
@@ -865,7 +819,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def scan_aggregator(bot, aggregator_id: int) -> AgentOutcome` (3)
 - `async def fill_resume(bot, aggregator_id: int, resume_id: int) -> AgentOutcome` (4)
 - `async def create_resume(bot, aggregator_id: int) -> AgentOutcome` (4)
-- `async def _on_site(bot, aggregator_id: int, flow: Callable[[AgentKit, Source], Awaitable[str]], label: str) -> AgentOutcome` (14)
+- `async def _on_site(bot, aggregator_id: int, flow: Callable[[AgentKit, Source], Awaitable[str]], doing: str) -> AgentOutcome` (19)
   - `async def on_site(kit: AgentKit) -> str` (2)
 - `async def delete_aggregator(bot, aggregator_id: int) -> str` (10)
 - `async def _row(bot, aggregator_id: int) -> Aggregator | None` (3)
@@ -1221,14 +1175,16 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def image_type(head: bytes) -> str | None` (14)
 
-### `backend/domain/language_choice.py` — 44 строк
+### `backend/domain/language_choice.py` — 55 строк
 
 Решение, на каком языке писать — человеку или работодателю — и искать работу.
 
 Зависит от: `backend.domain.taxonomy`
 
-- `def person_language(languages: Iterable) -> str` (7)
-- `def search_languages(languages: Iterable) -> list[str]` (10)
+- `class CandidateLanguage` (5)
+- `def candidate_languages(rows: Iterable) -> list[CandidateLanguage]` (3)
+- `def person_language(languages: Iterable[CandidateLanguage]) -> str` (6)
+- `def search_languages(languages: Iterable[CandidateLanguage]) -> list[str]` (7)
 - `def reply_language(vacancy_language: str | None, person: str) -> str` (7)
 
 ### `backend/domain/mail_servers.py` — 23 строк
@@ -1314,7 +1270,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def joined_stack(required: list[str], preferred: list[str]) -> list[str]` (8)
 - `def deduped_halves(required: list[str], preferred: list[str]) -> tuple[list[str], list[str]]` (22)
 
-### `backend/domain/taxonomy.py` — 129 строк
+### `backend/domain/taxonomy.py` — 137 строк
 
 Замкнутые перечни значений, которыми описывают вакансию и анкету.
 
@@ -1393,7 +1349,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _model_name(host: str, hints: list[str], chat: LlmProviderConfig | None) -> str | None` (12)
 - `def _site_like_part(host: str, parts: tuple[str, ...]) -> str | None` (10)
 
-### `backend/flows/aggregator_round.py` — 93 строк
+### `backend/flows/aggregator_round.py` — 91 строк
 
 Обход источника-агрегатора: поиск, разбор найденного и передача отобранного.
 
@@ -1402,7 +1358,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def seek_source(kit: AgentKit, source: Source) -> None` (28)
 - `async def _hand_over(kit: AgentKit, queue: ParseQueue) -> None` (3)
 - `async def _search(kit: AgentKit, job: SeekJob, queue: ParseQueue) -> AgentEnd` (7)
-- `async def _seek_plan(kit: AgentKit, job: SeekJob, queue: ParseQueue) -> SessionPlan` (13)
+- `async def _seek_plan(kit: AgentKit, job: SeekJob, queue: ParseQueue) -> SessionPlan` (12)
 - `async def _settle(kit: AgentKit, job: SeekJob, end: AgentEnd, started: datetime) -> None` (6)
 
 ### `backend/flows/aggregator_scan.py` — 34 строк
@@ -1788,13 +1744,14 @@ First-run bootstrap: ensure DB schema exists.
 - `def telegram_alive(bot) -> bool` (7)
 - `async def model_alive(cfg, kind: str) -> bool` (43)
 
-### `backend/incoming.py` — 188 строк
+### `backend/incoming.py` — 207 строк
 
 Приведение внешнего ввода к значениям, годным для записи.
 
 Зависит от: —
 
 - `def fold_homoglyphs(text: str) -> str` (12)
+- `def fold_signs(text: str) -> str` (10)
 - `def text_or_none(value) -> str | None` (16)
 - `def int_or_none(value) -> int | None` (3)
 - `def amount_or_none(value) -> int | None` (8)
@@ -1807,7 +1764,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def enum_member_or_none(value, kind: type[enum.Enum])` (8)
 - `def normalize_enum_list(values, allowed: tuple[str, ...]) -> list[str]` (15)
 
-### `backend/llm/agent_letter.py` — 103 строк
+### `backend/llm/agent_letter.py` — 102 строк
 
 Письмо и тема для отклика вне Telegram: пишет чат-модель, проверяет сверка фактов.
 
@@ -1817,7 +1774,7 @@ First-run bootstrap: ensure DB schema exists.
 - `class LetterAsk` (6)
 - `async def write_letter(ask: LetterAsk, client, model: str) -> tuple[Letter | None, list[str]]` (8)
 - `async def check_letter(ask: LetterAsk, letter: Letter, client, model: str) -> tuple[bool, list[str]]` (8)
-- `def _request(ask: LetterAsk) -> ChatRequest` (14)
+- `def _request(ask: LetterAsk) -> ChatRequest` (13)
 - `def _letter_of(text: str | None) -> Letter | None` (10)
 - `def _short_dash(text: str) -> str` (2)
 - `def _trouble(letter: Letter, limit: int | None) -> str | None` (7)
@@ -1838,26 +1795,24 @@ First-run bootstrap: ensure DB schema exists.
 - `def _say_unread(answer: str, told: tuple[logging.Logger, str], empty_means: str | None) -> None` (15)
 - `def str_or_none(value) -> str | None` (10)
 
-### `backend/llm/candidate.py` — 130 строк
+### `backend/llm/candidate.py` — 114 строк
 
 Сведения о кандидате в том виде, в каком они уходят в промпт.
 
 Зависит от: `backend.domain.language_choice`, `backend.incoming`, `backend.models`
 
-- `class CandidateLanguage` (5)
-- `class CandidateProfile` (24)
-- `def in_user_language(prompt: str, language: str) -> str` (3)
+- `class CandidateProfile` (27)
+  - `def user_language(self) -> str` (4)
 - `def format_languages(languages: list[CandidateLanguage] | None) -> str` (16)
 - `def format_text(text: str | None) -> str` (8)
 - `def format_known_skills(skills) -> str` (17)
-- `def candidate_languages(rows: list[ProfileLanguage]) -> list[CandidateLanguage]` (3)
-- `def build_candidate_profile(profile: Profile | None, languages: list[ProfileLanguage]) -> CandidateProfile` (22)
+- `def build_candidate_profile(profile: Profile | None, languages: list[ProfileLanguage]) -> CandidateProfile` (21)
 
-### `backend/llm/company.py` — 165 строк
+### `backend/llm/company.py` — 164 строк
 
 Арбитр: та же это компания, что уже заведена, или новая.
 
-Зависит от: `adapters.lm_chat`, `backend.incoming`, `backend.llm.answers`, `backend.llm.candidate`, `backend.llm.external`, `backend.llm.rules`
+Зависит от: `adapters.lm_chat`, `backend.incoming`, `backend.llm.answers`, `backend.llm.external`, `backend.llm.rules`
 
 - `class CompanyAsk` (8)
 - `def _shown_candidates(ask: CompanyAsk) -> str` (18)
@@ -1865,20 +1820,20 @@ First-run bootstrap: ensure DB schema exists.
 - `def _matched_id(answer: str) -> tuple[int | None, str | None]` (22)
 - `async def dedupe_company_with_llm(client: httpx.AsyncClient, model: str, ask: CompanyAsk) -> tuple[int | None, str | None]` (33)
 
-### `backend/llm/cover_letter.py` — 322 строк ⚠ подошёл к 300
+### `backend/llm/cover_letter.py` — 329 строк ⚠ подошёл к 300
 
 Сочинение письма-отклика.
 
-Зависит от: `adapters.lm_chat`, `backend.domain.language_choice`, `backend.llm.external`, `backend.llm.factcheck`, `backend.llm.rules`, `backend.payloads`
+Зависит от: `adapters.lm_chat`, `backend.llm.external`, `backend.llm.factcheck`, `backend.llm.rules`, `backend.payloads`
 
 - `class LetterPost` (16)
-- `def _letter_request(profile_block: str, parsed: ParsedVacancy, post: LetterPost) -> ChatRequest` (39)
+- `def _letter_request(profile_text: str, parsed: ParsedVacancy, post: LetterPost) -> ChatRequest` (38)
 - `def _vacancy_ref(parsed: ParsedVacancy, channel_ref) -> str` (9)
 - `def _with_vacancy_filled(raw_text: str, parsed: ParsedVacancy, channel_ref) -> str` (27)
 - `def _letter_refusal(text: str, finish_reason) -> str | None` (23)
-- `async def generate_cover_letter(profile_block: str, parsed: ParsedVacancy, client: httpx.AsyncClient, model: str, *, post: LetterPost=LetterPost()) -> tuple[str | None, str | None]` (48)
+- `async def generate_cover_letter(profile_text: str, parsed: ParsedVacancy, client: httpx.AsyncClient, model: str, *, post: LetterPost) -> tuple[str | None, str | None]` (48)
 
-### `backend/llm/cv.py` — 378 строк ⚠ подошёл к 300
+### `backend/llm/cv.py` — 381 строк ⚠ подошёл к 300
 
 Разбор резюме моделью: из текста файла — заполненная анкета.
 
@@ -1951,9 +1906,9 @@ First-run bootstrap: ensure DB schema exists.
 
 Зависит от: `adapters.lm_chat`, `backend.incoming`, `backend.llm.answers`, `backend.llm.external`, `backend.llm.rules`
 
-- `def _factcheck_request(profile_block: str, letter: str, about: str) -> ChatRequest` (23)
+- `def _factcheck_request(profile_text: str, letter: str, about: str) -> ChatRequest` (23)
 - `def _verdict_of(obj: dict, elapsed: float) -> tuple[bool, list[str]]` (29)
-- `async def factcheck_cover_letter(profile_block: str, letter: str, client: httpx.AsyncClient, model: str, *, about: str='') -> tuple[bool, list[str]]` (39)
+- `async def factcheck_cover_letter(profile_text: str, letter: str, client: httpx.AsyncClient, model: str, *, about: str='') -> tuple[bool, list[str]]` (39)
 
 ### `backend/llm/fill_review.py` — 97 строк
 
@@ -1966,16 +1921,16 @@ First-run bootstrap: ensure DB schema exists.
 - `def _verdict(one: dict) -> Verdict` (4)
 - `def _request(inventory: list[FieldEntry], items: list[dict]) -> ChatRequest` (21)
 
-### `backend/llm/fit.py` — 219 строк
+### `backend/llm/fit.py` — 229 строк
 
 Общее у зовов о пригодности: чем спросить модель и как прочесть ответ.
 
-Зависит от: `adapters.lm_chat`, `backend.incoming`, `backend.llm.answers`, `backend.llm.candidate`, `backend.llm.external`, `backend.llm.hallucination`, `backend.llm.rules`, `backend.payloads`
+Зависит от: `adapters.lm_chat`, `backend.incoming`, `backend.llm.answers`, `backend.llm.external`, `backend.llm.hallucination`, `backend.llm.rules`, `backend.payloads`
 
-- `class FitQuestion` (9)
+- `class FitQuestion` (14)
 - `def vacancy_block(parsed: ParsedVacancy, raw_text: str) -> str` (18)
-- `def vacancy_text(raw_text: str) -> str` (3)
-- `def text_fit_question(purpose: str, prompt_for: Callable) -> Callable` (18)
+- `def vacancy_text(parsed: ParsedVacancy, raw_text: str) -> str` (7)
+- `def fit_question(purpose: str, prompt_for: Callable, about: Callable=vacancy_text) -> Callable` (20)
   - `async def validate(parsed: ParsedVacancy, raw_text: str, client: httpx.AsyncClient, model: str, *, profile) -> tuple[FitValidation | None, str | None]` (9)
 - `def _parse_fit_validation(answer: str, purpose: str) -> FitValidation | None` (10)
 - `def _request(question: FitQuestion, about: str, max_tokens: int) -> ChatRequest` (16)
@@ -1983,15 +1938,15 @@ First-run bootstrap: ensure DB schema exists.
 - `async def ask_fit(question: FitQuestion, about: str, client: httpx.AsyncClient, model: str) -> tuple[FitValidation | None, str | None]` (29)
   - `def read(answer: str) -> FitValidation | None` (4)
 
-### `backend/llm/fit_languages.py` — 120 строк
+### `backend/llm/fit_languages.py` — 116 строк
 
 Один вопрос о вакансии: требует ли она языка, которого у кандидата нет.
 
-Зависит от: `backend.llm.candidate`, `backend.llm.fit`, `backend.llm.hallucination`, `backend.llm.rules`, `backend.payloads`
+Зависит от: `backend.domain.taxonomy`, `backend.llm.candidate`, `backend.llm.fit`, `backend.llm.hallucination`, `backend.llm.rules`, `backend.payloads`
 
-- `def _prompt_for(profile: CandidateProfile) -> str` (5)
+- `def _prompt_for(profile: CandidateProfile) -> str` (3)
 - `def _without_invented_language(validation: FitValidation, raw_text: str, profile: CandidateProfile) -> FitValidation` (19)
-- `async def validate_language_fit(parsed: ParsedVacancy, raw_text: str, client: httpx.AsyncClient, model: str, *, profile: CandidateProfile) -> tuple[FitValidation | None, str | None]` (15)
+- `async def validate_language_fit(parsed: ParsedVacancy, raw_text: str, client: httpx.AsyncClient, model: str, *, profile: CandidateProfile) -> tuple[FitValidation | None, str | None]` (9)
 
 ### `backend/llm/fit_place.py` — 96 строк
 
@@ -2009,57 +1964,60 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def _prompt_for(profile: CandidateProfile) -> str` (3)
 
-### `backend/llm/fit_role.py` — 96 строк
+### `backend/llm/fit_role.py` — 72 строк
 
 Один вопрос о вакансии: та ли это профессия.
 
-Зависит от: `backend.llm.candidate`, `backend.llm.fit`, `backend.payloads`
+Зависит от: `backend.llm.candidate`, `backend.llm.fit`
 
-- `def _prompt_for(profile: CandidateProfile) -> str` (8)
-- `async def validate_role_fit(parsed: ParsedVacancy, raw_text: str, client: httpx.AsyncClient, model: str, *, profile: CandidateProfile) -> tuple[FitValidation | None, str | None]` (12)
+- `def _prompt_for(profile: CandidateProfile) -> str` (7)
 
-### `backend/llm/genre.py` — 148 строк
+### `backend/llm/genre.py` — 149 строк
 
 Жанр поста: зовёт ли автор на работу или предлагает себя.
 
-Зависит от: `adapters.lm_chat`, `backend.llm.answers`, `backend.llm.candidate`, `backend.llm.external`, `backend.llm.rules`, `backend.payloads`
+Зависит от: `adapters.lm_chat`, `backend.llm.answers`, `backend.llm.external`, `backend.llm.rules`, `backend.payloads`
 
 - `def _parse_genre(answer: str) -> PostGenre | None` (20)
 - `def _genre_request(text: str, language: str, max_tokens: int) -> ChatRequest` (21)
 - `async def classify_post_genre(text: str, client: httpx.AsyncClient, model: str, language: str) -> tuple[PostGenre | None, str | None]` (22)
 
-### `backend/llm/hallucination.py` — 309 строк ⚠ подошёл к 300
+### `backend/llm/hallucination.py` — 325 строк ⚠ подошёл к 300
 
 Чем негодно обоснование, которое дала модель.
 
-Зависит от: `backend.domain.taxonomy`, `backend.llm.candidate`
+Зависит от: `backend.domain.taxonomy`, `backend.incoming`, `backend.llm.candidate`
 
 - `def language_root(name: str) -> str | None` (18)
 - `def _language_marker(root: str, name: str, inference_verbs: str, cefr_text: str) -> tuple[re.Pattern[str], re.Pattern[str]]` (21)
 - `def _build_profile_hallucination_markers(profile: CandidateProfile) -> tuple[tuple[re.Pattern[str], re.Pattern[str]], ...]` (30)
 - `def _flat(text: str) -> str` (4)
-- `def looks_hallucinated(reason: str, raw_text: str, profile: CandidateProfile) -> str | None` (35)
+- `def _quote_found(quote: str, post: str) -> bool` (11)
+- `def looks_hallucinated(reason: str, raw_text: str, profile: CandidateProfile) -> str | None` (36)
 - `def breaks_reason_style(reason: str) -> str | None` (15)
 
-### `backend/llm/hr_reply.py` — 275 строк
+### `backend/llm/hr_reply.py` — 280 строк
 
 Разбор ответа HR: на каком этапе теперь отклик.
 
-Зависит от: `adapters.lm_chat`, `backend.domain.transitions`, `backend.llm.answers`, `backend.llm.external`, `backend.models`, `backend.payloads`
+Зависит от: `adapters.lm_chat`, `backend.domain.transitions`, `backend.llm.answers`, `backend.llm.external`, `backend.llm.rules`, `backend.models`, `backend.payloads`
 
 - `def _parse_classification(answer: str) -> Classification | None` (19)
 - `def _allowed_next(current_status: VacancyStatus) -> set[VacancyStatus]` (21)
 - `def _as_line(allowed: set[VacancyStatus]) -> str` (3)
-- `def _classify_request(text: str, current_status: VacancyStatus, allowed_str: str, language: str) -> ChatRequest` (22)
-- `async def classify_hr_reply(text: str, current_status: VacancyStatus, client: httpx.AsyncClient, model: str, *, language: str) -> tuple[Classification | None, str | None]` (59)
+- `class HrReplyAsk` (8)
+- `def _classify_request(ask: HrReplyAsk, text: str, allowed_str: str) -> ChatRequest` (21)
+- `async def classify_hr_reply(ask: HrReplyAsk, client: httpx.AsyncClient, model: str) -> tuple[Classification | None, str | None]` (52)
 
-### `backend/llm/rules.py` — 306 строк ⚠ подошёл к 300
+### `backend/llm/rules.py` — 345 строк ⚠ подошёл к 300
 
 Приметы предметной области, общие для наставлений модели.
 
 Зависит от: `backend.domain.company_hosts`, `backend.domain.resume_marks`, `backend.domain.taxonomy`
 
 - `def has_placeholder(text: str) -> bool` (9)
+- `def in_user_language(prompt: str, language: str) -> str` (3)
+- `def in_reply_language(prompt: str, language: str) -> str` (3)
 
 ### `backend/llm/site_name.py` — 52 строк
 
@@ -2085,11 +2043,11 @@ First-run bootstrap: ensure DB schema exists.
 - `def _as_items(raw: object) -> list` (16)
 - `def clean_stack_items(raw: object, seen: set[str]) -> list[str]` (36)
 
-### `backend/llm/vacancy.py` — 499 строк ⚠ подошёл к 300
+### `backend/llm/vacancy.py` — 336 строк ⚠ подошёл к 300
 
 Разбор объявления о вакансии в структурированные поля.
 
-Зависит от: `adapters.lm_chat`, `backend.domain.company_names`, `backend.domain.contact_keys`, `backend.domain.taxonomy`, `backend.domain.telegram_identity`, `backend.incoming`, `backend.llm.answers`, `backend.llm.candidate`, `backend.llm.external`, `backend.llm.rules`, `backend.llm.skills`, `backend.payloads`
+Зависит от: `adapters.lm_chat`, `backend.domain.company_names`, `backend.domain.contact_keys`, `backend.domain.taxonomy`, `backend.domain.telegram_identity`, `backend.incoming`, `backend.llm.answers`, `backend.llm.candidate`, `backend.llm.external`, `backend.llm.rules`, `backend.llm.skills`, `backend.llm.vacancy_prompt`, `backend.payloads`
 
 - `def _split_stack(data: dict) -> tuple[list, list]` (19)
 - `def _company_name_and_site(company_name: str | None, company_website: str | None) -> tuple[str | None, str | None]` (28)
@@ -2103,7 +2061,14 @@ First-run bootstrap: ensure DB schema exists.
 - `def _without_the_channel_itself(parsed: ParsedVacancy, channel_username: str | None) -> ParsedVacancy` (27)
   - `def is_the_channel(contact: str | None) -> bool` (3)
 - `def _log_parsed(parsed: ParsedVacancy) -> None` (10)
-- `async def parse_vacancy(text: str, client: httpx.AsyncClient, model: str, channel_username: str | None=None, *, profile: CandidateProfile=CandidateProfile()) -> tuple[ParsedVacancy | None, str | None]` (39)
+- `async def parse_vacancy(text: str, client: httpx.AsyncClient, model: str, channel_username: str | None=None, *, profile: CandidateProfile) -> tuple[ParsedVacancy | None, str | None]` (39)
+
+### `backend/llm/vacancy_prompt.py` — 166 строк
+
+Наставление модели для разбора объявления о вакансии.
+
+Зависит от: `backend.domain.taxonomy`, `backend.llm.answers`, `backend.llm.rules`
+
 
 ### `backend/log_buffer.py` — 214 строк
 
@@ -2189,7 +2154,7 @@ First-run bootstrap: ensure DB schema exists.
 - `class CreatedAtMixin` (8)
 - `class UpdatedAtMixin` (14)
 
-### `backend/models/contacts.py` — 101 строк
+### `backend/models/contacts.py` — 104 строк
 
 Таблицы сторон, с которыми связана вакансия.
 
@@ -2197,7 +2162,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `class TelegramChannel(IdMixin, Base)` (11)
 - `class Aggregator(IdMixin, Base)` (20)
-- `class AggregatorResume(IdMixin, Base)` (24)
+- `class AggregatorResume(IdMixin, Base)` (27)
 - `class HR(IdMixin, Base)` (17)
 - `class Company(IdMixin, Base)` (10)
 
@@ -2517,11 +2482,11 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def list_companies_with_counts(session: AsyncSession, search: str | None=None, *, limit: int | None=None, offset: int=0) -> tuple[list[CompanyWithCount], bool]` (36)
 
-### `backend/repository/companies_matching.py` — 484 строк ⚠ подошёл к 300
+### `backend/repository/companies_matching.py` — 490 строк ⚠ подошёл к 300
 
 Сведение разобранной из вакансии компании с уже заведённой.
 
-Зависит от: `backend.domain.company_names`, `backend.domain.hosts`, `backend.incoming`, `backend.llm.company`, `backend.models`, `backend.repository.companies_card`, `backend.repository.companies_keys`, `backend.repository.profile_languages`
+Зависит от: `backend.domain.company_names`, `backend.domain.hosts`, `backend.incoming`, `backend.llm.company`, `backend.models`, `backend.repository.companies_card`, `backend.repository.companies_keys`
 
 - `def _known_spellings(company: Company) -> tuple[str, list[str]]` (13)
 - `def _enrich_company_with_parsed(company: Company, parsed_name: str, parsed_website: str | None) -> None` (23)
@@ -2541,8 +2506,9 @@ First-run bootstrap: ensure DB schema exists.
 - `def _rule_match(norms, parsed: _Parsed)` (23)
 - `def _llm_shortlist(norms, parsed: _Parsed) -> list[Company]` (28)
 - `def _log_no_match(parsed: _Parsed, shortlist, reasoning: str | None) -> None` (15)
-- `async def _llm_arbitrate(lm_client: Any, lm_model: str, parsed: _Parsed, shown: tuple[list, str]) -> tuple[Company | None, dict]` (37)
-- `async def find_or_create_company(session: AsyncSession, name: str, *, website: str | None=None, lm_client: Any=None, lm_model: str | None=None) -> tuple[Company | None, dict]` (41)
+- `class CompanyArbiter` (7)
+- `async def _llm_arbitrate(arbiter: CompanyArbiter, parsed: _Parsed, shortlist: list[Company]) -> tuple[Company | None, dict]` (36)
+- `async def find_or_create_company(session: AsyncSession, name: str, *, website: str | None=None, arbiter: CompanyArbiter | None=None) -> tuple[Company | None, dict]` (39)
 
 ### `backend/repository/hr_card.py` — 404 строк ⚠ подошёл к 300
 
@@ -2677,16 +2643,16 @@ First-run bootstrap: ensure DB schema exists.
 - `def _experience_fields(row: dict) -> dict` (21)
 - `async def save_experience(session: AsyncSession, rows: list[dict], profile_id: int) -> None` (3)
 
-### `backend/repository/profile_languages.py` — 64 строк
+### `backend/repository/profile_languages.py` — 73 строк
 
 Языки, названные в анкете кандидата.
 
-Зависит от: `backend.domain.language_choice`, `backend.llm.candidate`, `backend.models`
+Зависит от: `backend.domain.language_choice`, `backend.models`
 
 - `async def list_profile_languages(session: AsyncSession) -> list[ProfileLanguage]` (8)
 - `async def read_user_language(session: AsyncSession) -> str` (3)
 - `async def read_search_languages(session: AsyncSession) -> list[str]` (3)
-- `async def read_reply_language(session: AsyncSession, vacancy_language: str | None) -> str` (3)
+- `async def read_reply_language(session: AsyncSession, vacancy_id: int) -> str` (8)
 - `async def replace_profile_languages(session: AsyncSession, profile_id: int, items: list[tuple[str, str]]) -> None` (25)
 
 ### `backend/repository/profile_projects.py` — 51 строк
@@ -3989,6 +3955,15 @@ Runtime settings layer.
 - `def _install(root: Path, relative: str) -> Path` (5)
 - `def _roots(monkeypatch, tmp_path)` (4)
 
+### `tests/adapters/test_browser_downloads.py` — 29 строк
+
+Браузер агента не скачивает файлов: всякая загрузка обрывается самим браузером.
+
+Зависит от: `adapters.browser`
+
+Тестов: 1
+
+
 ### `tests/adapters/test_browser_sending.py` — 139 строк
 
 Профиль под симуляцией отклика: данные с сайта не уходят, капча проходится.
@@ -4399,7 +4374,7 @@ Runtime settings layer.
 
 - `async def page()` (3)
 
-### `tests/backend/test_agent_prompts.py` — 134 строк
+### `tests/backend/test_agent_prompts.py` — 137 строк
 
 Сборка промптов агента: что код подставляет и чего в них быть не может.
 
@@ -4466,15 +4441,15 @@ Runtime settings layer.
     - `async def review(_lm, _model, inventory, items)` (4)
     - `async def inventory_of(_page)` (2)
 
-### `tests/backend/test_agent_tools_letter.py` — 105 строк
+### `tests/backend/test_agent_tools_letter.py` — 90 строк
 
 Письмо для отклика: пишет приложение или сверяется письмо агента; две отбивки — предел.
 
-Зависит от: `backend.agent.tools_letter`, `backend.models`, `tests.dbio`, `tests.factories`, `tests.fakes.agent`, `tests.fakes.llm`
+Зависит от: `backend.agent.tools_letter`, `tests.dbio`, `tests.factories`, `tests.fakes.agent`, `tests.fakes.llm`
 
 Тестов: 7
 
-- `async def _letter(make_pipeline, session_factory, answers, *, writer='app', language=None)` (7)
+- `async def _letter(make_pipeline, session_factory, answers, *, writer='app', language='Русский')` (7)
 
 ### `tests/backend/test_agent_tools_seeker.py` — 224 строк
 
@@ -4521,7 +4496,7 @@ Runtime settings layer.
 - `def _silent(payload)` (2)
 - `async def _confirming(kit, answer, *, limit=3600.0)` (7)
 
-### `tests/backend/test_applying_email.py` — 110 строк
+### `tests/backend/test_applying_email.py` — 111 строк
 
 Отклик письмом: модель приложения пишет, сервер почты принимает, отклик записывается.
 
@@ -4542,7 +4517,7 @@ Runtime settings layer.
   - `def fake(method)` (5)
     - `async def execute(kit, vacancy_id, way)` (3)
 
-### `tests/backend/test_applying_telegram.py` — 142 строк
+### `tests/backend/test_applying_telegram.py` — 143 строк
 
 Отклик в Telegram: письмо, доставка и след в базе.
 
@@ -4582,13 +4557,13 @@ Runtime settings layer.
 - `def _project_of_two_revisions(root, db_file) -> None` (20)
 - `def _revisions_in(paths) -> set[str]` (9)
 
-### `tests/backend/test_bot_aggregators.py` — 450 строк ⚠ подошёл к 300
+### `tests/backend/test_bot_aggregators.py` — 463 строк ⚠ подошёл к 300
 
 Обход агрегаторов в боте: место прогона, режимы, человек, сроки, ручные действия.
 
 Зависит от: `backend.bot`, `backend.bot.turn`, `backend.models`, `backend.repository.aggregator_resumes`, `tests.backend.fixtures.bot`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.agent`, `tests.fakes.browser`, `tests.waiting`
 
-Тестов: 28
+Тестов: 29
 
 - `def agent(monkeypatch)` (13)
   - `def install(bot, steps, *, human_limit=None)` (8)
@@ -4928,11 +4903,11 @@ Runtime settings layer.
 Тестов: 17
 
 
-### `tests/backend/test_domain_language_choice.py` — 46 строк
+### `tests/backend/test_domain_language_choice.py` — 50 строк
 
 Решение, на каком языке писать: человеку — на его языке, работодателю — на языке вакансии.
 
-Зависит от: `backend.domain.language_choice`, `backend.llm.candidate`
+Зависит от: `backend.domain.language_choice`
 
 Тестов: 4
 
@@ -5308,13 +5283,13 @@ Runtime settings layer.
 
 - `async def _contacts(session_factory) -> list[tuple[str, str, str]]` (3)
 
-### `tests/backend/test_flows_parse_persist.py` — 291 строк
+### `tests/backend/test_flows_parse_persist.py` — 316 строк ⚠ подошёл к 300
 
 Что остаётся в базе после разбора объявления.
 
-Зависит от: `backend.flows`, `backend.models`, `backend.payloads`, `tests.dbio`, `tests.factories`
+Зависит от: `backend.domain.language_choice`, `backend.flows`, `backend.llm.candidate`, `backend.models`, `backend.payloads`, `tests.dbio`, `tests.factories`
 
-Тестов: 12
+Тестов: 13
 
 
 ### `tests/backend/test_flows_parse_queue.py` — 39 строк
@@ -5378,7 +5353,7 @@ Runtime settings layer.
 Тестов: 13
 
 - `async def reading(make_pipeline, session_factory, monkeypatch)` (36)
-  - `async def classify_hr_reply(text, status, client, model, *, language)` (5)
+  - `async def classify_hr_reply(ask, client, model)` (5)
 - `def _buffer(pipeline, hr, vacancy, message, *texts)` (11)
 
 ### `tests/backend/test_flows_rerun_fingerprint.py` — 174 строк
@@ -5462,13 +5437,13 @@ Runtime settings layer.
 
 - `def _ask(**over) -> LetterAsk` (5)
 
-### `tests/backend/test_llm_classify_reply.py` — 283 строк
+### `tests/backend/test_llm_classify_reply.py` — 292 строк
 
 Следствия разбора ответа HR в новый статус вакансии.
 
 Зависит от: `backend.llm.hr_reply`, `backend.models`, `tests.fakes.llm`
 
-Тестов: 17
+Тестов: 18
 
 - `def _allowed_line(client) -> str` (9)
 - `def _verdict(status: str, explanation: str | None=None) -> httpx.Response` (3)
@@ -5486,7 +5461,7 @@ Runtime settings layer.
 - `def _answer(matched_id=None, reasoning=None) -> httpx.Response` (3)
 - `async def _ask(client, candidates, name='Сбербанк Тех', website=None)` (3)
 
-### `tests/backend/test_llm_cover_letter.py` — 433 строк ⚠ подошёл к 300
+### `tests/backend/test_llm_cover_letter.py` — 438 строк ⚠ подошёл к 300
 
 Следствия составления письма-отклика.
 
@@ -5495,7 +5470,8 @@ Runtime settings layer.
 Тестов: 27
 
 - `def _client(letter: str, *, finish_reason: str='stop', factcheck=None)` (10)
-- `async def _written(*args, **kwargs)` (10)
+- `def _post(channel_ref=None, text='', earlier=0, language='English') -> LetterPost` (3)
+- `async def _written(*args, post=None, **kwargs)` (10)
 
 ### `tests/backend/test_llm_cv_grounding.py` — 392 строк ⚠ подошёл к 300
 
@@ -5595,13 +5571,13 @@ Runtime settings layer.
 Тестов: 4
 
 
-### `tests/backend/test_llm_fit_languages.py` — 205 строк
+### `tests/backend/test_llm_fit_languages.py` — 259 строк
 
 Следствия зова о языках вакансии.
 
-Зависит от: `backend.llm.candidate`, `backend.llm.fit_languages`, `tests.backend.fixtures.fit`, `tests.factories`, `tests.fakes.llm`
+Зависит от: `backend.domain.language_choice`, `backend.llm.candidate`, `backend.llm.fit_languages`, `tests.backend.fixtures.fit`, `tests.factories`, `tests.fakes.llm`
 
-Тестов: 11
+Тестов: 14
 
 
 ### `tests/backend/test_llm_fit_place.py` — 46 строк
@@ -5614,11 +5590,11 @@ Runtime settings layer.
 
 - `async def _system_for(profile: CandidateProfile) -> str` (4)
 
-### `tests/backend/test_llm_fit_validation.py` — 291 строк
+### `tests/backend/test_llm_fit_validation.py` — 292 строк
 
 Следствия общего у трёх зовов о пригодности.
 
-Зависит от: `backend.llm.candidate`, `backend.llm.fit`, `backend.llm.fit_languages`, `backend.llm.fit_place`, `backend.llm.fit_preferences`, `backend.llm.fit_role`, `tests.backend.fixtures.fit`, `tests.factories`, `tests.fakes.llm`
+Зависит от: `backend.domain.language_choice`, `backend.llm.candidate`, `backend.llm.fit`, `backend.llm.fit_languages`, `backend.llm.fit_place`, `backend.llm.fit_preferences`, `backend.llm.fit_role`, `tests.backend.fixtures.fit`, `tests.factories`, `tests.fakes.llm`
 
 Тестов: 17
 
@@ -5644,11 +5620,11 @@ Runtime settings layer.
 - `async def _second_try(answer: str, finish: str='stop', **options)` (9)
   - `async def ask(room)` (2)
 
-### `tests/backend/test_llm_profile_formatting.py` — 121 строк
+### `tests/backend/test_llm_profile_formatting.py` — 117 строк
 
 Следствия подготовки сведений о кандидате для запроса к модели.
 
-Зависит от: `backend.llm.candidate`
+Зависит от: `backend.domain.language_choice`, `backend.llm.candidate`
 
 Тестов: 7
 
@@ -5673,11 +5649,11 @@ Runtime settings layer.
 
 - `def _answer(**fields) -> str` (3)
 
-### `tests/backend/test_llm_vacancy_request.py` — 327 строк ⚠ подошёл к 300
+### `tests/backend/test_llm_vacancy_request.py` — 329 строк ⚠ подошёл к 300
 
 Следствия обращения к модели за разбором поста с вакансией.
 
-Зависит от: `backend.llm.candidate`, `backend.llm.rules`, `backend.llm.vacancy`, `tests.fakes.llm`
+Зависит от: `backend.domain.language_choice`, `backend.llm.candidate`, `backend.llm.rules`, `backend.llm.vacancy`, `tests.fakes.llm`
 
 Тестов: 19
 
@@ -5721,24 +5697,14 @@ Runtime settings layer.
 Тестов: 19
 
 
-### `tests/backend/test_migration_aggregators.py` — 127 строк
+### `tests/backend/test_migration_aggregators.py` — 85 строк
 
-Следствия схемной ревизии агрегаторов: что она заводит и что держит база.
+Что схема заводит для агрегаторов и что держит база.
 
-Зависит от: `alembic`, `backend.bootstrap`, `backend.models`, `tests.conftest`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`
+Зависит от: `alembic`, `backend.bootstrap`, `backend.models`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`
 
-Тестов: 8
+Тестов: 6
 
-
-### `tests/backend/test_migration_apply_trail.py` — 36 строк
-
-Ревизия следа откликов: одно событие отклика вместо пяти родов.
-
-Зависит от: `alembic`, `backend.bootstrap`, `tests.dbio`
-
-Тестов: 2
-
-- `def _with_old_events(target) -> None` (5)
 
 ### `tests/backend/test_migration_engine.py` — 164 строк
 
@@ -5751,16 +5717,14 @@ Runtime settings layer.
 - `def _learning_project(tmp_path, rebuild: str)` (14)
 - `def _tenants(db_file) -> list[tuple]` (2)
 
-### `tests/backend/test_migration_resume_autofill.py` — 98 строк
+### `tests/backend/test_migration_resume_autofill.py` — 42 строк
 
-Ревизия автозаполнения резюме: новые поля профиля и резюме на агрегаторах.
+Что база держит у резюме на агрегаторах: ссылку и отметку «откликаться этим».
 
-Зависит от: `alembic`, `backend.bootstrap`, `backend.models`, `tests.dbio`, `tests.factories_aggregators`
+Зависит от: `backend.models`, `tests.dbio`, `tests.factories_aggregators`
 
-Тестов: 5
+Тестов: 3
 
-- `def _columns(target, table: str) -> set[str]` (2)
-- `def _with_a_person_and_a_site(target) -> None` (8)
 
 ### `tests/backend/test_notify.py` — 61 строк
 
@@ -5983,11 +5947,11 @@ Runtime settings layer.
 
 - `async def _listed_and_clean(session_factory, *, is_active: bool)` (11)
 
-### `tests/backend/test_repository_company_autolink_llm.py` — 253 строк
+### `tests/backend/test_repository_company_autolink_llm.py` — 249 строк
 
 Следствия обращения к языковой модели при сведении компаний.
 
-Зависит от: `backend.models`, `backend.repository.companies_matching`, `tests.dbio`, `tests.factories`
+Зависит от: `backend.repository.companies_matching`, `tests.dbio`, `tests.factories`
 
 Тестов: 10
 
@@ -5995,7 +5959,7 @@ Runtime settings layer.
   - `async def __call__(self, client, model, ask)` (12)
 - `def arbiter(monkeypatch)` (14)
   - `def install(**kwargs) -> Arbiter` (4)
-- `async def resolve(session, name, arbiter_fake=None, **kwargs)` (9)
+- `async def resolve(session, name, arbiter_fake=None, *, language='Русский', **kwargs)` (8)
 
 ### `tests/backend/test_repository_company_autolink_rules.py` — 438 строк ⚠ подошёл к 300
 
@@ -6280,13 +6244,13 @@ Runtime settings layer.
 Тестов: 5
 
 
-### `tests/backend/test_repository_profile_languages.py` — 67 строк
+### `tests/backend/test_repository_profile_languages.py` — 92 строк
 
 Следствия замены списка языков профиля.
 
-Зависит от: `backend.repository.profile_languages`, `tests.dbio`, `tests.factories`
+Зависит от: `backend.models`, `backend.repository.profile_languages`, `tests.dbio`, `tests.factories`
 
-Тестов: 4
+Тестов: 5
 
 
 ### `tests/backend/test_repository_profile_projects.py` — 74 строк

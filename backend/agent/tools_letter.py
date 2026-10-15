@@ -6,7 +6,6 @@ from backend.agent.jobs import ApplyJob
 from backend.agent.kit import AgentKit
 from backend.llm.agent_letter import Letter, LetterAsk, check_letter, write_letter
 from backend.models import Vacancy
-from backend.repository.profile_languages import read_reply_language
 
 CHECKS_ALLOWED = 2
 """Сколько раз проверка второй моделью смотрит предложение агента — письмо или
@@ -24,7 +23,7 @@ def letter_tools(kit: AgentKit, job: ApplyJob) -> list[Callable]:
             return _ENOUGH
         if job.letter_writer == "agent" and not body.strip():
             return "Письмо пишешь ты: передай subject и body, приложение сверит их с анкетой."
-        ask = await letter_ask(kit, job.vacancy_id, limit or None)
+        ask = await letter_ask(kit, job.vacancy_id, job.language, limit or None)
         if ask is None:
             return "Вакансия удалена."
         if job.letter_writer == "agent":
@@ -34,15 +33,14 @@ def letter_tools(kit: AgentKit, job: ApplyJob) -> list[Callable]:
     return [letter]
 
 
-async def letter_ask(kit: AgentKit, vacancy_id: int, limit: int | None) -> LetterAsk | None:
-    """Что нужно модели для письма: анкета, вакансия и решённый язык отклика;
-    удалённая вакансия — пусто."""
+async def letter_ask(kit: AgentKit, vacancy_id: int, language: str, limit: int | None) -> LetterAsk | None:
+    """Что нужно модели для письма: анкета, вакансия и язык отклика, решённый
+    зовущим один раз на отклик; удалённая вакансия — пусто."""
     async with kit.pipeline.session_factory() as session:
         vacancy = await session.get(Vacancy, vacancy_id)
         if vacancy is None:
             return None
         profile = await kit.profile_text(session)
-        language = await read_reply_language(session, vacancy.language)
     return LetterAsk(profile_text=profile, title=vacancy.title or "", vacancy_text=vacancy.raw_text or "",
                      language=language, limit=limit)
 

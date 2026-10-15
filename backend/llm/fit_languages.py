@@ -15,8 +15,9 @@ import httpx
 
 from backend.payloads import FitValidation, ParsedVacancy
 
-from backend.llm.candidate import CandidateProfile, format_languages, in_user_language
-from backend.llm.fit import ANSWER_RULES, VERDICT_SCOPE, FitQuestion, ask_fit, vacancy_text
+from backend.domain.taxonomy import LEVEL_REQUIRED_WHEN_UNTOLD
+from backend.llm.candidate import CandidateProfile, format_languages
+from backend.llm.fit import ANSWER_RULES, VERDICT_SCOPE, fit_question
 from backend.llm.hallucination import looks_hallucinated
 from backend.llm.rules import LEVEL_MARKERS
 
@@ -33,7 +34,7 @@ LANGUAGE_FIT_PROMPT = """Ты проверяешь объявление о ва�
 
 Если языки кандидата — «—», блокера нет вовсе, ставь fit.
 
-reject ставится, только если текст прямо называет язык обязательным для работы — уровнем, словами «требуется / обязателен / required / must» или тем, что на нём идёт работа (команда, клиенты, встречи, собеседования), — а у кандидата этого языка нет или уровень ниже. Словесные уровни читаются по шкале: """ + LEVEL_MARKERS + """; «native» выше любого. Язык назван обязательным без уровня — нужен не ниже B1. Шкала нужна только для сравнения: в reason уровень, частоту и формат встреч пиши ровно словами поста («свободный английский», «созвоны каждый день»), не переводя в шкалу.
+reject ставится, только если текст прямо называет язык обязательным для работы — уровнем, словами «требуется / обязателен / required / must» или тем, что на нём идёт работа (команда, клиенты, встречи, собеседования), — а у кандидата этого языка нет или уровень ниже. Словесные уровни читаются по шкале: """ + LEVEL_MARKERS + """; «native» выше любого. Язык назван обязательным без уровня — нужен не ниже """ + LEVEL_REQUIRED_WHEN_UNTOLD + """. Шкала нужна только для сравнения: в reason уровень, частоту и формат встреч пиши ровно словами поста («свободный английский», «созвоны каждый день»), не переводя в шкалу.
 
 Языковым требованием не являются:
 - профессиональные заимствования внутри текста на другом языке («Code Review», «backlog», «бриф», «KPI», «су-шеф», «дедлайн») — это термины ремесла;
@@ -56,7 +57,7 @@ reject ставится, только если текст прямо назыв�
 Языки кандидата: Польский — native, Английский — A2. Текст: "Команда и клиенты общаются на немецком, собеседование тоже на немецком."
 Ответ: {"reason": "Работа ведётся на немецком: «Команда и клиенты общаются на немецком, собеседование тоже на немецком».", "verdict": "reject"}
 
-Пример 3 (reject — язык назван обязательным без уровня, а у кандидата ниже B1):
+Пример 3 (reject — язык назван обязательным без уровня, а у кандидата ниже """ + LEVEL_REQUIRED_WHEN_UNTOLD + """):
 Языки кандидата: Арабский — native, Немецкий — A2. Текст: "Требуется знание немецкого языка."
 Ответ: {"reason": "Язык обязателен: «Требуется знание немецкого языка».", "verdict": "reject"}
 
@@ -76,10 +77,11 @@ reject ставится, только если текст прямо назыв�
 
 
 def _prompt_for(profile: CandidateProfile) -> str:
-    """Наставление с подставленными языками кандидата и языком его самого."""
-    return in_user_language(LANGUAGE_FIT_PROMPT.replace(
-        "{LANGUAGE_REQUIREMENTS}", format_languages(profile.languages)
-    ), profile.user_language)
+    """Наставление с подставленными языками кандидата."""
+    return LANGUAGE_FIT_PROMPT.replace("{LANGUAGE_REQUIREMENTS}", format_languages(profile.languages))
+
+
+_asked = fit_question(PURPOSE, _prompt_for)
 
 
 def _without_invented_language(
@@ -108,13 +110,7 @@ async def validate_language_fit(
     *, profile: CandidateProfile,
 ) -> tuple[FitValidation | None, str | None]:
     """Требует ли вакансия чужого языка и, если не спросилось, почему."""
-    logger.debug("%s: title=%r", PURPOSE, parsed.title)
-    validation, trouble = await ask_fit(
-        FitQuestion(purpose=PURPOSE, prompt=_prompt_for(profile)),
-        vacancy_text(raw_text),
-        client,
-        model,
-    )
+    validation, trouble = await _asked(parsed, raw_text, client, model, profile=profile)
     if validation is None:
         return None, trouble
     return _without_invented_language(validation, raw_text, profile), None

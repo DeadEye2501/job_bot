@@ -8,9 +8,8 @@ import httpx
 
 from adapters.lm_chat import CUT_BY_LIMIT, ChatRequest, chat
 from backend.llm.answers import ONLY_JSON, TRUNCATED_TROUBLE, json_object, log_unparseable
-from backend.llm.candidate import in_user_language
 from backend.llm.external import external_block
-from backend.llm.rules import AGGREGATOR_HOSTS_LINE
+from backend.llm.rules import AGGREGATOR_HOSTS_LINE, in_user_language
 from backend.incoming import str_list
 
 logger = logging.getLogger(__name__)

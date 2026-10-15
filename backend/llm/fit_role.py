@@ -6,21 +6,8 @@
 """
 
 
-import logging
-
-import httpx
-
-from backend.payloads import FitValidation, ParsedVacancy
-
-from backend.llm.candidate import (
-    CandidateProfile,
-    format_known_skills,
-    format_text,
-    in_user_language,
-)
-from backend.llm.fit import ANSWER_RULES, VERDICT_SCOPE, FitQuestion, ask_fit, vacancy_block
-
-logger = logging.getLogger(__name__)
+from backend.llm.candidate import CandidateProfile, format_known_skills, format_text
+from backend.llm.fit import ANSWER_RULES, VERDICT_SCOPE, fit_question, vacancy_block
 
 PURPOSE = "validate_role_fit"
 
@@ -73,24 +60,13 @@ CANDIDATE_TITLE: Флорист. Текст: "Ищем флориста в ст�
 
 
 def _prompt_for(profile: CandidateProfile) -> str:
-    """Наставление с подставленными мерками кандидата и его языком."""
-    return in_user_language(
+    """Наставление с подставленными мерками кандидата."""
+    return (
         ROLE_FIT_PROMPT
         .replace("{CANDIDATE_TITLE}", format_text(profile.title))
-        .replace("{CANDIDATE_SKILLS}", format_known_skills(profile.known_skills)),
-        profile.user_language,
+        .replace("{CANDIDATE_SKILLS}", format_known_skills(profile.known_skills))
     )
 
 
-async def validate_role_fit(
-    parsed: ParsedVacancy, raw_text: str, client: httpx.AsyncClient, model: str,
-    *, profile: CandidateProfile,
-) -> tuple[FitValidation | None, str | None]:
-    """Та ли это профессия и, если не спросилось, почему."""
-    logger.debug("%s: title=%r", PURPOSE, parsed.title)
-    return await ask_fit(
-        FitQuestion(purpose=PURPOSE, prompt=_prompt_for(profile)),
-        vacancy_block(parsed, raw_text),
-        client,
-        model,
-    )
+validate_role_fit = fit_question(PURPOSE, _prompt_for, vacancy_block)
+"""Та ли это профессия и, если не спросилось, почему."""

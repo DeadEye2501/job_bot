@@ -13,7 +13,7 @@ import httpx
 import pytest
 
 from backend.models import VacancyStatus
-from backend.llm.hr_reply import classify_hr_reply
+from backend.llm.hr_reply import HrReplyAsk, classify_hr_reply
 from tests.fakes.llm import (
     CHAT,
     chat_json,
@@ -49,7 +49,7 @@ async def _read(text, status, client, model="qwen"):
     остальных провайдер отвечает, и разбирать пару в каждой значило бы писать
     `[0]` два десятка раз. Так же устроен и сосед — вердикт о пригодности.
     """
-    verdict, _trouble = await classify_hr_reply(text, status, client, model, language="Русский")
+    verdict, _trouble = await classify_hr_reply(HrReplyAsk(text, status, "Русский"), client, model)
     return verdict
 
 
@@ -139,7 +139,7 @@ async def test_trouble_with_the_provider_is_named_and_not_taken_for_a_verdict(pr
     client = provider({CHAT: prepared})
 
     verdict, trouble = await classify_hr_reply(
-        "текст", VacancyStatus.APPLIED, client, "qwen", language="Русский"
+        HrReplyAsk("текст", VacancyStatus.APPLIED, "Русский"), client, "qwen"
     )
 
     assert verdict is None
@@ -249,7 +249,7 @@ async def test_a_cut_answer_is_not_a_provider_trouble():
     client = provider({CHAT: chat_response('{"status": "Invit', finish_reason="length")})
 
     verdict, trouble = await classify_hr_reply(
-        "текст", VacancyStatus.APPLIED, client, "qwen", language="Русский"
+        HrReplyAsk("текст", VacancyStatus.APPLIED, "Русский"), client, "qwen"
     )
 
     assert verdict is None
@@ -278,6 +278,15 @@ async def test_the_explanation_is_asked_in_the_user_language():
     """Пояснение к смене статуса читает человек — и пишется на его языке, а не на языке HR."""
     client = provider({CHAT: _verdict("Answered", "HR ответил")})
 
-    await classify_hr_reply("Thanks!", VacancyStatus.APPLIED, client, "qwen", language="Қазақша")
+    await classify_hr_reply(HrReplyAsk("Thanks!", VacancyStatus.APPLIED, "Қазақша"), client, "qwen")
 
     assert "на языке пользователя — Қазақша" in messages_of(client.sent[0])["system"]
+
+
+async def test_a_language_name_with_braces_reaches_the_model_as_written():
+    """Название языка — текст человека, и знаки в нём шаблон не ломают."""
+    client = provider({CHAT: _verdict("Answered", "HR ответил")})
+
+    await classify_hr_reply(HrReplyAsk("Thanks!", VacancyStatus.APPLIED, "Язык {X}"), client, "qwen")
+
+    assert "на языке пользователя — Язык {X}" in messages_of(client.sent[0])["system"]

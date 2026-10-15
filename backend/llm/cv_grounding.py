@@ -41,7 +41,7 @@ from backend.domain.taxonomy import (
     WORK_FORMAT_SPELLINGS,
 )
 from backend.domain.wording import spelled_alone
-from backend.incoming import fold_homoglyphs
+from backend.incoming import fold_homoglyphs, fold_signs
 from backend.llm.hallucination import language_root
 from backend.payloads import ParsedCv
 
@@ -54,8 +54,8 @@ def _any_named_in(text: str, words: tuple[str, ...]) -> bool:
     «Ё» в резюме пишут через раз, и «стажер» — то же слово, что «стажёр». Не
     своди их — и настоящее звание объявлялось бы выдуманным.
     """
-    plain = text.replace("ё", "е")
-    return any(spelled_alone(plain, word.replace("ё", "е")) for word in words)
+    plain = fold_signs(text)
+    return any(spelled_alone(plain, fold_signs(word)) for word in words)
 
 
 def _grounded_formats(text: str, formats: list[str]) -> list[str]:

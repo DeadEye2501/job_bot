@@ -114,6 +114,39 @@ describe('живая нижняя полоса', () => {
     expect(document.querySelector('.progress-caption').textContent).toContain('hh.ru — найдено (3/10)');
   });
 
+  it('до первой вести о ходе подпись говорит, что идёт работа', async () => {
+    const { handlers } = bar({ db: true, tg: true, chat: true, embed: true });
+    await settled();
+
+    handlers.ingestion_started();
+    await settled();
+
+    expect(document.querySelector('.progress-caption').textContent).toBe('Идёт работа…');
+  });
+
+  it('дочитывание отложенных вакансий идёт полосой со счётом', async () => {
+    const { handlers } = bar({ db: true, tg: true, chat: true, embed: true });
+    await settled();
+
+    handlers.ingestion_started();
+    handlers.progress_update({ stage: 'recover', label: 'jobs', current: 1, total: 4 });
+    await settled();
+
+    expect(document.querySelector('.progress-caption').textContent).toBe('Отложенные вакансии (2/4)');
+    expect(document.querySelector('.progress-fill').getAttribute('style')).toContain('width: 25%');
+  });
+
+  it('работа агента на сайте называет себя подписью', async () => {
+    const { handlers } = bar({ db: true, tg: true, chat: true, embed: true });
+    await settled();
+
+    handlers.ingestion_started();
+    handlers.progress_update({ stage: 'site', label: 'Вход на site.test…', current: 0, total: 0 });
+    await settled();
+
+    expect(document.querySelector('.progress-caption').textContent).toBe('Вход на site.test…');
+  });
+
   it('ступень отклика видна подписью', async () => {
     expect(applyNote({ label: 'Python-разработчик', current: 0, total: 3 }))
       .toBe('Python-разработчик — отклик (1/3)');

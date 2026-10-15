@@ -1,21 +1,18 @@
 """Письмо для отклика: пишет приложение или сверяется письмо агента; две отбивки — предел."""
 
-import pytest
-
 from backend.agent.tools_letter import letter_tools
-from backend.models import ProfileLanguage
 from tests.dbio import put
-from tests.factories import profile_row, vacancy_row
+from tests.factories import vacancy_row
 from tests.fakes.agent import apply_job, kit_for, tool
 from tests.fakes.llm import CHAT, letter_answer, factcheck_answer, messages_of, provider
 
 
-async def _letter(make_pipeline, session_factory, answers, *, writer="app", language=None):
-    vacancy = vacancy_row(title="Инженер", raw_text="Текст вакансии", language=language)
+async def _letter(make_pipeline, session_factory, answers, *, writer="app", language="Русский"):
+    vacancy = vacancy_row(title="Инженер", raw_text="Текст вакансии")
     await put(session_factory, vacancy)
     pipeline = await make_pipeline()
     pipeline.lm_client = provider({CHAT: answers})
-    job = apply_job(vacancy.id, letter_writer=writer)
+    job = apply_job(vacancy.id, letter_writer=writer, language=language)
     return job, pipeline.lm_client, tool(letter_tools(kit_for(pipeline), job), "letter")
 
 
@@ -29,29 +26,17 @@ async def test_the_app_writes_the_letter_with_its_subject(make_pipeline, session
     assert answer == "Тема: Отклик\n\nПисьмо:\nГотов работать."
 
 
-@pytest.mark.parametrize(
-    ("vacancy_language", "expected"),
-    [
-        pytest.param("Español", "Español", id="язык вакансии известен"),
-        pytest.param(None, "Қазақша", id="неизвестен — язык человека"),
-    ],
-)
-async def test_the_letter_language_is_decided_by_the_app(
-    make_pipeline, session_factory, vacancy_language, expected
-):
-    """Язык письма решает приложение, а не агент: язык вакансии, а неизвестен
-    он — родной язык человека."""
-    person = profile_row()
-    await put(session_factory, person)
-    await put(session_factory, ProfileLanguage(profile_id=person.id, language="Қазақша", level="native"))
+async def test_the_letter_is_written_in_the_language_of_the_apply(make_pipeline, session_factory):
+    """Язык письма — тот, что решён для отклика один раз и назван агенту
+    заданием, а не решаемый инструментом заново."""
     job, client, letter = await _letter(
         make_pipeline, session_factory, [letter_answer("Готов работать."), factcheck_answer("ok")],
-        language=vacancy_language,
+        language="Español",
     )
 
     await letter()
 
-    assert f"Язык письма и темы: {expected}." in messages_of(client.sent[0])["system"]
+    assert "Язык письма и темы: Español." in messages_of(client.sent[0])["system"]
 
 
 async def test_a_rejected_app_letter_comes_back_as_remarks(make_pipeline, session_factory):
