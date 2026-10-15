@@ -50,6 +50,12 @@ async def sync_resumes(
     (await session.get(Aggregator, aggregator_id)).can_add_resume = can_add
 
 
+async def forbid_more_resumes(session: AsyncSession, aggregator_id: int) -> None:
+    """Сайт не дал завести ещё одно резюме: флаг «можно» снимается. Признаки
+    перечня могли обмануть, а отказ сайта при создании — уже не признак, а факт."""
+    (await session.get(Aggregator, aggregator_id)).can_add_resume = False
+
+
 async def choose_resume(session: AsyncSession, aggregator_id: int, resume_id: int) -> None:
     """Отметить резюме «откликаться этим», сняв отметку с прежнего.
 

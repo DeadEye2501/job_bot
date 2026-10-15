@@ -15,7 +15,7 @@ from backend.agent.tools_browser import browser_tools
 from backend.agent.tools_fill import fill_tools
 from backend.agent.sessions import end_reason, run_on_site
 from backend.flows.aggregator_scan import scan
-from backend.repository.aggregator_resumes import choose_resume, resumes_of
+from backend.repository.aggregator_resumes import choose_resume, forbid_more_resumes, resumes_of
 from backend.repository.profile_languages import read_user_language
 
 logger = logging.getLogger(__name__)
@@ -25,23 +25,33 @@ async def fill(kit: AgentKit, source: Source, resume_id: int | None) -> str:
     """Перезаписать резюме `resume_id` или завести новое (пусто).
 
     Ответ — `ok`, `no_resume` (перезаписываемого резюме у сайта нет — агент не
-    запускается), `required_missing` (обязательному полю не хватило данных:
-    перечня и отметки нет), `error` (агент не довёл работу до конца) или
-    ответ перечня, если он не удался. Заполненное резюме становится
-    отмеченным: это единственная отметка, которую ставит не человек.
+    запускается), `no_editor` (у резюме нет адреса правки — агент не
+    запускается: искать правку по сайту он приходил к созданию нового),
+    `required_missing` (обязательному полю не хватило данных: перечня и
+    отметки нет), `no_new_resume` (сайт не даёт завести ещё одно — флаг
+    агрегатора «нельзя»), `error` (агент не довёл работу до конца) или ответ
+    перечня, если он не удался. Заполненное резюме становится отмеченным: это
+    единственная отметка, которую ставит не человек.
     """
-    before = await _links(kit, source.id)
-    if resume_id is not None and resume_id not in before:
+    rows = await kit.read(lambda session: resumes_of(session, source.id))
+    target = next((row for row in rows if row.id == resume_id), None)
+    if resume_id is not None and target is None:
         return "no_resume"
-    resume_url = before.get(resume_id)
+    if target is not None and not target.editor_url:
+        return "no_editor"
+    resume_url = target.url if target else None
     await kit.browser.open_profile(source.id)
-    job = FillJob(source, resume_url)
+    job = FillJob(source, target.editor_url if target else None,
+                  frozenset(row.editor_url for row in rows if row.editor_url and row is not target))
     files = (kit.pipeline.cv_file(), kit.pipeline.photo_file())
     language = await kit.read(read_user_language)
-    end = await run_on_site(kit, job, FILL_PROMPT, fill_task(source.host, resume_url, language),
+    end = await run_on_site(kit, job, FILL_PROMPT, fill_task(source.host, job.editor_url, language),
                             *fill_tools(kit, job), *browser_tools(kit, *files, job))
     result = job.outcome.result if isinstance(job.outcome, Finished) else None
     if result == "required_missing":
+        return result
+    if result == "no_new_resume":
+        await kit.written(lambda session: forbid_more_resumes(session, source.id))
         return result
     _summary(job)
     if result != "done":
@@ -50,14 +60,8 @@ async def fill(kit: AgentKit, source: Source, resume_id: int | None) -> str:
     scanned = await scan(kit, source)
     if scanned != "ok":
         return scanned
-    await _mark_filled(kit, source.id, resume_url, set(before.values()))
+    await _mark_filled(kit, source.id, resume_url, {row.url for row in rows})
     return "ok"
-
-
-async def _links(kit: AgentKit, aggregator_id: int) -> dict[int, str]:
-    """Ссылки резюме сайта по номеру — до заполнения: по ним узнаётся новое."""
-    rows = await kit.read(lambda session: resumes_of(session, aggregator_id))
-    return {row.id: row.url for row in rows}
 
 
 async def _mark_filled(kit: AgentKit, aggregator_id: int, resume_url: str | None, before: set[str]) -> None:

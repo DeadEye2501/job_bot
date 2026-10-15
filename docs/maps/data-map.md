@@ -319,7 +319,8 @@
   - `unscreened: dict[tuple[str, str, str], dict]` = `field(default_factory=dict)`
 - `class FillJob`
   - `source: Source`
-  - `resume_url: str | None` = `None`
+  - `editor_url: str | None` = `None`
+  - `other_editors: frozenset[str]` = `frozenset()`
   - `outcome: Outcome | None` = `None`
   - `accepted: dict[tuple[str, str], dict]` = `field(default_factory=dict)`
   - `page_checks: dict[tuple[str, str], int]` = `field(default_factory=dict)`
@@ -436,6 +437,8 @@
 - `_ENOUGH` = `'проверок больше нет на этой странице: впиши эти…`
 - `_ONE_FIELD` = `'одно поле — один пункт: собери всё, что идёт в …`
 - `_NO_REASON` = `'поле общее: нужно обоснование, почему узкие пол…`
+- `_OFF_TARGET_EDIT` = `'это страница другого резюме — открой редактор р…`
+- `_OFF_TARGET_NEW` = `'это страница другого резюме — открой создание н…`
 - `class LayoutItem(ConfirmItem)`
   - `fallback_reason: str`
 
@@ -2172,7 +2175,7 @@
 - `WAY_UNKNOWN` = `'Этим способом на вакансию не откликнуться'`
 - `AGGREGATOR_REFUSALS` = `словарь из 5 и раскрытых`
 - `LOGIN_REFUSALS` = `словарь из 2 и раскрытых`
-- `FILL_REFUSALS` = `словарь из 2 и раскрытых`
+- `FILL_REFUSALS` = `словарь из 4 и раскрытых`
 - `RESUME_FILLED` = `'Резюме заполнено'`
 - `APPLY_VIA_REFUSALS` = `словарь из 7 и раскрытых`
 - `APPLY_ALL_REFUSALS` = `словарь из 3 и раскрытых`
@@ -2399,6 +2402,7 @@
 
 - `FIRST` = `'https://hh.ru/resume/1'`
 - `SECOND` = `'https://hh.ru/resume/2'`
+- `FIRST_EDITOR` = `'https://hh.ru/resume/1/edit'`
 
 ### `tests/backend/test_llm_cv_response.py`
 
