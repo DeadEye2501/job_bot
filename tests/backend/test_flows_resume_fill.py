@@ -143,6 +143,21 @@ async def test_a_resume_relinked_by_the_overwrite_is_found_as_the_only_new_link(
     assert await _marks(session_factory, site.id) == {"Швея": True, "Повар": False}
 
 
+async def test_an_overwrite_that_added_a_resume_is_caught_when_the_list_was_stale(
+    make_pipeline, session_factory
+):
+    """В базе лежит резюме, которое человек уже удалил на сайте, а перечень не
+    обновлял. Новое резюме вместо правки выходит тем же числом — и всё равно
+    ловится: судит новая ссылка рядом с живой выбранной, а не число."""
+    site, first = await _site(session_factory)
+    await put(session_factory, aggregator_resume_row(site.id, title="Удалённое", url=THIRD, position=2))
+    kit = scripted_kit(await make_pipeline(), [
+        finish_step(), resumes_step([("Швея", FIRST), ("Повар", SECOND), ("Швея (черновик)", FOURTH)]),
+    ])
+
+    assert await fill(kit, Source.of(site), first.id) == "extra_resume"
+
+
 @pytest.mark.parametrize(
     ("overwrite", "after", "outcome"),
     [
@@ -170,8 +185,8 @@ async def test_a_list_that_does_not_match_the_button_is_an_error_and_marks_nothi
 async def test_overwriting_a_resume_without_its_editor_is_refused_before_the_agent(
     make_pipeline, session_factory
 ):
-    """Без адреса правки агенту пришлось бы искать её по сайту — так он и
-    приходил к созданию нового резюме вместо правки."""
+    """Без адреса правки агенту пришлось бы искать её по сайту, а найденное
+    поиском может оказаться созданием нового резюме."""
     site = aggregator_row(is_logged_in=True)
     await put(session_factory, site)
     bare = aggregator_resume_row(site.id, title="Швея", url=FIRST)

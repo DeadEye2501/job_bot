@@ -26,7 +26,8 @@ async def fill(kit: AgentKit, source: Source, resume_id: int | None) -> str:
 
     Ответ — `ok`, `no_resume` (перезаписываемого резюме у сайта нет — агент не
     запускается), `no_editor` (у резюме нет адреса правки — агент не
-    запускается: искать правку по сайту он приходил к созданию нового),
+    запускается: правка, найденная поиском по сайту, может оказаться
+    созданием нового),
     `required_missing` (обязательному полю не хватило данных: перечня и
     отметки нет), `no_new_resume` (сайт не даёт завести ещё одно — флаг
     агрегатора «нельзя»), `error` (агент не довёл работу до конца) или ответ
@@ -67,18 +68,17 @@ def _verdict(before: set[str], after: set[str], resume_url: str | None) -> tuple
     """Исход по спискам ссылок до и после и ссылка заполненного резюме.
 
     Сделанное сверяется с нажатым: перезапись не заводит резюме, создание
-    заводит ровно одно. Перезапись вправе сменить ссылку резюме — тогда на
-    месте прежней ровно одна новая, а число резюме прежнее.
+    заводит ровно одно. Судят новые ссылки, а не число: список «до» — из базы,
+    и резюме, удалённое на сайте без обновления перечня, сравняло бы счёт.
+    Перезапись вправе сменить ссылку резюме — тогда прежней нет, а новая одна.
     """
     new = after - before
     if resume_url is None:
         if len(new) == 1:
             return "ok", next(iter(new))
         return ("many_created" if new else "not_created"), None
-    if len(after) > len(before):
-        return "extra_resume", None
     if resume_url in after:
-        return "ok", resume_url
+        return ("extra_resume", None) if new else ("ok", resume_url)
     return ("ok", next(iter(new))) if len(new) == 1 else ("resume_lost", None)
 
 

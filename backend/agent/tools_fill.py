@@ -42,7 +42,7 @@ def fill_tools(kit: AgentKit, job: FillJob) -> list[Callable]:
         """Раскладка страницы целиком: каждый пункт — поле страницы и всё его значение из анкеты, одно поле — один пункт. label — подпись поля; kind — text, choice (список, переключатель) или check; value — значение, у галочки true или false; error — пусто; selector — тот, которым будешь вписывать. У данных, положенных в общее текстовое поле, fallback_reason — почему узкие поля страницы им не подходят. Вписать можно только принятое."""
         page = await kit.browser.page()
         url = page.url
-        if _off_target(job, url):
+        if job.off_target(url):
             logger.warning("заполнение резюме на %s: раскладка на странице другого резюме отбита — %s",
                            job.source.host, url)
             return _OFF_TARGET_EDIT if job.editor_url else _OFF_TARGET_NEW
@@ -61,34 +61,23 @@ def fill_tools(kit: AgentKit, job: FillJob) -> list[Callable]:
 
     async def report_required_missing(labels: list[str]) -> str:
         """Обязательные поля страницы, которые нечем заполнить по анкете: заполнение останавливается."""
-        job.outcome = Finished("required_missing", ", ".join(labels))
-        logger.warning("заполнение резюме на %s: не хватает данных для обязательных полей — %s",
-                       job.source.host, ", ".join(labels))
-        return "Заполнение остановлено: не хватает данных для обязательных полей. Заверши работу."
+        return _stopped(job, Finished("required_missing", ", ".join(labels)),
+                        "не хватает данных для обязательных полей")
 
     async def report_no_new_resume(reason: str) -> str:
         """Сайт не даёт завести ещё одно резюме: ничего не заполняется, человеку — ошибка."""
-        job.outcome = Finished("no_new_resume", reason)
-        logger.warning("заполнение резюме на %s: сайт не даёт завести ещё одно — %s", job.source.host, reason)
-        return "Создание остановлено: сайт не даёт завести ещё одно резюме. Заверши работу."
+        return _stopped(job, Finished("no_new_resume", reason), "сайт не даёт завести ещё одно резюме")
 
     if job.editor_url:
         return [submit_layout, report_required_missing]
     return [submit_layout, report_required_missing, report_no_new_resume]
 
 
-def _within(url: str, place: str) -> bool:
-    """Страница — это место или его продолжение: подстраница, шаг, якорь."""
-    return url == place or (url.startswith(place) and url[len(place)] in "/?&#")
-
-
-def _off_target(job: FillJob, url: str) -> bool:
-    """Открыто не то резюме. Перезапись идёт только внутри редактора своего
-    резюме, а редакторы прочих резюме закрыты и ей, и созданию нового: правка
-    не того резюме — худший исход, хуже ошибки."""
-    if job.editor_url and not _within(url, job.editor_url):
-        return True
-    return any(_within(url, other) for other in job.other_editors)
+def _stopped(job: FillJob, outcome: Finished, why: str) -> str:
+    """Остановить заполнение итогом с причиной: запись в журнал и ответ агенту."""
+    job.outcome = outcome
+    logger.warning("заполнение резюме на %s: %s — %s", job.source.host, why, outcome.reason)
+    return f"Заполнение остановлено: {why}. Заверши работу."
 
 
 def _known(job: FillJob, url: str, item: dict) -> bool:
