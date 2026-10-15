@@ -15,10 +15,9 @@ from backend.applying.telegram_ban import clear_flood_wait, note_flood_wait
 from backend.applying.telegram_letter import (
     RECENT_SEND_WINDOW_DAYS,
     Letter,
+    compose_letter,
     format_channel_ref,
-    full_letter,
     parsed_from_row,
-    short_note,
 )
 from backend.domain.apply_order import Way
 from backend.llm.cover_letter import LetterPost
@@ -28,6 +27,7 @@ from backend.payloads import OutgoingMessage, ParsedVacancy
 from backend.repository.applications import ApplicationEntry, record_application
 from backend.repository.hr_identify import count_recent_outgoing_with_vacancy_for_hr
 from backend.repository.messages import save_outgoing_message
+from backend.repository.profile_languages import read_reply_language
 from backend.telegram_time import utc_now
 
 logger = logging.getLogger(__name__)
@@ -35,23 +35,18 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class _Errand:
-    """Кому и о чём пишем: адресат, вакансия и то, что решает вид письма.
-
-    Счёт прежних писем выбирает ветку — полное письмо или короткое, —
-    название и пост — канал и исходный текст — идут модели письма.
-    """
+    """Кому и о чём пишем: адресат, вакансия и её пост для модели письма —
+    канал, исходный текст, счёт прежних писем этому HR и язык отклика."""
 
     vacancy_id: int
     hr_id: int
     peer: int | str
     parsed: ParsedVacancy
-    prior_count: int
-    title: str
     post: LetterPost
 
 
 async def via_telegram(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome:
-    """Письмо HR в Telegram: первое за окно — полное с резюме, дальше короткое."""
+    """Письмо HR в Telegram: первое за окно — с резюме, дальше вдогон без него."""
     errand = await _errand(kit, vacancy_id)
     if errand is None:
         return GONE
@@ -86,17 +81,14 @@ async def _errand(kit: AgentKit, vacancy_id: int) -> _Errand | None:
         prior = await count_recent_outgoing_with_vacancy_for_hr(
             session, v.hr.id, window_days=RECENT_SEND_WINDOW_DAYS, other_than=vacancy_id)
         return _Errand(
-            vacancy_id, v.hr.id, telegram_peer(v.hr), parsed_from_row(v), prior,
-            (v.title or "").strip(),
+            vacancy_id, v.hr.id, telegram_peer(v.hr), parsed_from_row(v),
             LetterPost(format_channel_ref(v.channel.username if v.channel is not None else None),
-                       v.raw_text or ""),
+                       v.raw_text or "", prior, await read_reply_language(session, v.language)),
         )
 
 
 async def _letter(kit: AgentKit, errand: _Errand) -> Letter | Missed:
-    if errand.prior_count:
-        return Letter(short_note(errand.title, errand.post.channel_ref, errand.prior_count), None)
-    letter, refusal = await full_letter(kit.pipeline, errand.parsed, errand.post, errand.vacancy_id)
+    letter, refusal = await compose_letter(kit, errand.parsed, errand.post, errand.vacancy_id)
     return letter if letter is not None else Missed(f"письмо не готово: {refusal}")
 
 

@@ -15,7 +15,7 @@ import httpx
 import pytest
 
 from backend.llm.rules import AGGREGATOR_HOSTS_LINE
-from backend.llm.company import dedupe_company_with_llm
+from backend.llm.company import CompanyAsk, dedupe_company_with_llm
 from tests.fakes.llm import (
     CHAT,
     chat_json,
@@ -45,13 +45,7 @@ def _answer(matched_id=None, reasoning=None) -> httpx.Response:
 
 async def _ask(client, candidates, name="Сбербанк Тех", website=None):
     """Спросить арбитра о названии при заданных кандидатах."""
-    return await dedupe_company_with_llm(
-        client,
-        "qwen",
-        parsed_name=name,
-        parsed_website=website,
-        candidates=candidates,
-    )
+    return await dedupe_company_with_llm(client, "qwen", CompanyAsk(name, website, candidates, "Русский"))
 
 
 async def test_the_parsed_website_reaches_the_arbiter():

@@ -20,6 +20,7 @@ from backend.llm.answers import (
     read_with_a_second_try,
     str_or_none,
 )
+from backend.llm.candidate import in_user_language
 from backend.llm.external import external_block
 from backend.llm.rules import (
     RESUME_MARK_LINE,
@@ -54,9 +55,9 @@ CLASSIFY_POST_GENRE_PROMPT = """Ты определяешь ЖАНР поста 
 Верни ТОЛЬКО JSON-объект:
 {"is_vacancy": true | false, "reason": "..."}
 
-reason обязателен при любом ответе: 1 предложение с цитатой из присланного текста, доказывающей направление. Для true — слова нанимателя («ищем в команду», «обязанности», «требования»); для false — слова автора о себе или примета жанра («#cv», «ищу работу», «дайджест»). Язык reason — тот же, что у поста. Нет ни слов автора о себе, ни приметы другого жанра — ответ true: открытая роль с условиями или контактом — вакансия, даже короткая.
+reason обязателен при любом ответе: 1 предложение с цитатой из присланного текста, доказывающей направление. Для true — слова нанимателя («ищем в команду», «обязанности», «требования»); для false — слова автора о себе или примета жанра («#cv», «ищу работу», «дайджест»). Язык reason — язык пользователя: {USER_LANGUAGE}, каким бы ни был язык поста; цитата — как в посте. Нет ни слов автора о себе, ни приметы другого жанра — ответ true: открытая роль с условиями или контактом — вакансия, даже короткая.
 
-Примеры:
+Примеры (в них язык пользователя — русский):
 
 Текст: "Ищем прораба на объект: контроль бригад, приёмка материалов. Требования: опыт от 3 лет. Резюме @hr_build"
 Ответ: {"is_vacancy": true, "reason": "Пост от нанимателя: «Ищем прораба на объект», перечислены обязанности и требования."}
@@ -71,7 +72,7 @@ reason обязателен при любом ответе: 1 предложен
 Ответ: {"is_vacancy": false, "reason": "Пост соискателя: «Ищу работу медсестрой», автор перечисляет свой опыт и предлагает своё резюме."}
 
 Текст: "Senior Product Designer at Acme Berlin. Hybrid, 2 days in the office. Tools: Figma, Sketch. CV to jobs@acme.de"
-Ответ: {"is_vacancy": true, "reason": "Employer's post: an open role at Acme Berlin with working conditions and an address to send a CV to."}
+Ответ: {"is_vacancy": true, "reason": "Пост от нанимателя: открытая роль «Senior Product Designer at Acme Berlin» с условиями и адресом для резюме."}
 
 Текст: "Дайджест вакансий недели. Подборка лучших предложений в IT и дизайне."
 Ответ: {"is_vacancy": false, "reason": "Это дайджест-подборка, а не конкретная открытая роль: «Дайджест вакансий недели»."}
@@ -100,12 +101,16 @@ def _parse_genre(answer: str) -> PostGenre | None:
     return PostGenre(is_vacancy=is_vacancy, reason=reason)
 
 
-def _genre_request(text: str, max_tokens: int) -> ChatRequest:
-    """Что спросить у модели: только сам пост, без единого слова о кандидате."""
+def _genre_request(text: str, language: str, max_tokens: int) -> ChatRequest:
+    """Что спросить у модели: только сам пост, без единого слова о кандидате.
+
+    Язык обоснования приходит готовым названием: похожести на анкету взяться
+    от него неоткуда.
+    """
     return ChatRequest(
         purpose="classify_post_genre",
         messages=[
-            {"role": "system", "content": CLASSIFY_POST_GENRE_PROMPT},
+            {"role": "system", "content": in_user_language(CLASSIFY_POST_GENRE_PROMPT, language)},
             {
                 "role": "user",
                 "content": external_block(
@@ -120,7 +125,7 @@ def _genre_request(text: str, max_tokens: int) -> ChatRequest:
 
 
 async def classify_post_genre(
-    text: str, client: httpx.AsyncClient, model: str
+    text: str, client: httpx.AsyncClient, model: str, language: str,
 ) -> tuple[PostGenre | None, str | None]:
     """Жанр поста либо причина, по которой спросить не вышло.
 
@@ -136,7 +141,7 @@ async def classify_post_genre(
     if not text:
         return None, None
     return await read_with_a_second_try(
-        lambda room: chat(client, model, _genre_request(text, room), logger),
+        lambda room: chat(client, model, _genre_request(text, language, room), logger),
         _parse_genre,
         (MAX_GENRE_TOKENS, ROOMIER_GENRE_TOKENS),
         (logger, "classify_post_genre"),

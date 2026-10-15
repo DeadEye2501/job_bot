@@ -28,7 +28,7 @@ def apply_job(vacancy_id: int, *, method="form", target="https://company.test/ap
               aggregator_id=None, **overrides) -> ApplyJob:
     """Задание откликателя: по умолчанию форма работодателя, без агрегатора, всерьёз."""
     fields = dict(vacancy_id=vacancy_id, way=Way(method, target, aggregator_id), profile_id=1,
-                  simulated=False, letter_writer="app")
+                  simulated=False, letter_writer="app", language="Русский")
     fields.update(overrides)
     return ApplyJob(**fields)
 

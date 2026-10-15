@@ -342,7 +342,7 @@ async def test_without_a_buffer_the_letter_is_read_on_the_spot(session_factory, 
     )
     asked: list[str] = []
 
-    async def classify_hr_reply(text, status, client, model):
+    async def classify_hr_reply(text, status, client, model, *, language):
         asked.append(text)
         return (
             Classification(
@@ -373,7 +373,7 @@ async def test_a_reader_without_a_verdict_leaves_the_vacancy_alone(session_facto
     )
     asked: list[str] = []
 
-    async def classify_hr_reply(text, status, client, model):
+    async def classify_hr_reply(text, status, client, model, *, language):
         asked.append(text)
         return None, None
 

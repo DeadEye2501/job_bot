@@ -1,8 +1,9 @@
-"""Письмо HR в Telegram: полное с резюме или короткое вдогон."""
+"""Письмо HR в Telegram: первое с резюме или вдогон без него."""
 
 import logging
 from dataclasses import dataclass
 
+from backend.agent.kit import AgentKit
 from backend.applying.resume_link import resume_for_letter
 from backend.llm.cover_letter import LetterPost, generate_cover_letter
 from backend.models import Vacancy
@@ -11,8 +12,8 @@ from backend.payloads import DIRECT_PARSED_FIELDS, ParsedVacancy
 logger = logging.getLogger(__name__)
 
 # Окно «недавно отправляли письмо этому HR» (см.
-# count_recent_outgoing_with_vacancy_for_hr). Старше — шлём полное письмо с
-# резюме, как первый раз.
+# count_recent_outgoing_with_vacancy_for_hr). Старше — шлём письмо с резюме,
+# как первый раз.
 RECENT_SEND_WINDOW_DAYS = 14
 
 
@@ -20,7 +21,7 @@ RECENT_SEND_WINDOW_DAYS = 14
 class Letter:
     """Письмо к отправке: текст и вложение к нему.
 
-    У короткого письма вложения нет никогда; у полного — файл резюме, а нет
+    У письма вдогон вложения нет никогда; у первого — файл резюме, а нет
     файла — ссылка на резюме в тексте и вложения нет.
     """
 
@@ -38,41 +39,23 @@ def format_channel_ref(channel_username: str | None) -> str | None:
     return s if s.startswith("@") else f"@{s}"
 
 
-def short_note(title: str, channel_ref: str | None, prior_count: int) -> str:
-    """Короткое письмо вдогон. ``prior_count`` — сколько раз уже писали этому HR
-    в окне (1 → «Ещё одна ваша вакансия», 2+ → «И ещё одну»). Слова без рода:
-    готовый текст уходит от имени любого человека. Пустое название отклик не
-    отменяет — письмо говорит «вашу вакансию»."""
-    if title:
-        intro = (
-            f"Ещё одна ваша вакансия меня заинтересовала: {title}"
-            if prior_count == 1
-            else f"И ещё одну: {title}"
-        )
-    else:
-        intro = (
-            "Ещё одна ваша вакансия меня заинтересовала"
-            if prior_count == 1
-            else "И ещё одну вашу вакансию"
-        )
-    if channel_ref:
-        intro += f"\nКанал: {channel_ref}"
-    return intro
+async def compose_letter(kit: AgentKit, parsed: ParsedVacancy, post: LetterPost, vacancy_id: int):
+    """Письмо модели; первое за окно — с резюме файлом или ссылкой, вдогон — без:
+    резюме у HR уже есть. При беде — пара «пусто и код отказа».
 
-
-async def full_letter(pipeline, parsed: ParsedVacancy, post: LetterPost, vacancy_id: int):
-    """Полное письмо с резюме файлом или ссылкой; при беде — пара «пусто и код отказа».
-
-    Название и канал вплетает в текст сама модель: готовая приставка поверх
-    живого письма читается штампом.
+    Письмо вдогон пишет та же модель, а не готовая строка: отклик целиком идёт
+    на языке вакансии. Название и канал вплетает в текст сама модель: готовая
+    приставка поверх живого письма читается штампом. Анкета — та же, что видит
+    агент: на просьбу поста письмо отвечает из анкеты, и урезанная анкета
+    отвечала бы «обсудим» на то, что в ней есть.
     """
-    if not pipeline.profile_block:
-        logger.warning("vacancy %d: profile_block empty, skipping send", vacancy_id)
+    profile = await kit.read(kit.profile_text)
+    if not profile:
+        logger.warning("vacancy %d: анкета пуста, письмо не пишется", vacancy_id)
         return None, "profile_empty"
+    pipeline = kit.pipeline
     body, trouble = await generate_cover_letter(
-        pipeline.profile_block, parsed,
-        pipeline.lm_client, pipeline.lm_chat_model,
-        post=post,
+        profile, parsed, pipeline.lm_client, pipeline.lm_chat_model, post=post,
     )
     if trouble is not None:
         logger.warning("vacancy %d: письмо не сочинилось — модель не ответила (%s)",
@@ -81,6 +64,8 @@ async def full_letter(pipeline, parsed: ParsedVacancy, post: LetterPost, vacancy
     if body is None:
         logger.warning("vacancy %d: cover letter generation failed, skipping send", vacancy_id)
         return None, "cover_letter_failed"
+    if post.earlier:
+        return Letter(body, None), None
     resume = await resume_for_letter(pipeline)
     if resume is None:
         logger.warning("vacancy %d: CV file missing (%s), skipping send",

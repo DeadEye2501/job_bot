@@ -105,7 +105,8 @@ class ApplyJob:
     """Отклик одним способом.
 
     `profile_id` — профиль браузера: агрегатора или «Поиска по сети»;
-    `letter_writer` — значение из `LETTER_WRITERS`; `confirming` — перед
+    `letter_writer` — значение из `LETTER_WRITERS`; `language` — язык отклика,
+    решённый `domain/language_choice`; `confirming` — перед
     отправкой каждой страницы ждать подтверждения человека; `resume` —
     название и ссылка резюме, выбранного человеком на сайте агрегатора
     (у формы работодателя — пусто).
@@ -122,6 +123,7 @@ class ApplyJob:
     profile_id: int
     simulated: bool
     letter_writer: str
+    language: str
     resume: SeenResume | None = None
     confirming: bool = False
     letter_checks: int = 0

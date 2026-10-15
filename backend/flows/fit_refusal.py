@@ -124,7 +124,7 @@ async def _genre_refusal(
     стоит вердикт о пригодности.
     """
     genre, trouble = await classify_post_genre(
-        text, pipeline.lm_client, pipeline.lm_chat_model
+        text, pipeline.lm_client, pipeline.lm_chat_model, pipeline.profile_cache.user_language
     )
     trouble_answer = unanswered("жанр", trouble, vacancy_id)
     if trouble_answer is not None:

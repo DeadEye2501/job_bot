@@ -49,7 +49,7 @@ async def _read(text, status, client, model="qwen"):
     остальных провайдер отвечает, и разбирать пару в каждой значило бы писать
     `[0]` два десятка раз. Так же устроен и сосед — вердикт о пригодности.
     """
-    verdict, _trouble = await classify_hr_reply(text, status, client, model)
+    verdict, _trouble = await classify_hr_reply(text, status, client, model, language="Русский")
     return verdict
 
 
@@ -139,7 +139,7 @@ async def test_trouble_with_the_provider_is_named_and_not_taken_for_a_verdict(pr
     client = provider({CHAT: prepared})
 
     verdict, trouble = await classify_hr_reply(
-        "текст", VacancyStatus.APPLIED, client, "qwen"
+        "текст", VacancyStatus.APPLIED, client, "qwen", language="Русский"
     )
 
     assert verdict is None
@@ -249,7 +249,7 @@ async def test_a_cut_answer_is_not_a_provider_trouble():
     client = provider({CHAT: chat_response('{"status": "Invit', finish_reason="length")})
 
     verdict, trouble = await classify_hr_reply(
-        "текст", VacancyStatus.APPLIED, client, "qwen"
+        "текст", VacancyStatus.APPLIED, client, "qwen", language="Русский"
     )
 
     assert verdict is None
@@ -272,3 +272,12 @@ async def test_a_verdict_from_a_cut_answer_is_not_a_verdict():
     assert await _read(
         "спасибо, вы нам не подходите", VacancyStatus.APPLIED, client, "qwen"
     ) is None
+
+
+async def test_the_explanation_is_asked_in_the_user_language():
+    """Пояснение к смене статуса читает человек — и пишется на его языке, а не на языке HR."""
+    client = provider({CHAT: _verdict("Answered", "HR ответил")})
+
+    await classify_hr_reply("Thanks!", VacancyStatus.APPLIED, client, "qwen", language="Қазақша")
+
+    assert "на языке пользователя — Қазақша" in messages_of(client.sent[0])["system"]

@@ -64,12 +64,11 @@ async def _pipeline(make_pipeline, *, simulated: bool, resume=None):
 
 
 async def _resume_given(session_factory, tmp_path, resume: bool | str):
-    """Путь к резюме стенда. `True` — файл лежит; `False` — ни файла, ни ссылки;
-    строка — файла нет, а в анкете эта ссылка на резюме."""
+    """Анкета и путь к резюме стенда. `True` — файл лежит; `False` — ни файла,
+    ни ссылки; строка — файла нет, а в анкете эта ссылка на резюме."""
+    await put(session_factory, profile_row(resume_url=resume if isinstance(resume, str) else None))
     if resume is True:
         return resume_file(tmp_path, "cv.pdf")
-    if resume:
-        await put(session_factory, profile_row(resume_url=resume))
     return tmp_path / "cv.pdf"
 
 
@@ -120,7 +119,6 @@ def telegram_case(make_pipeline, session_factory, tmp_path, monkeypatch, outbox)
         if flood_wait is not None:
             outbox.error = FloodWait(value=flood_wait)
         pipeline = await _pipeline(make_pipeline, simulated=simulated, resume=cv)
-        pipeline.profile_block = "Иван Петров, Python-разработчик"
         _model_writes_the_letter(monkeypatch)
         return kit_for(pipeline, browser=FakeBrowser()), vacancy, outbox.sent
 
@@ -162,10 +160,12 @@ async def telegram_vacancy(session_factory, *, hr_user_id=None, status=VacancySt
 
 
 def _model_writes_the_letter(monkeypatch) -> None:
-    """Модель письма отвечает готовым текстом, в конце — текст поста, который ей дали."""
+    """Модель письма отвечает готовым текстом: в нём текст поста, счёт прежних
+    писем этому HR, язык письма и анкета — всё, что ей дали."""
 
     async def generate_cover_letter(block, parsed, client, model, *, post):
-        return f"Здравствуйте! Откликаюсь на вакансию. {post.text}", None
+        return (f"Здравствуйте! Откликаюсь на вакансию. {post.text}\nПисем до: {post.earlier}\n"
+                f"Язык: {post.language}\n{block}"), None
 
     monkeypatch.setattr("backend.applying.telegram_letter.generate_cover_letter", generate_cover_letter)
 

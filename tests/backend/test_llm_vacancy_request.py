@@ -13,6 +13,7 @@ import json
 import httpx
 import pytest
 
+from backend.llm.candidate import CandidateProfile
 from backend.llm.rules import AGGREGATOR_HOSTS_LINE
 from backend.llm.vacancy import parse_vacancy
 from tests.fakes.llm import (
@@ -139,9 +140,29 @@ async def test_the_known_skills_reach_the_prompt():
 
     client = provider({CHAT: _parsed()})
 
-    await parse_vacancy("текст", client, "qwen", known_skills=[Skill()])
+    await parse_vacancy("текст", client, "qwen", profile=CandidateProfile(known_skills=[Skill()]))
 
     assert "- PostgreSQL — Postgres" in messages_of(client.sent[0])["system"]
+
+
+async def test_the_post_language_comes_back_with_the_parse():
+    """Язык поста разбор отдаёт полем: по нему решается язык отклика."""
+    client = provider({CHAT: _parsed(language="Español")})
+
+    got, _ = await parse_vacancy("Buscamos cocinero", client, "qwen")
+
+    assert got.language == "Español"
+
+
+async def test_the_summary_is_asked_in_the_user_language():
+    """Пересказ вакансии и место пишутся на языке человека, который приходит
+    готовым, каким бы ни был язык поста."""
+    client = provider({CHAT: _parsed()})
+
+    await parse_vacancy("текст", client, "qwen", profile=CandidateProfile(user_language="Қазақша"))
+
+    system = messages_of(client.sent[0])["system"]
+    assert "ЯЗЫКЕ ПОЛЬЗОВАТЕЛЯ — Қазақша" in system and "{USER_LANGUAGE}" not in system
 
 
 @pytest.mark.parametrize(

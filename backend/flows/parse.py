@@ -117,7 +117,7 @@ async def _parsed_or_dropped(
         pipeline.lm_client,
         pipeline.lm_chat_model,
         channel_username=channel_username,
-        known_skills=pipeline.skills_cache,
+        profile=pipeline.profile_cache,
     )
     trouble = unanswered("разбор", refusal, vacancy_id)
     if trouble is not None:

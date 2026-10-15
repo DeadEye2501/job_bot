@@ -15,7 +15,7 @@ import httpx
 
 from backend.payloads import FitValidation, ParsedVacancy
 
-from backend.llm.candidate import CandidateProfile, format_languages
+from backend.llm.candidate import CandidateProfile, format_languages, in_user_language
 from backend.llm.fit import ANSWER_RULES, VERDICT_SCOPE, FitQuestion, ask_fit, vacancy_text
 from backend.llm.hallucination import looks_hallucinated
 from backend.llm.rules import LEVEL_MARKERS
@@ -50,15 +50,15 @@ reject ставится, только если текст прямо назыв�
 
 Пример 1 (reject — уровень и встречи на языке):
 Языки кандидата: Испанский — native, Английский — B1. Текст: "...daily meetings in English with the client, English Upper-Intermediate required..."
-Ответ: {"reason": "Upper-Intermediate English is required, with daily meetings in English.", "verdict": "reject"}
+Ответ: {"reason": "Требуется «English Upper-Intermediate» и «daily meetings in English with the client».", "verdict": "reject"}
 
 Пример 2 (reject — работа идёт на языке, которого у кандидата нет):
 Языки кандидата: Польский — native, Английский — A2. Текст: "Команда и клиенты общаются на немецком, собеседование тоже на немецком."
-Ответ: {"reason": "Работа ведётся на немецком: общение команды, клиентов и собеседование.", "verdict": "reject"}
+Ответ: {"reason": "Работа ведётся на немецком: «Команда и клиенты общаются на немецком, собеседование тоже на немецком».", "verdict": "reject"}
 
 Пример 3 (reject — язык назван обязательным без уровня, а у кандидата ниже B1):
 Языки кандидата: Арабский — native, Немецкий — A2. Текст: "Требуется знание немецкого языка."
-Ответ: {"reason": "Требуется знание немецкого языка.", "verdict": "reject"}
+Ответ: {"reason": "Язык обязателен: «Требуется знание немецкого языка».", "verdict": "reject"}
 
 Пример 4 (fit — заимствования без языкового требования):
 Языки кандидата: Казахский — native, Русский — C1. Текст: "Су-шеф на кухню ресторана: составление меню, бриф с поставщиками, контроль KPI смены. Опыт от 3 лет."
@@ -66,7 +66,7 @@ reject ставится, только если текст прямо назыв�
 
 Пример 5 (fit — пост на другом языке без требования):
 Языки кандидата: Турецкий — native, Английский — B2. Текст: "Store Manager. We're a retail chain in the city centre. You'll run a team of 12 and handle stock."
-Ответ: {"reason": "The post states no language requirement, only the role and the team.", "verdict": "fit"}
+Ответ: {"reason": "Языковых требований в посте нет: названы только роль «Store Manager» и команда.", "verdict": "fit"}
 
 Пример 6 (fit — язык как «будет плюсом»):
 Языки кандидата: Испанский — native, Английский — C1. Текст: "...будет плюсом: знание немецкого для чтения документации..."
@@ -76,10 +76,10 @@ reject ставится, только если текст прямо назыв�
 
 
 def _prompt_for(profile: CandidateProfile) -> str:
-    """Наставление с подставленными языками кандидата."""
-    return LANGUAGE_FIT_PROMPT.replace(
+    """Наставление с подставленными языками кандидата и языком его самого."""
+    return in_user_language(LANGUAGE_FIT_PROMPT.replace(
         "{LANGUAGE_REQUIREMENTS}", format_languages(profile.languages)
-    )
+    ), profile.user_language)
 
 
 def _without_invented_language(

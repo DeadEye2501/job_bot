@@ -35,7 +35,7 @@ CLASSIFY_HR_REPLY_PROMPT_TEMPLATE = """Ты классифицируешь от�
 
 Должен вернуть ТОЛЬКО JSON-объект с двумя полями:
 - status: ровно одно из значений из списка ДОПУСТИМЫХ выше
-- explanation: короткое (1-2 предложения) пояснение НА ТОМ ЖЕ ЯЗЫКЕ, что и сообщение HR (русский HR → русский explanation; English HR → English explanation; Deutsch → Deutsch и т.д.). КРАТКО ПЕРЕСКАЖИ СВОИМИ СЛОВАМИ ключевую идею ответа HR. Не цитируй текст дословно, не выдумывай слова и формулировки, которых в исходном сообщении нет.
+- explanation: короткое (1-2 предложения) пояснение на языке пользователя — {USER_LANGUAGE}, на каком бы языке ни писал HR. КРАТКО ПЕРЕСКАЖИ СВОИМИ СЛОВАМИ ключевую идею ответа HR. Не цитируй текст дословно, не выдумывай слова и формулировки, которых в исходном сообщении нет.
 
 Расшифровка ВСЕХ возможных статусов (некоторые могут отсутствовать в твоём списке ДОПУСТИМЫХ — игнорируй такие):
 - Applied — кандидат впервые ответил на вакансию и ждёт реакции HR. (Стартовое состояние, обычно не возвращается классификатором — только как no-op для current=Applied.)
@@ -57,9 +57,9 @@ CLASSIFY_HR_REPLY_PROMPT_TEMPLATE = """Ты классифицируешь от�
 - HR впервые отвечает на отклик без решения → Answered (если в ДОПУСТИМЫХ).
 - Текст пустой / бессмысленный / непонятен → no-op (вернуть ТЕКУЩИЙ СТАТУС, если он в ДОПУСТИМЫХ).
 
-Никогда не возвращай статусы, которых нет в списке ДОПУСТИМЫХ. Не переводи названия статусов на русский.
+Никогда не возвращай статусы, которых нет в списке ДОПУСТИМЫХ. Не переводи названия статусов ни на какой язык.
 
-Примеры (для каждого условно показан ТЕКУЩИЙ СТАТУС и ДОПУСТИМЫЕ — твой случай может отличаться, ориентируйся по логике):
+Примеры (для каждого условно показан ТЕКУЩИЙ СТАТУС и ДОПУСТИМЫЕ — твой случай может отличаться, ориентируйся по логике; язык пользователя в примерах — русский):
 
 [CURRENT=Applied, ALLOWED=Answered, Invitation, Test, Offer, Decline]
 Текст: "К сожалению, на текущий момент мы выбрали другого кандидата. Спасибо за интерес!"
@@ -119,23 +119,23 @@ CLASSIFY_HR_REPLY_PROMPT_TEMPLATE = """Ты классифицируешь от�
 
 [CURRENT=Applied, ALLOWED=Answered, Invitation, Test, Offer, Decline]
 Текст: "Hi! Unfortunately we've decided to move forward with another candidate. Best of luck with your search!"
-Ответ: {{"status": "Decline", "explanation": "HR informs that another candidate was chosen — a polite decline."}}
+Ответ: {{"status": "Decline", "explanation": "HR сообщает, что выбрали другого кандидата, — вежливый отказ."}}
 
 [CURRENT=Applied, ALLOWED=Answered, Invitation, Test, Offer, Decline]
 Текст: "Could we hop on a quick 30-min call tomorrow at 4pm CET to chat about the role?"
-Ответ: {{"status": "Invitation", "explanation": "HR invites the candidate to a 30-minute intro call at a specific time."}}
+Ответ: {{"status": "Invitation", "explanation": "HR зовёт на получасовой вводный созвон в конкретное время."}}
 
 [CURRENT=Test, ALLOWED=In Progress, Offer, Decline]
 Текст: "Got the assignment, looks great at first glance — we'll review internally and reach out by Friday."
-Ответ: {{"status": "In Progress", "explanation": "HR acknowledged the test submission and committed to feedback by Friday — ball is on HR's side."}}
+Ответ: {{"status": "In Progress", "explanation": "HR получил тестовое и обещал ответ к пятнице — мяч на стороне HR."}}
 
 [CURRENT=Applied, ALLOWED=Answered, Invitation, Test, Offer, Decline]
 Текст: "We'd like to offer you the Lead Florist position at €3200/month, full-time, starting Nov 15. Please confirm."
-Ответ: {{"status": "Offer", "explanation": "HR is making a formal offer with specified position, salary, schedule and start date."}}
+Ответ: {{"status": "Offer", "explanation": "HR делает оффер с позицией, зарплатой, графиком и датой выхода."}}
 
 [CURRENT=Applied, ALLOWED=Answered, Invitation, Test, Offer, Decline]
 Текст: "Hätten Sie Lust auf ein 30-minütiges Gespräch morgen um 14:00 Uhr CET, um die Stelle zu besprechen?"
-Ответ: {{"status": "Invitation", "explanation": "HR lädt zu einem 30-minütigen Gespräch zur konkreten Zeit ein."}}
+Ответ: {{"status": "Invitation", "explanation": "HR зовёт на получасовой разговор о вакансии в конкретное время."}}
 
 Формат ответа строго: {{"status": "...", "explanation": "..."}}
 """ + ONLY_JSON + """ Никаких пояснений вне поля explanation."""
@@ -191,12 +191,13 @@ def _as_line(allowed: set[VacancyStatus]) -> str:
 
 
 def _classify_request(
-    text: str, current_status: VacancyStatus, allowed_str: str
+    text: str, current_status: VacancyStatus, allowed_str: str, language: str
 ) -> ChatRequest:
     """Что спросить у модели: правила разбора и сама переписка как данные."""
     system_prompt = CLASSIFY_HR_REPLY_PROMPT_TEMPLATE.format(
         CURRENT_STATUS=current_status.value,
         ALLOWED_NEXT=allowed_str,
+        USER_LANGUAGE=language,
     )
     user_content = external_block(
         text,
@@ -218,8 +219,12 @@ async def classify_hr_reply(
     current_status: VacancyStatus,
     client: httpx.AsyncClient,
     model: str,
+    *,
+    language: str,
 ) -> tuple[Classification | None, str | None]:
     """Классифицирует burst HR-сообщений с учётом текущего статуса вакансии.
+
+    `language` — язык человека: пояснение к смене статуса читает он.
 
     Отвечает парой: вердикт и причина, по которой спросить не вышло. Пустой
     вердикт с пустой причиной значит «модель ответила, а вердикта в ответе
@@ -249,7 +254,7 @@ async def classify_hr_reply(
         "classify_hr_reply: %d chars, current=%s, allowed=%s",
         len(text), current_status.value, allowed_str,
     )
-    request = _classify_request(text, current_status, allowed_str)
+    request = _classify_request(text, current_status, allowed_str, language)
     reply = await chat(client, model, request, logger)
     if reply.text is None:
         return None, reply.error

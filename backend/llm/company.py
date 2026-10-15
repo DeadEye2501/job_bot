@@ -2,11 +2,13 @@
 
 
 import logging
+from dataclasses import dataclass
 
 import httpx
 
 from adapters.lm_chat import CUT_BY_LIMIT, ChatRequest, chat
 from backend.llm.answers import ONLY_JSON, TRUNCATED_TROUBLE, json_object, log_unparseable
+from backend.llm.candidate import in_user_language
 from backend.llm.external import external_block
 from backend.llm.rules import AGGREGATOR_HOSTS_LINE
 from backend.incoming import str_list
@@ -34,7 +36,7 @@ DEDUPE_COMPANY_PROMPT = """Ты определяешь, является ли р
 6. В случае любых сомнений выбирай null. Лучше создать дубликат (поправимо вручную), чем неверно склеить две разные компании (необратимо).
 
 Верни JSON-объект такого вида:
-{"matched_id": <id одного из кандидатов или null>, "reasoning": "<краткое пояснение НА ТОМ ЖЕ ЯЗЫКЕ, что и parsed_name (русское имя → русский reasoning; English/Latin name → English reasoning), 1-2 предложения>"}
+{"matched_id": <id одного из кандидатов или null>, "reasoning": "<краткое пояснение на языке пользователя — {USER_LANGUAGE}, 1-2 предложения>"}
 """
 # Местодержателем, как у соседнего наставления разбора: `format` здесь не
 # годится вовсе — образец ответа выше написан фигурными скобками, и они
@@ -45,31 +47,38 @@ DEDUPE_COMPANY_PROMPT = (
 )
 
 
-def _shown_candidates(
-    parsed_name: str, parsed_website: str | None, candidates: list
-) -> str:
+@dataclass(frozen=True)
+class CompanyAsk:
+    """Что нужно арбитру: разобранные имя и сайт, кандидаты из базы и язык
+    пояснения — решённый `domain/language_choice`, а не арбитром."""
+
+    parsed_name: str
+    parsed_website: str | None
+    candidates: list
+    language: str
+
+
+def _shown_candidates(ask: CompanyAsk) -> str:
     """Разобранное и кандидаты одним куском данных — тем, что увидит арбитр.
 
     Порядковых номеров у списка нет нарочно: при пяти кандидатах модель путала
     «третий» с `id=3` и приклеивала вакансию к чужой компании.
     """
     cand_lines = []
-    for c in candidates:
+    for c in ask.candidates:
         aliases = ", ".join(str_list(c.aliases)) or "—"
         cand_lines.append(
             f'id={c.id}, name="{c.name}", aliases=[{aliases}], '
             f'website="{c.website or "—"}"'
         )
     return (
-        f'Распарсено из вакансии:\n- name: "{parsed_name}"\n'
-        f'- website: "{parsed_website or "—"}"\n\n'
+        f'Распарсено из вакансии:\n- name: "{ask.parsed_name}"\n'
+        f'- website: "{ask.parsed_website or "—"}"\n\n'
         "Кандидаты в БД:\n" + "\n".join(cand_lines)
     )
 
 
-def _dedupe_request(
-    parsed_name: str, parsed_website: str | None, candidates: list
-) -> ChatRequest:
+def _dedupe_request(ask: CompanyAsk) -> ChatRequest:
     """Что спросить у модели: разобранное имя и все кандидаты списком.
 
     Прозвища кандидатов идут в тот же список: компания, названная в
@@ -83,14 +92,14 @@ def _dedupe_request(
     подсказывают как раз номер из списка.
     """
     user_content = external_block(
-        _shown_candidates(parsed_name, parsed_website, candidates),
+        _shown_candidates(ask),
         "разобранное имя компании и кандидаты из базы",
         "Реши по правилам system prompt'а.",
     )
     return ChatRequest(
         purpose="dedupe_company",
         messages=[
-            {"role": "system", "content": DEDUPE_COMPANY_PROMPT},
+            {"role": "system", "content": in_user_language(DEDUPE_COMPANY_PROMPT, ask.language)},
             {"role": "user", "content": user_content},
         ],
         max_tokens=MAX_DEDUPE_TOKENS,
@@ -124,10 +133,7 @@ def _matched_id(answer: str) -> tuple[int | None, str | None]:
 async def dedupe_company_with_llm(
     client: httpx.AsyncClient,
     model: str,
-    *,
-    parsed_name: str,
-    parsed_website: str | None,
-    candidates: list,
+    ask: CompanyAsk,
 ) -> tuple[int | None, str | None]:
     """Номер сведённой компании и пояснение к решению; пусто — не свелось.
 
@@ -139,18 +145,13 @@ async def dedupe_company_with_llm(
     """
     logger.debug(
         "dedupe_company: parsed=%r website=%r candidates=%d",
-        parsed_name,
-        parsed_website,
-        len(candidates),
+        ask.parsed_name,
+        ask.parsed_website,
+        len(ask.candidates),
     )
-    if not candidates:
+    if not ask.candidates:
         return None, "no_candidates"
-    reply = await chat(
-        client,
-        model,
-        _dedupe_request(parsed_name, parsed_website, candidates),
-        logger,
-    )
+    reply = await chat(client, model, _dedupe_request(ask), logger)
     if reply.text is None:
         # Причина уходит в решение и доходит до человека: её показывают в
         # разборе сведения компаний, поэтому она остаётся строкой провайдера,

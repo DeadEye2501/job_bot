@@ -6,12 +6,12 @@ import pytest
 from backend.agent.jobs import Source
 from backend.agent.stops import HumanTimeout, LimitExhausted
 from backend.flows.aggregator_round import seek_source
-from backend.models import Aggregator, Vacancy
+from backend.models import Aggregator, ProfileLanguage, Vacancy
 from tests.backend.fixtures.applying import PAGE
 from tests.backend.fixtures.flows import similar_by_hand
 from tests.backend.fixtures.parse_stub import parse_into
 from tests.dbio import all_rows, put
-from tests.factories import blacklist_row
+from tests.factories import blacklist_row, profile_row
 from tests.factories_aggregators import aggregator_row
 from tests.fakes.agent import LimitHit, captcha_step, finish_step, scripted_kit
 
@@ -190,6 +190,19 @@ async def test_the_web_seeker_hears_that_no_site_is_blacklisted(seek, parsed):
 
     (plan,) = kit.run_session.plans
     assert "Сайты в чёрном списке: нет" in plan.task
+
+
+async def test_the_seeker_is_told_the_languages_to_search_in(seek, session_factory, parsed):
+    """На каких языках искать, решает приложение по анкете, а не агент."""
+    person = profile_row()
+    await put(session_factory, person)
+    await put(session_factory, ProfileLanguage(profile_id=person.id, language="Deutsch", level="A2"))
+    await put(session_factory, ProfileLanguage(profile_id=person.id, language="Español", level="B1"))
+
+    _, _, kit = await seek([finish_step()])
+
+    (plan,) = kit.run_session.plans
+    assert "Языки запросов: Español" in plan.task
 
 
 async def test_the_pipeline_refreshes_its_snapshots_before_the_search(

@@ -245,6 +245,13 @@
 - `branch_labels: Union[str, Sequence[str], None]` = `None`
 - `depends_on: Union[str, Sequence[str], None]` = `None`
 
+### `alembic/versions/a7c2e9d41b06_vacancy_language.py`
+
+- `revision: str` = `'a7c2e9d41b06'`
+- `down_revision: Union[str, Sequence[str], None]` = `'f3b8d1c2a7e4'`
+- `branch_labels: Union[str, Sequence[str], None]` = `None`
+- `depends_on: Union[str, Sequence[str], None]` = `None`
+
 ### `alembic/versions/a9c3e1f07b42_aggregators.py`
 
 - `revision: str` = `'a9c3e1f07b42'`
@@ -342,6 +349,7 @@
   - `profile_id: int`
   - `simulated: bool`
   - `letter_writer: str`
+  - `language: str`
   - `resume: SeenResume | None` = `None`
   - `confirming: bool` = `False`
   - `letter_checks: int` = `0`
@@ -532,8 +540,6 @@
   - `hr_id: int`
   - `peer: int | str`
   - `parsed: ParsedVacancy`
-  - `prior_count: int`
-  - `title: str`
   - `post: LetterPost`
 
 ### `backend/applying/telegram_ban.py`
@@ -735,6 +741,10 @@
 ### `backend/domain/image_types.py`
 
 - `_IMAGE_SIGNATURES` = `набор из 4`
+
+### `backend/domain/language_choice.py`
+
+- `FALLBACK_LANGUAGE` = `'English'`
 
 ### `backend/domain/mail_servers.py`
 
@@ -950,7 +960,6 @@
   - `embed_client: object`
   - `embed_model: str`
 - `class IngestionPipeline`
-  - `profile_block: str`
   - `skills_cache: list[ProfileSkill]`
   - `profile_cache: CandidateProfile`
   - `blacklist_patterns: list[str]`
@@ -1026,6 +1035,7 @@
   - `languages: list[CandidateLanguage]` = `field(default_factory=list)`
   - `free_preferences: str | None` = `None`
   - `known_skills: list[ProfileSkill]` = `field(default_factory=list)`
+  - `user_language: str` = `FALLBACK_LANGUAGE`
 
 ### `backend/llm/company.py`
 
@@ -1033,6 +1043,11 @@
 - `MAX_DEDUPE_TOKENS` = `1200`
 - `DEDUPE_COMPANY_PROMPT` = `'Ты определяешь, является ли распарсенная из вак…`
 - `DEDUPE_COMPANY_PROMPT` = `DEDUPE_COMPANY_PROMPT.replace('{AGGREGATOR_HOSTS…`
+- `class CompanyAsk`
+  - `parsed_name: str`
+  - `parsed_website: str | None`
+  - `candidates: list`
+  - `language: str`
 
 ### `backend/llm/cover_letter.py`
 
@@ -1043,6 +1058,8 @@
 - `class LetterPost`
   - `channel_ref: str | None` = `None`
   - `text: str` = `''`
+  - `earlier: int` = `0`
+  - `language: str` = `FALLBACK_LANGUAGE`
 
 ### `backend/llm/cv.py`
 
@@ -1136,10 +1153,12 @@
 - `_CEFR_ALT` = `'|'.join(CEFR_LEVELS)`
 - `_GRADE_ALT` = `'|'.join(GRADES)`
 - `_CEFR_LEVEL_RE` = `re.compile('\\b(' + '|'.join((level.lower() for …`
-- `_GENERIC_HALLUCINATION_MARKERS: tuple[tuple[re.Pattern[str], re.Pattern[str]], ...]` = `набор из 2`
+- `_GENERIC_HALLUCINATION_MARKERS: tuple[tuple[re.Pattern[str], re.Pattern[str]], ...]` = `набор из 1`
 - `_REASON_STYLE_VIOLATIONS: tuple[re.Pattern[str], ...]` = `набор из 10`
 - `_LANGUAGE_ROOT_OVERRIDES: dict[str, str]` = `словарь из 23`
 - `_MIN_LANG_ROOT_LEN` = `4`
+- `_QUOTE_RE` = `re.compile('«([^»]+)»')`
+- `_SAME_SIGNS` = `str.maketrans({'ё': 'е', '—': '-', '–': '-', '…'…`
 
 ### `backend/llm/hr_reply.py`
 
@@ -1488,6 +1507,7 @@
   - `salary_currency: Mapped[str | None]`
   - `remote: Mapped[str | None]`
   - `location: Mapped[str | None]`
+  - `language: Mapped[str | None]`
   - `score: Mapped[int | None]`
   - `skip_reason: Mapped[str | None]`
   - `source_url: Mapped[str | None]`
@@ -1538,7 +1558,7 @@
 
 ### `backend/payloads.py`
 
-- `DIRECT_PARSED_FIELDS` = `набор из 8`
+- `DIRECT_PARSED_FIELDS` = `набор из 9`
 - `FitVerdict` = `Literal['fit', 'reject', 'trash']`
 - `class ChannelPost`
   - `channel_id: int | None`
@@ -1639,6 +1659,7 @@
   - `salary: str | None`
   - `remote: str | None`
   - `location: str | None`
+  - `language: str | None`
 - `class PostGenre`
   - `is_vacancy: bool`
   - `reason: str`

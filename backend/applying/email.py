@@ -35,7 +35,7 @@ async def via_email(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome:
         return Missed("почта для откликов не настроена")
     if resume is None:
         return Missed("нет ни файла резюме, ни ссылки на него")
-    ask = await letter_ask(kit, vacancy_id, "язык текста вакансии", None)
+    ask = await letter_ask(kit, vacancy_id, None)
     if ask is None:
         return GONE
     letter, issues = await write_letter(ask, kit.pipeline.lm_client, kit.pipeline.lm_chat_model)

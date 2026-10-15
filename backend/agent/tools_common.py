@@ -177,7 +177,7 @@ def _report_login(kit: AgentKit, aggregator_id: int) -> Callable:
 
 def _report_failure(job: ApplyJob) -> Callable:
     async def report_failure(reason: str) -> str:
-        """Отклик этим способом не удался; причина — коротко, по-русски."""
+        """Отклик этим способом не удался; причина — коротко."""
         if isinstance(job.outcome, FINAL):
             return FINAL_ANSWER
         job.outcome = Failed(reason)

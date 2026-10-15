@@ -68,6 +68,18 @@ async def test_a_silent_provider_is_told_apart_from_a_rejected_letter(prepared):
     assert trouble
 
 
+async def test_the_letter_is_asked_in_the_given_language_and_knows_earlier_letters():
+    """Язык письма и счёт прежних писем модель получает готовыми, а не выводит
+    из текста поста: счёт — в наставлении, куда чужой пост его не подделает."""
+    client = _client("Hola! Me interesa su vacante. Hablemos.")
+
+    await _written("профиль", parsed_vacancy(), client, "qwen",
+                   post=LetterPost(text="Buscamos cocinero", earlier=2, language="Español"))
+
+    system = messages_of(client.sent[0])["system"]
+    assert "на языке: Español" in system and "этому HR о других его вакансиях: 2" in system
+
+
 async def test_a_rejected_letter_is_not_a_provider_trouble():
     """Забракованное своими проверками письмо бедой поставщика не считается."""
     client = _client("Здравствуйте! Прикладываю резюме и жду ответа.")

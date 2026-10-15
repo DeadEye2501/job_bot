@@ -86,7 +86,7 @@ def _answer_instead_of_the_model(pipeline, monkeypatch) -> None:
         pipeline.parse_asked = True
         return pipeline.parsed, pipeline.parse_refusal
 
-    async def classify_post_genre(text, client_, model):
+    async def classify_post_genre(text, client_, model, languages):
         pipeline.genre_asked = True
         return pipeline.genre, pipeline.genre_trouble
 
