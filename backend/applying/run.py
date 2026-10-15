@@ -3,8 +3,6 @@
 import logging
 from collections.abc import Awaitable, Callable
 
-from sqlalchemy import select
-
 from backend.agent.kit import AgentKit
 from backend.agent.stops import RUN_STOPPERS
 from backend.applying.browser import via_browser
@@ -14,6 +12,7 @@ from backend.applying.telegram import via_telegram
 from backend.applying.world import awaits_application, learn, read_world, ways_in
 from backend.domain.apply_order import VIA_AGGREGATOR, VIA_EMAIL, VIA_FORM, VIA_TELEGRAM, Way, World
 from backend.models import Vacancy
+from backend.repository.vacancy_brief import source_name
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +32,7 @@ async def apply_vacancies(kit: AgentKit, vacancy_ids: list[int]) -> None:
     total = len(vacancy_ids)
     # Счёт с нуля, как у каналов: окно само называет место в очереди с единицы.
     for number, vacancy_id in enumerate(vacancy_ids):
-        kit.pipeline.emit_progress("apply", await _title(kit, vacancy_id), number, total)
+        kit.pipeline.emit_progress("apply", await _note(kit, vacancy_id), number, total)
         await _apply_one(kit, world, vacancy_id)
 
 
@@ -74,6 +73,12 @@ async def apply_chosen(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome:
     return outcome
 
 
-async def _title(kit: AgentKit, vacancy_id: int) -> str:
-    title = await kit.read(lambda session: session.scalar(select(Vacancy.title).where(Vacancy.id == vacancy_id)))
-    return title or "вакансия"
+async def _note(kit: AgentKit, vacancy_id: int) -> str:
+    """Подпись у полос окна: что делаем и с чем — откуда вакансия, на которую откликаемся."""
+
+    async def source(session) -> str | None:
+        vacancy = await session.get(Vacancy, vacancy_id)
+        return await source_name(session, vacancy) if vacancy else None
+
+    name = await kit.read(source)
+    return f"Отклик на {name}" if name else "Отклик"

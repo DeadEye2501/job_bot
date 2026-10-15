@@ -30,10 +30,18 @@ async def describe_vacancy(session: AsyncSession, vacancy_id: int) -> str | None
 
 
 async def _source(session: AsyncSession, vacancy: Vacancy) -> str:
+    if vacancy.source_aggregator_id is None and vacancy.source_channel_id is None:
+        return "заведена человеком"
+    return await source_name(session, vacancy) or "—"
+
+
+async def source_name(session: AsyncSession, vacancy: Vacancy) -> str | None:
+    """Откуда вакансия: имя агрегатора или `@ник` канала. Пусто — источника
+    нет: вакансию завёл человек, или источник с тех пор удалён."""
     if vacancy.source_aggregator_id is not None:
         site = await session.get(Aggregator, vacancy.source_aggregator_id)
-        return site.name if site else "—"
+        return site.name if site else None
     if vacancy.source_channel_id is not None:
         channel = await session.get(TelegramChannel, vacancy.source_channel_id)
-        return f"@{channel.username}" if channel else "—"
-    return "заведена человеком"
+        return f"@{channel.username}" if channel else None
+    return None

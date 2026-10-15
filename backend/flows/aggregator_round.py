@@ -37,7 +37,7 @@ async def seek_source(kit: AgentKit, source: Source) -> None:
     job = SeekJob(source, kit.pipeline.rs.aggregator_backfill_limit)
     queue = ParseQueue(kit.pipeline)
     started = utc_now()
-    kit.pipeline.emit_progress("aggregator", f"{source.name} — найдено", 0, job.limit)
+    kit.pipeline.emit_progress("aggregator", source.sweep, 0, job.limit)
     try:
         end = await _search(kit, job, queue)
         await queue.drain()

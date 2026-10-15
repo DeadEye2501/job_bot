@@ -2,12 +2,15 @@
    Что стоит внутри — лампочки, режим, ход обхода, счётчик — своими файлами. */
 
 .bottom-bar {
+  /* Ширина полос хода: по ней же подписи по их бокам отступают от оси. */
+  --bars-width: 220px;
   grid-column: 1 / span 2;
   grid-row: 2;
   background: var(--bg-secondary);
   border-top: 1px solid var(--border);
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* Края поровну, ось между ними — нулевой ширины, ровно посередине. */
+  grid-template-columns: 1fr 0 1fr;
   align-items: center;
   padding: 0 10px;
   font-size: 0.75rem;
@@ -18,23 +21,24 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  min-width: 0;
 }
 
 .bb-right {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 6px;
-  justify-self: end;
+  min-width: 0;
 }
 
-/* Ось нулевой ширины по центру полосы, вынутая из сетки. Начинка встаёт по ней
-   сама (`progress.css`, `human-plate.css`), и подпись, меняясь в длине, не двигает полосы. Сделай
-   это обычной ячейкой, и каждое новое имя канала дёргало бы их. */
+/* Ось нулевой ширины по центру полосы. Начинка встаёт по ней сама
+   (`progress.css`, `human-plate.css`), а подписи хода стоят в краях: меняясь в
+   длине, они не двигают полосы. Займи ось ширину по начинке, и каждое новое
+   имя канала дёргало бы их. */
 .bb-center {
-  position: absolute;
-  left: 50%;
-  top: 0;
-  bottom: 0;
+  position: relative;
+  align-self: stretch;
   width: 0;
   pointer-events: none;
 }

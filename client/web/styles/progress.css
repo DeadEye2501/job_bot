@@ -1,9 +1,6 @@
-/* Ход обхода: две полосы и подпись рядом с ними. */
+/* Ход обхода: две полосы по оси полосы окна и подписи по их бокам. */
 
 .bb-center .progress-wrap {
-  --bars-width: 220px;
-  /* Полосы чуть левее оси: справа от них подпись, и место под неё заложено. */
-  --bars-shift: 80px;
   position: relative;
   height: 100%;
   width: 0;
@@ -14,24 +11,38 @@
   position: absolute;
   left: 0;
   top: 50%;
-  transform: translate(calc(-50% - var(--bars-shift)), -50%);
+  transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
   gap: 5px;
   width: var(--bars-width);
 }
 
-.progress-caption {
-  position: absolute;
-  left: calc(var(--bars-width) / 2 - var(--bars-shift) + 8px);
-  top: 50%;
-  transform: translateY(-50%);
+/* Подписи живут в краях полосы окна, а не на оси: так их ширина — место
+   между полосами и лампочками или кнопками, и длинная обрезается многоточием
+   по ширине окна, а не налезает на соседей. Отступ от оси — половина полос и
+   просвет. */
+.progress-what,
+.progress-count {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--text-secondary);
   font-size: 0.72rem;
   line-height: 1.1;
   /* Цифры одной ширины: без этого подпись дёргается на каждом счётчике. */
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+}
+
+.progress-what {
+  margin: 0 calc(var(--bars-width) / 2 + 8px) 0 8px;
+  text-align: right;
+}
+
+.progress-count {
+  margin: 0 8px 0 calc(var(--bars-width) / 2 + 8px);
 }
 
 .progress-bar {

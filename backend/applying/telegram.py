@@ -113,6 +113,9 @@ async def _record(kit: AgentKit, errand: _Errand, way: Way, letter: Letter,
                   tg_message_id: int | None) -> None:
     """Письмо в переписку и отклик — одной сделкой.
 
+    Письмо пишется только в переписку: письмо отклика — реплика скрининга, а
+    разговор в Telegram скринингом не считается.
+
     Строка переписки без номера сообщения не пишется: под симуляцией его нет, и
     строка показала бы в окне письмо, которого HR не получал. Зов записи письма
     идёт первым нарочно: на повторе он откатывает сессию, а повтор — выигранная
@@ -126,6 +129,6 @@ async def _record(kit: AgentKit, errand: _Errand, way: Way, letter: Letter,
             stored.vacancy_id = errand.vacancy_id
         await record_application(session, ApplicationEntry(
             vacancy_id=errand.vacancy_id, aggregator_id=None, via=ApplicationVia.TELEGRAM,
-            target=way.target, letter=letter.text, screening=[]))
+            target=way.target, letter=None, screening=[]))
         await session.commit()
     kit.pipeline.fire_vacancies_changed()

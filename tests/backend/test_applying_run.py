@@ -9,6 +9,8 @@ from backend.applying import run
 from backend.applying.result import Dropped, Missed, TelegramClosed, Unfit
 from backend.models import Vacancy, VacancyStatus
 from tests.backend.fixtures.applying import MAIL
+from tests.dbio import put
+from tests.factories import channel_row
 
 
 @pytest.fixture
@@ -103,12 +105,18 @@ async def test_a_crashed_way_hands_over_to_the_next(executors, two_vacancies, ki
 
 async def test_the_window_hears_each_vacancy_and_its_place_counted_from_zero(
         executors, two_vacancies, kit, monkeypatch):
-    """Окно само называет место в очереди с единицы — ход уходит с нуля, как у каналов."""
+    """Окно само называет место в очереди с единицы — ход уходит с нуля, как у
+    каналов. Подпись — откуда вакансия; заведённая человеком — просто «Отклик»."""
+    channel = channel_row(username="jobs")
+    await put(kit.pipeline.session_factory, channel)
+    async with kit.pipeline.session_factory() as session:
+        (await session.get(Vacancy, two_vacancies[0].id)).source_channel_id = channel.id
+        await session.commit()
     steps = []
     monkeypatch.setattr(kit.pipeline, "emit_progress",
                         lambda stage, label, current, total: steps.append((stage, label, current, total)))
     await run.apply_vacancies(kit, [v.id for v in two_vacancies])
-    assert steps == [("apply", "Вакансия 1", 0, 2), ("apply", "Вакансия 2", 1, 2)]
+    assert steps == [("apply", "Отклик на @jobs", 0, 2), ("apply", "Отклик", 1, 2)]
 
 
 async def test_a_chosen_way_is_tried_alone(executors, two_vacancies, kit):

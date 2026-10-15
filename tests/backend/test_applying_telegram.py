@@ -22,6 +22,14 @@ async def test_the_first_letter_goes_with_the_resume(telegram_case):
     assert row.via is ApplicationVia.TELEGRAM and row.target == "@hr_name"
 
 
+async def test_a_telegram_letter_is_not_kept_as_screening(telegram_case):
+    """Письмо остаётся в переписке; разговор в Telegram скринингом не считается."""
+    kit, vacancy, _ = await telegram_case()
+    await via_telegram(kit, vacancy.id, TG)
+    (row,) = await all_rows(kit.pipeline.session_factory, Application)
+    assert row.letter is None
+
+
 async def test_without_a_file_the_letter_goes_with_the_resume_link(telegram_case):
     """Строку дописывает код после модели и её проверки: проверка, отбивающая
     слово «резюме», её не видит. Строка — голый адрес: подпись на одном языке

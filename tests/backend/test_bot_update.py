@@ -34,8 +34,8 @@ async def test_the_download_lies_next_to_the_app_and_goes_to_the_copy(make_bot, 
     assert await download_update(bot) == "ok"
 
     assert (tmp_path / "JobBot.exe.new").read_bytes() == APP
-    assert steps[0] == ("update", "Обновление", 0, 0)
-    assert steps[-1] == ("update", "Обновление", len(APP), len(APP))
+    assert steps[0] == ("update", "Скачивание обновления", 0, 0)
+    assert steps[-1] == ("update", "Скачивание обновления", len(APP), len(APP))
     assert handed == [tmp_path / "JobBot.exe.new"]
 
 

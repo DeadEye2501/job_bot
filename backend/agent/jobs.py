@@ -22,6 +22,12 @@ class Source:
         """Снимок строки: обход живёт дольше сессии базы, а строка за её пределами не читается."""
         return cls(id=row.id, name=row.name, host=row.host, last_run_at=row.last_run_at)
 
+    @property
+    def sweep(self) -> str:
+        """Подпись обхода у полос окна: что делаем и с чем. У «Поиска по сети»
+        места нет, и его имя — уже такая подпись."""
+        return self.name if self.host is None else f"Обход {self.name}"
+
 
 @dataclass(frozen=True)
 class Finished:

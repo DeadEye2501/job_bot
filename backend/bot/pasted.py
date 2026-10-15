@@ -34,5 +34,5 @@ async def ui_ingest_pasted_text(
         bot,
         lambda _kit: bot.ingestion.ingest_pasted_text(text, posted_at),
         "ingest pasted text",
-        progress=("pasted", "Разбор вставленного объявления…", 0, 0),
+        progress=("pasted", "Разбор объявления", 0, 0),
     )

@@ -40,7 +40,7 @@ async def test_pasted_text_reaches_the_pipeline_and_frees_the_slot(make_bot):
 
     assert await bot.ui_ingest_pasted_text("Ищем повара", None) == "ok"
     assert ingestion.pasted_calls == [("Ищем повара", None)]
-    assert hooks.progress == [("pasted", "Разбор вставленного объявления…", 0, 0)]
+    assert hooks.progress == [("pasted", "Разбор объявления", 0, 0)]
     assert bot.current_poll_task is None
 
 

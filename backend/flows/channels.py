@@ -63,7 +63,7 @@ async def poll_active_channels(pipeline) -> None:
         total,
     )
     for idx, ch in enumerate(active_named):
-        pipeline.emit_progress("channel", f"@{ch.username}", idx, total)
+        pipeline.emit_progress("channel", f"Обход @{ch.username}", idx, total)
         await _walk_channel(pipeline, ch)
     pipeline.emit_progress("channel", "", total, total)
     # 0/0 on the message track signals the UI to clear that bar between

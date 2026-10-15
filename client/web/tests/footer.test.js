@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 import { allAlive, blockedTip, downNames, shouldTurnOff } from '../state/health.js';
 import { modeChosen, modeHintAt } from '../state/modes.js';
-import { bar, caption, countlessNote, humanText } from '../state/progress.js';
+import { bar, countlessNote, humanText, sweepNote } from '../state/progress.js';
 
 describe('здоровье систем', () => {
   it('живо всё — значит живо каждое из четырёх', () => {
@@ -114,43 +114,43 @@ describe('переключатель режима', () => {
 });
 
 describe('полоса прогресса', () => {
-  it('подпись называет обе половины обхода', () => {
-    // Каналы и сообщения идут разом, и человек по подписи понимает, где
-    // сейчас работа. Пропади половина — полоса двигалась бы необъяснимо.
-    expect(caption({ label: 'python jobs', current: 3, total: 10 }, { current: 7, total: 20 }))
-      .toBe('python jobs (3/10), Сообщение (7/20)');
+  it('идут сообщения канала — слева канал, справа сообщение по счёту', () => {
+    expect(sweepNote({ stage: 'channel', label: 'Обход @jobs', current: 3, total: 10 }, { current: 6, total: 20 }))
+      .toEqual({ what: 'Обход @jobs', count: 'Сообщение 7 из 20' });
   });
 
-  it('канал без имени называется каналом', () => {
-    // Имя приходит не всегда — источник мог его не прислать. Пустое место в
+  it('без сообщений счёт идёт по каналам', () => {
+    // Подпись приходит не всегда — между каналами её нет. Пустое место в
     // подписи читалось бы как поломка.
-    expect(caption({ label: '', current: 1, total: 2 }, { current: 0, total: 0 }))
-      .toBe('Каналы (1/2), Сообщение (—)');
+    expect(sweepNote({ stage: 'channel', label: '', current: 1, total: 2 }, { current: 0, total: 0 }))
+      .toEqual({ what: 'Обход каналов', count: 'Канал 2 из 2' });
   });
 
-  it('названный канал называется и до того, как узнан его итог', () => {
-    // Имя приходит раньше счёта: канал уже взят в работу, и человек по подписи
-    // видит, какой именно. Спрячь его до итога — начало обхода выглядело бы
-    // так же, как «делать нечего».
-    expect(caption({ label: 'канал', current: 0, total: 0 }, { current: 0, total: 0 }))
-      .toBe('канал (0/0), Сообщение (—)');
+  it('последняя весть с итогом вместо номера не переваливает за итог', () => {
+    expect(sweepNote({ stage: 'channel', label: '', current: 2, total: 2 }, { current: 0, total: 0 }).count)
+      .toBe('Канал 2 из 2');
   });
 
-  it('пока не назван ни канал, ни итог, подпись молчит', () => {
-    // «0/0» читается как «нечего делать», а не как «считаем», и человек решил
-    // бы, что обход завис.
-    expect(caption({ label: '', current: 0, total: 0 }, { current: 0, total: 0 }))
-      .toBe('…, Сообщение (—)');
+  it('сайт агрегатора считает найденное', () => {
+    expect(sweepNote({ stage: 'aggregator', label: 'Обход hh.ru', current: 3, total: 10 }, { current: 0, total: 0 }))
+      .toEqual({ what: 'Обход hh.ru', count: 'Найдено 3 из 10' });
+  });
+
+  it('пока итога нет, на месте счёта многоточие', () => {
+    // «0 из 0» читается как «нечего делать», а не как «считаем», и человек
+    // решил бы, что обход завис.
+    expect(sweepNote({ label: '', current: 0, total: 0 }, { current: 0, total: 0 }))
+      .toEqual({ what: 'Обход каналов', count: '…' });
   });
 
   it('прогон одной вакансии без имени стадии называется прогоном', () => {
     // Полосам показать нечего — счёта у прогона нет, — и пустая подпись рядом с
     // бегущими полосами не говорит человеку даже того, что бот занят.
-    expect(countlessNote('')).toBe('Прогон вакансии…');
+    expect(countlessNote('')).toEqual({ what: 'Прогон вакансии…', count: '' });
   });
 
   it('названная стадия прогона говорит за себя', () => {
-    expect(countlessNote('Разбор поста')).toBe('Разбор поста');
+    expect(countlessNote('Разбор поста')).toEqual({ what: 'Разбор поста', count: '' });
   });
 
   it('заполнение не переваливает за край', () => {

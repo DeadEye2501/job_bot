@@ -373,7 +373,7 @@ async def test_the_window_hears_about_the_recovery(parses, make_pipeline, sessio
 
     await pipeline.recover_orphan_vacancies()
 
-    assert heard == [("recover", "", 0, 1), ("recover", "", 0, 0)]
+    assert heard == [("recover", "Разбор отложенных", 0, 1), ("recover", "", 0, 0)]
 
 
 async def test_the_sweep_does_not_eat_the_whole_turn(parses, make_pipeline, session_factory):
