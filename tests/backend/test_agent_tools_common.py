@@ -142,7 +142,7 @@ async def test_a_missing_resume_is_an_outcome_only_where_a_resume_was_named(make
     своих резюме не держит."""
     form = apply_job(1)
     named = apply_job(1, method="aggregator", target="https://hh.ru/vacancy/1", aggregator_id=4,
-                      resume=SeenResume("Повар", "https://hh.ru/resume/1", None))
+                      resume=SeenResume("Повар", "https://hh.ru/resume/1"))
     kit = kit_for(await make_pipeline())
 
     refused = await tool(common_tools(kit, form), "finish")(result="resume_missing")

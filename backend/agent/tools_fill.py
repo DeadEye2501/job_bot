@@ -3,8 +3,6 @@
 
 Как `tools_letter` у отклика: агент предлагает, код решает, что примет, — здесь
 пункты раскладки, вписать можно только принятое (`tools_browser._strict`).
-Раскладка же — единственная дверь ввода, и потому именно она решает, то ли
-резюме открыто.
 """
 
 import logging
@@ -22,8 +20,6 @@ logger = logging.getLogger(__name__)
 _ENOUGH = "проверок больше нет на этой странице: впиши эти данные в узкое поле или пропусти"
 _ONE_FIELD = "одно поле — один пункт: собери всё, что идёт в это поле, в одно значение"
 _NO_REASON = "поле общее: нужно обоснование, почему узкие поля страницы не подходят"
-_OFF_TARGET_EDIT = "это страница другого резюме — открой редактор резюме из задания"
-_OFF_TARGET_NEW = "это страница другого резюме — открой создание нового резюме"
 
 
 # Пункт подтверждения, а не свой вид: строгий ввод читает одну форму у
@@ -42,10 +38,6 @@ def fill_tools(kit: AgentKit, job: FillJob) -> list[Callable]:
         """Раскладка страницы целиком: каждый пункт — поле страницы и всё его значение из анкеты, одно поле — один пункт. label — подпись поля; kind — text, choice (список, переключатель) или check; value — значение, у галочки true или false; error — пусто; selector — тот, которым будешь вписывать. У данных, положенных в общее текстовое поле, fallback_reason — почему узкие поля страницы им не подходят. Вписать можно только принятое."""
         page = await kit.browser.page()
         url = page.url
-        if job.off_target(url):
-            logger.warning("заполнение резюме на %s: раскладка на странице другого резюме отбита — %s",
-                           job.source.host, url)
-            return _OFF_TARGET_EDIT if job.editor_url else _OFF_TARGET_NEW
         inventory = await page_inventory(page)
         job.general |= {(url, item["selector"]) for item in items if item.get("fallback_reason")}
         refused = _unfit(job, url, items)
@@ -68,7 +60,7 @@ def fill_tools(kit: AgentKit, job: FillJob) -> list[Callable]:
         """Сайт не даёт завести ещё одно резюме; reason — почему, словами. Создание останавливается."""
         return _stopped(job, Finished("no_new_resume", reason), "сайт не даёт завести ещё одно резюме")
 
-    if job.editor_url:
+    if job.resume_url:
         return [submit_layout, report_required_missing]
     return [submit_layout, report_required_missing, report_no_new_resume]
 

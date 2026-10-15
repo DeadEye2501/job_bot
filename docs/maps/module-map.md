@@ -342,13 +342,13 @@ Claude через установленный Claude Code по подписке: 
 - `async def run_async_migrations() -> None` (14)
 - `def run_migrations_online() -> None` (2)
 
-### `alembic/versions/032b8b1c9f8a_init.py` — 400 строк ⚠ подошёл к 300
+### `alembic/versions/032b8b1c9f8a_init.py` — 399 строк ⚠ подошёл к 300
 
 init
 
 Зависит от: `alembic`
 
-- `def upgrade() -> None` (332)
+- `def upgrade() -> None` (331)
 - `def downgrade() -> None` (44)
 
 ## backend — 209 модулей
@@ -403,7 +403,7 @@ init
   - `def reset(self) -> None` (6)
   - `async def _take(self, browser) -> str | dict` (13)
 
-### `backend/agent/jobs.py` — 188 строк
+### `backend/agent/jobs.py` — 172 строк
 
 Задачи сессий агента и их итоги.
 
@@ -419,9 +419,7 @@ init
 - `class ScanJob` (8)
 - `class SeekJob` (10)
 - `class ApplyJob` (29)
-- `class FillJob` (35)
-  - `def off_target(self, url: str) -> bool` (8)
-- `def _within(url: str, place: str) -> bool` (3)
+- `class FillJob` (24)
 
 ### `backend/agent/kit.py` — 61 строк
 
@@ -461,13 +459,13 @@ init
 
 - `def applier_task(job, vacancy_text: str, profile_text: str, today: date) -> str` (22)
 
-### `backend/agent/prompts/fill.py` — 52 строк
+### `backend/agent/prompts/fill.py` — 55 строк
 
 Заполнение резюме на сайте агрегатора по анкете человека.
 
 Зависит от: `backend.llm.rules`
 
-- `def fill_task(host: str, editor_url: str | None, language: str) -> str` (11)
+- `def fill_task(host: str, resume_url: str | None, language: str) -> str` (14)
 
 ### `backend/agent/prompts/frame.py` — 39 строк
 
@@ -485,7 +483,7 @@ init
 
 - `def login_task(host: str) -> str` (3)
 
-### `backend/agent/prompts/scan.py` — 18 строк
+### `backend/agent/prompts/scan.py` — 16 строк
 
 Перечень резюме: какие резюме человека заведены на сайте агрегатора.
 
@@ -558,7 +556,7 @@ init
 - `async def record_and_announce(kit: AgentKit, entry: ApplicationEntry) -> int` (5)
 - `async def _append(kit: AgentKit, application_id: int, lines: list[tuple[bool, str]]) -> str` (5)
 
-### `backend/agent/tools_browser.py` — 258 строк
+### `backend/agent/tools_browser.py` — 250 строк
 
 Инструменты браузера для агента: открыть, снять, нажать, ввести, выбрать, приложить резюме и фото.
 
@@ -574,8 +572,7 @@ init
   - `async def browser_type(selector: str, text: str) -> str` (3)
   - `async def browser_select(selector: str, value: str) -> str` (3)
   - `async def browser_back() -> str` (3)
-- `def _attach_tools(act: Callable, resume: Path | None, photo: Path | None, job: ApplyJob | FillJob | None) -> list[Callable]` (24)
-  - `async def attach(page, selector: str, file: Path) -> None` (4)
+- `def _attach_tools(act: Callable, resume: Path | None, photo: Path | None) -> list[Callable]` (16)
   - `async def browser_attach_resume(selector: str) -> str` (5)
   - `async def browser_attach_photo(selector: str) -> str` (5)
 - `def _actions(kit: AgentKit, job: ApplyJob | FillJob | None) -> tuple[Callable, Callable, Callable, Callable]` (13)
@@ -624,15 +621,15 @@ init
 - `def _report_failure(job: ApplyJob) -> Callable` (9)
   - `async def report_failure(reason: str) -> str` (6)
 
-### `backend/agent/tools_fill.py` — 143 строк
+### `backend/agent/tools_fill.py` — 135 строк
 
 Инструменты заполнения резюме: раскладка страницы и остановки — за нехваткой
 
 Зависит от: `backend.agent.confirm`, `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.page_fields`, `backend.agent.tools_letter`, `backend.llm.fill_review`
 
 - `class LayoutItem(ConfirmItem)` (5)
-- `def fill_tools(kit: AgentKit, job: FillJob) -> list[Callable]` (36)
-  - `async def submit_layout(items: list[LayoutItem]) -> str` (20)
+- `def fill_tools(kit: AgentKit, job: FillJob) -> list[Callable]` (32)
+  - `async def submit_layout(items: list[LayoutItem]) -> str` (16)
   - `async def report_required_missing(labels: list[str]) -> str` (4)
   - `async def report_no_new_resume(reason: str) -> str` (3)
 - `def _stopped(job: FillJob, outcome: Finished, why: str) -> str` (5)
@@ -808,7 +805,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def alembic_config() -> Config` (10)
 - `def ensure_schema() -> None` (9)
 
-### `backend/bot/aggregators.py` — 155 строк
+### `backend/bot/aggregators.py` — 153 строк
 
 Работа агента у бота с источниками: обход агрегаторов, вход на сайт, перечень и заполнение резюме, удаление источника.
 
@@ -1718,13 +1715,13 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _recover_one(pipeline, row) -> bool` (20)
 - `async def recover_orphan_vacancies(pipeline) -> int` (47)
 
-### `backend/flows/resume_fill.py` — 107 строк
+### `backend/flows/resume_fill.py` — 101 строк
 
 Заполнение резюме на сайте агрегатора по анкете.
 
 Зависит от: `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.prompts.fill`, `backend.agent.sessions`, `backend.agent.tools_browser`, `backend.agent.tools_fill`, `backend.flows.aggregator_scan`, `backend.repository.aggregator_resumes`, `backend.repository.profile_languages`
 
-- `async def fill(kit: AgentKit, source: Source, resume_id: int | None) -> str` (41)
+- `async def fill(kit: AgentKit, source: Source, resume_id: int | None) -> str` (35)
 - `def _verdict(before: set[str], after: set[str], resume_url: str | None) -> tuple[str, str | None]` (16)
 - `async def _settle(kit: AgentKit, aggregator_id: int, resume_url: str | None, before: set[str]) -> str` (14)
   - `async def settle(session) -> str` (8)
@@ -2159,7 +2156,7 @@ First-run bootstrap: ensure DB schema exists.
 - `class CreatedAtMixin` (8)
 - `class UpdatedAtMixin` (14)
 
-### `backend/models/contacts.py` — 104 строк
+### `backend/models/contacts.py` — 101 строк
 
 Таблицы сторон, с которыми связана вакансия.
 
@@ -2167,7 +2164,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `class TelegramChannel(IdMixin, Base)` (11)
 - `class Aggregator(IdMixin, Base)` (20)
-- `class AggregatorResume(IdMixin, Base)` (27)
+- `class AggregatorResume(IdMixin, Base)` (24)
 - `class HR(IdMixin, Base)` (17)
 - `class Company(IdMixin, Base)` (10)
 
@@ -2240,7 +2237,7 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def fire(hook, name: str, *args) -> None` (13)
 
-### `backend/payloads.py` — 493 строк ⚠ подошёл к 300
+### `backend/payloads.py` — 491 строк ⚠ подошёл к 300
 
 Свёртки значений, ходящих между слоями.
 
@@ -2269,7 +2266,7 @@ First-run bootstrap: ensure DB schema exists.
 - `class ChannelWithCount` (4)
 - `class SourceStats` (20)
 - `class ChannelDetail` (4)
-- `class SeenResume` (8)
+- `class SeenResume` (6)
 - `class FieldEntry(NamedTuple)` (11)
 - `class VacancyFilter` (53)
 
@@ -2305,14 +2302,14 @@ First-run bootstrap: ensure DB schema exists.
 - `def _skill_names(record) -> list[str]` (4)
 - `def _project_lines(projects) -> list[str]` (8)
 
-### `backend/repository/aggregator_resumes.py` — 92 строк
+### `backend/repository/aggregator_resumes.py` — 91 строк
 
 Резюме человека на сайте агрегатора — зеркало того, что сейчас на сайте.
 
 Зависит от: `backend.models`, `backend.payloads`
 
 - `async def resumes_of(session: AsyncSession, aggregator_id: int) -> list[AggregatorResume]` (7)
-- `async def sync_resumes(session: AsyncSession, aggregator_id: int, seen: list[SeenResume], can_add: bool) -> None` (25)
+- `async def sync_resumes(session: AsyncSession, aggregator_id: int, seen: list[SeenResume], can_add: bool) -> None` (24)
 - `async def forbid_more_resumes(session: AsyncSession, aggregator_id: int) -> None` (4)
 - `async def choose_resume(session: AsyncSession, aggregator_id: int, resume_id: int) -> None` (14)
 - `async def drop_resume(session: AsyncSession, aggregator_id: int, url: str) -> None` (10)
@@ -3594,7 +3591,7 @@ Runtime settings layer.
 - `def _photo_url(relative: str) -> str | None` (11)
 - `def _read_profile_fields(payload: dict) -> dict` (32)
 
-### `client/bridge/refusals.py` — 318 строк ⚠ подошёл к 300
+### `client/bridge/refusals.py` — 317 строк ⚠ подошёл к 300
 
 Слова, которыми мост отказывает окну.
 
@@ -4409,13 +4406,13 @@ Runtime settings layer.
 
 - `def _job(vacancy_id, **over) -> ApplyJob` (3)
 
-### `tests/backend/test_agent_tools_browser.py` — 317 строк ⚠ подошёл к 300
+### `tests/backend/test_agent_tools_browser.py` — 291 строк
 
 Инструменты браузера: что агент видит и что доходит до страницы.
 
 Зависит от: `backend.agent.jobs`, `backend.agent.tools_browser`, `tests.backend.fixtures.applying`, `tests.fakes.agent`, `tests.fakes.browser`
 
-Тестов: 29
+Тестов: 27
 
 - `def _tools(page, resume=None, photo=None)` (2)
 - `def _item(selector, value, kind='text', url=VACANCY)` (3)
@@ -4434,16 +4431,16 @@ Runtime settings layer.
 - `class _Gate` (7)
   - `async def wait(self, kind, host, _browser)` (3)
 
-### `tests/backend/test_agent_tools_fill.py` — 195 строк
+### `tests/backend/test_agent_tools_fill.py` — 166 строк
 
 Раскладка страницы при заполнении резюме: что принимается сразу, что идёт к
 
 Зависит от: `backend.agent`, `backend.agent.jobs`, `backend.agent.tools_fill`, `backend.llm.fill_review`, `backend.payloads`, `tests.fakes.agent`, `tests.fakes.browser`
 
-Тестов: 14
+Тестов: 12
 
 - `def stand(monkeypatch, make_pipeline)` (24)
-  - `async def make(verdicts=None, job=None, url=FORM)` (18)
+  - `async def make(verdicts=None, job=None)` (18)
     - `async def review(_lm, _model, inventory, items)` (4)
     - `async def inventory_of(_page)` (2)
 
@@ -5024,7 +5021,7 @@ Runtime settings layer.
 - `async def _name_of_created(session_factory, chat: LlmProviderConfig | None) -> str` (4)
 - `def _image(body: bytes=_ICON) -> httpx.Response` (2)
 
-### `tests/backend/test_flows_aggregator_scan.py` — 97 строк
+### `tests/backend/test_flows_aggregator_scan.py` — 93 строк
 
 Сканирование резюме: агент перечисляет резюме сайта, список в базе приводится к увиденному.
 
@@ -5380,15 +5377,15 @@ Runtime settings layer.
 Тестов: 8
 
 
-### `tests/backend/test_flows_resume_fill.py` — 223 строк
+### `tests/backend/test_flows_resume_fill.py` — 206 строк
 
 Заполнение резюме: агент заполняет, следом — перечень резюме и отметка заполненного.
 
 Зависит от: `backend.agent.jobs`, `backend.flows.resume_fill`, `backend.models`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.agent`
 
-Тестов: 13
+Тестов: 12
 
-- `async def _site(session_factory)` (8)
+- `async def _site(session_factory)` (7)
 - `async def _marks(session_factory, aggregator_id)` (2)
 
 ### `tests/backend/test_flows_vacancy_removal.py` — 167 строк
@@ -5769,15 +5766,14 @@ Runtime settings layer.
 Тестов: 10
 
 
-### `tests/backend/test_repository_aggregator_resumes.py` — 163 строк
+### `tests/backend/test_repository_aggregator_resumes.py` — 148 строк
 
 Резюме агрегатора в базе: сверка со сканом, отметка «откликаться этим», удаление.
 
 Зависит от: `backend.models`, `backend.payloads`, `backend.repository.aggregator_resumes`, `backend.repository.aggregators`, `tests.dbio`, `tests.factories_aggregators`
 
-Тестов: 12
+Тестов: 11
 
-- `def _seen(title: str, url: str, editor_url: str | None=None) -> SeenResume` (3)
 - `async def _site(session_factory) -> int` (4)
 
 ### `tests/backend/test_repository_aggregators.py` — 110 строк
@@ -6684,13 +6680,13 @@ Runtime settings layer.
 - `def _rerun_outcomes() -> set[str]` (3)
 - `def _pasted_outcomes() -> set[str]` (3)
 
-### `tests/client/test_bridge_aggregators.py` — 446 строк ⚠ подошёл к 300
+### `tests/client/test_bridge_aggregators.py` — 431 строк ⚠ подошёл к 300
 
 Домен «Агрегаторы»: перечень, заведение, удаление, включение, вход и обход.
 
 Зависит от: `backend.agent.availability`, `backend.bot.work`, `backend.models`, `backend.repository.aggregators`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.site_home`
 
-Тестов: 35
+Тестов: 34
 
 
 ### `tests/client/test_bridge_answer.py` — 132 строк
@@ -7274,7 +7270,7 @@ Runtime settings layer.
 - `def parsed_cv_project(**overrides) -> ParsedCvProject` (3)
 - `def parsed_cv(**overrides) -> ParsedCv` (12)
 
-### `tests/fakes/agent.py` — 178 строк
+### `tests/fakes/agent.py` — 175 строк
 
 Набор сессии агента без браузера, водителя и человека.
 
@@ -7296,8 +7292,8 @@ Runtime settings layer.
   - `async def step(tools)` (2)
 - `def login_step(logged_in: bool)` (6)
   - `async def step(tools)` (3)
-- `def resumes_step(resumes: list[tuple], many_resumes: bool=True, signs_found: str='список «Мои резюме»')` (11)
-  - `async def step(tools)` (6)
+- `def resumes_step(resumes: list[tuple], many_resumes: bool=True, signs_found: str='список «Мои резюме»')` (8)
+  - `async def step(tools)` (4)
 - `def silent_gate(limit_sec: float=3600.0) -> HumanGate` (3)
 - `def answering_gate(answer: Callable[[dict], dict | None], limit_sec: float=3600.0) -> tuple[HumanGate, list]` (14)
   - `def needed(kind, host, payload)` (5)

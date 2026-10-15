@@ -152,7 +152,6 @@ def upgrade() -> None:
     sa.Column('aggregator_id', sa.Integer(), nullable=False),
     sa.Column('title', sa.String(), nullable=False),
     sa.Column('url', sa.String(), nullable=False),
-    sa.Column('editor_url', sa.String(), nullable=True),
     sa.Column('position', sa.Integer(), nullable=False),
     sa.Column('is_chosen', sa.Boolean(), server_default=sa.text('0'), nullable=False),
     sa.ForeignKeyConstraint(['aggregator_id'], ['aggregator.id'], ),

@@ -42,32 +42,6 @@ async def test_after_finishing_the_resume_is_not_attached(tmp_path):
     assert answer.startswith("не вышло") and page.calls == []
 
 
-async def test_a_file_is_not_attached_on_another_resume(tmp_path):
-    """Вложение тоже ввод: при перезаписи на странице не того резюме файл не
-    прикладывается, как не вписывается и текст."""
-    page = FakePage(choosers={"text=Загрузить"})
-    job = fill_job(editor_url="https://site.test/resume/1/edit")
-    tools = browser_tools(kit_for(None, browser=FakeBrowser(page)), tmp_path / "cv.pdf", tmp_path / "me.jpg", job)
-    await tool(tools, "browser_open")(url="https://site.test/resume/new")
-    page.calls.clear()
-
-    resume = await tool(tools, "browser_attach_resume")(selector="text=Загрузить")
-    photo = await tool(tools, "browser_attach_photo")(selector="text=Загрузить")
-
-    assert resume.startswith("не вышло") and photo.startswith("не вышло") and page.calls == []
-
-
-async def test_a_file_is_attached_in_the_editor_of_its_resume(tmp_path):
-    page = FakePage(choosers={"text=Загрузить"})
-    job = fill_job(editor_url="https://site.test/resume/1/edit")
-    tools = browser_tools(kit_for(None, browser=FakeBrowser(page)), tmp_path / "cv.pdf", None, job)
-    await tool(tools, "browser_open")(url="https://site.test/resume/1/edit")
-
-    answer = await tool(tools, "browser_attach_resume")(selector="text=Загрузить")
-
-    assert answer.startswith("готово")
-
-
 async def test_after_finishing_nothing_reaches_the_page():
     """Человек закончил — «Отправить» не нажимается, что бы агент ни решил."""
     page, tools = await _strict(_item("#name", "Иван"), outcome=Dropped())
