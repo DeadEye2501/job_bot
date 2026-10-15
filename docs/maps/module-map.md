@@ -459,13 +459,14 @@ init
 
 - `def applier_task(job, vacancy_text: str, profile_text: str, today: date) -> str` (22)
 
-### `backend/agent/prompts/fill.py` — 55 строк
+### `backend/agent/prompts/fill.py` — 95 строк
 
 Заполнение резюме на сайте агрегатора по анкете человека.
 
 Зависит от: `backend.llm.rules`
 
-- `def fill_task(host: str, resume_url: str | None, language: str) -> str` (14)
+- `def fill_task(host: str, resume_url: str | None, language: str) -> str` (7)
+- `def _overwrite(resume_url: str) -> str` (20)
 
 ### `backend/agent/prompts/frame.py` — 39 строк
 
@@ -556,7 +557,7 @@ init
 - `async def record_and_announce(kit: AgentKit, entry: ApplicationEntry) -> int` (5)
 - `async def _append(kit: AgentKit, application_id: int, lines: list[tuple[bool, str]]) -> str` (5)
 
-### `backend/agent/tools_browser.py` — 250 строк
+### `backend/agent/tools_browser.py` — 279 строк
 
 Инструменты браузера для агента: открыть, снять, нажать, ввести, выбрать, приложить резюме и фото.
 
@@ -565,24 +566,27 @@ init
 - `class _Refused(Exception)` (2)
 - `class _Ledger(NamedTuple)` (7)
 - `def _ledger(job: ApplyJob | FillJob) -> _Ledger` (6)
-- `def browser_tools(kit: AgentKit, resume: Path | None, photo: Path | None, strict: ApplyJob | FillJob | None=None) -> list[Callable]` (36)
+- `def browser_tools(kit: AgentKit, resume: Path | None, photo: Path | None, strict: ApplyJob | FillJob | None=None) -> list[Callable]` (40)
   - `async def browser_open(url: str) -> str` (3)
   - `async def browser_snapshot() -> str` (3)
   - `async def browser_click(selector: str) -> str` (3)
   - `async def browser_type(selector: str, text: str) -> str` (3)
+  - `async def browser_press(selector: str, key: str) -> str` (3)
   - `async def browser_select(selector: str, value: str) -> str` (3)
   - `async def browser_back() -> str` (3)
 - `def _attach_tools(act: Callable, resume: Path | None, photo: Path | None) -> list[Callable]` (16)
   - `async def browser_attach_resume(selector: str) -> str` (5)
   - `async def browser_attach_photo(selector: str) -> str` (5)
-- `def _actions(kit: AgentKit, job: ApplyJob | FillJob | None) -> tuple[Callable, Callable, Callable, Callable]` (13)
+- `def _actions(kit: AgentKit, job: ApplyJob | FillJob | None) -> tuple[Callable, ...]` (14)
   - `async def act(action: Callable[..., Awaitable]) -> str` (2)
 - `async def _act(kit: AgentKit, action: Callable[..., Awaitable], held: Callable[[], None]) -> str` (16)
-- `def _plain() -> tuple[Callable, Callable, Callable]` (13)
-  - `def fill(page, selector, text)` (2)
+- `def _plain() -> tuple[Callable, Callable, Callable, Callable]` (28)
+  - `async def fill(page, selector, text)` (12)
   - `def select(page, selector, value)` (2)
   - `def click(page, selector)` (2)
-- `def _strict(job: ApplyJob | FillJob) -> tuple[Callable, Callable, Callable]` (33)
+  - `def press(page, selector, key)` (4)
+- `def _strict(job: ApplyJob | FillJob) -> tuple[Callable, Callable, Callable, Callable]` (38)
+  - `async def press(page, selector, key)` (3)
   - `async def fill(page, selector, text)` (5)
   - `async def select(page, selector, value)` (3)
   - `async def click(page, selector)` (8)
@@ -3924,7 +3928,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 339 модулей
+## tests — 340 модулей
 
 ### `tests/adapters/test_agent_mcp.py` — 85 строк
 
@@ -4406,19 +4410,28 @@ Runtime settings layer.
 
 - `def _job(vacancy_id, **over) -> ApplyJob` (3)
 
-### `tests/backend/test_agent_tools_browser.py` — 291 строк
+### `tests/backend/test_agent_tools_browser.py` — 319 строк ⚠ подошёл к 300
 
 Инструменты браузера: что агент видит и что доходит до страницы.
 
 Зависит от: `backend.agent.jobs`, `backend.agent.tools_browser`, `tests.backend.fixtures.applying`, `tests.fakes.agent`, `tests.fakes.browser`
 
-Тестов: 27
+Тестов: 30
 
 - `def _tools(page, resume=None, photo=None)` (2)
 - `def _item(selector, value, kind='text', url=VACANCY)` (3)
 - `async def _opened(job, fields=None)` (8)
 - `async def _strict(confirmed, outcome=None, fields=None)` (3)
 - `async def _filling(accepted)` (3)
+
+### `tests/backend/test_agent_tools_browser_typing.py` — 33 строк
+
+Ввод в редактор форматированного текста: набор с клавиатуры, а не прямое заполнение.
+
+Зависит от: `backend.agent.tools_browser`, `tests.backend.fixtures.real_page`, `tests.fakes.agent`, `tests.fakes.browser`
+
+Тестов: 1
+
 
 ### `tests/backend/test_agent_tools_common.py` — 192 строк
 
@@ -7307,7 +7320,7 @@ Runtime settings layer.
 - `def work_kit(bot) -> AgentKit` (3)
 - `def kit_for(pipeline, *, browser=None, gate=None, run_session=None) -> AgentKit` (3)
 
-### `tests/fakes/browser.py` — 149 строк
+### `tests/fakes/browser.py` — 156 строк
 
 Браузер агента с заданными страницами: что открыто, что нажато, что отказало.
 
@@ -7320,18 +7333,19 @@ Runtime settings layer.
   - `async def __aexit__(self, kind, *_rest)` (4)
   - `def value(self)` (4)
     - `async def _chooser()` (2)
-- `class _Locator` (19)
+- `class _Locator` (22)
   - `async def aria_snapshot(self, **_options)` (3)
   - `def first(self)` (2)
   - `async def count(self)` (2)
-  - `async def evaluate(self, _script, **_options)` (4)
-- `class FakePage` (56)
+  - `async def evaluate(self, script, **_options)` (7)
+- `class FakePage` (60)
   - `def fail_if_asked(self, selector)` (3)
   - `async def goto(self, url, **_options)` (4)
   - `async def title(self)` (2)
   - `def locator(self, selector)` (2)
   - `async def click(self, selector, **_options)` (4)
   - `async def fill(self, selector, text, **_options)` (3)
+  - `async def press(self, selector, key, **_options)` (3)
   - `async def select_option(self, selector, value, **_options)` (3)
   - `async def set_checked(self, selector, checked, **_options)` (3)
   - `async def set_input_files(self, selector, files, **_options)` (3)
