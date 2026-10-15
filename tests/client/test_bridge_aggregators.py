@@ -400,3 +400,28 @@ async def test_rewriting_a_resume_gone_from_the_site_asks_to_refresh_the_list(
 
     assert await told() == {"message": "Этого резюме на сайте уже нет — обновите список резюме",
                             "danger": True}
+
+
+async def test_rewriting_a_resume_without_its_editor_asks_to_refresh_the_list(
+    api, ask, with_bot, told, session_factory
+):
+    with_bot(resume_fill="no_editor")
+    site = aggregator_row()
+    await put(session_factory, site)
+    resume = aggregator_resume_row(site.id)
+    await put(session_factory, resume)
+
+    await ask(api.aggregators.fill_resume, {"aggregator_id": site.id, "resume_id": resume.id})
+
+    assert await told() == {"message": "Не найден редактор резюме — обновите список резюме",
+                            "danger": True}
+
+
+async def test_a_new_resume_the_site_refuses_says_so(api, ask, with_bot, told, session_factory):
+    with_bot(resume_fill="no_new_resume")
+    site = aggregator_row()
+    await put(session_factory, site)
+
+    await ask(api.aggregators.create_resume, site.id)
+
+    assert await told() == {"message": "Сайт не даёт завести ещё одно резюме", "danger": True}

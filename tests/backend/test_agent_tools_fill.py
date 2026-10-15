@@ -21,10 +21,10 @@ def stand(monkeypatch, make_pipeline):
     """Страница резюме с описью `INVENTORY`; проверяющий отвечает из `verdicts`
     (по умолчанию — «убедительно») и помнит каждый вызов."""
 
-    async def make(verdicts=None):
+    async def make(verdicts=None, job=None, url=FORM):
         page = FakePage()
-        page.url = FORM
-        job = fill_job()
+        page.url = url
+        job = job or fill_job()
         calls = []
 
         async def review(_lm, _model, inventory, items):
@@ -41,6 +41,49 @@ def stand(monkeypatch, make_pipeline):
         return page, job, tools, calls
 
     return make
+
+
+@pytest.mark.parametrize("url", [FORM, FORM + "?step=2", FORM + "/experience"])
+async def test_an_overwrite_lays_out_its_own_resume_and_its_pages(stand, url):
+    _, job, tools, _ = await stand(job=fill_job(editor_url=FORM), url=url)
+
+    await tool(tools, "submit_layout")(items=[layout_item("#skills", "Раскрой")])
+
+    assert job.accepted[(url, "#skills")]["value"] == "Раскрой"
+
+
+@pytest.mark.parametrize(
+    ("job_fields", "url"),
+    [
+        pytest.param({"editor_url": FORM}, "https://hh.ru/resume/new", id="перезапись на создании нового"),
+        pytest.param({"editor_url": FORM}, FORM + "-copy", id="перезапись на чужом адресе с тем же началом"),
+        pytest.param({"other_editors": frozenset({FORM})}, FORM, id="создание на редакторе существующего"),
+        pytest.param({"editor_url": FORM, "other_editors": frozenset({FORM + "/2"})}, FORM + "/2",
+                     id="перезапись на редакторе другого резюме"),
+    ],
+)
+async def test_a_layout_on_another_resume_is_refused(stand, job_fields, url):
+    """Не то резюме открыто — в принятое не ложится ничего, а вписать можно
+    только принятое: правка не того резюме не начинается."""
+    _, job, tools, calls = await stand(job=fill_job(**job_fields), url=url)
+
+    answer = await tool(tools, "submit_layout")(items=[layout_item("#skills", "Раскрой")])
+
+    assert job.accepted == {} and calls == [] and "другого резюме" in answer
+
+
+async def test_a_creation_the_site_does_not_allow_is_reported_as_such(stand):
+    _, job, tools, _ = await stand()
+
+    await tool(tools, "report_no_new_resume")(reason="на сайте одно резюме на аккаунт")
+
+    assert job.outcome == Finished("no_new_resume", "на сайте одно резюме на аккаунт")
+
+
+async def test_an_overwrite_has_no_way_to_say_a_new_resume_is_impossible(stand):
+    _, _, tools, _ = await stand(job=fill_job(editor_url=FORM))
+
+    assert "report_no_new_resume" not in {one.__name__ for one in tools}
 
 
 async def test_an_item_for_its_own_field_is_accepted_without_the_reviewer(stand):

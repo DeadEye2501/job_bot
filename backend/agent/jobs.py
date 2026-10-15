@@ -136,7 +136,9 @@ class ApplyJob:
 class FillJob:
     """Заполнение резюме на сайте агрегатора по профилю.
 
-    `resume_url` — резюме, которое перезаписывается; пусто — заводится новое.
+    `editor_url` — редактор резюме, которое перезаписывается; пусто — заводится
+    новое. `other_editors` — редакторы прочих резюме сайта: на них раскладка
+    не принимается ни при перезаписи, ни при создании.
     `accepted` — принятые пункты раскладки по ключу «адрес страницы, селектор
     поля», той же формы, что `ApplyJob.confirmed`: вписать можно только их.
     `page_checks` — сколько раз проверяющий смотрел запасной путь поля, по
@@ -150,7 +152,8 @@ class FillJob:
     """
 
     source: Source
-    resume_url: str | None = None
+    editor_url: str | None = None
+    other_editors: frozenset[str] = frozenset()
     outcome: Outcome | None = None
     accepted: dict[tuple[str, str], dict] = field(default_factory=dict)
     page_checks: dict[tuple[str, str], int] = field(default_factory=dict)

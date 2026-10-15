@@ -1,7 +1,10 @@
-"""Инструменты заполнения резюме: раскладка страницы и остановка за нехваткой данных.
+"""Инструменты заполнения резюме: раскладка страницы и остановки — за нехваткой
+данных и за отказом сайта завести ещё одно резюме.
 
 Как `tools_letter` у отклика: агент предлагает, код решает, что примет, — здесь
 пункты раскладки, вписать можно только принятое (`tools_browser._strict`).
+Раскладка же — единственная дверь ввода, и потому именно она решает, то ли
+резюме открыто.
 """
 
 import logging
@@ -19,6 +22,8 @@ logger = logging.getLogger(__name__)
 _ENOUGH = "проверок больше нет на этой странице: впиши эти данные в узкое поле или пропусти"
 _ONE_FIELD = "одно поле — один пункт: собери всё, что идёт в это поле, в одно значение"
 _NO_REASON = "поле общее: нужно обоснование, почему узкие поля страницы не подходят"
+_OFF_TARGET_EDIT = "это страница другого резюме — открой редактор резюме из задания"
+_OFF_TARGET_NEW = "это страница другого резюме — открой создание нового резюме"
 
 
 # Пункт подтверждения, а не свой вид: строгий ввод читает одну форму у
@@ -37,6 +42,10 @@ def fill_tools(kit: AgentKit, job: FillJob) -> list[Callable]:
         """Раскладка страницы целиком: каждый пункт — поле страницы и всё его значение из анкеты, одно поле — один пункт. label — подпись поля; kind — text, choice (список, переключатель) или check; value — значение, у галочки true или false; error — пусто; selector — тот, которым будешь вписывать. У данных, положенных в общее текстовое поле, fallback_reason — почему узкие поля страницы им не подходят. Вписать можно только принятое."""
         page = await kit.browser.page()
         url = page.url
+        if _off_target(job, url):
+            logger.warning("заполнение резюме на %s: раскладка на странице другого резюме отбита — %s",
+                           job.source.host, url)
+            return _OFF_TARGET_EDIT if job.editor_url else _OFF_TARGET_NEW
         inventory = await page_inventory(page)
         job.general |= {(url, item["selector"]) for item in items if item.get("fallback_reason")}
         refused = _unfit(job, url, items)
@@ -57,7 +66,29 @@ def fill_tools(kit: AgentKit, job: FillJob) -> list[Callable]:
                        job.source.host, ", ".join(labels))
         return "Заполнение остановлено: не хватает данных для обязательных полей. Заверши работу."
 
-    return [submit_layout, report_required_missing]
+    async def report_no_new_resume(reason: str) -> str:
+        """Сайт не даёт завести ещё одно резюме: ничего не заполняется, человеку — ошибка."""
+        job.outcome = Finished("no_new_resume", reason)
+        logger.warning("заполнение резюме на %s: сайт не даёт завести ещё одно — %s", job.source.host, reason)
+        return "Создание остановлено: сайт не даёт завести ещё одно резюме. Заверши работу."
+
+    if job.editor_url:
+        return [submit_layout, report_required_missing]
+    return [submit_layout, report_required_missing, report_no_new_resume]
+
+
+def _within(url: str, place: str) -> bool:
+    """Страница — это место или его продолжение: подстраница, шаг, якорь."""
+    return url == place or (url.startswith(place) and url[len(place)] in "/?&#")
+
+
+def _off_target(job: FillJob, url: str) -> bool:
+    """Открыто не то резюме. Перезапись идёт только внутри редактора своего
+    резюме, а редакторы прочих резюме закрыты и ей, и созданию нового: правка
+    не того резюме — худший исход, хуже ошибки."""
+    if job.editor_url and not _within(url, job.editor_url):
+        return True
+    return any(_within(url, other) for other in job.other_editors)
 
 
 def _known(job: FillJob, url: str, item: dict) -> bool:

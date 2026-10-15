@@ -4,22 +4,24 @@ import logging
 
 from backend.agent.jobs import Source
 from backend.flows.resume_fill import fill
-from backend.models import ProfileLanguage
-from tests.dbio import put, resume_marks
+from backend.models import Aggregator, ProfileLanguage
+from tests.dbio import only_row, put, resume_marks
 from tests.factories import profile_row
 from tests.factories_aggregators import aggregator_resume_row, aggregator_row
 from tests.fakes.agent import finish_step, resumes_step, scripted_kit
 
 FIRST = "https://hh.ru/resume/1"
 SECOND = "https://hh.ru/resume/2"
+FIRST_EDITOR = "https://hh.ru/resume/1/edit"
 
 
 async def _site(session_factory):
     site = aggregator_row(is_logged_in=True, can_add_resume=True)
     await put(session_factory, site)
-    first = aggregator_resume_row(site.id, title="Швея", url=FIRST)
+    first = aggregator_resume_row(site.id, title="Швея", url=FIRST, editor_url=FIRST_EDITOR)
     await put(session_factory, first,
-              aggregator_resume_row(site.id, title="Повар", url=SECOND, position=1, is_chosen=True))
+              aggregator_resume_row(site.id, title="Повар", url=SECOND, editor_url=SECOND + "/edit",
+                                    position=1, is_chosen=True))
     return site, first
 
 
@@ -105,7 +107,7 @@ async def test_the_fill_works_in_the_profile_of_its_site_able_to_save(make_pipel
     await fill(kit, Source.of(site), first.id)
 
     assert seen == [(("profile", site.id), True)]
-    assert FIRST in kit.run_session.plans[0].task
+    assert FIRST_EDITOR in kit.run_session.plans[0].task
 
 
 async def test_the_resume_is_written_in_the_language_of_the_person(make_pipeline, session_factory):
@@ -148,6 +150,37 @@ async def test_two_new_links_leave_the_mark_alone(make_pipeline, session_factory
 
     marks = await _marks(session_factory, site.id)
     assert marks["Кондитер"] is False and marks["Пекарь"] is False and marks["Повар"] is True
+
+
+async def test_overwriting_a_resume_without_its_editor_is_refused_before_the_agent(
+    make_pipeline, session_factory
+):
+    """Без адреса правки агенту пришлось бы искать её по сайту — так он и
+    приходил к созданию нового резюме вместо правки."""
+    site = aggregator_row(is_logged_in=True)
+    await put(session_factory, site)
+    bare = aggregator_resume_row(site.id, title="Швея", url=FIRST)
+    await put(session_factory, bare)
+    kit = scripted_kit(await make_pipeline(), [])
+
+    assert await fill(kit, Source.of(site), bare.id) == "no_editor"
+    assert kit.run_session.plans == []
+
+
+async def test_a_creation_the_site_refuses_marks_the_site_and_scans_nothing(
+    make_pipeline, session_factory
+):
+    site, _ = await _site(session_factory)
+
+    async def impossible(tools):
+        await tools["report_no_new_resume"](reason="одно резюме на аккаунт")
+        await tools["finish"](result="done")
+
+    kit = scripted_kit(await make_pipeline(), [impossible])
+
+    assert await fill(kit, Source.of(site), None) == "no_new_resume"
+    assert (await only_row(session_factory, Aggregator)).can_add_resume is False
+    assert len(kit.run_session.plans) == 1
 
 
 async def test_overwriting_a_resume_the_site_does_not_have_is_refused_before_the_agent(
