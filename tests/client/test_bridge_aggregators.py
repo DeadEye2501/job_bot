@@ -1,6 +1,7 @@
 """Домен «Агрегаторы»: перечень, заведение, удаление, включение, вход и обход."""
 
 import httpx
+import pytest
 
 from backend.agent.availability import NO_DRIVER
 from backend.bot.work import HUMAN_TIMEOUT_NOTE
@@ -415,6 +416,24 @@ async def test_rewriting_a_resume_without_its_editor_asks_to_refresh_the_list(
 
     assert await told() == {"message": "Не найден редактор резюме — обновите список резюме",
                             "danger": True}
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        ("extra_resume", "Вместо правки заведено новое резюме — удалите его на сайте"),
+        ("resume_lost", "Перезаписанное резюме не нашлось на сайте — обновите список резюме"),
+        ("not_created", "Новое резюме не появилось на сайте"),
+        ("many_created", "На сайте появилось больше одного нового резюме — проверьте список"),
+    ],
+)
+async def test_a_list_that_does_not_match_the_button_is_told_as_an_error(api, ask, with_bot, told, case):
+    outcome, message = case
+    with_bot(resume_fill=outcome)
+
+    await ask(api.aggregators.create_resume, 1)
+
+    assert await told() == {"message": message, "danger": True}
 
 
 async def test_a_new_resume_the_site_refuses_says_so(api, ask, with_bot, told, session_factory):

@@ -2175,7 +2175,7 @@
 - `WAY_UNKNOWN` = `'Этим способом на вакансию не откликнуться'`
 - `AGGREGATOR_REFUSALS` = `словарь из 5 и раскрытых`
 - `LOGIN_REFUSALS` = `словарь из 2 и раскрытых`
-- `FILL_REFUSALS` = `словарь из 4 и раскрытых`
+- `FILL_REFUSALS` = `словарь из 8 и раскрытых`
 - `RESUME_FILLED` = `'Резюме заполнено'`
 - `APPLY_VIA_REFUSALS` = `словарь из 7 и раскрытых`
 - `APPLY_ALL_REFUSALS` = `словарь из 3 и раскрытых`
@@ -2402,6 +2402,8 @@
 
 - `FIRST` = `'https://hh.ru/resume/1'`
 - `SECOND` = `'https://hh.ru/resume/2'`
+- `THIRD` = `'https://hh.ru/resume/3'`
+- `FOURTH` = `'https://hh.ru/resume/4'`
 - `FIRST_EDITOR` = `'https://hh.ru/resume/1/edit'`
 
 ### `tests/backend/test_llm_cv_response.py`
