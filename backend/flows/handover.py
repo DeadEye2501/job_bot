@@ -36,12 +36,26 @@ async def orphan_intake(pipeline, vacancy_id: int, intake: Intake) -> Intake:
     """Как вести брошенную недоразобранной строку: заведённую человеком — без передачи.
 
     Отдавать ли её откликателю, человек решал при заведении, и решение это
-    жило только в окне. Дочитывают такую строку двое — подбор недоразобранного
-    и обход канала, наткнувшийся на её перепост, — и правило у них одно.
+    жило только в окне. Дочитывают такую строку подбор недоразобранного и все,
+    кто наткнулся на её перепост, — обход канала и искатель, — и правило у них
+    одно (`finish_orphan`).
     """
     async with pipeline.session_factory() as session:
         by_hand = await made_by_hand(session, vacancy_id)
     return replace(intake, hands_over=False) if by_hand else intake
+
+
+async def finish_orphan(pipeline, vacancy_id: int, text: str, intake: Intake) -> bool:
+    """Дочитать брошенную недоразобранной строку этим текстом и провести дальше;
+    ответ — записан ли исход.
+
+    Текст бывает и чужой — перепост из другого источника: разбор идёт по нему
+    и с доводами зовущего, а ложится в ту строку — совпадение отпечатков
+    ручается, что тексты почти дословны. Полон ли текст, проверяет зовущий:
+    дочитывать шапкой без статьи нельзя.
+    """
+    intake = await orphan_intake(pipeline, vacancy_id, intake)
+    return await judge_and_hand_over(pipeline, vacancy_id, text, intake)
 
 
 async def to_apply(session_factory, vacancy_ids: list[int]) -> list[int]:

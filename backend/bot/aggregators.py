@@ -10,7 +10,7 @@ from backend.agent.jobs import Source
 from backend.agent.kit import AgentKit
 from backend.bot import slot, work
 from backend.flows.aggregator_login import log_in
-from backend.flows.aggregator_round import seek_source
+from backend.flows.aggregator_round import open_clean_profile, seek_source
 from backend.flows.aggregator_scan import scan
 from backend.flows.resume_fill import fill
 from backend.models import Aggregator
@@ -57,8 +57,7 @@ async def seek_all(bot, kit: AgentKit) -> None:
         web_search = await repo.web_search_id(session)
     if not sources:
         return
-    await kit.browser.open_profile(web_search)
-    await kit.browser.clear_cache()
+    await open_clean_profile(kit, web_search)
     for source in sources:
         await seek_source(kit, source)
 

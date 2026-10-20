@@ -70,13 +70,7 @@ async def _resume_or_skip(
         "[@%s] %d matched orphan vacancy %d, finishing parse",
         post.channel_username, post.msg.id, similar_id,
     )
-    # Брошенная строка могла прийти из другого канала (перепост): разбираем
-    # по тексту нынешнего поста и его каналу, а кладём в ту строку.
-    # Совпадение отпечатков ручается, что тексты почти дословны.
-    intake = await handover.orphan_intake(
-        pipeline, similar_id, Intake(channel=post.channel_username)
-    )
-    await handover.judge_and_hand_over(pipeline, similar_id, post.text, intake)
+    await handover.finish_orphan(pipeline, similar_id, post.text, Intake(channel=post.channel_username))
 
 
 async def ingest_post(

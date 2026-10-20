@@ -38,19 +38,6 @@ WITH_ARTICLE = "Senior QA https://telegra.ph/QA-08-21"
 """Пост, всё содержание которого вынесено в статью по ссылке."""
 
 
-@pytest.fixture
-def parses(monkeypatch):
-    """Подставной разбор объявления: список того, о чём его просили.
-
-    Общим домом (`fixtures/parse_stub`), а не своим телом: разъедься у копий
-    умолчание `allow_delete`, проверка про запрет зеленела бы на подделке, а
-    не на коде.
-    """
-    calls: list[tuple] = []
-    parse_into(monkeypatch, calls)
-    return calls
-
-
 async def _orphan_waiting_for_an_article(session_factory, created_at=None):
     """Заведённая, но не разобранная строка под пост со ссылкой на статью."""
     await put(session_factory, channel_row(username="jobs"))
@@ -195,7 +182,7 @@ async def test_a_refused_row_leaves_no_vector_behind(make_pipeline, session_fact
     assert pipeline.embeddings.ids.tolist() == [first]
 
 
-async def test_an_unfinished_vacancy_is_picked_up_later(parses,
+async def test_an_unfinished_vacancy_is_picked_up_later(parsed,
     make_pipeline, session_factory
 ):
     """Недоразобранная вакансия без ссылок на статью подбирается целиком.
@@ -209,12 +196,12 @@ async def test_an_unfinished_vacancy_is_picked_up_later(parses,
     pipeline = await make_pipeline(client)
 
     assert await pipeline.recover_orphan_vacancies() == 1
-    assert parses == [(1, "текст", "", True)]
+    assert parsed == [(1, "текст", "", True)]
     assert client.asked == [] and pipeline.applied == [[1]]
 
 
 async def test_a_new_post_goes_from_the_parse_to_the_applier(
-    parses, one_vector, make_pipeline, session_factory, monkeypatch
+    parsed, one_vector, make_pipeline, session_factory, monkeypatch
 ):
     await put(session_factory, channel_row(username="jobs"))
     channel = await only_row(session_factory, TelegramChannel)
@@ -228,7 +215,7 @@ async def test_a_new_post_goes_from_the_parse_to_the_applier(
 
 
 async def test_an_orphan_whose_article_arrived_is_judged_in_full(monkeypatch,
-    parses, make_pipeline, session_factory
+    parsed, make_pipeline, session_factory
 ):
     """Дочитанное объявление судят по свежему тексту, и мусор уже можно убрать.
 
@@ -243,12 +230,12 @@ async def test_an_orphan_whose_article_arrived_is_judged_in_full(monkeypatch,
     assert await pipeline.recover_orphan_vacancies() == 1
 
     whole = f"{WITH_ARTICLE}\n\nТребования: Python"
-    assert parses == [(1, whole, "jobs", True)]
+    assert parsed == [(1, whole, "jobs", True)]
     assert (await only_row(session_factory, Vacancy)).raw_text == whole
 
 
 async def test_a_dug_out_article_moves_the_fingerprint_too(monkeypatch,
-    parses, one_vector, make_pipeline, session_factory
+    parsed, one_vector, make_pipeline, session_factory
 ):
     """Дочитанная статья двигает и отпечаток строки.
 
@@ -274,7 +261,7 @@ async def test_a_dug_out_article_moves_the_fingerprint_too(monkeypatch,
 
 
 async def test_an_orphan_still_without_its_article_waits_on(monkeypatch,
-    parses, make_pipeline, session_factory
+    parsed, make_pipeline, session_factory
 ):
     """Объявление, статья которого так и не пришла, ждёт дальше — приговора нет.
 
@@ -287,11 +274,11 @@ async def test_an_orphan_still_without_its_article_waits_on(monkeypatch,
     pipeline = await make_pipeline(WithMessages(post=post(42, text=WITH_ARTICLE)))
 
     assert await pipeline.recover_orphan_vacancies() == 0
-    assert parses == []
+    assert parsed == []
 
 
 async def test_an_orphan_that_waited_too_long_is_judged_as_it_is(monkeypatch,
-    parses, make_pipeline, session_factory
+    parsed, make_pipeline, session_factory
 ):
     """Прождавшее статью дольше срока объявление судят по тому, что есть.
 
@@ -306,19 +293,19 @@ async def test_an_orphan_that_waited_too_long_is_judged_as_it_is(monkeypatch,
     pipeline = await make_pipeline(WithMessages(post=post(42, text=WITH_ARTICLE)))
 
     assert await pipeline.recover_orphan_vacancies() == 1
-    assert parses == [(1, WITH_ARTICLE, "jobs", False)]
+    assert parsed == [(1, WITH_ARTICLE, "jobs", False)]
 
 
-async def test_a_parsed_vacancy_is_not_picked_up(parses, make_pipeline, session_factory):
+async def test_a_parsed_vacancy_is_not_picked_up(parsed, make_pipeline, session_factory):
     """Разобранная вакансия повторно не подбирается."""
     await put(session_factory, vacancy_row(title="готова", is_parsed=True, raw_text="т"))
     pipeline = await make_pipeline()
 
     assert await pipeline.recover_orphan_vacancies() == 0
-    assert parses == []
+    assert parsed == []
 
 
-async def test_a_vacancy_without_text_cannot_be_picked_up(parses,
+async def test_a_vacancy_without_text_cannot_be_picked_up(parsed,
     make_pipeline, session_factory
 ):
     """Недоразобранная вакансия без текста не подбирается: разбирать нечего."""
@@ -326,7 +313,7 @@ async def test_a_vacancy_without_text_cannot_be_picked_up(parses,
     pipeline = await make_pipeline()
 
     assert await pipeline.recover_orphan_vacancies() == 0
-    assert parses == []
+    assert parsed == []
 
 
 async def test_one_broken_orphan_does_not_stop_the_rest(monkeypatch,
@@ -348,7 +335,7 @@ async def test_one_broken_orphan_does_not_stop_the_rest(monkeypatch,
     assert [text for _, text, *_ in calls] == ["вторая"]
 
 
-async def test_the_window_hears_about_the_recovery(parses, make_pipeline, session_factory):
+async def test_the_window_hears_about_the_recovery(parsed, make_pipeline, session_factory):
     """Окно узнаёт о подборе и о его завершении.
 
     Подбор идёт до обхода каналов; без гашения полосы следующая стадия
@@ -364,7 +351,7 @@ async def test_the_window_hears_about_the_recovery(parses, make_pipeline, sessio
     assert heard == [("recover", "Разбор отложенных", 0, 1), ("recover", "", 0, 0)]
 
 
-async def test_the_sweep_does_not_eat_the_whole_turn(parses, make_pipeline, session_factory):
+async def test_the_sweep_does_not_eat_the_whole_turn(parsed, make_pipeline, session_factory):
     """Подбор берёт за оборот не больше горсти строк, сколько бы их ни ждало.
 
     Идёт он перед обходом каналов, и каждая ждущая строка стоит похода в
@@ -382,7 +369,7 @@ async def test_the_sweep_does_not_eat_the_whole_turn(parses, make_pipeline, sess
     pipeline = await make_pipeline()
 
     assert await pipeline.recover_orphan_vacancies() == rerun.RECOVERED_PER_TURN
-    assert len(parses) == rerun.RECOVERED_PER_TURN
+    assert len(parsed) == rerun.RECOVERED_PER_TURN
 
 
 async def test_a_row_the_parse_gave_up_on_is_not_counted(monkeypatch,

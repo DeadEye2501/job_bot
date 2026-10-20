@@ -301,8 +301,9 @@
   - `source: Source`
   - `limit: int`
   - `submitted: int` = `0`
-  - `found: list[int]` = `field(default_factory=list)`
   - `refused: bool` = `False`
+  - `nested: bool` = `False`
+  - `stopper: Exception | None` = `None`
   - `outcome: Outcome | None` = `None`
 - `class ApplyJob`
   - `vacancy_id: int`
@@ -465,9 +466,13 @@
 
 ### `backend/agent/tools_seeker.py`
 
+- `logger` = `logging.getLogger(__name__)`
 - `WHAT` = `'найденная агентом вакансия'`
 - `BARRED` = `'сайт в чёрном списке человека'`
 - `TELEGRAM_OWN` = `'у Telegram свой обход'`
+- `STOPPED` = `'Работа остановлена: заверши сессию — finish с r…`
+- `LIMIT_REACHED` = `'предел исчерпан; заверши работу: finish с resul…`
+- `BACK` = `'вкладка могла уйти: вернись к выдаче — browser_…`
 - `class _Page`
   - `text: str`
   - `url: str`
@@ -960,10 +965,6 @@
 - `class Judged`
   - `stored: bool`
   - `fresh_hr: HR | None` = `None`
-
-### `backend/flows/parse_queue.py`
-
-- `logger` = `logging.getLogger(__name__)`
 
 ### `backend/flows/parse_write.py`
 
