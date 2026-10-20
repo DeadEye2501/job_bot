@@ -18,6 +18,7 @@ import logging
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.domain.hosts import vacancy_address_key
 from backend.models import (
     Application,
     Message,
@@ -94,6 +95,28 @@ async def source_seen(session: AsyncSession, aggregator_id: int, key: str) -> bo
         Vacancy.source_aggregator_id == aggregator_id, Vacancy.source_key == key
     ).limit(1))
     return stored is not None or await source_trashed(session, aggregator_id, key)
+
+
+async def vacancy_at_address(session: AsyncSession, url: str) -> int | None:
+    """Вакансия, чей собственный адрес — та же страница; пусто — такой нет.
+
+    Сравниваются только собственные адреса строк (`source_url`): ссылки в
+    тексте и контактах — упоминания, а не страница вакансии. Из нескольких —
+    первая по номеру: повтор, заведённый раньше, всё равно та же вакансия.
+
+    Ключ считается на лету по каждой строке, а не хранится колонкой: колонка
+    стала бы третьим ключом источника рядом с `source_key` и парой канала, а
+    строк в базе — сотни.
+    """
+    key = vacancy_address_key(url)
+    if key is None:
+        return None
+    rows = await session.execute(
+        select(Vacancy.id, Vacancy.source_url)
+        .where(Vacancy.source_url.is_not(None))
+        .order_by(Vacancy.id)
+    )
+    return next((vid for vid, own in rows if vacancy_address_key(own) == key), None)
 
 
 async def _trash_noted(session: AsyncSession, mark: TrashEvent) -> bool:

@@ -3,7 +3,69 @@
 
 import pytest
 
-from backend.domain.hosts import AddressParts, address_parts, host_owns, site_label, source_key
+from backend.domain.hosts import (
+    AddressParts,
+    address_parts,
+    host_owns,
+    site_label,
+    source_key,
+    vacancy_address_key,
+)
+
+_LEVER_UUID = "0f6a9c3e-1b2d-4e5f-8a7b-9c0d1e2f3a4b"
+
+
+@pytest.mark.parametrize(("url", "key"), [
+    pytest.param("https://hh.ru/vacancy/123", "hh:123", id="hh"),
+    pytest.param("http://spb.hh.ru/vacancy/123/?utm_source=tg&from=main", "hh:123",
+                 id="hh с поддоменом, метками, http и косой"),
+    pytest.param("https://career.habr.com/vacancies/1000150", "habr:1000150", id="Habr Career"),
+    pytest.param("https://geekjob.ru/vacancy/6AD0B496115D80A7CD04E2B6", "geekjob:6ad0b496115d80a7cd04e2b6",
+                 id="GeekJob"),
+    pytest.param("https://getmatch.ru/vacancies/24081-python-developer", "getmatch:24081", id="getmatch"),
+    pytest.param("https://www.linkedin.com/jobs/view/4012345678/", "linkedin:4012345678", id="LinkedIn"),
+    pytest.param("https://www.linkedin.com/jobs/search/?currentJobId=4012345678&keywords=python",
+                 "linkedin:4012345678", id="LinkedIn в выдаче"),
+    pytest.param("https://job-boards.greenhouse.io/acme/jobs/8240119", "greenhouse:8240119", id="Greenhouse"),
+    pytest.param("https://boards.greenhouse.io/acme/jobs/8240119?gh_src=board", "greenhouse:8240119",
+                 id="Greenhouse со старого адреса"),
+    pytest.param(f"https://jobs.lever.co/acme/{_LEVER_UUID.upper()}/apply", f"lever:{_LEVER_UUID}",
+                 id="Lever с хвостом и в другом регистре"),
+    pytest.param(f"https://jobs.ashbyhq.com/acme/{_LEVER_UUID}", f"ashby:{_LEVER_UUID}", id="Ashby"),
+    pytest.param("https://acme.test/careers?gh_jid=8240119", "acme.test:gh:8240119",
+                 id="Greenhouse на сайте компании"),
+    pytest.param("https://t.me/s/Jobs_Channel/15", "tg:jobs_channel:15", id="пост Telegram"),
+    pytest.param("https://t.me/c/1234567/15", "tg:1234567:15", id="пост закрытого канала"),
+])
+def test_a_vacancy_page_on_a_known_platform_is_keyed_by_its_number(url, key):
+    """Один адрес такого вида — одна страница — одна вакансия: метки прихода,
+    поддомен, схема и косая в конце номера не меняют."""
+    assert vacancy_address_key(url) == key
+
+
+@pytest.mark.parametrize("url", [
+    pytest.param("https://acme.test/careers/python", id="сайт компании"),
+    pytest.param("https://telegra.ph/Senior-QA-08-21", id="статья Telegraph"),
+    pytest.param("https://hh.ru/employer/1455", id="страница площадки без вакансии"),
+    pytest.param("https://t.me/jobs_channel", id="канал без поста"),
+    pytest.param("hr@acme.test", id="почта"),
+])
+def test_an_address_without_a_vacancy_number_has_no_key(url):
+    """Что однозначно не определить, того и не сравнивают: ложный повтор хуже
+    пропущенного."""
+    assert vacancy_address_key(url) is None
+
+
+def test_two_numbers_on_one_platform_are_two_keys():
+    assert vacancy_address_key("https://hh.ru/vacancy/1") != vacancy_address_key("https://hh.ru/vacancy/2")
+
+
+def test_the_european_greenhouse_is_a_platform_of_its_own():
+    """Общий ли у европейского экземпляра счёт номеров с основным, по адресу
+    не сказать: один номер на двух экземплярах — две вакансии."""
+    us = vacancy_address_key("https://job-boards.greenhouse.io/acme/jobs/8240119")
+    eu = vacancy_address_key("https://job-boards.eu.greenhouse.io/acme/jobs/8240119")
+    assert us != eu
 
 
 def test_an_address_splits_into_its_host_and_the_rest():

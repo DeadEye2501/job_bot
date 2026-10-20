@@ -1,8 +1,17 @@
-"""Заглавная буква в названии компании."""
+"""Заглавная буква в названии компании — и начало адреса, с которым её не путают."""
 
 import re
 
 ADDRESS_START_RE = re.compile(r"^[a-z][a-z0-9+.\-]*://", re.IGNORECASE)
+
+
+def without_scheme(url: str) -> str:
+    """Адрес без схемы и косых черт перед хостом; регистр не трогается.
+
+    Живёт рядом с началом адреса, а не с разбором хоста: им пользуются и хосты,
+    и ссылки Telegram, а хосты сами разбирают ссылки Telegram.
+    """
+    return ADDRESS_START_RE.sub("", url.strip()).lstrip("/")
 
 
 def capitalized_company_name(name: str | None) -> str | None:

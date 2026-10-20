@@ -714,6 +714,13 @@
   - `query: str`
   - `fragment: str`
 - `_ZONE_SECOND_LEVELS` = `frozenset({'co', 'com', 'net', 'org', 'ac', 'gov…`
+- `class VacancyPage(NamedTuple)`
+  - `platform: str`
+  - `host: str`
+  - `path: re.Pattern`
+  - `query: str | None` = `None`
+- `_UUID` = `'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}…`
+- `VACANCY_PAGES` = `набор из 9`
 
 ### `backend/domain/image_types.py`
 
@@ -804,6 +811,11 @@
 - `_TG_USERNAME_RE` = `re.compile('^[A-Za-z][A-Za-z0-9_]{4,31}$')`
 - `_TG_TYPED_USERNAME_RE` = `re.compile('^[A-Za-z][A-Za-z0-9_]{3,31}$')`
 - `_TG_RESERVED_PATHS` = `набор из 6`
+- `class PostAddress`
+  - `channel: str | None`
+  - `private_id: int | None`
+  - `msg_id: int`
+- `_POST_PATH_RE` = `re.compile('(?:c/(?P<private>\\d+)|(?P<nick>[^/]…`
 - `class DialogPeer`
   - `peer_id: int`
   - `username: str | None` = `None`
@@ -2388,6 +2400,10 @@
 
 - `IDS` = `np.array([10, 20, 30])`
 - `MATRIX` = `np.array([[1.0, 0.0], [0.0, 1.0], [0.9, 0.1]], d…`
+
+### `tests/backend/test_domain_hosts.py`
+
+- `_LEVER_UUID` = `'0f6a9c3e-1b2d-4e5f-8a7b-9c0d1e2f3a4b'`
 
 ### `tests/backend/test_domain_transitions.py`
 

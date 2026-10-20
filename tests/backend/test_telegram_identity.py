@@ -5,10 +5,33 @@ import pytest
 from backend.domain.telegram_identity import (
     ARTICLE_URL_RE,
     DialogPeer,
+    PostAddress,
     hrs_to_catch_up,
     normalize_username,
+    post_address,
     typed_username,
 )
+
+
+@pytest.mark.parametrize(("url", "address"), [
+    pytest.param("https://t.me/Jobs_Channel/15", PostAddress("jobs_channel", None, 15), id="пост"),
+    pytest.param("t.me/s/jobs_channel/15/", PostAddress("jobs_channel", None, 15), id="веб-просмотр"),
+    pytest.param("https://telegram.me/jobs_channel/15?single", PostAddress("jobs_channel", None, 15),
+                 id="второй домен и хвост"),
+    pytest.param("https://t.me/c/1234567/15", PostAddress(None, 1234567, 15), id="закрытый канал"),
+])
+def test_a_post_link_names_its_channel_and_number(url, address):
+    assert post_address(url) == address
+
+
+@pytest.mark.parametrize("url", [
+    pytest.param("https://t.me/jobs_channel", id="канал без поста"),
+    pytest.param("https://t.me/joinchat/15", id="служебный путь"),
+    pytest.param("https://hh.ru/jobs_channel/15", id="чужой сайт"),
+    pytest.param("https://t.me/iv?url=https://telegra.ph/QA&rhash=1", id="Instant View"),
+])
+def test_a_link_that_is_not_a_post_has_no_post_address(url):
+    assert post_address(url) is None
 
 
 @pytest.mark.parametrize(

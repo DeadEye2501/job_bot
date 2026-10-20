@@ -1,9 +1,11 @@
 """Разбор адреса: нормальный хост, имя сайта, остаток, принадлежность сайту, номер страницы."""
 
+import re
 from typing import NamedTuple
 from urllib.parse import parse_qsl, urlsplit
 
-from backend.domain.company_names import ADDRESS_START_RE
+from backend.domain.company_names import without_scheme
+from backend.domain.telegram_identity import post_address
 
 
 class AddressParts(NamedTuple):
@@ -20,7 +22,7 @@ def normalize_host(url: str | None) -> str:
     `yandex.ru` (subsidiary trap)."""
     if not url:
         return ""
-    s = _without_scheme(url.lower())
+    s = without_scheme(url.lower())
     # Срезаем path / query / fragment ДО того, как лезть в port:
     # "sber.ru?utm=foo" без strip-а query превратился бы в host
     # "sber.ru?utm=foo" и сломал бы host-match.
@@ -42,7 +44,7 @@ def address_parts(url: str) -> AddressParts:
     Хост даёт `normalize_host`, а не `urlsplit`: тот оставил бы порт,
     завершающую точку и регистр, и одна ссылка получила бы два хоста.
     """
-    text = _without_scheme(url)
+    text = without_scheme(url)
     try:
         parts = urlsplit("//" + text)
     except ValueError:
@@ -117,6 +119,80 @@ def source_key(url: str, aggregator_host: str | None) -> str | None:
     return parts.path + numbering if host_owns(aggregator_host, parts.host) else None
 
 
+class VacancyPage(NamedTuple):
+    """Вид страницы вакансии на площадке: номер вакансии лежит в пути или в
+    параметре адреса."""
+
+    platform: str
+    host: str
+    path: re.Pattern
+    query: str | None = None
+
+
+_UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+
+VACANCY_PAGES = (
+    VacancyPage("hh", "hh.ru", re.compile(r"vacancy/(\d+)")),
+    VacancyPage("habr", "habr.com", re.compile(r"vacancies/(\d+)")),
+    VacancyPage("geekjob", "geekjob.ru", re.compile(r"vacancy/([0-9a-f]+)", re.I)),
+    VacancyPage("getmatch", "getmatch.ru", re.compile(r"vacancies/(\d+)-.*")),
+    VacancyPage("linkedin", "linkedin.com", re.compile(r"jobs/view/(\d+)"), "currentJobId"),
+    VacancyPage("greenhouse-eu", "eu.greenhouse.io", re.compile(r"[^/]+/jobs/(\d+)"), "gh_jid"),
+    VacancyPage("greenhouse", "greenhouse.io", re.compile(r"[^/]+/jobs/(\d+)"), "gh_jid"),
+    VacancyPage("lever", "lever.co", re.compile(rf"[^/]+/({_UUID})(?:/.*)?", re.I)),
+    VacancyPage("ashby", "ashbyhq.com", re.compile(rf"[^/]+/({_UUID})(?:/.*)?", re.I)),
+)
+"""Площадки, у которых одна страница вакансии — один номер.
+
+Хост — тот, которому принадлежат страницы (`host_owns`): поддомены вроде
+`spb.hh.ru` и `job-boards.greenhouse.io` — та же площадка. Строки сверяются по
+порядку, первая подходящая и решает: у Greenhouse для Европы свой экземпляр, и
+общий ли у него счёт номеров с основным, по адресу не сказать — поэтому он
+стоит выше своей площадкой.
+"""
+
+
+def vacancy_address_key(url: str) -> str | None:
+    """Ключ собственного адреса вакансии; пусто — однозначного ключа у адреса нет.
+
+    Ключ — площадка и номер вакансии на ней, поэтому одна страница, записанная
+    по-разному, даёт один ключ: метки прихода, поддомен, схема и косая в конце
+    его не меняют. Адрес не по виду площадки — сайт компании, статья, страница
+    без номера — ключа не получает: ложный повтор отказал бы человеку в новой
+    вакансии, а пропущенный только заведёт вторую строку.
+
+    `gh_jid` на сайте компании — номер Greenhouse, встроенного в чужую
+    страницу; ключ ему пишется вместе с хостом сайта, потому что общий ли этот
+    номер у разных сайтов, по адресу не сказать.
+
+    Пост Telegram ключуется ником канала, как его записывает приём: ник может
+    перейти к другому каналу, но тот же номер поста у нового владельца — случай,
+    которого ждать не приходится.
+    """
+    post = post_address(url)
+    if post is not None:
+        return f"tg:{post.channel or post.private_id}:{post.msg_id}"
+    parts = address_parts(url)
+    if not parts.host:
+        return None
+    query = dict(parse_qsl(parts.query))
+    for page in VACANCY_PAGES:
+        if host_owns(page.host, parts.host):
+            number = _page_number(page, parts.path, query)
+            return f"{page.platform}:{number.lower()}" if number else None
+    jid = query.get("gh_jid", "")
+    return f"{parts.host}:gh:{jid}" if jid.isdigit() else None
+
+
+def _page_number(page: VacancyPage, path: str, query: dict[str, str]) -> str | None:
+    """Номер вакансии со страницы площадки: из пути, иначе из параметра."""
+    match = page.path.fullmatch(path)
+    if match is not None:
+        return match[1]
+    number = query.get(page.query, "") if page.query else ""
+    return number if number.isdigit() else None
+
+
 def is_arrival_mark(name: str) -> bool:
     """Параметр адреса, который говорит, откуда пришли, а не на что смотрят.
 
@@ -141,8 +217,3 @@ def _numbering(query: str) -> str:
         if not is_arrival_mark(low) and ("id" in low or value.isdigit()):
             kept.append(f"{name}={value}")
     return "?" + "&".join(sorted(kept)) if kept else ""
-
-
-def _without_scheme(url: str) -> str:
-    """Адрес без схемы и косых черт перед хостом; регистр не трогается."""
-    return ADDRESS_START_RE.sub("", url.strip()).lstrip("/")
