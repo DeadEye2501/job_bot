@@ -20,10 +20,11 @@ import logging
 from concurrent.futures import CancelledError
 from typing import Any, Callable, Coroutine
 
+from backend.bot.work import TOLD
 from backend.incoming import int_or_none
 from client.bridge.events import Events
 from client.bridge.payload import _log_invalid_payload
-from client.bridge.refusals import NO_BOT
+from client.bridge.refusals import CALM, NO_BOT
 from client.bridge.runner import AsyncRunner
 
 
@@ -192,9 +193,15 @@ def launched(
     Работа принимается вызываемым, а не готовой корутиной: на погашенном
     моторе её никто не станет ждать, и она осталась бы висеть неисполненной.
 
+    Весть несёт метку кнопки (`action`): окно, ждущее свою весть, узнаёт её
+    по метке. Работа, ответившая `told`, свой исход окну уже сказала по ходу
+    — вторая весть по концу ей не нужна.
+
     Собирающий обязан держать `runner` и `events` — оба берутся из хозяйства
     окна, и другого хозяйства у моста нет.
     """
+    labels = {"action": started["action"]} if "action" in started else {}
+
     async def report() -> None:
         try:
             status = await work()
@@ -204,7 +211,8 @@ def launched(
         except Exception:
             logger.exception("bridge: launched job failed")
             status = "error"
-        finished(hub.events, status, refusals, done)
+        if status != TOLD:
+            finished(hub.events, status, refusals, done, **labels)
 
     try:
         hub.runner.submit(report())
@@ -230,7 +238,9 @@ def launched_on_bot(
     return launched(hub, lambda: start(bot), refusals, done, **started)
 
 
-def finished(events: Events, status: str, refusals: dict[str, str], done: str) -> None:
+def finished(
+    events: Events, status: str, refusals: dict[str, str], done: str, **labels: Any
+) -> None:
     """Сказать окну, чем кончилась пущенная работа.
 
     Пара к `launched`: ответ на зов сказал только «пущено», и всё остальное
@@ -240,12 +250,17 @@ def finished(events: Events, status: str, refusals: dict[str, str], done: str) -
     обязан быть ключ `error`: исходы заводит бэкенд, и новый появляется там
     раньше, чем перевод к нему здесь, а промолчи мы, человек остался бы без
     ответа вовсе.
+
+    Метки (`labels`) ложатся в весть как есть, и только названные: чья она и о
+    какой вакансии. Красной плашкой идёт всякий исход, кроме удачи и того, что
+    не беда (`CALM`).
     """
     ok = status == "ok"
     events.add(
         "action_finished",
         {
             "message": done if ok else refusals.get(status, refusals["error"]),
-            "danger": not ok,
+            "danger": not ok and status not in CALM,
+            **labels,
         },
     )

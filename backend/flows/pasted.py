@@ -2,35 +2,26 @@
 
 Найденное глазами — на бирже, в почте, по наводке — бот не принесёт никогда,
 а вести по воронке его надо тем же экраном. Текст объявления человек приносит
-сам, и дальше строка идёт обычной дорогой: отпечаток, отсев уже заведённого,
-разбор моделью, балл и приговор.
+сам, и дальше строка идёт дорогой заведённой человеком: отпечаток, разбор
+моделью и балл, но без приговора и без слияния с похожими.
 
-От соседнего `ingest.py` отличается источником, и только им: там пост канала с
-номером и курсором, здесь — голый текст. Статьи по ссылкам дописывает обоим
-одна склейка. Всё, что о
+От соседнего `ingest.py` отличается источником и тем, кто завёл: там пост
+канала с номером и курсором, найденный обходом, здесь — голый текст от
+человека. Статьи по ссылкам дописывает обоим одна склейка. Всё, что о
 происхождении знал приём поста, здесь не знают вовсе, и выдумывать это нельзя:
 проставленный наугад канал сделал бы строку чужой статистикой.
 """
 
 import logging
 from datetime import datetime
-from typing import Literal
 
-from backend.flows import embeddings, handover, intake, linked_article, sameness
+from backend.flows import embeddings, handover, intake, linked_article
+from backend.flows.hand_outcome import tell
 from backend.flows.handover import Intake
 from backend.models import Vacancy
 from backend.repository.vacancies_new import HAND_MADE
 
 logger = logging.getLogger(__name__)
-
-PastedIntakeOutcome = Literal["ok", "duplicate", "embed", "llm", "trash", "article"]
-"""Чем кончился приём вставленного текста.
-
-Словами, а не «да/нет»: молчащий поставщик отпечатков, уже заведённое
-объявление, не дошедший разбор, снесённый разбором мусор, не скачавшаяся статья
-и удача — разные вести человеку, и различить их после того, как ответ сведён к
-признаку, уже нечем.
-"""
 
 WHAT = "вставленный текст"
 """Чей текст не посчитался — так это назовут в журнале.
@@ -41,14 +32,9 @@ WHAT = "вставленный текст"
 
 
 async def ingest_pasted_text(
-    pipeline, text: str, posted_at: datetime | None
-) -> PastedIntakeOutcome:
-    """Завести вакансию по вставленному тексту; сказать, чем это кончилось.
-
-    Ответ словом, а не номером строки: зовущий отвечает человеку фразой, и
-    беды у этой работы четыре — статья по ссылке не скачалась, поставщик
-    отпечатков молчит, объявление уже заведено, разбор не задался. Номер
-    человеку не нужен: строка появляется в списке сама.
+    pipeline, text: str, posted_at: datetime | None, hands_over: bool
+) -> None:
+    """Завести вакансию по вставленному тексту; итог окну — вестью (`tell`).
 
     Статьи дочитываются первыми, как у поста канала: отпечаток, строка и
     разбор идут по полному тексту. Не скачалась — строка не заводится вовсе:
@@ -57,77 +43,32 @@ async def ingest_pasted_text(
 
     Отпечаток считается до записи: без него строка вышла бы из отсева
     перепостов, и то же объявление, пришедшее следом из канала, завелось бы
-    второй раз.
+    второй раз. Похожую заведённую он не ищет: сходство однозначного повтора
+    не даёт, и вставленное человеком заводится своей строкой, а с чужой
+    брошенной не сливается — её доберёт подбор недоразобранного.
 
-    Своя строка заводится заведённой человеком: разбор её не судит и не
-    сносит. Снести может только чужую брошенную строку, которую вставленный
-    текст дочитывает (`_finish_or_refuse`).
+    Отдавать ли откликателю (`hands_over`), решал человек переключателем окна.
+
+    Нижняя полоса показывает разбор с нулями — «шкала неизвестна»: сколько
+    шагов займёт разбор одного объявления, заранее не знает никто.
     """
+    pipeline.emit_progress("pasted", "Разбор объявления", 0, 0)
     text, whole = await linked_article.with_linked_articles(text)
     if not whole:
         logger.info("%s: статья по ссылке не скачалась, не заведено", WHAT)
-        return "article"
-    try:
-        match = await sameness.known_or_new(pipeline, text, WHAT)
-    except embeddings.ProviderIsSilent:
-        logger.warning("%s: поставщик отпечатков молчит", WHAT)
-        return "embed"
-    if match is None:
-        return "embed"
-    if match.kind != "new":
-        return await _finish_or_refuse(pipeline, match, text)
-
-    vacancy_id = await _save_pasted_vacancy(pipeline, text, match.embedding, posted_at)
-    return await _parsed(pipeline, vacancy_id, text)
-
-
-async def _finish_or_refuse(
-    pipeline, match: sameness.Match, text: str
-) -> PastedIntakeOutcome:
-    """Что делать со вставленным текстом уже знакомого объявления.
-
-    Знакомая строка бывает двух родов, и приём поста канала разводит их так
-    же: настоящий повтор — про него говорят человеку, — и вакансия, брошенная
-    недоразобранной. Вторую дорзабирают вставленным текстом: сказав про неё
-    «уже заведено», человека послали бы искать в списке строку, которой там
-    нет — показывают только разобранные.
-    """
-    if match.kind == "parsed":
-        logger.info("%s: уже заведено вакансией %d", WHAT, match.vacancy_id)
-        return "duplicate"
-    logger.info("%s: дочитывает брошенную вакансию %d", WHAT, match.vacancy_id)
-    return await _parsed(pipeline, match.vacancy_id, text)
-
-
-async def _parsed(pipeline, vacancy_id: int, text: str) -> PastedIntakeOutcome:
-    """Разобрать строку и сказать, вышло ли.
-
-    Слепки конвейера перечитываются перед разбором — так же, как это делают
-    обход каналов и прогон заново: наполняет их только перечитывание, а зовут
-    его не во всяком режиме бота. Разбери по пустым, и балл выйдет нулевым,
-    чёрный список не сработает вовсе, а о пригодности рассудят по анкете, в
-    которой ничего нет.
-
-    Удачей не зовут два исхода. Не дошедший разбор — строка осталась
-    неразобранной, а показывают только разобранные. И снесённая разбором
-    чужая брошенная строка: «дошло» он отвечает и там, где сам убрал её как
-    рекламу, пост соискателя или пустышку. Оба раза «объявление заведено»
-    послало бы человека искать то, чего он не найдёт.
-    """
+        tell(pipeline, "article")
+        return
+    embedding = await embeddings.embed_or_none(pipeline, text, WHAT)
+    if embedding is None:
+        tell(pipeline, "embed")
+        return
+    vacancy_id = await _save_pasted_vacancy(pipeline, text, embedding, posted_at)
+    # Слепки перечитываются перед разбором: наполняет их только перечитывание,
+    # а зовут его не во всяком режиме бота, и балл по пустым вышел бы нулевым.
     await pipeline.reload_resources()
-    if not await handover.judge_and_hand_over(pipeline, vacancy_id, text, Intake()):
-        return "llm"
-    return "ok" if await _still_there(pipeline, vacancy_id) else "trash"
-
-
-async def _still_there(pipeline, vacancy_id: int) -> bool:
-    """Осталась ли строка в базе после разбора.
-
-    Иначе не отличить: разбор отвечает «дошло» и когда записал поля, и когда
-    снёс непригодное, а человеку это две разные вести.
-    """
-    async with pipeline.session_factory() as session:
-        return await session.get(Vacancy, vacancy_id) is not None
+    await handover.judge_and_hand_over(
+        pipeline, vacancy_id, text, Intake(hands_over=hands_over, tells_window=True)
+    )
 
 
 async def _save_pasted_vacancy(

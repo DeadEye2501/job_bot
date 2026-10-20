@@ -10,7 +10,7 @@
 import asyncio
 import logging
 
-from client.bridge.answer import reply
+from client.bridge.answer import launched, reply
 
 
 async def test_a_rejected_payload_never_lands_in_the_journal(api, ask, caplog):
@@ -47,6 +47,28 @@ async def test_a_missing_field_is_named_in_the_journal(api, ask, caplog):
     written = "\n".join(record.getMessage() for record in caplog.records)
     assert "vacancy_id" in written
     assert "без вакансии" not in written
+
+
+async def test_a_job_that_told_the_window_itself_sends_no_second_word(hub, ask, heard):
+    """Работа, сказавшая окну исход по ходу, по концу второй вести не шлёт."""
+
+    async def told_already() -> str:
+        return "told"
+
+    await ask(lambda: launched(hub, told_already, {"error": "беда"}, "готово", action="x"))
+
+    assert await heard() is None
+
+
+async def test_the_word_of_a_launched_job_carries_its_label(hub, ask, heard):
+    """Весть по концу работы несёт метку пустившей её кнопки: окно ждёт свою."""
+
+    async def done() -> str:
+        return "ok"
+
+    await ask(lambda: launched(hub, done, {"error": "беда"}, "готово", action="parse_cv"))
+
+    assert await heard() == {"message": "готово", "danger": False, "action": "parse_cv"}
 
 
 async def test_a_broken_job_comes_back_named_on_the_new_road(runner, ask, caplog):

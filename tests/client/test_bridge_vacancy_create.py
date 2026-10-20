@@ -5,6 +5,7 @@
 у двух заведений нет ничего, кроме таблицы.
 """
 
+from backend.flows.hand_made import HandRequest
 from tests.dbio import put
 from tests.factories import company_row, hr_row, profile_row, profile_skill_row
 
@@ -167,12 +168,14 @@ async def test_pasted_text_goes_to_the_bot_without_waiting_for_the_parser(
     answer = await ask(api.vacancies.create_from_text, {"raw_text": "Ищем флориста"})
 
     assert answer["ok"]["started"] is True
-    assert [call for call in bot.calls if call[0] == "ui_ingest_pasted_text"] == [
-        ("ui_ingest_pasted_text", "Ищем флориста", None)
-    ]
-    # Об удаче человеку говорят вестью, а не ответом на зов: к её приходу окно
-    # уже закрыто, и другого способа сказать «получилось» нет.
-    assert await told() == {"message": "Объявление заведено", "danger": False}
+    assert _requests(bot) == [HandRequest("text", "Ищем флориста", None, False)]
+    # Чем кончилось, бот говорит вестью сам, до отклика; второй вести по концу
+    # работы нет — исход уже сказан.
+    assert await told() is None
+
+
+def _requests(bot) -> list:
+    return [call[1] for call in bot.calls if call[0] == "ui_ingest_pasted_text"]
 
 
 async def test_the_named_publication_date_reaches_the_bot(api, ask, with_bot):
@@ -189,10 +192,31 @@ async def test_the_named_publication_date_reaches_the_bot(api, ask, with_bot):
         {"raw_text": "Ищем сварщика", "posted_at": "2026-08-20"},
     )
 
-    _, _, when = next(
-        call for call in bot.calls if call[0] == "ui_ingest_pasted_text"
-    )
-    assert when.date().isoformat() == "2026-08-20"
+    (request,) = _requests(bot)
+    assert request.posted_at.date().isoformat() == "2026-08-20"
+
+
+async def test_the_switch_reaches_the_bot_as_the_window_shows_it(api, ask, with_bot):
+    bot = with_bot()
+
+    await ask(api.vacancies.create_from_text, {"raw_text": "Ищем повара", "hands_over": True})
+
+    (request,) = _requests(bot)
+    assert request.hands_over is True
+
+
+async def test_fields_to_be_handed_over_go_to_the_bot(api, ask, with_bot):
+    """С включённым переключателем поля заводит бот: отклик идёт через место
+    прогона. Ответ — «пущено», итог — вестью."""
+    bot = with_bot()
+
+    answer = await ask(api.vacancies.create, {"title": "Python", "hands_over": True})
+
+    assert answer["ok"]["started"] is True
+    (request,) = _requests(bot)
+    assert (request.tab, request.value["title"], request.hands_over) == ("fields", "Python", True)
+    listed = await ask(api.vacancies.list, {})
+    assert listed["ok"]["vacancies"] == []
 
 
 async def test_an_empty_paste_is_refused_with_words(api, ask, with_bot):
@@ -221,23 +245,15 @@ async def test_pasting_before_the_bot_is_up_is_refused_by_name(api, ask):
     assert answer["detail"] == "Бот ещё не готов"
 
 
-async def test_a_pasted_duplicate_is_explained_not_swallowed(
-    api, ask, with_bot, told
-):
-    """Про уже заведённое объявление человеку говорят словом.
+async def test_a_paste_the_bot_could_not_take_is_explained(api, ask, with_bot, heard):
+    """Место прогона занято — человеку говорят это словами, а весть несёт метку
+    заведения: окно, ждущее свою весть, иначе ждало бы вечно."""
+    with_bot(pasted="busy")
 
-    Иначе он вставляет текст, ничего не появляется, и он вставляет снова —
-    так и не узнав, что эта вакансия давно в списке.
-    """
-    with_bot(pasted="duplicate")
+    await ask(api.vacancies.create_from_text, {"raw_text": "Ищем повара"})
 
-    answer = await ask(api.vacancies.create_from_text, {"raw_text": "Ищем повара"})
-
-    assert answer["ok"]["started"] is True
-    assert await told() == {
-        "message": "Такая вакансия уже существует",
-        "danger": True,
-    }
+    said = await heard()
+    assert said["danger"] is True and said["action"] == "create_from_text"
 
 
 async def test_the_typed_description_is_not_passed_off_as_the_source_text(api, ask):

@@ -194,21 +194,22 @@ async def test_parsing_without_a_chosen_model_is_refused(api, ask, resume_on_dis
 
 
 async def test_a_file_that_cannot_be_read_is_explained_in_words(
-    api, ask, told, resume_on_disk, chat_model
+    api, ask, heard, resume_on_disk, chat_model
 ):
     """Нечитаемый файл называет, что с ним делать, а не «не получилось».
 
     Причины у отказа разные и чинятся по-разному: пропавший файл выбирают
     заново, `.doc` и запароленный PDF пересохраняют, скан не спасёт ничто.
     Скажи мост одно слово на все три — человек не узнал бы, что делать.
+    Весть несёт метку разбора резюме: мастер ждёт свою, а не любую.
     """
     await resume_on_disk("не пдф вовсе", name="резюме.pdf")
 
     answer = await ask(api.profile.parse_cv)
     assert answer["ok"]["started"] is True
 
-    said = await told()
-    assert said["danger"] is True
+    said = await heard()
+    assert (said["danger"], said["action"]) == (True, "parse_cv")
     assert "пересохран" in said["message"].lower()
 
 

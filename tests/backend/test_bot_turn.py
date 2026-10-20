@@ -71,7 +71,6 @@ async def test_the_play_button_answers_after_the_whole_turn(bot_with_turn):
 
 
 @pytest.mark.parametrize(("action", "pipeline_method"), [
-    (lambda bot: bot.ui_ingest_pasted_text("текст", None), "ingest_pasted_text"),
     (lambda bot: bot.ui_rerun_vacancy_pipeline(1), "rerun_pipeline_for_vacancy"),
     (lambda bot: bot.poll_channel_now(1), "poll_one_channel"),
 ])

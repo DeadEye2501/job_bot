@@ -27,7 +27,6 @@ class FakeIngestion:
         self._hangs = hangs
         self.channel_calls: list[int] = []
         self.rerun_calls: list[int] = []
-        self.pasted_calls: list[tuple] = []
         self.forget_calls: list[int] = []
         self.full_calls = 0
         self.buffer_edits: list[tuple] = []
@@ -38,6 +37,8 @@ class FakeIngestion:
         self.recovery_error: BaseException | None = None
         self.ghosting_error: BaseException | None = None
         self.backfill_tasks: set[asyncio.Task] = set()
+        self.hand_made_told = False
+        self.on_hand_made = None
 
     async def recover_orphan_vacancies(self):
         self.log.append("недоразобранные")
@@ -75,6 +76,10 @@ class FakeIngestion:
         self.log.append(f"пущено задачей: {what}")
         IngestionPipeline.spawn_backfill(self, work, what, extra=extra)
 
+    def emit_hand_made(self, result) -> None:
+        """Сказать итог ручного заведения — тем же телом, что у конвейера."""
+        IngestionPipeline.emit_hand_made(self, result)
+
     def schedule_dm_classification(self, hr_id, *rest):
         self.log.append(f"разбор запланирован: {hr_id}")
         self.scheduled.append((hr_id, *rest))
@@ -108,10 +113,6 @@ class FakeIngestion:
 
     async def rerun_pipeline_for_vacancy(self, vacancy_id: int):
         self.rerun_calls.append(vacancy_id)
-        return await self._answer(outcome=self._word_outcome)
-
-    async def ingest_pasted_text(self, text: str, posted_at):
-        self.pasted_calls.append((text, posted_at))
         return await self._answer(outcome=self._word_outcome)
 
     async def forget_vacancy(self, vacancy_id: int):

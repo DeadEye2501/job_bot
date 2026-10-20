@@ -21,6 +21,7 @@ from backend.bot import client as client_mod
 from backend.bot.client import Bot
 from backend.bot.pasted import PastedOutcome
 from backend.bot.rerun import RerunOutcome
+from backend.flows.hand_outcome import HandOutcome
 from client.bridge import lifespan
 from client.bridge.refusals import PASTED_REFUSALS, RERUN_REFUSALS
 from tests.fakes.ui_bot import ANSWERS, UiBot
@@ -154,19 +155,26 @@ def test_the_fake_answers_the_rerun_with_an_outcome_the_bot_can_return():
 
 
 def _pasted_outcomes() -> set[str]:
-    """Чем приём вставленного объявления может кончиться по объявлению бота."""
+    """Чем работа заведения может кончиться по объявлению бота."""
     return set(get_args(PastedOutcome))
 
 
+def _hand_made_outcomes() -> set[str]:
+    """Чем кончается само ручное заведение — это окно слышит вестью по ходу."""
+    return set(get_args(HandOutcome))
+
+
 def test_every_pasted_outcome_has_a_phrase_for_the_human():
-    """У каждого исхода приёма вставленного есть своя фраза человеку.
+    """У каждого исхода ручного заведения есть своя фраза человеку.
 
     Тот же шов, что и у повторного разбора, и та же беда без него: исход
     заводит бэкенд, а переводит мост, и непереведённый доедет запасным «не
-    удалось завести» на том, что кончилось внятно — объявление уже заведено,
-    разбор не нашёл здесь вакансии, молчит модель отпечатков.
+    удалось завести» на том, что кончилось внятно — вакансия уже существует,
+    статья не скачалась, молчит модель отпечатков. «Сказано» и удача фразы не
+    требуют: первое значит, что исход уже ушёл вестью, второе — слово удачи.
     """
-    assert _pasted_outcomes() - {"ok"} == set(PASTED_REFUSALS)
+    said = _pasted_outcomes() | _hand_made_outcomes()
+    assert said - {"ok", "told"} == set(PASTED_REFUSALS)
 
 
 def test_the_fake_answers_the_pasted_intake_with_an_outcome_the_bot_can_return():

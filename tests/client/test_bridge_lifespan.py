@@ -12,6 +12,7 @@
 
 from concurrent.futures import Future
 
+from backend.flows.hand_outcome import HandResult
 from backend.telegram_login import LoginStep
 from client.bridge import lifespan
 from tests.fakes.ui_login import UiLogin
@@ -200,6 +201,25 @@ async def test_what_the_bot_does_by_itself_reaches_the_queue(hub):
     ]
     assert news["events"][-4]["payload"] == {"kind": "confirm", "host": "site.test", "payload": {"items": []}}
     assert news["events"][-2]["payload"] == {"text": "обход снят"}
+
+
+async def test_the_end_of_a_vacancy_made_by_hand_reaches_the_window_with_its_number(hub):
+    """Итог ручного заведения — та же весть исхода, что у пущенных кнопок, с
+    меткой заведения и номером вакансии: по номеру окно переходит на
+    существующую. Повтор — не беда, плашка не красная."""
+    bot = Silent()
+    lifespan._tell_the_window(bot, hub)
+
+    bot.on_hand_made(HandResult("duplicate", 5))
+    bot.on_hand_made(HandResult("ok", 6))
+
+    news = await hub.events.take(after=0, timeout=0.01)
+    assert [one["payload"] for one in news["events"]] == [
+        {"message": "Такая вакансия уже существует", "danger": False,
+         "action": "create_from_text", "outcome": "duplicate", "vacancy_id": 5},
+        {"message": "Вакансия заведена", "danger": False,
+         "action": "create_from_text", "outcome": "ok", "vacancy_id": 6},
+    ]
 
 
 async def test_an_arrived_letter_also_moves_the_unread_count(hub):

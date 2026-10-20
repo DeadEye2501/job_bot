@@ -41,7 +41,7 @@ const SAID = [];
 async function bridge(method, payload) {
   if (method === 'vacancies.create') {
     SENT.push(payload);
-    return { created_id: 77 };
+    return { created_id: 77, created: true, message: 'Вакансия заведена' };
   }
   if (method === 'vacancies.create_from_text') {
     PASTED.push(payload);
