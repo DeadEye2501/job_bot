@@ -311,7 +311,7 @@ Claude через установленный Claude Code по подписке: 
 - `def _peers_of(dialogs, users) -> list` (8)
 - `async def list_dialog_peers(client) -> list | None` (44)
 
-### `adapters/telegraph.py` — 118 строк
+### `adapters/telegraph.py` — 100 строк
 
 Статья Telegraph: сходить по адресу и достать из страницы её текст.
 
@@ -674,11 +674,11 @@ init
 - `def scan_tools(kit: AgentKit, job: ScanJob) -> list[Callable]` (21)
   - `async def report_resumes(resumes: list[SeenResume], many_resumes: bool, signs_found: str) -> str` (7)
 
-### `backend/agent/tools_seeker.py` — 139 строк
+### `backend/agent/tools_seeker.py` — 147 строк
 
 Инструменты искателя: известна ли вакансия и передача найденного в конвейер.
 
-Зависит от: `backend.agent.jobs`, `backend.agent.kit`, `backend.domain.hosts`, `backend.flows`, `backend.incoming`, `backend.models`, `backend.repository.aggregators`, `backend.repository.vacancies_life`, `backend.repository.vacancy_contacts`
+Зависит от: `backend.agent.jobs`, `backend.agent.kit`, `backend.domain.hosts`, `backend.domain.telegram_identity`, `backend.flows`, `backend.incoming`, `backend.models`, `backend.repository.aggregators`, `backend.repository.vacancies_life`, `backend.repository.vacancy_contacts`
 
 - `def seeker_tools(kit: AgentKit, job: SeekJob, queue) -> list[Callable]` (15)
   - `async def is_known(url: str) -> str` (6)
@@ -686,7 +686,7 @@ init
 - `class _Page` (5)
 - `async def _submit(kit: AgentKit, job: SeekJob, queue, page: _Page) -> str` (31)
 - `def _left(answer: str, job: SeekJob) -> str` (2)
-- `async def _numbered(kit: AgentKit, job: SeekJob, url: str) -> tuple[str | None, str]` (11)
+- `async def _numbered(kit: AgentKit, job: SeekJob, url: str) -> tuple[str | None, str]` (16)
 - `async def _barred(kit: AgentKit, url: str) -> bool` (3)
 - `async def _known(kit: AgentKit, aggregator_id: int, key: str) -> bool` (3)
 - `async def _store(kit: AgentKit, job: SeekJob, page: _Page, key: str, embedding: list[float]) -> int` (25)
@@ -1068,7 +1068,7 @@ First-run bootstrap: ensure DB schema exists.
 Зависит от: —
 
 
-### `backend/domain/apply_order.py` — 120 строк
+### `backend/domain/apply_order.py` — 122 строк
 
 Какими способами откликнуться и в каком порядке.
 
@@ -1081,7 +1081,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def apply_ways(vacancy: VacancyFacts, world: World) -> list[Way]` (12)
 - `def _telegram(vacancy: VacancyFacts, world: World) -> Way | None` (4)
 - `def _buttons(vacancy: VacancyFacts, world: World) -> list[Way]` (13)
-- `def _forms(vacancy: VacancyFacts, world: World) -> list[Way]` (8)
+- `def _forms(vacancy: VacancyFacts, world: World) -> list[Way]` (10)
 - `def _links(vacancy: VacancyFacts) -> list[str]` (9)
 - `def _contact_links(vacancy: VacancyFacts) -> list[str]` (2)
 - `def _owner(link: str, sites: list[KnownSite]) -> KnownSite | None` (3)
@@ -1101,7 +1101,7 @@ First-run bootstrap: ensure DB schema exists.
 
 Хосты, которые не бывают домашним сайтом компании.
 
-Зависит от: `backend.domain.hosts`
+Зависит от: `backend.domain.hosts`, `backend.domain.telegram_identity`
 
 - `def _is_brand_domain(host: str) -> bool` (15)
 - `def is_aggregator_host(host: str) -> bool` (11)
@@ -1293,9 +1293,9 @@ First-run bootstrap: ensure DB schema exists.
 Зависит от: —
 
 
-### `backend/domain/telegram_identity.py` — 166 строк
+### `backend/domain/telegram_identity.py` — 202 строк
 
-Правила опознания собеседника в Telegram по написанному о нём.
+Правила Telegram по написанному: чей это ник, куда ведёт адрес.
 
 Зависит от: —
 
@@ -1365,11 +1365,11 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _model_name(host: str, hints: list[str], chat: LlmProviderConfig | None) -> str | None` (12)
 - `def _site_like_part(host: str, parts: tuple[str, ...]) -> str | None` (10)
 
-### `backend/flows/aggregator_round.py` — 91 строк
+### `backend/flows/aggregator_round.py` — 92 строк
 
 Обход источника-агрегатора: поиск, разбор найденного и передача отобранного.
 
-Зависит от: `adapters.claude_code_agent`, `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.prompts.frame`, `backend.agent.prompts.seeker`, `backend.agent.sessions`, `backend.agent.stops`, `backend.agent.tools_browser`, `backend.agent.tools_common`, `backend.agent.tools_seeker`, `backend.flows.handover`, `backend.flows.parse_queue`, `backend.repository.aggregators`, `backend.repository.profile_languages`, `backend.telegram_time`
+Зависит от: `adapters.claude_code_agent`, `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.prompts.frame`, `backend.agent.prompts.seeker`, `backend.agent.sessions`, `backend.agent.stops`, `backend.agent.tools_browser`, `backend.agent.tools_common`, `backend.agent.tools_seeker`, `backend.domain.telegram_identity`, `backend.flows.handover`, `backend.flows.parse_queue`, `backend.repository.aggregators`, `backend.repository.profile_languages`, `backend.telegram_time`
 
 - `async def seek_source(kit: AgentKit, source: Source) -> None` (28)
 - `async def _hand_over(kit: AgentKit, queue: ParseQueue) -> None` (3)
@@ -1601,11 +1601,11 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def save_new_vacancy(pipeline, vacancy: Vacancy, kind: str, payload: dict | None=None) -> int` (23)
 
-### `backend/flows/linked_article.py` — 95 строк
+### `backend/flows/linked_article.py` — 96 строк
 
 Статья, на которую ссылается объявление, дописанная к его тексту.
 
-Зависит от: `adapters`, `backend.domain.spellings`
+Зависит от: `adapters`, `backend.domain.spellings`, `backend.domain.telegram_identity`
 
 - `def _article_urls(text: str) -> list[str]` (11)
 - `def _blame_the_site(url: str, trouble: httpx.HTTPError) -> None` (16)
@@ -1711,7 +1711,7 @@ First-run bootstrap: ensure DB schema exists.
 
 Повторный разбор уже заведённой вакансии.
 
-Зависит от: `adapters`, `backend.agent.stops`, `backend.flows`, `backend.message_text`, `backend.models`, `backend.repository.channels`, `backend.repository.vacancy_status`, `backend.telegram_lookup`, `backend.telegram_time`
+Зависит от: `backend.agent.stops`, `backend.domain.telegram_identity`, `backend.flows`, `backend.message_text`, `backend.models`, `backend.repository.channels`, `backend.repository.vacancy_status`, `backend.telegram_lookup`, `backend.telegram_time`
 
 - `class _Origin` (14)
 - `async def _vacancy_origin(pipeline, vacancy_id: int) -> _Origin | None` (23)
@@ -4332,13 +4332,13 @@ Runtime settings layer.
 Тестов: 6
 
 
-### `tests/backend/test_adapters_telegraph.py` — 205 строк
+### `tests/backend/test_adapters_telegraph.py` — 164 строк
 
 Следствия, которые наблюдают тесты `adapters/telegraph.py`.
 
 Зависит от: `adapters`
 
-Тестов: 9
+Тестов: 8
 
 - `def _page(*, headline: str='Senior Manual QA', body: str='<p>Ищем QA</p>') -> str` (9)
 - `def _client(handler) -> httpx.AsyncClient` (3)
@@ -4498,13 +4498,13 @@ Runtime settings layer.
 
 - `async def _letter(make_pipeline, session_factory, answers, *, writer='app', language='Русский')` (7)
 
-### `tests/backend/test_agent_tools_seeker.py` — 224 строк
+### `tests/backend/test_agent_tools_seeker.py` — 244 строк
 
 Инструменты искателя: известна ли вакансия и передача найденного в конвейер.
 
 Зависит от: `backend.agent.jobs`, `backend.agent.tools_seeker`, `backend.models`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.agent`
 
-Тестов: 16
+Тестов: 17
 
 - `class _Queue` (6)
   - `def put(self, vacancy_id, text)` (2)
@@ -4876,13 +4876,13 @@ Runtime settings layer.
 - `async def engine_on_disk(tmp_path)` (5)
 - `async def _pragma(engine, name)` (4)
 
-### `tests/backend/test_domain_apply_order.py` — 120 строк
+### `tests/backend/test_domain_apply_order.py` — 126 строк
 
-Порядок способов отклика: Telegram, кнопка агрегатора, форма, почта.
+Порядок способов отклика: Telegram, кнопки агрегаторов, формы, почта.
 
 Зависит от: `backend.domain.apply_order`, `tests.factories_aggregators`
 
-Тестов: 17
+Тестов: 18
 
 - `def _vacancy(**over) -> VacancyFacts` (3)
 - `def _world(**over) -> World` (3)
@@ -5075,13 +5075,13 @@ Runtime settings layer.
 
 - `async def _can_add_after(make_pipeline, session_factory, resumes: list[tuple], many_resumes: bool) -> bool` (6)
 
-### `tests/backend/test_flows_aggregator_seek.py` — 224 строк
+### `tests/backend/test_flows_aggregator_seek.py` — 234 строк
 
 Обход источника: искатель находит, конвейер разбирает, отобранное уходит
 
 Зависит от: `backend.agent.jobs`, `backend.agent.stops`, `backend.flows.aggregator_round`, `backend.models`, `tests.backend.fixtures.applying`, `tests.backend.fixtures.flows`, `tests.backend.fixtures.parse_stub`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.agent`
 
-Тестов: 14
+Тестов: 15
 
 - `def parsed(monkeypatch)` (5)
 - `def seek(make_pipeline, session_factory)` (16)
@@ -6603,13 +6603,13 @@ Runtime settings layer.
 - `def _raw_dialog(peer_id: int)` (11)
 - `def _raw_message(peer_id: int, message_id: int, *, date: int)` (4)
 
-### `tests/backend/test_telegram_identity.py` — 156 строк
+### `tests/backend/test_telegram_identity.py` — 198 строк
 
 Следствия, которые наблюдают тесты `backend/domain/telegram_identity.py`.
 
 Зависит от: `backend.domain.telegram_identity`
 
-Тестов: 9
+Тестов: 10
 
 - `class Contact` (7)
 

@@ -226,7 +226,6 @@
 ### `adapters/telegraph.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `ARTICLE_URL_RE` = `re.compile('https?://telegra\\.ph/[^\\s)\\]]*[^\…`
 - `FETCH_TIMEOUT_SEC` = `20.0`
 - `_USER_AGENT` = `'Mozilla/5.0 (compatible; JobBot/1.0)'`
 - `_GONE_FOR_GOOD` = `frozenset({404, 410, 451})`
@@ -463,6 +462,7 @@
 
 - `WHAT` = `'найденная агентом вакансия'`
 - `BARRED` = `'сайт в чёрном списке человека'`
+- `TELEGRAM_OWN` = `'у Telegram свой обход'`
 - `class _Page`
   - `text: str`
   - `url: str`
@@ -675,7 +675,7 @@
 
 ### `backend/domain/company_hosts.py`
 
-- `AGGREGATOR_HOSTS` = `frozenset({'t.me', 'telegram.me', 'telegram.org'…`
+- `AGGREGATOR_HOSTS` = `frozenset({*TELEGRAM_LINK_HOSTS, 'telegram.org',…`
 - `AGGREGATOR_BRANDS` = `frozenset({'indeed', 'stepstone'})`
 
 ### `backend/domain/company_names.py`
@@ -796,6 +796,11 @@
 
 ### `backend/domain/telegram_identity.py`
 
+- `TELEGRAM_LINK_HOSTS` = `frozenset({'t.me', 'telegram.me'})`
+- `TELEGRAPH_HOSTS` = `frozenset({'telegra.ph'})`
+- `TELEGRAM_HOSTS` = `TELEGRAM_LINK_HOSTS | TELEGRAPH_HOSTS`
+- `ARTICLE_URL_RE` = `re.compile('https?://(?:' + '|'.join(map(re.esca…`
+- `_LINK_PREFIXES` = `tuple((f'{www}{host}/' for host in sorted(TELEGR…`
 - `_TG_USERNAME_RE` = `re.compile('^[A-Za-z][A-Za-z0-9_]{4,31}$')`
 - `_TG_TYPED_USERNAME_RE` = `re.compile('^[A-Za-z][A-Za-z0-9_]{3,31}$')`
 - `_TG_RESERVED_PATHS` = `набор из 6`

@@ -14,8 +14,8 @@ from typing import Literal
 
 from sqlalchemy import select
 
-from adapters import telegraph
 from backend.agent.stops import RUN_STOPPERS
+from backend.domain.telegram_identity import ARTICLE_URL_RE
 from backend.flows import embeddings, handover, linked_article
 from backend.message_text import extract_post_text
 from backend.models import TelegramChannel
@@ -370,7 +370,7 @@ async def _text_to_judge_by(pipeline, row) -> tuple[str, bool] | None:
     Ждать не бесконечно: прождавшую дольше `LONGEST_WAIT` судят по
     сохранённому, но удалять по нему не дают — целым он так и не собрался.
     """
-    if not telegraph.ARTICLE_URL_RE.search(row.raw_text):
+    if not ARTICLE_URL_RE.search(row.raw_text):
         return row.raw_text, True
     fresh = await _reread_and_store(
         pipeline, row.id, row.raw_text, (row.username or "", row.source_msg_id)

@@ -12,12 +12,12 @@
 """
 
 from backend.domain.hosts import host_owns
+from backend.domain.telegram_identity import TELEGRAM_LINK_HOSTS, TELEGRAPH_HOSTS
 
 AGGREGATOR_HOSTS = frozenset({
     # Агрегаторы вакансий, соцсети, мессенджеры, блог-платформы: ссылка на
     # канал, профиль или пост говорит о компании не больше, чем её отсутствие.
-    "t.me",
-    "telegram.me",
+    *TELEGRAM_LINK_HOSTS,
     "telegram.org",
     "linkedin.com",
     "hh.ru",
@@ -57,7 +57,7 @@ AGGREGATOR_HOSTS = frozenset({
     "docs.google.com",
     "forms.gle",
     "typeform.com",
-    "telegra.ph",
+    *TELEGRAPH_HOSTS,
     "notion.so",
     "taplink.cc",
     "bit.ly",

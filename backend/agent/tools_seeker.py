@@ -6,7 +6,8 @@ from datetime import datetime, timezone
 
 from backend.agent.jobs import SeekJob
 from backend.agent.kit import AgentKit
-from backend.domain.hosts import source_key
+from backend.domain.hosts import owning_host, source_key
+from backend.domain.telegram_identity import TELEGRAM_HOSTS
 from backend.flows import embeddings, intake, sameness
 from backend.incoming import moment_or_none, str_list
 from backend.models import ContactAddedBy, Vacancy
@@ -17,6 +18,8 @@ from backend.repository.vacancy_contacts import add_contact
 WHAT = "найденная агентом вакансия"
 
 BARRED = "сайт в чёрном списке человека"
+
+TELEGRAM_OWN = "у Telegram свой обход"
 
 
 def seeker_tools(kit: AgentKit, job: SeekJob, queue) -> list[Callable]:
@@ -84,10 +87,15 @@ def _left(answer: str, job: SeekJob) -> str:
 async def _numbered(kit: AgentKit, job: SeekJob, url: str) -> tuple[str | None, str]:
     """Номер страницы на этом источнике — или пусто и причина, почему его нет.
 
-    Причины две, и обе значат «не открывать и не передавать»: сайт из отсева и
-    адрес не с этого источника. Отсев проверяется первым: его страница могла бы
-    оказаться и на этом источнике, а человеку она не нужна всё равно.
+    Причины три, и все значат «не открывать и не передавать»: страница
+    Telegram, сайт из отсева и адрес не с этого источника. Отсев проверяется
+    раньше источника: его страница могла бы оказаться и на этом источнике, а
+    человеку она не нужна всё равно. Telegram — не отсев: его каналы и статьи
+    читает приём постов, и человек их не запрещал. Поэтому он и проверяется
+    первым — запрет действует всегда, есть ли такой хост в отсеве или нет.
     """
+    if owning_host(url, TELEGRAM_HOSTS) is not None:
+        return None, f"{TELEGRAM_OWN} — не открывай"
     if await _barred(kit, url):
         return None, f"{BARRED} — не открывай"
     key = source_key(url, job.source.host)
