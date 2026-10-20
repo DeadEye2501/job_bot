@@ -43,9 +43,11 @@ async def ui_ingest_pasted_text(bot, request: HandRequest) -> PastedOutcome:
     logger.info("UI hand-made vacancy from tab %s", request.tab)
     bot.ingestion.hand_made_told = False
 
+    # Сказан ли итог, решается здесь одном: работа, кончившаяся без вести, —
+    # беда, которой окно иначе не услышало бы вовсе.
     async def job(kit) -> str:
         await hand_made.ingest_by_hand(kit, request)
-        return TOLD
+        return TOLD if bot.ingestion.hand_made_told else "error"
 
     outcome = await work.in_slot(bot, job, "ingest by hand")
     return TOLD if bot.ingestion.hand_made_told else outcome

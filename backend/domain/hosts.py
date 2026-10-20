@@ -127,6 +127,16 @@ def article_address(url: str) -> str:
     return f"https://{normalize_host(url)}/{address_parts(url.strip()).path}"
 
 
+def typed_page(url: str | None) -> str | None:
+    """Собственный адрес вакансии, набранной в «Полях»; пусто — его нет.
+
+    Ссылка на пост Telegram у набранной — упоминание, а не её адрес: в посте
+    бывает несколько вакансий, и вторая из них, сочтённая повтором первой,
+    пропала бы вместе с набранным.
+    """
+    return url if url and post_address(url) is None else None
+
+
 def on_telegram(url: str) -> bool:
     """Ведёт ли адрес в Telegram или на его статьи — туда, что читает приём постов."""
     return owning_host(url, set(TELEGRAM_HOSTS)) is not None

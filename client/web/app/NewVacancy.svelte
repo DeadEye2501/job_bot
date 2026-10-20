@@ -56,10 +56,10 @@
    */
   async function filed(draft) {
     const awaits = viaBot(draft, handsOver.checked);
-    if (awaits) {
-      newVacancy.handed = true;
-      awaited.start(HAND_MADE_ACTION, onhandmade);
-    }
+    // Отметка ставится на каждой отправке заново: оставшаяся от прошлой
+    // неудачи, она не дала бы стереть черновик заведённых мимо бота полей.
+    newVacancy.handed = awaits;
+    if (awaits) awaited.start(HAND_MADE_ACTION, onhandmade);
     const answer = await sent(draft);
     if (answer === null && awaits) {
       newVacancy.handed = false;
@@ -122,6 +122,10 @@
    * пустыми и говорят об этом сами.
    */
   async function openNew() {
+    // Отданный боту черновик держат, пока ждут итога; после неудачи окно
+    // открыто снова — набранное на месте, а закрыть его без отправки значит,
+    // как у любого окна, его бросить.
+    newVacancy.handed = awaited.pending(HAND_MADE_ACTION);
     newCard.adding = true;
     const now = await ask('vacancies.create_options');
     if (now === null) return;

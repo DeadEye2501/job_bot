@@ -1,4 +1,5 @@
-"""Передача отобранного откликателю: решение «откликаться» и догон новых HR после отклика."""
+"""Разобранная строка дальше по конвейеру: как её вести (`Intake`), разбор с
+передачей откликателю, дочитывание брошенной и догон новых HR после отклика."""
 
 from dataclasses import dataclass, replace
 
@@ -8,6 +9,7 @@ from backend.applying.world import AWAITS_APPLICATION
 from backend.flows import parse
 from backend.flows.dm_backfill import spawn_hr_backfill
 from backend.flows.hand_outcome import tell
+from backend.flows.linked_article import article_urls
 from backend.flows.parse import Judged
 from backend.models import Vacancy
 from backend.repository.hr_card import LAST_VACANCY_ORDER
@@ -58,16 +60,21 @@ async def tell_known(pipeline, vacancy_id: int) -> None:
     Неразобранную дочитывают её собственным текстом — без сноса и без
     откликателя: окно переходит на неё, а отдавать ли её, решали, когда её
     заводили. Дочитать не вышло — окну не повтор, а молчание модели: строки
-    без разбора в списке не видно, и переходить было бы некуда.
+    без разбора в списке не видно, и переходить было бы некуда. Ждущую статью
+    одной шапкой не судят — её дочитает подбор недоразобранного, а окну
+    говорится, что статья ещё не пришла.
     """
     async with pipeline.session_factory() as session:
         row = await session.get(Vacancy, vacancy_id)
         unparsed, text = not row.is_parsed, row.raw_text
-    done = True
-    if unparsed and text:
+    outcome = "duplicate"
+    if unparsed and text and article_urls(text):
+        outcome = "article"
+    elif unparsed and text:
         await pipeline.reload_resources()
-        done = await finish_orphan(pipeline, vacancy_id, text, Intake(allow_delete=False, hands_over=False))
-    tell(pipeline, "duplicate" if done else "llm", vacancy_id)
+        stored = await finish_orphan(pipeline, vacancy_id, text, Intake(allow_delete=False, hands_over=False))
+        outcome = "duplicate" if stored else "llm"
+    tell(pipeline, outcome, vacancy_id)
 
 
 async def orphan_intake(pipeline, vacancy_id: int, intake: Intake) -> Intake:

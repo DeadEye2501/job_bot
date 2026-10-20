@@ -490,6 +490,50 @@ describe('живой экран вакансий', () => {
     expect(page.querySelector('.modal-footer .btn.primary').disabled).toBe(false);
   });
 
+  it('после неудачи открытое и закрытое окно черновик стирает', async () => {
+    // Неудача оставляет набранное до следующего захода; но закрыл окно сам,
+    // ничего не отправив, — набранное больше не нужно, как у любого окна.
+    const page = screen();
+    await settled();
+    await typedText(page, 'Занято');
+    press('Создать', { exact: true });
+    await settled();
+
+    page.querySelector('button[title="Добавить вакансию"]').click();
+    await settled();
+    press('Отмена', { exact: true });
+    await settled();
+    page.querySelector('button[title="Добавить вакансию"]').click();
+    await settled();
+    press('Текст', { exact: true });
+    await settled();
+
+    expect(page.querySelector('textarea[placeholder="Текст объявления"]').value).toBe('');
+  });
+
+  it('после неудачи заведённые напрямую поля черновик не оставляют', async () => {
+    const page = screen();
+    await settled();
+    await typedText(page, 'Занято');
+    press('Создать', { exact: true });
+    await settled();
+
+    page.querySelector('button[title="Добавить вакансию"]').click();
+    await settled();
+    press('Поля', { exact: true });
+    await settled();
+    const title = page.querySelector('input[placeholder="Название (обязательно)"]');
+    title.value = 'Python';
+    title.dispatchEvent(new Event('input', { bubbles: true }));
+    await settled();
+    press('Создать', { exact: true });
+    await settled();
+    page.querySelector('button[title="Добавить вакансию"]').click();
+    await settled();
+
+    expect(page.querySelector('input[placeholder="Название (обязательно)"]').value).toBe('');
+  });
+
   it('отказ зова снимает ожидание: «Создать» снова доступна', async () => {
     const page = screen();
     await settled();

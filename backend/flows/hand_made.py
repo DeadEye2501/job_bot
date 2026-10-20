@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import Literal
 
 from backend.agent.kit import AgentKit
-from backend.domain.hosts import LinkKind, article_address
+from backend.domain.hosts import LinkKind, article_address, typed_page
 from backend.domain.telegram_identity import post_address
 from backend.flows import handover, ingest, linked_article, linked_page, pasted
 from backend.flows.hand_outcome import HandResult, show_parsing, tell
@@ -79,7 +79,7 @@ def _own_address(request: HandRequest) -> str | None:
     if request.tab in ("post", "page"):
         return request.value
     if request.tab == "fields":
-        return request.value.get("source_url")
+        return typed_page(request.value.get("source_url"))
     return None
 
 

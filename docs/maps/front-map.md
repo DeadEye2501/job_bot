@@ -62,7 +62,7 @@
 - —
 - принимает: ask, events, say
 
-### app/NewVacancy.svelte (203)
+### app/NewVacancy.svelte (207)
 - —
 - принимает: ask, say, lockedTip, newVacancy, onhandmade, onvacancy, onfiled
 
@@ -2058,7 +2058,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/vacancies.test.js (348)
 - * Черновик, ушедший боту, — каким его держит оболочка.
 
-### tests/vacancies_screen_new_live.test.js (558)
+### tests/vacancies_screen_new_live.test.js (602)
 - * Мост, отвечающий тем же, чем отвечает настоящий. * * Заведение чужой карточки отказывает: так ведёт себя настоящий, когда имя * занято или связь оборвалась, — и это единственный способ увидеть, что * остаётся в черновике после неудачи.
 
 ### tests/vacancy_actions.test.js (191)

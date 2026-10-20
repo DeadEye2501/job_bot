@@ -10,7 +10,7 @@ from backend.agent.kit import AgentKit
 from backend.agent.stops import RUN_STOPPERS
 from backend.domain.hosts import host_owns, normalize_host, on_telegram, source_key
 from backend.flows import embeddings, handover, intake, pasted, sameness
-from backend.flows.hand_outcome import show_parsing, tell
+from backend.flows.hand_outcome import show_parsing
 from backend.incoming import moment_or_none, str_list
 from backend.models import ContactAddedBy, Vacancy
 from backend.repository.aggregators import barred_host_of
@@ -162,8 +162,6 @@ async def _through(kit: AgentKit, job: SeekJob, answer: str, cycle: Awaitable) -
     except Exception:
         logger.exception("цикл находки искателя на %s: сбой", job.source.name)
         said = "не вышло: на этой вакансии сбой приложения"
-        if job.intake.tells_window and not kit.pipeline.hand_made_told:
-            tell(kit.pipeline, "error")
     finally:
         job.nested = False
     await kit.browser.open_profile(job.source.id)

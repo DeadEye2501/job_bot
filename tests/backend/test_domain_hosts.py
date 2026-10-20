@@ -29,6 +29,8 @@ _LEVER_UUID = "0f6a9c3e-1b2d-4e5f-8a7b-9c0d1e2f3a4b"
     pytest.param("https://t.me/pyjobs/15", "post", id="пост"),
     pytest.param("https://t.me/s/pyjobs/15", "post", id="пост веб-просмотра"),
     pytest.param("https://t.me/c/12345/15", "post", id="пост закрытого"),
+    pytest.param("https://t.me/pyjobs/3/15", "post", id="пост темы форума"),
+    pytest.param("https://t.me/c/12345/3/15", "post", id="пост темы закрытого"),
     pytest.param("https://t.me/pyjobs", "channel", id="канал"),
     pytest.param("t.me/pyjobs/", "channel", id="канал без схемы"),
     pytest.param("https://t.me/iv?url=https://site.test/a&rhash=1", "telegram", id="мгновенный просмотр"),

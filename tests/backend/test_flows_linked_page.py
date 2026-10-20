@@ -74,10 +74,11 @@ async def test_a_page_without_a_vacancy_is_said_so(page, session_factory):
 
 
 async def test_a_session_that_failed_is_not_a_page_without_a_vacancy(page, session_factory):
-    """Сессия сорвалась — капча, вход, срок: это не «вакансии нет», а беда."""
+    """Сессия сорвалась — капча, вход, срок: это не «вакансии нет»; беду окну
+    скажет бот по концу работы, где итога не прозвучало."""
     kit = await page(COMPANY_PAGE, [finish_step("failed", "капча")])
 
-    assert kit.pipeline.told == [HandResult("error")]
+    assert kit.pipeline.told == []
 
 
 async def test_the_page_seeker_only_submits(page):
@@ -97,7 +98,9 @@ async def test_a_redirect_within_the_aggregator_is_still_this_page(page, session
     assert len(await all_rows(session_factory, Vacancy)) == 1
 
 
-async def test_a_broken_parse_tells_the_window_of_the_trouble(page, session_factory, monkeypatch):
+async def test_a_broken_parse_leaves_the_word_to_the_bot(page, session_factory, monkeypatch):
+    """Беда цикла — запись в журнал и конец страницы; окну её скажет бот, а не
+    «нет вакансии»."""
     def broken():
         raise RuntimeError("разбор упал")
 
@@ -105,7 +108,7 @@ async def test_a_broken_parse_tells_the_window_of_the_trouble(page, session_fact
 
     kit = await page(COMPANY_PAGE, [_submitting(COMPANY_PAGE)])
 
-    assert kit.pipeline.told == [HandResult("error")]
+    assert kit.pipeline.told == []
 
 
 async def test_a_broken_apply_after_the_word_sends_no_second_word(page, session_factory, parsed):
