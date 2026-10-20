@@ -53,9 +53,15 @@ async def list_aggregators(session: AsyncSession) -> list[Aggregator]:
     )).all())
 
 
+async def web_search_row(session: AsyncSession) -> Aggregator | None:
+    """Строка «Поиска по сети» — источника без хоста."""
+    return next((a for a in await list_aggregators(session) if a.host is None), None)
+
+
 async def web_search_id(session: AsyncSession) -> int:
     """Профиль «Поиска по сети»: у формы работодателя своего агрегатора нет."""
-    return next((a.id for a in await list_aggregators(session) if a.host is None), 0)
+    row = await web_search_row(session)
+    return 0 if row is None else row.id
 
 
 def aggregator_blacklist_candidates(row: Aggregator) -> list[str]:

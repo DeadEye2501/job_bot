@@ -12,14 +12,15 @@ from backend.telegram_lookup import TelegramTrouble
 
 HandOutcome = Literal[
     "ok", "duplicate", "embed", "llm", "article",
-    TelegramTrouble, "no_post", "empty_post", "channel_link",
+    TelegramTrouble, "no_post", "empty_post", "channel_link", "no_vacancy", "error",
 ]
 """Чем кончилось ручное заведение.
 
 Словами, а не «да/нет»: молчащий поставщик отпечатков, однозначный повтор, не
 дошедший разбор, не скачавшаяся статья, беда Telegram, пропавший или пустой
-пост, ссылка на канал вместо поста и удача — разные вести человеку, и различить
-их после того, как ответ сведён к признаку, уже нечем.
+пост, ссылка на канал вместо поста, страница без вакансии, сбой приложения и
+удача — разные вести человеку, и различить их после того, как ответ сведён к
+признаку, уже нечем.
 """
 
 
@@ -30,6 +31,13 @@ class HandResult:
 
     outcome: HandOutcome
     vacancy_id: int | None = None
+
+
+def show_parsing(pipeline) -> None:
+    """Нижняя полоса ручного заведения: разбор объявления с нулями — «шкала
+    неизвестна»: сколько шагов займёт разбор одного объявления, заранее не
+    знает никто."""
+    pipeline.emit_progress("pasted", "Разбор объявления", 0, 0)
 
 
 def tell(pipeline, outcome: HandOutcome, vacancy_id: int | None = None) -> None:

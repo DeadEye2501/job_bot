@@ -273,6 +273,67 @@ describe('живой экран вакансий', () => {
     expect(SAID).toEqual([]);
   });
 
+  it('ссылка уезжает слотом текста одним адресом, а не полями', async () => {
+    // Что за ссылкой — пост, статья, страница, — решает бот; окно отдаёт адрес
+    // как есть и ждёт итога вестью, как у текста.
+    const page = screen();
+    await settled();
+    page.querySelector('button[title="Добавить вакансию"]').click();
+    await settled();
+    page.querySelector('.choice-line input[type="checkbox"]').click();
+    press('Ссылка', { exact: true });
+    await settled();
+
+    const link = page.querySelector('input[placeholder="Ссылка на объявление"]');
+    link.value = 'https://t.me/pyjobs/5';
+    link.dispatchEvent(new Event('input', { bubbles: true }));
+    await settled();
+    press('Создать', { exact: true });
+    await settled();
+
+    expect(PASTED).toEqual([{ url: 'https://t.me/pyjobs/5', hands_over: true }]);
+    expect(SENT).toHaveLength(0);
+    expect(SAID).toEqual([]);
+  });
+
+  it('вкладка «Ссылка» и «Ссылка на объявление» у полей — одно поле черновика', async () => {
+    const page = screen();
+    await settled();
+    page.querySelector('button[title="Добавить вакансию"]').click();
+    await settled();
+    press('Ссылка', { exact: true });
+    await settled();
+    const create = buttonBy('Создать', { exact: true });
+    expect(create.disabled).toBe(true);
+
+    const link = page.querySelector('input[placeholder="Ссылка на объявление"]');
+    link.value = 'https://hh.ru/vacancy/1';
+    link.dispatchEvent(new Event('input', { bubbles: true }));
+    await settled();
+    expect(create.disabled).toBe(false);
+
+    press('Поля', { exact: true });
+    await settled();
+    expect(page.querySelector('input[placeholder="Ссылка на объявление"]').value).toBe('https://hh.ru/vacancy/1');
+  });
+
+  it('без живых систем ссылка не заводится, как и текст', async () => {
+    const page = screen({ lockedTip: 'Нужны все системы, сейчас недоступно: LLM.' });
+    await settled();
+    page.querySelector('button[title="Добавить вакансию"]').click();
+    await settled();
+    press('Ссылка', { exact: true });
+    await settled();
+    const link = page.querySelector('input[placeholder="Ссылка на объявление"]');
+    link.value = 'https://hh.ru/vacancy/1';
+    link.dispatchEvent(new Event('input', { bubbles: true }));
+    await settled();
+
+    const create = page.querySelector('.modal-footer .btn.primary');
+    expect(create.disabled).toBe(true);
+    expect(create.textContent.trim()).toBe('Нужны все системы, сейчас недоступно: LLM.');
+  });
+
   it('на стороне полей окно подтверждает заведение словом', async () => {
     // Там работа кончается ответом моста, а не вестью: промолчи окно —
     // человек не понял бы, завелась ли вакансия.

@@ -1,7 +1,8 @@
 """Заявка окна «Добавить вакансию»: довести её до строки дорогой её рода.
 
 Отличие от `pasted`: тот доводит до строки вставленный текст, а здесь заявку
-любого рода — текст отдают ему, поля и пост по ссылке заводят сами. Поля с выключенным
+любого рода — текст и статью отдают ему, страницу — агенту (`linked_page`),
+поля и пост по ссылке заводят сами. Поля с выключенным
 переключателем заводит мост без бота, но той же `file_fields`; бот получает
 их, только когда заведённое надо отдать откликателю, а отклик идёт через место
 прогона.
@@ -12,10 +13,11 @@ from datetime import datetime
 from typing import Literal
 
 from backend.agent.kit import AgentKit
+from backend.domain.hosts import LinkKind, article_address
 from backend.domain.telegram_identity import post_address
-from backend.flows import ingest, linked_article, pasted
-from backend.flows.hand_outcome import HandResult, tell
-from backend.flows.handover import Intake, hand_over
+from backend.flows import handover, ingest, linked_article, linked_page, pasted
+from backend.flows.hand_outcome import HandResult, show_parsing, tell
+from backend.flows.handover import hand_over
 from backend.flows.parse import Judged
 from backend.payloads import ChannelPost
 from backend.repository.channels import find_channel_by_username
@@ -23,8 +25,16 @@ from backend.repository.vacancies_life import vacancy_at_address
 from backend.repository.vacancies_new import create_vacancy
 from backend.telegram_lookup import read_post
 
-HandTab = Literal["fields", "text", "post", "channel"]
-"""Род заявки: вкладка окна, а у ссылки — то, на что она ведёт."""
+HandTab = Literal["fields", "text", "link", LinkKind]
+"""Род заявки: вкладка окна, а у ссылки — то, на что она ведёт (`link_kind`).
+
+«Ссылка» — род, с которым заявка приходит из окна; ниже бота она идёт уже
+родом самого адреса.
+"""
+
+_NOTHING_TO_READ = {"channel": "channel_link", "telegram": "no_vacancy"}
+"""Ссылки, по которым нечего читать: на канал вместо поста и прочий Telegram,
+куда агенту хода нет."""
 
 
 @dataclass(frozen=True)
@@ -39,35 +49,61 @@ class HandRequest:
 
 
 async def ingest_by_hand(kit: AgentKit, request: HandRequest) -> None:
-    """Довести заявку окна до строки; итог — вестью окну (`tell`)."""
+    """Довести заявку окна до строки; итог — вестью окну (`tell`).
+
+    Однозначный повтор узнаётся первым (`_known_address`): ни Telegram, ни
+    агент, ни модель ради уже заведённой вакансии не зовутся. Статья по ссылке
+    — тот же вставленный текст из одной ссылки, без проверки повтора: адрес
+    статьи — не страница вакансии.
+    """
+    pipeline = kit.pipeline
+    if await _known_address(pipeline, _own_address(request)):
+        return
     if request.tab == "text":
-        await pasted.ingest_pasted_text(
-            kit.pipeline, request.value, request.posted_at, request.hands_over
-        )
+        await pasted.ingest_pasted_text(pipeline, request.value, request.posted_at, request.hands_over)
+    elif request.tab == "article":
+        await pasted.ingest_pasted_text(pipeline, article_address(request.value), None, request.hands_over)
     elif request.tab == "post":
-        await _posted(kit.pipeline, request.value, request.hands_over)
-    elif request.tab == "channel":
-        tell(kit.pipeline, "channel_link")
+        await _posted(pipeline, request.value, request.hands_over)
+    elif request.tab == "page":
+        await linked_page.ingest_page(kit, request.value, handover.hand_made_intake(request.hands_over))
+    elif request.tab in _NOTHING_TO_READ:
+        tell(pipeline, _NOTHING_TO_READ[request.tab])
     else:
-        await _filed(kit.pipeline, request.value, request.hands_over)
+        await _filed(pipeline, request.value, request.hands_over)
+
+
+def _own_address(request: HandRequest) -> str | None:
+    """Собственный адрес вакансии в заявке: у поста и страницы — сама ссылка,
+    у полей — «Ссылка на объявление»; у текста и статьи его нет."""
+    if request.tab in ("post", "page"):
+        return request.value
+    if request.tab == "fields":
+        return request.value.get("source_url")
+    return None
+
+
+async def _known_address(pipeline, url: str | None) -> bool:
+    """Заведена ли уже вакансия с этим адресом; да — окну сказано (`tell_known`)."""
+    if not url:
+        return False
+    async with pipeline.session_factory() as session:
+        existing = await vacancy_at_address(session, url)
+    if existing is None:
+        return False
+    await handover.tell_known(pipeline, existing)
+    return True
 
 
 async def _posted(pipeline, url: str, hands_over: bool) -> None:
     """Завести пост Telegram по ссылке дорогой поста канала, но заведённым
     человеком: без слияния с похожими и без приговора.
 
-    Однозначный повтор — тот же адрес у заведённой строки — узнаётся первым,
-    до Telegram: у поста незаведённого или закрытого канала уникальности в
-    базе нет. Читается тем же чтением, что пост канала, — со статьями; не
-    скачалась статья — строка не заводится, как у вставленного текста:
-    человек может нажать ещё раз. Заведён канал поста — строка связана с ним.
+    Читается тем же чтением, что пост канала, — со статьями; не скачалась
+    статья — строка не заводится, как у вставленного текста: человек может
+    нажать ещё раз. Заведён канал поста — строка связана с ним.
     """
-    pipeline.emit_progress("pasted", "Разбор объявления", 0, 0)
-    async with pipeline.session_factory() as session:
-        existing = await vacancy_at_address(session, url)
-    if existing is not None:
-        tell(pipeline, "duplicate", existing)
-        return
+    show_parsing(pipeline)
     msg, trouble = await read_post(pipeline.client, post_address(url))
     if trouble is not None:
         tell(pipeline, trouble)
@@ -82,7 +118,7 @@ async def _posted(pipeline, url: str, hands_over: bool) -> None:
         return
     nick = getattr(msg.chat, "username", None)
     post = ChannelPost(await _channel_id(pipeline, nick), nick or "", msg, text, url)
-    by_hand = Intake(channel=nick, hands_over=hands_over, tells_window=True, by_hand=True)
+    by_hand = handover.hand_made_intake(hands_over, nick)
 
     async def save(embedding: list[float]) -> int | None:
         vacancy_id = await ingest.save_new_vacancy(pipeline, post, embedding, by_hand)

@@ -13,7 +13,7 @@
   // Черновик приходит своим объектом и правится на месте: отправляет его тот,
   // кто его завёл.
   import { NEW_CARD } from '$state/new_card.js';
-  import { VACANCY_MODES, isText } from '$state/vacancies.js';
+  import { VACANCY_MODES, isLink, isText } from '$state/vacancies.js';
 
   import AskDialog from './AskDialog.svelte';
   import ChoiceRow from './ChoiceRow.svelte';
@@ -22,6 +22,7 @@
   import NewVacancyFields from './NewVacancyFields.svelte';
   import PastedVacancyFields from './PastedVacancyFields.svelte';
   import RowToggle from './RowToggle.svelte';
+  import SourceUrlField from './SourceUrlField.svelte';
 
   // Подсказки и приём набранного нужны одной форме из трёх — вакансии: она
   // называет компанию и человека словами, а узнаёт их и заводит тот, кто
@@ -66,10 +67,10 @@
   {:else if kind === 'company'}
     <NewCompanyFields {draft} />
   {:else}
-    <!-- Ряд способов только у вакансии: её заводят двумя — набирают поля сами
-         или отдают боту текст объявления. У человека и компании второго нет
-         вовсе. Ряд тот же, что у грейда и формата: свой разошёлся бы с ними
-         видом. -->
+    <!-- Ряд способов только у вакансии: её заводят тремя — набирают поля сами
+         или отдают боту текст объявления или ссылку на него. У человека и
+         компании второго нет вовсе. Ряд тот же, что у грейда и формата: свой
+         разошёлся бы с ними видом. -->
     <div class="choice-line">
       <ChoiceRow
         options={VACANCY_MODES}
@@ -87,6 +88,8 @@
     </div>
     {#if isText(draft)}
       <PastedVacancyFields {draft} />
+    {:else if isLink(draft)}
+      <SourceUrlField {draft} />
     {:else}
       <NewVacancyFields {draft} {options} {oncompany} {onhr} />
     {/if}

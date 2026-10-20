@@ -1,11 +1,13 @@
-"""Разбор адреса: нормальный хост, имя сайта, остаток, принадлежность сайту, номер страницы."""
+"""Разбор адреса: нормальный хост, имя сайта, остаток, принадлежность сайту, номер страницы, род ссылки."""
 
 import re
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 from urllib.parse import parse_qsl, urlsplit
 
 from backend.domain.company_names import without_scheme
-from backend.domain.telegram_identity import post_address
+from backend.domain.telegram_identity import (
+    TELEGRAM_HOSTS, TELEGRAM_LINK_HOSTS, TELEGRAPH_HOSTS, post_address,
+)
 
 
 class AddressParts(NamedTuple):
@@ -100,6 +102,51 @@ def owning_host(url: str, hosts: set[str]) -> str | None:
     if not link_host:
         return None
     return next((host for host in sorted(hosts) if host_owns(host, link_host)), None)
+
+
+def page_owner(url: str, sites: list):
+    """Сайт из списка, которому принадлежит страница (`owning_host`); пусто — ничей.
+
+    Сайт — что угодно с полем `host`: агрегатор окна, строка обхода. Сайт без
+    хоста — «Поиск по сети» — не владеет ничем.
+    """
+    host = owning_host(url, {site.host for site in sites if site.host})
+    return next((site for site in sites if host and site.host == host), None)
+
+
+LinkKind = Literal["article", "post", "channel", "telegram", "page"]
+"""Куда ведёт ссылка, вставленная человеком."""
+
+
+def article_address(url: str) -> str:
+    """Адрес статьи так, как его узнаёт склейка статей: схема и хост строчными.
+
+    Человек вставляет его как попало — без схемы, заглавными, — а склейка ищет
+    статьи в тексте по одному написанию.
+    """
+    return f"https://{normalize_host(url)}/{address_parts(url.strip()).path}"
+
+
+def on_telegram(url: str) -> bool:
+    """Ведёт ли адрес в Telegram или на его статьи — туда, что читает приём постов."""
+    return owning_host(url, set(TELEGRAM_HOSTS)) is not None
+
+
+def link_kind(url: str) -> LinkKind:
+    """Род ссылки — одно правило по самому адресу: статья Telegraph, пост
+    Telegram, иная ссылка Telegram на канал или приглашение, прочий Telegram —
+    мгновенный просмотр, корень статей, — или любая другая страница.
+
+    Прочий Telegram отдельным родом, а не страницей: агенту туда хода нет.
+    """
+    parts = address_parts(url.strip())
+    if owning_host(url, set(TELEGRAPH_HOSTS)):
+        return "article" if parts.path else "telegram"
+    if post_address(url) is not None:
+        return "post"
+    if owning_host(url, set(TELEGRAM_LINK_HOSTS)):
+        return "telegram" if parts.path.split("/", 1)[0] in ("", "iv") else "channel"
+    return "page"
 
 
 def source_key(url: str, aggregator_host: str | None) -> str | None:

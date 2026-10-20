@@ -3,7 +3,7 @@
 from adapters.browser import BROWSER_NAMES, InstalledBrowser, find_browser
 from backend.provider_config import LlmProviderConfig, serves_claude_code
 
-NO_DRIVER = "Для агрегаторов нужен Claude Code: выберите его поставщиком чата."
+NO_DRIVER = "Нужен Claude Code: выберите его поставщиком чата."
 NO_BROWSER = (
     f"Не найден браузер на движке Chromium: {', '.join(BROWSER_NAMES[:-1])} "
     f"или {BROWSER_NAMES[-1]}."

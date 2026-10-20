@@ -13,7 +13,7 @@ from tests.backend.fixtures.flows import similar_by_hand
 from tests.dbio import all_rows, put
 from tests.factories import blacklist_row, profile_row
 from tests.factories_aggregators import aggregator_row
-from tests.fakes.agent import LimitHit, captcha_step, finish_step, scripted_kit
+from tests.fakes.agent import LimitHit, captcha_step, finish_step, scripted_kit, submit_step
 
 pytestmark = pytest.mark.usefixtures("one_vector")
 
@@ -41,9 +41,7 @@ async def _submit(tools, url=PAGE):
     await tools["submit_vacancy"](text=f"Текст {url}", url=url, published="", contacts=[])
 
 
-async def _submit_and_finish(tools):
-    await _submit(tools)
-    await tools["finish"](result="done")
+_submit_and_finish = submit_step(PAGE)
 
 
 async def test_a_finished_search_moves_the_last_run_and_parses_what_it_found(

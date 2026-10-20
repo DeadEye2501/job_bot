@@ -249,7 +249,7 @@
 
 ### `backend/agent/availability.py`
 
-- `NO_DRIVER` = `'Для агрегаторов нужен Claude Code: выберите его…`
+- `NO_DRIVER` = `'Нужен Claude Code: выберите его поставщиком чат…`
 - `NO_BROWSER` = `f"Не найден браузер на движке Chromium: {', '.jo…`
 
 ### `backend/agent/confirm.py`
@@ -305,6 +305,8 @@
   - `nested: bool` = `False`
   - `stopper: Exception | None` = `None`
   - `outcome: Outcome | None` = `None`
+  - `page: str | None` = `None`
+  - `intake: 'Intake'` = `field(default_factory=lambda: _automatic())`
 - `class ApplyJob`
   - `vacancy_id: int`
   - `way: Way`
@@ -398,7 +400,10 @@
 
 ### `backend/agent/prompts/seeker.py`
 
+- `_SUBMIT` = `'submit_vacancy: текст вакансии со страницы досл…`
+- `_ANSWERS` = `'Ответ submit_vacancy: «принята», «повтор», «про…`
 - `_SELECTION` = `'Отбор — средний. После тебя каждую вакансию про…`
+- `PAGE_PROMPT` = `'Твоя задача — передать приложению вакансию со с…`
 - `SEEKER_PROMPT` = `'Твоя задача — найти на сайте агрегатора свежие …`
 - `WEB_SEEKER_PROMPT` = `'Твоя задача — найти по всей сети свежие ваканси…`
 - `class SeekBounds`
@@ -473,6 +478,7 @@
 - `STOPPED` = `'Работа остановлена: заверши сессию — finish с r…`
 - `LIMIT_REACHED` = `'предел исчерпан; заверши работу: finish с resul…`
 - `BACK` = `'вкладка могла уйти: вернись к выдаче — browser_…`
+- `NOT_THIS_PAGE` = `'не та страница: передавай вакансию только со ст…`
 - `class _Page`
   - `text: str`
   - `url: str`
@@ -608,7 +614,7 @@
 
 - `logger` = `logging.getLogger(__name__)`
 - `TOLD` = `work.TOLD`
-- `PastedOutcome` = `Literal[work.WorkOutcome, 'told']`
+- `PastedOutcome` = `Literal[work.WorkOutcome, 'told', 'locked']`
 
 ### `backend/bot/rerun.py`
 
@@ -725,6 +731,7 @@
   - `query: str`
   - `fragment: str`
 - `_ZONE_SECOND_LEVELS` = `frozenset({'co', 'com', 'net', 'org', 'ac', 'gov…`
+- `LinkKind` = `Literal['article', 'post', 'channel', 'telegram'…`
 - `class VacancyPage(NamedTuple)`
   - `platform: str`
   - `host: str`
@@ -923,7 +930,8 @@
 
 ### `backend/flows/hand_made.py`
 
-- `HandTab` = `Literal['fields', 'text', 'post', 'channel']`
+- `HandTab` = `Literal['fields', 'text', 'link', LinkKind]`
+- `_NOTHING_TO_READ` = `словарь из 2`
 - `class HandRequest`
   - `tab: HandTab`
   - `value: str | dict`
@@ -2207,6 +2215,7 @@
 - `NOTHING_TO_UPDATE` = `'Нечего обновлять'`
 - `NAME_REQUIRED` = `'Название обязательно'`
 - `TEXT_REQUIRED` = `'Вставьте текст объявления'`
+- `URL_REQUIRED` = `'Вставьте ссылку на объявление'`
 - `IDENTITY_REQUIRED` = `'Укажите хотя бы имя или @username'`
 - `COMPANY_EXISTS` = `'Компания «{name}» уже существует'`
 - `CODE_FIRST` = `'Сначала запросите код подтверждения'`
@@ -2225,7 +2234,7 @@
 - `POLL_REFUSALS` = `словарь из 5 и раскрытых`
 - `RERUN_REFUSALS` = `словарь из 6 и раскрытых`
 - `TELEGRAM_REFUSALS` = `словарь из 3`
-- `PASTED_REFUSALS` = `словарь из 10 и раскрытых`
+- `PASTED_REFUSALS` = `словарь из 11 и раскрытых`
 - `CALM` = `frozenset({'duplicate'})`
 - `PARSE_CV_REFUSALS` = `словарь из 5`
 - `NO_AGGREGATOR` = `'Агрегатор не найден'`
@@ -2466,11 +2475,18 @@
 ### `tests/backend/test_flows_aggregator_seek.py`
 
 - `pytestmark` = `pytest.mark.usefixtures('one_vector')`
+- `_submit_and_finish` = `submit_step(PAGE)`
 
 ### `tests/backend/test_flows_ghosting_timer.py`
 
 - `_SILENT_DAYS` = `15`
 - `_STILL_WAITING_DAYS` = `13`
+
+### `tests/backend/test_flows_linked_page.py`
+
+- `pytestmark` = `pytest.mark.usefixtures('one_vector')`
+- `HH_PAGE` = `'https://hh.ru/vacancy/123'`
+- `COMPANY_PAGE` = `'https://company.test/careers/qa'`
 
 ### `tests/backend/test_flows_new_vacancy.py`
 

@@ -89,11 +89,16 @@ async def source_trashed(session: AsyncSession, aggregator_id: int, key: str) ->
     )
 
 
-async def source_seen(session: AsyncSession, aggregator_id: int, key: str) -> bool:
-    """Видели ли номер на этом агрегаторе: вакансия с ним заведена или удалена как мусор."""
-    stored = await session.scalar(select(Vacancy.id).where(
+async def source_row(session: AsyncSession, aggregator_id: int, key: str) -> int | None:
+    """Заведённая вакансия с этим номером на этом агрегаторе; пусто — такой нет."""
+    return await session.scalar(select(Vacancy.id).where(
         Vacancy.source_aggregator_id == aggregator_id, Vacancy.source_key == key
     ).limit(1))
+
+
+async def source_seen(session: AsyncSession, aggregator_id: int, key: str) -> bool:
+    """Видели ли номер на этом агрегаторе: вакансия с ним заведена или удалена как мусор."""
+    stored = await source_row(session, aggregator_id, key)
     return stored is not None or await source_trashed(session, aggregator_id, key)
 
 

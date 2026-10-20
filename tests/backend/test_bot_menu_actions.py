@@ -59,6 +59,40 @@ async def test_pasted_text_reaches_the_intake_and_frees_the_slot(make_bot, reque
     assert bot.current_poll_task is None
 
 
+@pytest.mark.parametrize(("url", "kind"), [
+    ("https://t.me/pyjobs/5", "post"),
+    ("https://telegra.ph/QA-08-21", "article"),
+    ("https://t.me/pyjobs", "channel"),
+], ids=["пост", "статья", "канал"])
+async def test_a_link_is_sorted_once_by_the_bot(make_bot, requests_seen, url, kind):
+    """Род ссылки бот решает один раз, и ниже заявка идёт уже своего рода."""
+    bot = wire(await make_bot(), FakeIngestion())
+
+    await bot.ui_ingest_pasted_text(HandRequest("link", url, None, True))
+
+    ((_, request),) = requests_seen
+    assert request == HandRequest(kind, url, None, True)
+
+
+async def test_a_page_without_claude_code_is_locked_before_the_slot(make_bot, requests_seen):
+    """Страницу читает агент, а без Claude Code его нет: отказ сразу, работа не
+    начинается. Пост и статья агента не ждут."""
+    bot = wire(await make_bot(), FakeIngestion())
+
+    assert await bot.ui_ingest_pasted_text(HandRequest("link", "https://hh.ru/vacancy/1", None, False)) == "locked"
+    assert requests_seen == []
+
+
+async def test_a_page_with_the_agent_at_hand_goes_through(make_bot, requests_seen, monkeypatch):
+    monkeypatch.setattr(pasted_mod, "aggregators_available", lambda bot: None)
+    bot = wire(await make_bot(), FakeIngestion())
+
+    await bot.ui_ingest_pasted_text(HandRequest("link", "https://hh.ru/vacancy/1", None, False))
+
+    ((_, request),) = requests_seen
+    assert request.tab == "page"
+
+
 async def test_a_job_that_never_told_the_window_answers_with_its_own_end(make_bot, monkeypatch):
     """Работа сорвалась до итога — окно слышит срыв: другой вести не будет."""
     bot = wire(await make_bot(), FakeIngestion())

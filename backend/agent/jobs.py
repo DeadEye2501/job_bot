@@ -2,10 +2,14 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from backend.domain.apply_order import Way
 from backend.models import Aggregator
 from backend.payloads import SeenResume
+
+if TYPE_CHECKING:
+    from backend.flows.handover import Intake
 
 
 @dataclass(frozen=True)
@@ -100,7 +104,11 @@ class SeekJob:
 
     `nested` — идёт цикл находки, вложенный в вызов инструмента: срок искателя
     стоит. `stopper` — беда, снявшая работу посреди этого цикла (`RUN_STOPPERS`);
-    поднимается после конца сессии, чтобы агент успел её закончить сам."""
+    поднимается после конца сессии, чтобы агент успел её закончить сам.
+
+    `page` — страница, которую принёс человек: искатель не ищет, а заводит
+    вакансию с неё; `intake` — как вести найденное (у страницы человека —
+    заведённой вручную)."""
 
     source: Source
     limit: int
@@ -109,6 +117,19 @@ class SeekJob:
     nested: bool = False
     stopper: Exception | None = None
     outcome: Outcome | None = None
+    page: str | None = None
+    intake: "Intake" = field(default_factory=lambda: _automatic())
+
+
+def _automatic() -> "Intake":
+    """Находка автоматики: ведётся по умолчанию.
+
+    Ввоз здесь, а не наверху: передача ввозит откликателя, а тот — эти задачи,
+    и ввоз наверху замкнул бы круг.
+    """
+    from backend.flows.handover import Intake
+
+    return Intake()
 
 
 @dataclass

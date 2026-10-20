@@ -1,9 +1,12 @@
-"""Заведение вакансии из окна, которое ведёт бот: вставленный текст и поля к отклику."""
+"""Заведение вакансии из окна, которое ведёт бот: текст, ссылка и поля к отклику — в месте прогона."""
 
 import logging
+from dataclasses import replace
 from typing import Literal
 
 from backend.bot import work
+from backend.bot.aggregators import aggregators_available
+from backend.domain.hosts import link_kind
 from backend.flows import hand_made
 from backend.flows.hand_made import HandRequest
 
@@ -11,11 +14,12 @@ logger = logging.getLogger(__name__)
 
 TOLD = work.TOLD
 
-PastedOutcome = Literal[work.WorkOutcome, "told"]
+PastedOutcome = Literal[work.WorkOutcome, "told", "locked"]
 """Чем кончилась работа заведения, как это видит окно.
 
-«Сказано» значит, что второй вести не нужно. Остальное — отказы места
-прогона, до итога заведения не дошедшего.
+«Сказано» значит, что второй вести не нужно. «Заперто» — страницу по ссылке
+читает агент, а его сейчас нет. Остальное — отказы места прогона, до итога
+заведения не дошедшего.
 """
 
 
@@ -31,6 +35,11 @@ async def ui_ingest_pasted_text(bot, request: HandRequest) -> PastedOutcome:
     вторая весть «не удалось завести» была бы неправдой. О срыве отклика окно
     узнаёт своим путём (`work.agent_work`).
     """
+    if request.tab == "link":
+        # Род ссылки решается здесь, один раз: ниже заявка идёт уже им.
+        request = replace(request, tab=link_kind(request.value))
+        if request.tab == "page" and aggregators_available(bot) is not None:
+            return "locked"
     logger.info("UI hand-made vacancy from tab %s", request.tab)
     bot.ingestion.hand_made_told = False
 

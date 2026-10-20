@@ -16,7 +16,7 @@
   import { personName } from '$state/people.js';
   import { labels, sameName } from '$state/picker.js';
   import { round } from '$state/round.svelte.js';
-  import { handsOverToggle, isText, pasteLock, vacancyFields, viaBot } from '$state/vacancies.js';
+  import { handsOverToggle, isLink, isText, pasteLock, vacancyFields, viaBot } from '$state/vacancies.js';
 
   // `newVacancy` — черновик и положение «Отклик при создании»; держит их
   // оболочка, потому что оба переживают этот экран. `onhandmade(news)` — что
@@ -60,18 +60,28 @@
       newVacancy.handed = true;
       awaited.start(HAND_MADE_ACTION, onhandmade);
     }
-    const answer = await (isText(draft)
-      ? ask('vacancies.create_from_text', {
-          raw_text: draft.raw_text,
-          posted_at: draft.posted_at,
-          hands_over: handsOver.checked,
-        })
-      : ask('vacancies.create', { ...vacancyFields(draft), hands_over: handsOver.checked }));
+    const answer = await sent(draft);
     if (answer === null && awaits) {
       newVacancy.handed = false;
       awaited.cancel(HAND_MADE_ACTION);
     }
     return answer;
+  }
+
+  /** Зов моста своей вкладки: ссылка уходит тем же слотом, что текст, одним
+   *  адресом — что за ней, решает бот. */
+  function sent(draft) {
+    if (isText(draft)) {
+      return ask('vacancies.create_from_text', {
+        raw_text: draft.raw_text,
+        posted_at: draft.posted_at,
+        hands_over: handsOver.checked,
+      });
+    }
+    if (isLink(draft)) {
+      return ask('vacancies.create_from_text', { url: draft.source_url, hands_over: handsOver.checked });
+    }
+    return ask('vacancies.create', { ...vacancyFields(draft), hands_over: handsOver.checked });
   }
 
   /** Запомнить положение галочки; ответ зову — «легло», держать нечего. */

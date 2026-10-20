@@ -1,6 +1,12 @@
-"""Обход источника-агрегатора: поиск, где каждая находка проходит весь цикл до отклика."""
+"""Обход источника-агрегатора: поиск, где каждая находка проходит весь цикл до отклика.
+
+Здесь же живёт запуск сессии искателя (`run_seeker_on`, `open_clean_profile`):
+страница, принесённая человеком (`linked_page`), идёт той же сессией, только
+со своим наставлением и заданием.
+"""
 
 import logging
+from collections.abc import Awaitable, Callable
 from datetime import datetime
 
 from backend.agent.jobs import Finished, SeekJob, Source
@@ -51,25 +57,37 @@ async def open_clean_profile(kit: AgentKit, source_id: int) -> None:
 
 
 async def _search(kit: AgentKit, job: SeekJob) -> AgentEnd:
-    """Слепки конвейера освежаются до поиска: обход идёт без приёма каналов,
-    который их освежает, и без этого балл был бы нулевым, а чёрный список молчал."""
+    return await run_seeker_on(kit, job, lambda tools: _seek_plan(kit, job, tools))
+
+
+async def run_seeker_on(
+    kit: AgentKit, job: SeekJob, plan_of: Callable[[list], Awaitable[SessionPlan]]
+) -> AgentEnd:
+    """Сессия искателя на профиле его источника — у обхода и у страницы
+    человека одна: чистый кеш, свежие слепки, инструменты, сроки искателя.
+
+    `plan_of(tools)` собирает план из инструментов — наставление и задание у
+    каждого своё. Слепки конвейера освежаются до сессии: обход идёт без приёма
+    каналов, который их освежает, и без этого балл был бы нулевым, а чёрный
+    список молчал.
+    """
     await open_clean_profile(kit, job.source.id)
     await kit.pipeline.reload_resources()
-    return await run_seeker(kit, job, await _seek_plan(kit, job))
-
-
-async def _seek_plan(kit: AgentKit, job: SeekJob) -> SessionPlan:
-    source = job.source
     tools = [*common_tools(kit, job), *seeker_tools(kit, job), *browser_tools(kit, None, None)]
+    return await run_seeker(kit, job, seeker_plan(kit, job, await plan_of(tools)))
+
+
+async def _seek_plan(kit: AgentKit, job: SeekJob, tools: list) -> SessionPlan:
+    source = job.source
     bounds = SeekBounds(source.last_run_at, job.limit, kit.today, await kit.read(read_search_languages))
     if source.host is not None:
         task = seeker_task(source.host, bounds)
-        return seeker_plan(kit, job, SessionPlan(system_prompt(SEEKER_PROMPT, tools), task, tools, web_search=False))
+        return SessionPlan(system_prompt(SEEKER_PROMPT, tools), task, tools, web_search=False)
     async with kit.pipeline.session_factory() as session:
         hosts = [a.host for a in await list_aggregators(session) if a.host] + sorted(TELEGRAM_HOSTS)
         barred = sorted(await barred_hosts(session))
     task = web_seeker_task(hosts, barred, bounds)
-    return seeker_plan(kit, job, SessionPlan(system_prompt(WEB_SEEKER_PROMPT, tools), task, tools, web_search=True))
+    return SessionPlan(system_prompt(WEB_SEEKER_PROMPT, tools), task, tools, web_search=True)
 
 
 async def _settle(kit: AgentKit, job: SeekJob, end: AgentEnd, started: datetime) -> None:

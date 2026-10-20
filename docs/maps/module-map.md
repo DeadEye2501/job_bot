@@ -351,7 +351,7 @@ init
 - `def upgrade() -> None` (331)
 - `def downgrade() -> None` (44)
 
-## backend — 211 модулей
+## backend — 212 модулей
 
 ### `backend/agent/__init__.py` — 1 строк
 
@@ -404,11 +404,11 @@ init
   - `def reset(self) -> None` (6)
   - `async def _take(self, browser) -> str | dict` (13)
 
-### `backend/agent/jobs.py` — 183 строк
+### `backend/agent/jobs.py` — 204 строк
 
 Задачи сессий агента и их итоги.
 
-Зависит от: `backend.domain.apply_order`, `backend.models`, `backend.payloads`
+Зависит от: `backend.domain.apply_order`, `backend.flows.handover`, `backend.models`, `backend.payloads`
 
 - `class Source` (18)
   - `def of(cls, row: Aggregator) -> 'Source'` (3)
@@ -419,7 +419,8 @@ init
 - `class Dropped` (9)
 - `class LoginJob` (3)
 - `class ScanJob` (8)
-- `class SeekJob` (15)
+- `class SeekJob` (21)
+- `def _automatic() -> 'Intake'` (9)
 - `class ApplyJob` (29)
 - `class FillJob` (24)
 
@@ -502,15 +503,16 @@ init
 Зависит от: `backend.llm.rules`
 
 
-### `backend/agent/prompts/seeker.py` — 79 строк
+### `backend/agent/prompts/seeker.py` — 95 строк
 
-Искатели вакансий: на сайте агрегатора и по всей сети.
+Искатели вакансий: на сайте агрегатора, по всей сети и на странице, которую принёс человек.
 
 Зависит от: —
 
 - `class SeekBounds` (9)
 - `def seeker_task(host: str, bounds: SeekBounds) -> str` (3)
 - `def web_seeker_task(aggregator_hosts: list[str], barred_hosts: list[str], bounds: SeekBounds) -> str` (8)
+- `def page_task(url: str) -> str` (3)
 - `def _bounds(bounds: SeekBounds) -> list[str]` (7)
 - `def _since(last_run: datetime | None) -> str` (4)
 
@@ -680,18 +682,22 @@ init
 - `def scan_tools(kit: AgentKit, job: ScanJob) -> list[Callable]` (21)
   - `async def report_resumes(resumes: list[SeenResume], many_resumes: bool, signs_found: str) -> str` (7)
 
-### `backend/agent/tools_seeker.py` — 190 строк
+### `backend/agent/tools_seeker.py` — 247 строк
 
 Инструменты искателя: известна ли вакансия и передача найденного в конвейер.
 
-Зависит от: `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.stops`, `backend.domain.hosts`, `backend.domain.telegram_identity`, `backend.flows`, `backend.flows.handover`, `backend.incoming`, `backend.models`, `backend.repository.aggregators`, `backend.repository.vacancies_life`, `backend.repository.vacancy_contacts`
+Зависит от: `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.stops`, `backend.domain.hosts`, `backend.flows`, `backend.flows.hand_outcome`, `backend.incoming`, `backend.models`, `backend.repository.aggregators`, `backend.repository.vacancies_life`, `backend.repository.vacancy_contacts`
 
-- `def seeker_tools(kit: AgentKit, job: SeekJob) -> list[Callable]` (17)
+- `def seeker_tools(kit: AgentKit, job: SeekJob) -> list[Callable]` (22)
   - `async def is_known(url: str) -> str` (8)
-  - `async def submit_vacancy(text: str, url: str, published: str, contacts: list[str]) -> str` (3)
+  - `async def submit_vacancy(text: str, url: str, published: str, contacts: list[str]) -> str` (4)
 - `class _Page` (5)
-- `async def _submit(kit: AgentKit, job: SeekJob, page: _Page) -> str` (34)
-- `async def _through(kit: AgentKit, job: SeekJob, answer: str, cycle: Awaitable) -> str` (23)
+- `async def _submit(kit: AgentKit, job: SeekJob, page: _Page) -> str` (31)
+- `async def _submit_page(kit: AgentKit, job: SeekJob, page: _Page) -> str` (29)
+  - `async def save(embedding: list[float]) -> int` (2)
+- `async def _filed(kit: AgentKit, job: SeekJob, page: _Page, key: str, embedding: list[float]) -> str` (6)
+- `async def _through(kit: AgentKit, job: SeekJob, answer: str, cycle: Awaitable) -> str` (25)
+- `def _show_bar(kit: AgentKit, job: SeekJob) -> None` (7)
 - `def _left(answer: str, job: SeekJob) -> str` (2)
 - `async def _numbered(kit: AgentKit, job: SeekJob, url: str) -> tuple[str | None, str]` (16)
 - `async def _barred(kit: AgentKit, url: str) -> bool` (3)
@@ -978,13 +984,13 @@ First-run bootstrap: ensure DB schema exists.
 - `def drop_stored_media(relative: str) -> None` (5)
 - `async def download_media(client, msg, hr_id: int) -> str | None` (25)
 
-### `backend/bot/pasted.py` — 42 строк
+### `backend/bot/pasted.py` — 51 строк
 
-Заведение вакансии из окна, которое ведёт бот: вставленный текст и поля к отклику.
+Заведение вакансии из окна, которое ведёт бот: текст, ссылка и поля к отклику — в месте прогона.
 
-Зависит от: `backend.bot`, `backend.flows`, `backend.flows.hand_made`
+Зависит от: `backend.bot`, `backend.bot.aggregators`, `backend.domain.hosts`, `backend.flows`, `backend.flows.hand_made`
 
-- `async def ui_ingest_pasted_text(bot, request: HandRequest) -> PastedOutcome` (21)
+- `async def ui_ingest_pasted_text(bot, request: HandRequest) -> PastedOutcome` (26)
   - `async def job(kit) -> str` (3)
 
 ### `backend/bot/rerun.py` — 38 строк
@@ -1075,7 +1081,7 @@ First-run bootstrap: ensure DB schema exists.
 Зависит от: —
 
 
-### `backend/domain/apply_order.py` — 122 строк
+### `backend/domain/apply_order.py` — 117 строк
 
 Какими способами откликнуться и в каком порядке.
 
@@ -1091,7 +1097,6 @@ First-run bootstrap: ensure DB schema exists.
 - `def _forms(vacancy: VacancyFacts, world: World) -> list[Way]` (10)
 - `def _links(vacancy: VacancyFacts) -> list[str]` (9)
 - `def _contact_links(vacancy: VacancyFacts) -> list[str]` (2)
-- `def _owner(link: str, sites: list[KnownSite]) -> KnownSite | None` (3)
 
 ### `backend/domain/blacklist.py` — 56 строк
 
@@ -1173,9 +1178,9 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def percent_or_none(numerator: int, denominator: int) -> int | None` (14)
 
-### `backend/domain/hosts.py` — 219 строк
+### `backend/domain/hosts.py` — 266 строк
 
-Разбор адреса: нормальный хост, имя сайта, остаток, принадлежность сайту, номер страницы.
+Разбор адреса: нормальный хост, имя сайта, остаток, принадлежность сайту, номер страницы, род ссылки.
 
 Зависит от: `backend.domain.company_names`, `backend.domain.telegram_identity`
 
@@ -1186,6 +1191,10 @@ First-run bootstrap: ensure DB schema exists.
 - `def host_owns(host: str, link_host: str) -> bool` (6)
 - `def owning_hosts(host: str) -> list[str]` (9)
 - `def owning_host(url: str, hosts: set[str]) -> str | None` (10)
+- `def page_owner(url: str, sites: list)` (8)
+- `def article_address(url: str) -> str` (7)
+- `def on_telegram(url: str) -> bool` (3)
+- `def link_kind(url: str) -> LinkKind` (15)
 - `def source_key(url: str, aggregator_host: str | None) -> str | None` (15)
 - `class VacancyPage(NamedTuple)` (8)
 - `def vacancy_address_key(url: str) -> str | None` (30)
@@ -1379,7 +1388,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def _model_name(host: str, hints: list[str], chat: LlmProviderConfig | None) -> str | None` (12)
 - `def _site_like_part(host: str, parts: tuple[str, ...]) -> str | None` (10)
 
-### `backend/flows/aggregator_round.py` — 80 строк
+### `backend/flows/aggregator_round.py` — 98 строк
 
 Обход источника-агрегатора: поиск, где каждая находка проходит весь цикл до отклика.
 
@@ -1387,8 +1396,9 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def seek_source(kit: AgentKit, source: Source) -> None` (18)
 - `async def open_clean_profile(kit: AgentKit, source_id: int) -> None` (5)
-- `async def _search(kit: AgentKit, job: SeekJob) -> AgentEnd` (6)
-- `async def _seek_plan(kit: AgentKit, job: SeekJob) -> SessionPlan` (12)
+- `async def _search(kit: AgentKit, job: SeekJob) -> AgentEnd` (2)
+- `async def run_seeker_on(kit: AgentKit, job: SeekJob, plan_of: Callable[[list], Awaitable[SessionPlan]]) -> AgentEnd` (15)
+- `async def _seek_plan(kit: AgentKit, job: SeekJob, tools: list) -> SessionPlan` (11)
 - `async def _settle(kit: AgentKit, job: SeekJob, end: AgentEnd, started: datetime) -> None` (6)
 
 ### `backend/flows/aggregator_scan.py` — 34 строк
@@ -1584,30 +1594,33 @@ First-run bootstrap: ensure DB schema exists.
 
 - `async def check_ghosting_timeouts(pipeline) -> int` (26)
 
-### `backend/flows/hand_made.py` — 125 строк
+### `backend/flows/hand_made.py` — 161 строк
 
 Заявка окна «Добавить вакансию»: довести её до строки дорогой её рода.
 
-Зависит от: `backend.agent.kit`, `backend.domain.telegram_identity`, `backend.flows`, `backend.flows.hand_outcome`, `backend.flows.handover`, `backend.flows.parse`, `backend.payloads`, `backend.repository.channels`, `backend.repository.vacancies_life`, `backend.repository.vacancies_new`, `backend.telegram_lookup`
+Зависит от: `backend.agent.kit`, `backend.domain.hosts`, `backend.domain.telegram_identity`, `backend.flows`, `backend.flows.hand_outcome`, `backend.flows.handover`, `backend.flows.parse`, `backend.payloads`, `backend.repository.channels`, `backend.repository.vacancies_life`, `backend.repository.vacancies_new`, `backend.telegram_lookup`
 
 - `class HandRequest` (8)
-- `async def ingest_by_hand(kit: AgentKit, request: HandRequest) -> None` (12)
-- `async def _posted(pipeline, url: str, hands_over: bool) -> None` (41)
+- `async def ingest_by_hand(kit: AgentKit, request: HandRequest) -> None` (23)
+- `def _own_address(request: HandRequest) -> str | None` (8)
+- `async def _known_address(pipeline, url: str | None) -> bool` (10)
+- `async def _posted(pipeline, url: str, hands_over: bool) -> None` (34)
   - `async def save(embedding: list[float]) -> int | None` (7)
 - `async def _channel_id(pipeline, nick: str | None) -> int | None` (7)
 - `async def file_fields(session_factory, fields: dict) -> HandResult` (8)
 - `async def _filed(pipeline, fields: dict, hands_over: bool) -> None` (9)
 
-### `backend/flows/hand_outcome.py` — 42 строк
+### `backend/flows/hand_outcome.py` — 50 строк
 
 Итог ручного заведения для окна: чем кончилось и о какой вакансии.
 
 Зависит от: `backend.telegram_lookup`
 
 - `class HandResult` (6)
+- `def show_parsing(pipeline) -> None` (5)
 - `def tell(pipeline, outcome: HandOutcome, vacancy_id: int | None=None) -> None` (8)
 
-### `backend/flows/handover.py` — 125 строк
+### `backend/flows/handover.py` — 149 строк
 
 Передача отобранного откликателю: решение «откликаться» и догон новых HR после отклика.
 
@@ -1615,6 +1628,8 @@ First-run bootstrap: ensure DB schema exists.
 
 - `class Intake` (28)
   - `def event(self, kind: str, payload: dict) -> tuple[str, dict]` (10)
+- `def hand_made_intake(hands_over: bool, channel: str | None=None) -> Intake` (4)
+- `async def tell_known(pipeline, vacancy_id: int) -> None` (16)
 - `async def orphan_intake(pipeline, vacancy_id: int, intake: Intake) -> Intake` (11)
 - `async def finish_orphan(pipeline, vacancy_id: int, text: str, intake: Intake) -> bool` (11)
 - `async def to_apply(session_factory, vacancy_ids: list[int]) -> list[int]` (9)
@@ -1653,6 +1668,16 @@ First-run bootstrap: ensure DB schema exists.
 - `def _blame_the_site(url: str, trouble: httpx.HTTPError) -> None` (16)
 - `async def with_linked_articles(text: str) -> tuple[str, bool]` (37)
 - `async def post_full_text(msg) -> tuple[str, bool] | None` (6)
+
+### `backend/flows/linked_page.py` — 44 строк
+
+Страница вакансии по ссылке человека: агент открывает её и заводит вакансию.
+
+Зависит от: `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.prompts.frame`, `backend.agent.prompts.seeker`, `backend.domain.hosts`, `backend.flows.aggregator_round`, `backend.flows.hand_outcome`, `backend.flows.handover`, `backend.repository.aggregators`
+
+- `async def ingest_page(kit: AgentKit, url: str, intake: Intake) -> None` (19)
+  - `async def plan(tools: list) -> SessionPlan` (2)
+- `async def _source(kit: AgentKit, url: str) -> Source` (5)
 
 ### `backend/flows/parse.py` — 341 строк ⚠ подошёл к 300
 
@@ -1693,13 +1718,13 @@ First-run bootstrap: ensure DB schema exists.
 - `def _parsed_event_payload(v: Vacancy, outcome: Outcome, decision) -> dict` (15)
 - `async def persist_parse_outcome(pipeline, vacancy_id: int, parsed: ParsedVacancy | None, outcome: Outcome) -> tuple[HR | None, bool] | None` (41)
 
-### `backend/flows/pasted.py` — 99 строк
+### `backend/flows/pasted.py` — 96 строк
 
 Приём объявления, вставленного человеком: тот же конвейер, но без канала.
 
 Зависит от: `backend.flows`, `backend.flows.hand_outcome`, `backend.flows.handover`, `backend.models`
 
-- `async def ingest_pasted_text(pipeline, text: str, posted_at: datetime | None, hands_over: bool) -> None` (37)
+- `async def ingest_pasted_text(pipeline, text: str, posted_at: datetime | None, hands_over: bool) -> None` (34)
   - `async def save(embedding: list[float]) -> int` (6)
 - `async def file_by_hand(pipeline, text: str, by_hand: Intake, save: Callable[[list[float]], Awaitable[int | None]]) -> None` (21)
 
@@ -2364,7 +2389,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def drop_resume(session: AsyncSession, aggregator_id: int, url: str) -> None` (10)
 - `async def chosen_resume(session: AsyncSession, aggregator_id: int) -> AggregatorResume | None` (6)
 
-### `backend/repository/aggregators.py` — 239 строк
+### `backend/repository/aggregators.py` — 245 строк
 
 Ведение записей об агрегаторах.
 
@@ -2373,7 +2398,8 @@ First-run bootstrap: ensure DB schema exists.
 - `async def find_aggregator(session: AsyncSession, host: str) -> Aggregator | None` (3)
 - `async def create_aggregator(session: AsyncSession, address: str, name: str, avatar: bytes | None) -> tuple[Aggregator | None, str]` (14)
 - `async def list_aggregators(session: AsyncSession) -> list[Aggregator]` (5)
-- `async def web_search_id(session: AsyncSession) -> int` (3)
+- `async def web_search_row(session: AsyncSession) -> Aggregator | None` (3)
+- `async def web_search_id(session: AsyncSession) -> int` (4)
 - `def aggregator_blacklist_candidates(row: Aggregator) -> list[str]` (10)
 - `async def deactivate_blacklisted_aggregators(session: AsyncSession) -> int` (6)
 - `async def barred_hosts(session: AsyncSession) -> set[str]` (7)
@@ -2889,7 +2915,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _last_activity(vacancy: Vacancy, last_msg_at, entered_at, touched_at)` (10)
 - `async def mark_ghosted_vacancies(session: AsyncSession, *, timeout_days: int) -> list[int]` (27)
 
-### `backend/repository/vacancies_life.py` — 200 строк
+### `backend/repository/vacancies_life.py` — 205 строк
 
 Что случается с вакансией после того, как её завели, кроме смены статуса.
 
@@ -2898,7 +2924,8 @@ First-run bootstrap: ensure DB schema exists.
 - `async def repoint_vacancies(session: AsyncSession, column, *, absorbed_id: int, survivor_id: int | None) -> int` (23)
 - `async def record_trash_event(session: AsyncSession, vacancy: Vacancy | None, reason: str | None) -> None` (20)
 - `async def source_trashed(session: AsyncSession, aggregator_id: int, key: str) -> bool` (7)
-- `async def source_seen(session: AsyncSession, aggregator_id: int, key: str) -> bool` (6)
+- `async def source_row(session: AsyncSession, aggregator_id: int, key: str) -> int | None` (5)
+- `async def source_seen(session: AsyncSession, aggregator_id: int, key: str) -> bool` (4)
 - `async def vacancy_at_address(session: AsyncSession, url: str) -> int | None` (20)
 - `async def _trash_noted(session: AsyncSession, mark: TrashEvent) -> bool` (11)
 - `async def _marked(session: AsyncSession, *same) -> bool` (2)
@@ -3645,7 +3672,7 @@ Runtime settings layer.
 - `def _photo_url(relative: str) -> str | None` (11)
 - `def _read_profile_fields(payload: dict) -> dict` (32)
 
-### `client/bridge/refusals.py` — 334 строк ⚠ подошёл к 300
+### `client/bridge/refusals.py` — 336 строк ⚠ подошёл к 300
 
 Слова, которыми мост отказывает окну.
 
@@ -3758,14 +3785,14 @@ Runtime settings layer.
 - `def _probed(task: Future) -> None` (16)
 - `def _after(asked) -> int | None` (21)
 
-### `client/bridge/vacancies.py` — 361 строк ⚠ подошёл к 300
+### `client/bridge/vacancies.py` — 369 строк ⚠ подошёл к 300
 
 Экран «Вакансии»: список, карточка и правки в них.
 
 Зависит от: `backend.domain.scoring`, `backend.flows`, `backend.flows.hand_made`, `backend.incoming`, `backend.models`, `backend.repository`, `client.bridge.answer`, `client.bridge.events`, `client.bridge.form_payloads`, `client.bridge.hub`, `client.bridge.page`, `client.bridge.refusals`, `client.bridge.vacancy_actions`, `client.bridge.vacancy_contacts`, `client.bridge.vacancy_filter`, `client.bridge.vacancy_links`, `client.bridge.wire`
 
 - `def _typed_text(raw) -> str | None` (8)
-- `class Vacancies(VacancyActions, VacancyLinks, VacancyContacts)` (283)
+- `class Vacancies(VacancyActions, VacancyLinks, VacancyContacts)` (289)
   - `def list(self, payload: dict | None=None) -> dict` (15)
   - `def filter_options(self) -> dict` (19)
     - `async def run() -> dict` (4)
@@ -3782,7 +3809,7 @@ Runtime settings layer.
     - `async def run() -> dict` (16)
   - `def create(self, payload: dict) -> dict` (43)
     - `async def run() -> dict` (7)
-  - `def create_from_text(self, payload: dict) -> dict` (27)
+  - `def create_from_text(self, payload: dict) -> dict` (33)
 - `def tell_hand_made(events, result) -> None` (9)
 
 ### `client/bridge/vacancy_actions.py` — 117 строк
@@ -3979,7 +4006,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 345 модулей
+## tests — 346 модулей
 
 ### `tests/adapters/test_agent_mcp.py` — 85 строк
 
@@ -4773,13 +4800,13 @@ Runtime settings layer.
 Тестов: 10
 
 
-### `tests/backend/test_bot_menu_actions.py` — 223 строк
+### `tests/backend/test_bot_menu_actions.py` — 257 строк
 
 Следствия команд из меню карточки вакансии.
 
 Зависит от: `backend.bot`, `backend.flows.hand_made`, `backend.flows.hand_outcome`, `tests.fakes.ingestion`
 
-Тестов: 14
+Тестов: 17
 
 - `def requests_seen(monkeypatch)` (9)
   - `async def ingest_by_hand(kit, request)` (2)
@@ -4981,13 +5008,13 @@ Runtime settings layer.
 Тестов: 9
 
 
-### `tests/backend/test_domain_hosts.py` — 160 строк
+### `tests/backend/test_domain_hosts.py` — 195 строк
 
 Адрес, разобранный на хост и остаток: по хосту сравнивают сайты, по остатку —
 
 Зависит от: `backend.domain.hosts`
 
-Тестов: 21
+Тестов: 23
 
 
 ### `tests/backend/test_domain_language_choice.py` — 50 строк
@@ -5115,7 +5142,7 @@ Runtime settings layer.
 
 - `async def _can_add_after(make_pipeline, session_factory, resumes: list[tuple], many_resumes: bool) -> bool` (6)
 
-### `tests/backend/test_flows_aggregator_seek.py` — 284 строк
+### `tests/backend/test_flows_aggregator_seek.py` — 282 строк
 
 Обход источника: искатель находит, и каждая находка проходит весь цикл до
 
@@ -5126,7 +5153,6 @@ Runtime settings layer.
 - `def seek(make_pipeline, session_factory)` (16)
   - `async def run(steps, human_limit=3600.0, on_kit=None, **source)` (10)
 - `async def _submit(tools, url=PAGE)` (2)
-- `async def _submit_and_finish(tools)` (3)
 
 ### `tests/backend/test_flows_backfill_deletes.py` — 162 строк
 
@@ -5276,13 +5302,13 @@ Runtime settings layer.
 - `def _long_ago()` (3)
 - `def _recently()` (3)
 
-### `tests/backend/test_flows_hand_made.py` — 199 строк
+### `tests/backend/test_flows_hand_made.py` — 281 строк
 
 Заявка окна «Добавить вакансию», которую ведёт бот: поля с переключателем, текст, пост.
 
-Зависит от: `backend.flows.hand_made`, `backend.flows.hand_outcome`, `backend.models`, `backend.repository.vacancies_new`, `backend.telegram_time`, `tests.dbio`, `tests.factories`, `tests.fakes.agent`, `tests.fakes.telegram`, `tests.fakes.telegram_objects`, `tests.fakes.telegraph`
+Зависит от: `backend.flows.hand_made`, `backend.flows.hand_outcome`, `backend.models`, `backend.repository.vacancies_new`, `backend.telegram_time`, `tests.backend.fixtures.parse_stub`, `tests.dbio`, `tests.factories`, `tests.fakes.agent`, `tests.fakes.telegram`, `tests.fakes.telegram_objects`, `tests.fakes.telegraph`
 
-Тестов: 12
+Тестов: 18
 
 - `def _fields(**overrides) -> dict` (8)
 - `async def filing(make_pipeline)` (17)
@@ -5352,6 +5378,18 @@ Runtime settings layer.
 Тестов: 10
 
 - `def fetched(monkeypatch)` (4)
+
+### `tests/backend/test_flows_linked_page.py` — 226 строк
+
+Страница вакансии по ссылке: агент открывает её и заводит вакансию теми же
+
+Зависит от: `backend.flows.hand_outcome`, `backend.flows.handover`, `backend.flows.linked_page`, `backend.models`, `backend.repository.vacancies_new`, `tests.backend.fixtures.parse_stub`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.agent`
+
+Тестов: 17
+
+- `async def page(make_pipeline, session_factory, parsed)` (16)
+  - `async def run(url, steps, hands_over=False, on_kit=None)` (8)
+- `def _submitting(url)` (2)
 
 ### `tests/backend/test_flows_new_vacancy.py` — 435 строк ⚠ подошёл к 300
 
@@ -7116,13 +7154,13 @@ Runtime settings layer.
 Тестов: 6
 
 
-### `tests/client/test_bridge_vacancy_create.py` — 465 строк ⚠ подошёл к 300
+### `tests/client/test_bridge_vacancy_create.py` — 495 строк ⚠ подошёл к 300
 
 Следствия заведения вакансии руками: что после него видно в списке и в карточке.
 
 Зависит от: `backend.flows.hand_made`, `tests.dbio`, `tests.factories`
 
-Тестов: 29
+Тестов: 32
 
 - `async def created(ask, api, **fields) -> int` (9)
 - `async def profile_knowing(session_factory, name: str, level: int) -> None` (10)
@@ -7385,7 +7423,7 @@ Runtime settings layer.
 - `def parsed_cv_project(**overrides) -> ParsedCvProject` (3)
 - `def parsed_cv(**overrides) -> ParsedCv` (12)
 
-### `tests/fakes/agent.py` — 175 строк
+### `tests/fakes/agent.py` — 183 строк
 
 Набор сессии агента без браузера, водителя и человека.
 
@@ -7399,6 +7437,8 @@ Runtime settings layer.
   - `async def run(plan: SessionPlan) -> AgentEnd` (8)
 - `def finish_step(result: str='done', reason: str='')` (5)
   - `async def step(tools)` (2)
+- `def submit_step(url: str, text: str='Текст вакансии')` (6)
+  - `async def step(tools)` (3)
 - `def fail_step(reason: str)` (5)
   - `async def step(tools)` (2)
 - `def record_step(target: str, via: str='form')` (5)

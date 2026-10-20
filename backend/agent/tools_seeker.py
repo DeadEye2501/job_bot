@@ -8,14 +8,13 @@ from datetime import datetime, timezone
 from backend.agent.jobs import SeekJob
 from backend.agent.kit import AgentKit
 from backend.agent.stops import RUN_STOPPERS
-from backend.domain.hosts import owning_host, source_key
-from backend.domain.telegram_identity import TELEGRAM_HOSTS
-from backend.flows import embeddings, handover, intake, sameness
-from backend.flows.handover import Intake
+from backend.domain.hosts import host_owns, normalize_host, on_telegram, source_key
+from backend.flows import embeddings, handover, intake, pasted, sameness
+from backend.flows.hand_outcome import show_parsing, tell
 from backend.incoming import moment_or_none, str_list
 from backend.models import ContactAddedBy, Vacancy
 from backend.repository.aggregators import barred_host_of
-from backend.repository.vacancies_life import source_seen
+from backend.repository.vacancies_life import source_row, source_seen
 from backend.repository.vacancy_contacts import add_contact
 
 logger = logging.getLogger(__name__)
@@ -35,8 +34,18 @@ LIMIT_REACHED = 'предел исчерпан; заверши работу: fin
 BACK = "вкладка могла уйти: вернись к выдаче — browser_open её адреса — и продолжай со следующей вакансии"
 
 
+NOT_THIS_PAGE = (
+    'не та страница: передавай вакансию только со страницы из задания; '
+    'нет её там — заверши работу: finish с result="done"'
+)
+
+
 def seeker_tools(kit: AgentKit, job: SeekJob) -> list[Callable]:
-    """Инструменты искателя, привязанные к своему источнику."""
+    """Инструменты искателя, привязанные к своему источнику.
+
+    Искателю страницы человека (`job.page`) спрашивать, известна ли вакансия,
+    незачем: он ничего не ищет, а заводит одну, которую человек уже выбрал.
+    """
 
     async def is_known(url: str) -> str:
         """Есть ли вакансия по этому адресу на этом источнике — заведённая или удалённая как мусор."""
@@ -49,9 +58,10 @@ def seeker_tools(kit: AgentKit, job: SeekJob) -> list[Callable]:
 
     async def submit_vacancy(text: str, url: str, published: str, contacts: list[str]) -> str:
         """Передать вакансию в конвейер: дословный текст страницы, её адрес, дата публикации YYYY-MM-DD или пусто, контакты со страницы."""
-        return await _submit(kit, job, _Page(text, url, published, str_list(contacts)))
+        page = _Page(text, url, published, str_list(contacts))
+        return await (_submit(kit, job, page) if job.page is None else _submit_page(kit, job, page))
 
-    return [is_known, submit_vacancy]
+    return [submit_vacancy] if job.page is not None else [is_known, submit_vacancy]
 
 
 @dataclass(frozen=True)
@@ -91,11 +101,47 @@ async def _submit(kit: AgentKit, job: SeekJob, page: _Page) -> str:
         return _left("повтор", job)
     if match.kind == "unparsed":
         return await _through(kit, job, "повтор", handover.finish_orphan(
-            kit.pipeline, match.vacancy_id, page.text, Intake()))
-    vacancy_id = await _store(kit, job, page, key, match.embedding)
+            kit.pipeline, match.vacancy_id, page.text, job.intake))
+    return await _filed(kit, job, page, key, match.embedding)
+
+
+async def _submit_page(kit: AgentKit, job: SeekJob, page: _Page) -> str:
+    """Вакансия со страницы человека: заведённая вручную, своей строкой.
+
+    Чёрный список и сходство с заведёнными — подсказки автоматике, и здесь их
+    нет: человек сам выбрал страницу. Однозначный повтор — тот же номер на том
+    же источнике (`source_key`), только у живой строки: снесённую мусором
+    человек вправе завести снова. Страница с другого сайта — переадресация, а
+    не его вакансия.
+    """
+    if job.stopper is not None:
+        return STOPPED
+    if job.submitted >= job.limit:
+        return LIMIT_REACHED
+    # Переадресация внутри площадки — её же страница: хозяин — хост источника,
+    # а у «Поиска по сети» — сайт вставленной страницы.
+    owner = job.source.host or normalize_host(job.page)
+    key = source_key(page.url, job.source.host) if host_owns(owner, normalize_host(page.url)) else None
+    if key is None:
+        return NOT_THIS_PAGE
+    # Одна страница — одна попытка: итог её окно слышит один раз, чем бы она ни кончилась.
+    job.submitted = job.limit
+    existing = await kit.read(lambda session: source_row(session, job.source.id, key))
+    if existing is not None:
+        return await _through(kit, job, "повтор", handover.tell_known(kit.pipeline, existing))
+
+    async def save(embedding: list[float]) -> int:
+        return await _store(kit, job, page, key, embedding)
+
+    return await _through(kit, job, "передана", pasted.file_by_hand(kit.pipeline, page.text, job.intake, save))
+
+
+async def _filed(kit: AgentKit, job: SeekJob, page: _Page, key: str, embedding: list[float]) -> str:
+    """Завести находку и провести её по циклу."""
+    vacancy_id = await _store(kit, job, page, key, embedding)
     job.submitted += 1
     return await _through(kit, job, "принята", handover.judge_and_hand_over(
-        kit.pipeline, vacancy_id, page.text, Intake()))
+        kit.pipeline, vacancy_id, page.text, job.intake))
 
 
 async def _through(kit: AgentKit, job: SeekJob, answer: str, cycle: Awaitable) -> str:
@@ -116,11 +162,22 @@ async def _through(kit: AgentKit, job: SeekJob, answer: str, cycle: Awaitable) -
     except Exception:
         logger.exception("цикл находки искателя на %s: сбой", job.source.name)
         said = "не вышло: на этой вакансии сбой приложения"
+        if job.intake.tells_window and not kit.pipeline.hand_made_told:
+            tell(kit.pipeline, "error")
     finally:
         job.nested = False
     await kit.browser.open_profile(job.source.id)
-    kit.pipeline.emit_progress("aggregator", job.source.sweep, job.submitted, job.limit)
+    _show_bar(kit, job)
     return f"{said}; {LIMIT_REACHED if job.submitted >= job.limit else BACK}"
+
+
+def _show_bar(kit: AgentKit, job: SeekJob) -> None:
+    """Нижняя полоса снова за искателем: у обхода — ход обхода, а там, где
+    итога ждёт окно, — разбор объявления, как у вставленного текста."""
+    if job.intake.tells_window:
+        show_parsing(kit.pipeline)
+    else:
+        kit.pipeline.emit_progress("aggregator", job.source.sweep, job.submitted, job.limit)
 
 
 def _left(answer: str, job: SeekJob) -> str:
@@ -137,7 +194,7 @@ async def _numbered(kit: AgentKit, job: SeekJob, url: str) -> tuple[str | None, 
     читает приём постов, и человек их не запрещал. Поэтому он и проверяется
     первым — запрет действует всегда, есть ли такой хост в отсеве или нет.
     """
-    if owning_host(url, TELEGRAM_HOSTS) is not None:
+    if on_telegram(url):
         return None, f"{TELEGRAM_OWN} — не открывай"
     if await _barred(kit, url):
         return None, f"{BARRED} — не открывай"
@@ -173,7 +230,7 @@ async def _store(kit: AgentKit, job: SeekJob, page: _Page, key: str, embedding: 
     # «Поиск по сети» — способ поиска, а не место: окно подписывает такую
     # находку своими словами, и знать об этом ему неоткуда, кроме события.
     found = {"source": job.source.name, "url": page.url, "web_search": job.source.host is None}
-    vacancy_id = await intake.save_new_vacancy(kit.pipeline, row, "found", found)
+    vacancy_id = await intake.save_new_vacancy(kit.pipeline, row, *job.intake.event("found", found))
     async def contacts(session) -> None:
         for value in (page.url, *page.contacts):
             await add_contact(session, vacancy_id, value, ContactAddedBy.AGENT)
