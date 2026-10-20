@@ -26,6 +26,7 @@ from backend.models import VacancyStatus
 from backend.flows import cleanup
 from backend.flows.parse_write import Outcome, persist_parse_outcome
 from backend.repository.aggregators import barred_host_of
+from backend.repository.vacancies_new import made_by_hand
 from backend.repository.vacancy_contacts import vacancy_addresses
 
 logger = logging.getLogger(__name__)
@@ -112,14 +113,7 @@ async def _parsed_or_dropped(
     Строка остаётся неразобранной, за ней вернётся подбор недоразобранного.
     Удали её здесь — и пост не вернётся ничем: курсор канала уже сдвинут.
     """
-    parsed, refusal = await parse_vacancy(
-        text,
-        pipeline.lm_client,
-        pipeline.lm_chat_model,
-        channel_username=channel_username,
-        profile=pipeline.profile_cache,
-    )
-    trouble = unanswered("разбор", refusal, vacancy_id)
+    parsed, refusal, trouble = await _asked_model(pipeline, vacancy_id, text, channel_username)
     if trouble is not None:
         reason, unasked = trouble
         if unasked:
@@ -134,6 +128,52 @@ async def _parsed_or_dropped(
     ):
         return None, None, Judged(True)
     return None, None, await save_empty_vacancy(pipeline, vacancy_id, parsed)
+
+
+async def _asked_model(pipeline, vacancy_id: int, text: str, channel_username: str | None):
+    """Разбор объявления моделью: поля, отказ модели и что с этим отказом делать
+    (`unanswered`: пусто — отказа не было)."""
+    parsed, refusal = await parse_vacancy(
+        text,
+        pipeline.lm_client,
+        pipeline.lm_chat_model,
+        channel_username=channel_username,
+        profile=pipeline.profile_cache,
+    )
+    return parsed, refusal, unanswered("разбор", refusal, vacancy_id)
+
+
+def _score(pipeline, parsed) -> int:
+    """Балл разобранного по анкете: обязательный стек весит больше желательного."""
+    return score_stack(parsed.stack_required, parsed.stack_preferred, pipeline.skills_cache)
+
+
+async def _parsed_by_hand(
+    pipeline, vacancy_id: int, text: str, channel_username: str | None
+) -> Judged:
+    """Разобрать заведённую человеком: поля заполняются, приговора нет вовсе.
+
+    Человек её добавил — значит, хочет откликнуться. Ни метки поста
+    соискателя, ни чёрного списка, ни «вакансия ли это» и пригодности, ни
+    порога балла: не вынести и переписать, а не звать. Исход — New, и снести
+    её как мусор нельзя.
+
+    Обрыв и отказ модели тоже кончаются New: строка встаёт в список без
+    разобранных полей, и человек видит её там, куда сам её положил. Молчание
+    провайдера приговором не является и здесь — строка ждёт следующего захода.
+    """
+    parsed, _refusal, trouble = await _asked_model(pipeline, vacancy_id, text, channel_username)
+    if trouble is not None:
+        _reason, unasked = trouble
+        if unasked:
+            return Judged(False)
+        parsed = None
+    score = 0 if parsed is None else _score(pipeline, parsed)
+    outcome = Outcome(
+        status=VacancyStatus.NEW, skip_reason=None, score=score,
+        keep_previous_stack=parsed is not None,
+    )
+    return await _finish_parse(pipeline, vacancy_id, parsed, outcome)
 
 
 async def _barred_site(pipeline, vacancy_id: int, found: list[str]) -> str | None:
@@ -166,9 +206,7 @@ async def _verdict_for(
     текстом, а с адресом вакансии и её контактами: отметка сайта отсеивает то,
     что на нём живёт, а не всякий пост, где он назван.
     """
-    score = score_stack(
-        parsed.stack_required, parsed.stack_preferred, pipeline.skills_cache
-    )
+    score = _score(pipeline, parsed)
     barred = await _barred_site(pipeline, vacancy_id, parsed.other_contacts)
     blocked = blacklist_refusal(check_blacklist(text, pipeline.blacklist_patterns) or barred)
     logger.debug(
@@ -227,7 +265,14 @@ async def parse_and_update_vacancy(
     разбор к ним не относится, это состоявшийся приговор. Различие нужно окну.
 
     Метка соискательского поста стоит раньше разбора: она стоит ноль.
+
+    Заведённая человеком судится одним решением здесь, в начале, а не
+    приговором, переписанным после: приговора у неё нет (`_parsed_by_hand`).
     """
+    async with pipeline.session_factory() as session:
+        by_hand = await made_by_hand(session, vacancy_id)
+    if by_hand:
+        return await _parsed_by_hand(pipeline, vacancy_id, text, channel_username)
     mark = resume_mark(text[:VACANCY_TEXT_CHARS])
     if mark is not None:
         return await _thrown_out_as_a_resume(pipeline, vacancy_id, mark, allow_delete)
@@ -288,14 +333,9 @@ async def save_empty_vacancy(
     прежние поля, окно показало бы разобранное прошлым заходом рядом с
     приговором «мусор», то есть выдало бы старое за новое.
     """
-    return _judged(await persist_parse_outcome(
-        pipeline,
-        vacancy_id,
-        parsed,
-        Outcome(
-            status=VacancyStatus.NOT_FIT,
-            skip_reason=reason,
-            score=0,
-            keep_previous_stack=False,
-        ),
+    return await _finish_parse(pipeline, vacancy_id, parsed, Outcome(
+        status=VacancyStatus.NOT_FIT,
+        skip_reason=reason,
+        score=0,
+        keep_previous_stack=False,
     ))

@@ -197,7 +197,7 @@ async def test_a_first_time_hr_gets_his_history_caught_up(
     judged = await parse.save_empty_vacancy(
         pipeline, vacancy.id, parsed_vacancy(title="Что-то", hr_contact="@maria")
     )
-    await hand_over(pipeline, [(vacancy.id, judged)])
+    await hand_over(pipeline, [(vacancy.id, judged)], applies=True)
     await asyncio.sleep(0)
 
     assert caught_backfills == [(await only_row(session_factory, HR)).id]
@@ -220,7 +220,7 @@ async def test_a_known_hr_is_not_caught_up_again(
     judged = await parse.save_empty_vacancy(
         pipeline, vacancy.id, parsed_vacancy(title="Что-то", hr_contact="@maria")
     )
-    await hand_over(pipeline, [(vacancy.id, judged)])
+    await hand_over(pipeline, [(vacancy.id, judged)], applies=True)
     await asyncio.sleep(0)
 
     assert caught_backfills == []

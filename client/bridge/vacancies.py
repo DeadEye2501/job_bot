@@ -277,7 +277,9 @@ class Vacancies(VacancyActions, VacancyLinks, VacancyContacts):
         человеку надо тем же экраном.
 
         Номер заведённой едет ответом тем же полем, каким отвечает заведение
-        человека и компании; список окно перечитывает следом само.
+        человека и компании; список окно перечитывает следом само. Повтор по
+        «Ссылке на объявление» отвечает номером существующей с `created: false`
+        и фразой из набора отказов: доставить её окну иначе нечем.
 
         Заслон здесь, а не в репозитории: пустое название — это про форму, а
         не про строку, и отвечать на него надо словами человеку.
@@ -292,9 +294,12 @@ class Vacancies(VacancyActions, VacancyLinks, VacancyContacts):
         async def run() -> dict:
             async with self._hub.session_factory() as session:
                 async with session.begin():
-                    created_id = await vacancies_new.create_vacancy(session, fields)
+                    created_id, created = await vacancies_new.create_vacancy(session, fields)
+            if not created:
+                return {"action": "create_vacancy", "created_id": created_id, "created": False,
+                        "message": PASTED_REFUSALS["duplicate"]}
             self._hub.events.add(LIST_CHANGED)
-            return {"action": "create_vacancy", "created_id": created_id}
+            return {"action": "create_vacancy", "created_id": created_id, "created": True}
 
         return reply(self._hub.runner, run())
 

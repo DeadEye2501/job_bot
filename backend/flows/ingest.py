@@ -5,6 +5,7 @@ import logging
 from sqlalchemy.exc import IntegrityError
 
 from backend.flows import handover, intake, linked_article
+from backend.flows.handover import Intake
 from backend.models import Vacancy
 from backend.payloads import ChannelPost
 from backend.telegram_time import tg_moment
@@ -72,9 +73,10 @@ async def _resume_or_skip(
     # Брошенная строка могла прийти из другого канала (перепост): разбираем
     # по тексту нынешнего поста и его каналу, а кладём в ту строку.
     # Совпадение отпечатков ручается, что тексты почти дословны.
-    await handover.judge_and_hand_over(
-        pipeline, similar_id, post.text, post.channel_username
+    intake = await handover.orphan_intake(
+        pipeline, similar_id, Intake(channel=post.channel_username)
     )
+    await handover.judge_and_hand_over(pipeline, similar_id, post.text, intake)
 
 
 async def ingest_post(
@@ -107,7 +109,7 @@ async def ingest_post(
         _waits_to_be_read_out(new_vacancy_id, post)
         return
     await handover.judge_and_hand_over(
-        pipeline, new_vacancy_id, text, channel_username
+        pipeline, new_vacancy_id, text, Intake(channel=channel_username)
     )
 
 

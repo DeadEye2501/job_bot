@@ -235,7 +235,7 @@ async def test_a_pasted_duplicate_is_explained_not_swallowed(
 
     assert answer["ok"]["started"] is True
     assert await told() == {
-        "message": "Такое объявление уже заведено",
+        "message": "Такая вакансия уже существует",
         "danger": True,
     }
 
@@ -279,6 +279,28 @@ async def test_an_unknown_grade_does_not_reach_the_card(api, ask):
     answer = await ask(api.vacancies.detail, vacancy_id)
 
     assert answer["ok"]["vacancy"]["grade"] is None
+
+
+async def test_a_page_filed_before_is_not_filed_again(api, ask):
+    """Та же страница вакансии, заведённая снова, — повтор: строки нет, ответ
+    ведёт к существующей и говорит это словами."""
+    existing = await created(ask, api, source_url="https://hh.ru/vacancy/123")
+
+    answer = await ask(api.vacancies.create, {
+        "title": "Другое название", "source_url": "http://spb.hh.ru/vacancy/123?utm_source=tg",
+    })
+
+    assert answer["ok"]["created"] is False
+    assert answer["ok"]["created_id"] == existing
+    assert answer["ok"]["message"] == "Такая вакансия уже существует"
+    listed = await ask(api.vacancies.list, {})
+    assert [row["id"] for row in listed["ok"]["vacancies"]] == [existing]
+
+
+async def test_a_new_page_is_filed(api, ask):
+    answer = await ask(api.vacancies.create, {"title": "Python", "source_url": "https://hh.ru/vacancy/1"})
+
+    assert answer["ok"]["created"] is True
 
 
 async def test_the_card_timeline_tells_the_vacancy_was_made_by_hand(api, ask):

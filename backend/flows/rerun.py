@@ -16,6 +16,7 @@ from sqlalchemy import select
 
 from backend.agent.stops import RUN_STOPPERS
 from backend.flows import embeddings, handover, linked_article
+from backend.flows.handover import Intake
 from backend.models import TelegramChannel
 from backend.models import Vacancy, VacancyStatus
 from backend.repository.channels import list_named_channels
@@ -259,7 +260,7 @@ async def rerun_pipeline_for_vacancy(
         return "no_text"
     await pipeline.reload_resources()
     if not await handover.judge_and_hand_over(
-        pipeline, vacancy_id, text, origin.channel_username, allow_delete=False
+        pipeline, vacancy_id, text, Intake(channel=origin.channel_username, allow_delete=False)
     ):
         # Разбор не дошёл до конца по одной из двух причин, и человеку они
         # говорят разное: модель не ответила — поднимать модель, строки не
@@ -383,15 +384,19 @@ async def _recover_one(pipeline, row) -> bool:
     в отсеве повторов строка так и осталась бы шапкой. Своё же объявление,
     пришедшее из соседнего канала уже со статьёй, с ней бы не сошлось и
     завелось второй строкой.
+
+    Заведённую человеком подбор дочитывает, но откликателю не отдаёт
+    (`handover.orphan_intake`).
     """
     judged = await _text_to_judge_by(pipeline, row)
     if judged is None:
         logger.info("recover: vacancy %d ждёт дочитывания статьи", row.id)
         return False
     text, allow_delete = judged
-    if not await handover.judge_and_hand_over(
-        pipeline, row.id, text, row.username or "", allow_delete=allow_delete
-    ):
+    intake = await handover.orphan_intake(
+        pipeline, row.id, Intake(channel=row.username or "", allow_delete=allow_delete)
+    )
+    if not await handover.judge_and_hand_over(pipeline, row.id, text, intake):
         return False
     await _refresh_embedding(pipeline, row.id, text)
     return True
