@@ -7,14 +7,16 @@
 знали, приходится не знать.
 
 Приём поста проверяется своим слайсом (`test_flows_post_intake`): там предмет
-— курсор канала и дочитывание статьи по ссылке, и общего у двух приёмов только
-отпечаток.
+— курсор канала, а общего у двух приёмов отпечаток и дочитывание статей по
+ссылке.
 """
 
 from datetime import datetime, timezone
 
+import httpx
 import pytest
 
+from tests.fakes.telegraph import serve_articles
 from backend.flows import cleanup
 from backend.flows import parse as parse_mod
 from backend.flows import pasted
@@ -80,6 +82,34 @@ async def test_the_pasted_text_becomes_a_row_and_goes_to_the_parser(
     assert [(text, username) for _, text, username, _ in parse_calls(intake)] == [
         ("Ищем Python-разработчика", None)
     ]
+
+
+async def test_a_pasted_text_reads_its_linked_article(intake, session_factory, monkeypatch):
+    """Вставленный текст дочитывает статью так же, как пост канала: шапка со
+    ссылкой — объявление без требований, и разбирать в нём нечего."""
+
+    serve_articles(monkeypatch)
+    text = "Senior QA https://telegra.ph/QA-08-21"
+
+    assert await pasted.ingest_pasted_text(intake, text, None) == "ok"
+
+    expected = f"{text}\n\nТребования: Python"
+    assert (await only_row(session_factory, Vacancy)).raw_text == expected
+    assert [got for _, got, _, _ in parse_calls(intake)] == [expected]
+
+
+async def test_a_pasted_text_whose_article_did_not_come_is_not_filed(
+    intake, session_factory, monkeypatch
+):
+    """Статья не скачалась — строки нет: приём поста ждёт статью у заведённой
+    строки, а человек может просто нажать ещё раз."""
+
+    serve_articles(monkeypatch, httpx.ConnectError("сайт лежит"))
+
+    outcome = await pasted.ingest_pasted_text(intake, "Senior QA https://telegra.ph/QA-08-21", None)
+
+    assert outcome == "article"
+    assert (await all_rows(session_factory, Vacancy), parse_calls(intake)) == ([], [])
 
 
 async def test_the_new_vector_joins_the_cache(intake, session_factory):

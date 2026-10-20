@@ -2177,7 +2177,7 @@
 - `RUN_REFUSALS` = `словарь из 3 и раскрытых`
 - `POLL_REFUSALS` = `словарь из 5 и раскрытых`
 - `RERUN_REFUSALS` = `словарь из 6 и раскрытых`
-- `PASTED_REFUSALS` = `словарь из 7 и раскрытых`
+- `PASTED_REFUSALS` = `словарь из 8 и раскрытых`
 - `PARSE_CV_REFUSALS` = `словарь из 5`
 - `NO_AGGREGATOR` = `'Агрегатор не найден'`
 - `WEB_SEARCH_KEPT` = `'Поиск по сети удалить нельзя'`
@@ -2601,6 +2601,10 @@
 - `TG_EPOCH` = `EPOCH.replace(tzinfo=timezone.utc).astimezone().…`
 - `OUR_USER_ID` = `1`
 - `_UNSET` = `object()`
+
+### `tests/fakes/telegraph.py`
+
+- `ARTICLE` = `'Требования: Python'`
 
 ### `tests/fakes/ui_bot.py`
 

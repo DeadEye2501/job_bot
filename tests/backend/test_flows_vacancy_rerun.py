@@ -16,7 +16,7 @@ import httpx
 import pytest
 from pyrogram.errors import FloodWait
 
-from adapters import telegraph
+from tests.fakes.telegraph import serve_articles
 from backend.flows import parse as parse_mod
 from backend.models import (
     StatusHistorySource,
@@ -76,10 +76,7 @@ async def test_an_unreachable_article_keeps_the_saved_text(monkeypatch, rerunnin
     """
     session_factory, vacancy, make_pipeline = rerunning
 
-    async def fetch_article(_client, _url):
-        raise httpx.ConnectError("сеть отвалилась")
-
-    monkeypatch.setattr(telegraph, "fetch_article", fetch_article)
+    serve_articles(monkeypatch, httpx.ConnectError("сеть отвалилась"))
     fresh = post(42, text="Senior QA https://telegra.ph/QA-08-21")
     pipeline = await prepare(monkeypatch, make_pipeline, WithMessages(post=fresh))
 

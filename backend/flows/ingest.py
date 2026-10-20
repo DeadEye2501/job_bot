@@ -5,7 +5,6 @@ import logging
 from sqlalchemy.exc import IntegrityError
 
 from backend.flows import handover, intake, linked_article
-from backend.message_text import extract_post_text
 from backend.models import Vacancy
 from backend.payloads import ChannelPost
 from backend.telegram_time import tg_moment
@@ -82,10 +81,12 @@ async def ingest_post(
     pipeline, channel_id: int, channel_username: str, msg
 ) -> None:
     # Cursor advance'ится в `poll_channel` (батчами), не здесь.
-    text = extract_post_text(msg)
-    if not text or msg.service is not None or msg.poll is not None:
+    if msg.service is not None or msg.poll is not None:
         return
-    text, whole = await linked_article.with_linked_articles(text)
+    read = await linked_article.post_full_text(msg)
+    if read is None:
+        return
+    text, whole = read
     post = ChannelPost(channel_id, channel_username, msg, text)
     match = await _post_match(pipeline, post)
     if match is None:

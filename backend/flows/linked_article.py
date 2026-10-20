@@ -1,7 +1,8 @@
 """Статья, на которую ссылается объявление, дописанная к его тексту.
 
-Живёт отдельно от приёма поста потому, что нужна двоим: и приёму, и прогону
-заново. Прогон обязан читать объявление тем же чтением, что и приём, — иначе
+Живёт отдельно от приёма поста потому, что склейка нужна троим — приёму,
+прогону заново и вставленному тексту, — а чтение поста со статьями двоим из
+них. Прогон обязан читать объявление тем же чтением, что и приём, — иначе
 разобранное кнопкой расходится с разобранным на обходе.
 
 Статья дописывается в сам текст объявления, а не хранится рядом: это его
@@ -16,6 +17,7 @@ import httpx
 from adapters import telegraph
 from backend.domain.spellings import dedupe_first_wins
 from backend.domain.telegram_identity import ARTICLE_URL_RE
+from backend.message_text import extract_post_text
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +28,7 @@ logger = logging.getLogger(__name__)
 _MAX_ARTICLES = 3
 
 
-def _article_urls(text: str) -> list[str]:
+def article_urls(text: str) -> list[str]:
     """Адреса статей из текста объявления, по разу каждый, в порядке встречи.
 
     Один и тот же адрес попадается в посте дважды: словами и подписью кнопки.
@@ -75,7 +77,7 @@ async def with_linked_articles(text: str) -> tuple[str, bool]:
     это навсегда, и прогон заново у такой вакансии перестал бы обновлять текст
     до конца её дней.
     """
-    urls = _article_urls(text)
+    urls = article_urls(text)
     if not urls:
         return text, True
     parts = [text]
@@ -94,3 +96,11 @@ async def with_linked_articles(text: str) -> tuple[str, bool]:
         "telegraph: статей у объявления %d, дописано %d", len(urls), len(parts) - 1
     )
     return "\n\n".join(parts), whole
+
+
+async def post_full_text(msg) -> tuple[str, bool] | None:
+    """Текст поста со статьями и целиком ли он; пусто — текста в посте нет."""
+    text = extract_post_text(msg)
+    if not text:
+        return None
+    return await with_linked_articles(text)
