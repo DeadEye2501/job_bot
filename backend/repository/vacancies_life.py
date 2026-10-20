@@ -124,17 +124,6 @@ async def vacancy_at_address(session: AsyncSession, url: str) -> int | None:
     return next((vid for vid, own in rows if vacancy_address_key(own) == key), None)
 
 
-async def unparsed_at_address(session: AsyncSession, url: str | None) -> int | None:
-    """Недоразобранная вакансия на этой странице (`vacancy_at_address`); пусто — такой нет."""
-    if not url:
-        return None
-    vacancy_id = await vacancy_at_address(session, url)
-    if vacancy_id is None:
-        return None
-    row = await session.get(Vacancy, vacancy_id)
-    return None if row.is_parsed else vacancy_id
-
-
 async def _trash_noted(session: AsyncSession, mark: TrashEvent) -> bool:
     """Отмечено ли это объявление мусором раньше."""
     if mark.source_key is not None:

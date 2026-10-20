@@ -6,7 +6,7 @@ from urllib.parse import parse_qsl, urlsplit
 
 from backend.domain.company_names import without_scheme
 from backend.domain.telegram_identity import (
-    TELEGRAM_HOSTS, TELEGRAM_LINK_HOSTS, TELEGRAPH_HOSTS, post_address,
+    ARTICLE_URL_RE, TELEGRAM_HOSTS, TELEGRAM_LINK_HOSTS, TELEGRAPH_HOSTS, post_address,
 )
 
 
@@ -151,7 +151,9 @@ def link_kind(url: str) -> LinkKind:
     """
     parts = address_parts(url.strip())
     if owning_host(url, set(TELEGRAPH_HOSTS)):
-        return "article" if parts.path else "telegram"
+        # Распознаёт статью то же правило, что склейка в тексте поста: с начала
+        # адреса, без хвостовой точки конца предложения.
+        return "article" if ARTICLE_URL_RE.match(article_address(url)) else "telegram"
     if post_address(url) is not None:
         return "post"
     if owning_host(url, set(TELEGRAM_LINK_HOSTS)):

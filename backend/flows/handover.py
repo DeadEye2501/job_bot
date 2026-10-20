@@ -1,7 +1,9 @@
 """Разобранная строка дальше по конвейеру: как её вести (`Intake`), разбор с
 передачей откликателю, дочитывание брошенной и догон новых HR после отклика."""
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
+from functools import partial
 
 from sqlalchemy import select
 
@@ -53,35 +55,30 @@ def hand_made_intake(hands_over: bool, channel: str | None = None) -> Intake:
     return Intake(channel=channel, hands_over=hands_over, tells_window=True, by_hand=True)
 
 
-async def known_and_told(pipeline, vacancy_id: int) -> bool:
-    """Повтор ли эта вакансия для ручного заведения; да — окну сказано.
+async def known_or_forgotten(
+    session_factory, vacancy_id: int, forget: Callable[[int], Awaitable[object]]
+) -> bool:
+    """Повтор ли эта вакансия для ручного заведения.
 
     Разобранная — повтор: окно переходит на неё. Недоразобранная прав не имеет
-    — в списке её не видно, и переходить было бы некуда, — её сносят вместе с
-    отпечатком (`cleanup.forget_vacancy`), а заведение идёт заново тем, что
-    принёс человек.
+    — в списке её не видно, и переходить было бы некуда, — её сносят (`forget`),
+    а заведение идёт заново тем, что принёс человек. Сносят разные руки: у бота
+    — вместе с отпечатком в его кэше, у моста без бота кэша нет вовсе.
     """
-    async with pipeline.session_factory() as session:
+    async with session_factory() as session:
         row = await session.get(Vacancy, vacancy_id)
-        parsed = row.is_parsed
-    if not parsed:
-        await cleanup.forget_vacancy(pipeline, vacancy_id)
+        state = None if row is None else row.is_parsed
+    if state is False:
+        await forget(vacancy_id)
+    return bool(state)
+
+
+async def known_and_told(pipeline, vacancy_id: int) -> bool:
+    """Повтор ли эта вакансия (`known_or_forgotten`); да — окну сказано."""
+    if not await known_or_forgotten(pipeline.session_factory, vacancy_id, partial(cleanup.forget_vacancy, pipeline)):
         return False
     tell(pipeline, "duplicate", vacancy_id)
     return True
-
-
-async def orphan_intake(pipeline, vacancy_id: int, intake: Intake) -> Intake:
-    """Как вести брошенную недоразобранной строку: заведённую человеком — без передачи.
-
-    Отдавать ли её откликателю, человек решал при заведении, и решение это
-    жило только в окне. Дочитывают такую строку подбор недоразобранного и все,
-    кто наткнулся на её перепост, — обход канала и искатель, — и правило у них
-    одно (`finish_orphan`).
-    """
-    async with pipeline.session_factory() as session:
-        by_hand = await made_by_hand(session, vacancy_id)
-    return replace(intake, hands_over=False) if by_hand else intake
 
 
 async def finish_orphan(pipeline, vacancy_id: int, text: str, intake: Intake) -> bool:
@@ -92,8 +89,16 @@ async def finish_orphan(pipeline, vacancy_id: int, text: str, intake: Intake) ->
     и с доводами зовущего, а ложится в ту строку — совпадение отпечатков
     ручается, что тексты почти дословны. Полон ли текст, проверяет зовущий:
     дочитывать шапкой без статьи нельзя.
+
+    Заведённую человеком — без передачи: отдавать ли её откликателю, человек
+    решал при заведении, и решение это жило только в окне. Дочитывают такую
+    строку подбор недоразобранного и все, кто наткнулся на её перепост, —
+    обход канала и искатель, — и правило у них одно.
     """
-    intake = await orphan_intake(pipeline, vacancy_id, intake)
+    async with pipeline.session_factory() as session:
+        by_hand = await made_by_hand(session, vacancy_id)
+    if by_hand:
+        intake = replace(intake, hands_over=False)
     return await judge_and_hand_over(pipeline, vacancy_id, text, intake)
 
 

@@ -20,7 +20,7 @@ from backend.flows import parse as parse_mod
 from backend.flows import pasted
 from backend.flows.hand_outcome import HandResult
 from backend.models import Vacancy, VacancyEvent
-from tests.backend.fixtures.flows import similar_by_hand
+from tests.backend.fixtures.flows import similar_by_hand, told_then_applied
 from tests.dbio import all_rows, only_row, put
 from tests.factories import vacancy_row
 from tests.fakes.telegraph import serve_articles
@@ -35,9 +35,8 @@ async def intake(make_pipeline, monkeypatch, one_vector):
     """
     pipeline = await make_pipeline()
     pipeline.parsed = []
-    pipeline.told = []
-    pipeline.order = []
     pipeline.parse_done = True
+    told_then_applied(pipeline)
     similar_by_hand(pipeline, monkeypatch)
 
     async def reload_resources():
@@ -52,17 +51,6 @@ async def intake(make_pipeline, monkeypatch, one_vector):
         return parse_mod.Judged(pipeline.parse_done)
 
     monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
-
-    def told(result: HandResult) -> None:
-        pipeline.told.append(result)
-        pipeline.order.append("весть")
-
-    async def apply(ids):
-        pipeline.applied.append(ids)
-        pipeline.order.append("отклик")
-
-    pipeline.on_hand_made = told
-    pipeline.apply = apply
     return pipeline
 
 

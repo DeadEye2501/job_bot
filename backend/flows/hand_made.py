@@ -8,15 +8,17 @@
 прогона.
 """
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime
+from functools import partial
 from typing import Literal
 
 from backend.agent.kit import AgentKit
 from backend.domain.hosts import LinkKind, article_address, typed_page
 from backend.domain.telegram_identity import post_address
-from backend.flows import handover, ingest, linked_article, linked_page, pasted
-from backend.flows.hand_outcome import HandResult, show_parsing, tell
+from backend.flows import cleanup, handover, ingest, linked_article, linked_page, pasted
+from backend.flows.hand_outcome import show_parsing, tell
 from backend.flows.handover import hand_over
 from backend.flows.parse import Judged
 from backend.payloads import ChannelPost
@@ -83,13 +85,25 @@ def _own_address(request: HandRequest) -> str | None:
     return None
 
 
-async def _known_address(pipeline, url: str | None) -> bool:
-    """Заведена ли уже вакансия с этим адресом; да — окну сказано (`known_and_told`)."""
+async def known_at(session_factory, url: str | None, forget: Callable[[int], Awaitable[object]]) -> int | None:
+    """Номер разобранной вакансии с этим собственным адресом; недоразобранная
+    снесена (`handover.known_or_forgotten`). Одно правило у бота и у «Полей»
+    мимо бота — разные у них только руки сноса."""
     if not url:
-        return False
-    async with pipeline.session_factory() as session:
+        return None
+    async with session_factory() as session:
         existing = await vacancy_at_address(session, url)
-    return existing is not None and await handover.known_and_told(pipeline, existing)
+    if existing is None or not await handover.known_or_forgotten(session_factory, existing, forget):
+        return None
+    return existing
+
+
+async def _known_address(pipeline, url: str | None) -> bool:
+    """Заведена ли уже вакансия с этим адресом (`known_at`); да — окну сказано."""
+    existing = await known_at(pipeline.session_factory, url, partial(cleanup.forget_vacancy, pipeline))
+    if existing is not None:
+        tell(pipeline, "duplicate", existing)
+    return existing is not None
 
 
 async def _posted(pipeline, url: str, hands_over: bool) -> None:
@@ -137,22 +151,18 @@ async def _channel_id(pipeline, nick: str | None) -> int | None:
     return None if channel is None else channel.id
 
 
-async def file_fields(session_factory, fields: dict) -> HandResult:
-    """Завести набранное в окне: заведено — с номером, повтор по «Ссылке на
-    объявление» — с номером существующей. Набранное — уже разбор, модели оно
-    не отдаётся."""
+async def file_fields(session_factory, fields: dict) -> int:
+    """Завести набранное в окне и назвать номер. Набранное — уже разбор, модели
+    оно не отдаётся; повтор по «Ссылке на объявление» зовущий проверил до
+    этого (`known_at`)."""
     async with session_factory() as session:
         async with session.begin():
-            vacancy_id, created = await create_vacancy(session, fields)
-    return HandResult("ok" if created else "duplicate", vacancy_id)
+            return await create_vacancy(session, fields)
 
 
 async def _filed(pipeline, fields: dict, hands_over: bool) -> None:
-    """Завести набранное и отдать откликателю; повтор не отдаётся — окно
-    перейдёт на существующую."""
-    result = await file_fields(pipeline.session_factory, fields)
-    if result.outcome == "ok":
-        pipeline.fire_vacancies_changed()
-    tell(pipeline, result.outcome, result.vacancy_id)
-    if result.outcome == "ok":
-        await hand_over(pipeline, [(result.vacancy_id, Judged(True))], applies=hands_over)
+    """Завести набранное и отдать откликателю."""
+    vacancy_id = await file_fields(pipeline.session_factory, fields)
+    pipeline.fire_vacancies_changed()
+    tell(pipeline, "ok", vacancy_id)
+    await hand_over(pipeline, [(vacancy_id, Judged(True))], applies=hands_over)

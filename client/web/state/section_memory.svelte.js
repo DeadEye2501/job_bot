@@ -61,33 +61,11 @@ export function withView(memory, section, view) {
 /** Держатель памяти: что запомнено и как запомнить новое. */
 export function heldMemory() {
   let memory = $state(sectionMemory());
-  let vacancyDraft = $state(blankVacancy());
-  let handsOver = $state(false);
-  let handed = $state(false);
   // Окно заведения правит черновик на месте его полей, поэтому он держится
   // руной целиком, а не сменой памяти, как отбор и вкладки. `handed` — черновик
   // ушёл боту и его итог ещё не принят: закрытое окно его не стирает, даже если
   // отказ пришёл вестью раньше ответа на сам зов.
-  const newVacancy = {
-    get draft() {
-      return vacancyDraft;
-    },
-    set draft(value) {
-      vacancyDraft = value;
-    },
-    get handsOver() {
-      return handsOver;
-    },
-    set handsOver(on) {
-      handsOver = on;
-    },
-    get handed() {
-      return handed;
-    },
-    set handed(on) {
-      handed = on;
-    },
-  };
+  const newVacancy = $state({ draft: blankVacancy(), handsOver: false, handed: false });
   return {
     newVacancy,
     get tabs() {

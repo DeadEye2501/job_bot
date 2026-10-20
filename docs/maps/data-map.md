@@ -402,6 +402,7 @@
 
 - `_SUBMIT` = `'submit_vacancy: текст вакансии со страницы досл…`
 - `_ANSWERS` = `'Ответ submit_vacancy: «принята», «повтор», «про…`
+- `_BACK_TO_RESULTS` = `'Пока ты ждёшь ответа submit_vacancy, приложение…`
 - `_SELECTION` = `'Отбор — средний. После тебя каждую вакансию про…`
 - `PAGE_PROMPT` = `'Твоя задача — передать приложению вакансию со с…`
 - `SEEKER_PROMPT` = `'Твоя задача — найти на сайте агрегатора свежие …`
@@ -613,7 +614,6 @@
 ### `backend/bot/pasted.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `TOLD` = `work.TOLD`
 - `PastedOutcome` = `Literal[work.WorkOutcome, 'told', 'locked']`
 
 ### `backend/bot/rerun.py`

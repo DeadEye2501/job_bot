@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import WizardCv from '../app/WizardCv.svelte';
 import { hearAwaited } from '../state/awaited.svelte.js';
+import { listening } from './bridge_stub.js';
 import { settled } from './settled.js';
 
 let deaf = () => {};
@@ -38,14 +39,9 @@ const ANSWERS = {
  */
 function step(during = null) {
   const trail = [];
-  let hear = null;
-  deaf = hearAwaited({
-    on: (kind, heard) => {
-      hear = heard;
-      return () => {};
-    },
-  });
-  const finished = (payload) => hear({ action: 'parse_cv', ...payload });
+  const events = listening();
+  deaf = hearAwaited(events);
+  const finished = (payload) => events.fire('action_finished', { action: 'parse_cv', ...payload });
   render(WizardCv, {
     props: {
       ask: async (path) => {

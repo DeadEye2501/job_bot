@@ -12,13 +12,12 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.domain.hosts import typed_page
 from backend.domain.salary import salary_text
 from backend.domain.scoring import score_stack
 from backend.domain.stack import deduped_halves, joined_stack
 from backend.models import Vacancy, VacancyEvent
 from backend.repository.profile_skills import list_skills
-from backend.repository.vacancies_life import add_vacancy_event, vacancy_at_address
+from backend.repository.vacancies_life import add_vacancy_event
 
 logger = logging.getLogger(__name__)
 
@@ -57,11 +56,9 @@ async def add_with_event(
     await add_vacancy_event(session, vacancy.id, kind, payload)
 
 
-async def create_vacancy(session: AsyncSession, fields: dict) -> tuple[int, bool]:
-    """Завести вакансию по набранному в окне; номер и заведена ли она.
-
-    «Ссылка на объявление» ведёт на страницу уже заведённой вакансии — это
-    повтор: строка не пишется, в ответ номер существующей и `False`.
+async def create_vacancy(session: AsyncSession, fields: dict) -> int:
+    """Завести вакансию по набранному в окне и назвать номер. Повтор по
+    «Ссылке на объявление» зовущий проверил до этого (`hand_made.known_at`).
 
     Поля приходят одним объектом, каким их прочитала форма
     (`bridge/form_payloads.read_new_vacancy_fields`): колонки они называют
@@ -77,12 +74,6 @@ async def create_vacancy(session: AsyncSession, fields: dict) -> tuple[int, bool
 
     Оборот открывает зовущий.
     """
-    page = typed_page(fields.get("source_url"))
-    if page is not None:
-        existing = await vacancy_at_address(session, page)
-        if existing is not None:
-            logger.info("vacancy by hand: page %s is vacancy %d", page, existing)
-            return existing, False
     # Свой набор: половины стека из него вынимаются, а объект чужой.
     fields = dict(fields)
     required, preferred = deduped_halves(
@@ -102,4 +93,4 @@ async def create_vacancy(session: AsyncSession, fields: dict) -> tuple[int, bool
     )
     await add_with_event(session, vacancy, HAND_MADE)
     logger.info("Created vacancy id=%d by hand title=%r", vacancy.id, fields["title"])
-    return vacancy.id, True
+    return vacancy.id

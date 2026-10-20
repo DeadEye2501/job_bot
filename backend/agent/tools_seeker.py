@@ -133,7 +133,7 @@ async def _submit_page(kit: AgentKit, job: SeekJob, page: _Page) -> str:
     async def save(embedding: list[float]) -> int:
         return await _store(kit, job, page, key, embedding)
 
-    return await _through(kit, job, "передана", pasted.file_by_hand(kit.pipeline, page.text, job.intake, save))
+    return await _through(kit, job, "принята", pasted.file_by_hand(kit.pipeline, page.text, job.intake, save))
 
 
 async def _filed(kit: AgentKit, job: SeekJob, page: _Page, key: str, embedding: list[float]) -> str:

@@ -14,7 +14,7 @@ import { hearAwaited } from '../state/awaited.svelte.js';
 import { hearRound } from '../state/round.svelte.js';
 import { heldMemory, sectionMemory } from '../state/section_memory.svelte.js';
 import { settleHandMade } from '../state/vacancies.js';
-import { roundGoes } from './bridge_stub.js';
+import { listening, roundGoes } from './bridge_stub.js';
 import { livingProps } from './live_props.svelte.js';
 import { buttonBy, press } from './press.js';
 import { settled } from './settled.js';
@@ -93,12 +93,9 @@ function screen({ lockedTip = '', memory = heldMemory() } = {}) {
   PASTED.length = 0;
   SAID.length = 0;
   OPENED.length = 0;
-  hearAwaited({
-    on: (kind, hear) => {
-      NEWS = hear;
-      return () => {};
-    },
-  });
+  const events = listening();
+  NEWS = (payload) => events.fire('action_finished', payload);
+  hearAwaited(events);
   const [props] = livingProps({
     ask: bridge,
     say: (text) => SAID.push(text),

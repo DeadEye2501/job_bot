@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from functools import partial
 
 from backend.domain.hosts import typed_page
 from backend.domain.scoring import build_skill_lookup
@@ -11,7 +12,6 @@ from backend.repository import (
     applications,
     profile_skills as skills_repo,
     vacancies_card,
-    vacancies_life,
     vacancies_list,
     vacancy_status,
 )
@@ -310,18 +310,14 @@ class Vacancies(VacancyActions, VacancyLinks, VacancyContacts):
             )
 
         async def run() -> dict:
-            # Недоразобранная на той же странице прав не имеет: набранное её
-            # затирает, а не уводит на карточку, которой в списке не видно.
-            async with self._hub.session_factory() as session:
-                stale = await vacancies_life.unparsed_at_address(session, typed_page(fields["source_url"]))
-            if stale is not None:
-                await forgotten(self._hub, stale)
-            result = await hand_made.file_fields(self._hub.session_factory, fields)
-            created = result.outcome == "ok"
-            if created:
-                self._hub.events.add(LIST_CHANGED)
-            return {"action": "create_vacancy", "created_id": result.vacancy_id, "created": created,
-                    "message": FILED if created else PASTED_REFUSALS[result.outcome]}
+            known = await hand_made.known_at(
+                self._hub.session_factory, typed_page(fields["source_url"]), partial(forgotten, self._hub))
+            if known is not None:
+                return {"action": "create_vacancy", "created_id": known, "created": False,
+                        "message": PASTED_REFUSALS["duplicate"]}
+            vacancy_id = await hand_made.file_fields(self._hub.session_factory, fields)
+            self._hub.events.add(LIST_CHANGED)
+            return {"action": "create_vacancy", "created_id": vacancy_id, "created": True, "message": FILED}
 
         return reply(self._hub.runner, run())
 

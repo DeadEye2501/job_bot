@@ -16,7 +16,7 @@ from backend.agent.prompts.frame import system_prompt
 from backend.agent.prompts.seeker import (
     SEEKER_PROMPT, WEB_SEEKER_PROMPT, SeekBounds, seeker_task, web_seeker_task,
 )
-from backend.agent.sessions import end_reason, run_seeker, seeker_plan
+from backend.agent.sessions import end_reason, run_seeker
 from backend.agent.stops import RUN_STOPPERS
 from backend.agent.tools_browser import browser_tools
 from backend.agent.tools_common import common_tools
@@ -74,7 +74,7 @@ async def run_seeker_on(
     await open_clean_profile(kit, job.source.id)
     await kit.pipeline.reload_resources()
     tools = [*common_tools(kit, job), *seeker_tools(kit, job), *browser_tools(kit, None, None)]
-    return await run_seeker(kit, job, seeker_plan(kit, job, await plan_of(tools)))
+    return await run_seeker(kit, job, await plan_of(tools))
 
 
 async def _seek_plan(kit: AgentKit, job: SeekJob, tools: list) -> SessionPlan:
