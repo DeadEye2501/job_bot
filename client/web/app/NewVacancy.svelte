@@ -59,13 +59,21 @@
     // Отметка ставится на каждой отправке заново: оставшаяся от прошлой
     // неудачи, она не дала бы стереть черновик заведённых мимо бота полей.
     newVacancy.handed = awaits;
-    if (awaits) awaited.start(HAND_MADE_ACTION, onhandmade);
+    if (awaits) awaited.start(HAND_MADE_ACTION, heard);
     const answer = await sent(draft);
     if (answer === null && awaits) {
       newVacancy.handed = false;
       awaited.cancel(HAND_MADE_ACTION);
     }
     return answer;
+  }
+
+  /** Итог пришёл: черновик больше не держат — разве что ответ на зов ещё в
+   *  пути, и окно закроется следом за вестью; закрытие тогда не должно стереть
+   *  набранное, которое неудача оставила человеку. */
+  function heard(news) {
+    newVacancy.handed = newCard.saving;
+    onhandmade(news);
   }
 
   /** Зов моста своей вкладки: ссылка уходит тем же слотом, что текст, одним

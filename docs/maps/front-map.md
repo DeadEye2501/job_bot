@@ -62,7 +62,7 @@
 - —
 - принимает: ask, events, say
 
-### app/NewVacancy.svelte (207)
+### app/NewVacancy.svelte (215)
 - —
 - принимает: ask, say, lockedTip, newVacancy, onhandmade, onvacancy, onfiled
 
@@ -924,7 +924,7 @@
 - * Чем подписана запись без названия. Показывают её приглушённой * (`styles/unnamed.css`) — так видно, что это не название, а его отсутствие.
 - отдаёт: UNNAMED, titled
 
-### state/vacancies.js (350)
+### state/vacancies.js (349)
 - * Порядки списка в том виде, в каком их выбирают. Ключи уезжают на мост и * разбираются там `backend/repository/vacancies_list._order_for`; незнакомый * ему ключ сводится к «сначала новые». Первый здесь — тот, в котором список * открывается.
 - отдаёт: SORTS, VACANCY_MODES, ago, blankVacancy, emptyNote, gradeLabel, handsOverToggle, isLink, isText, pasteLock, remoteLabel, salaryLabel, scoreTone, settleHandMade, shortAgo, shownStack, sortKey, vacancyFields, vacancyLine, vacancyNamed, viaBot
 
@@ -1800,8 +1800,8 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/avatar.test.js (27)
 - —
 
-### tests/awaited.test.js (63)
-- * Слушатель вестей (`listening`), которым тест сам доставляет итог работы.
+### tests/awaited.test.js (60)
+- * Подписать учёт на подставные вести; ответ — доставка итога работы.
 
 ### tests/blacklist.test.js (227)
 - —
@@ -1822,9 +1822,9 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/bridge.test.js (161)
 - —
 
-### tests/bridge_stub.js (96)
+### tests/bridge_stub.js (105)
 - * Подписка на вести моста: обработчики копятся по имени в `handlers`, `fire` * зовёт их так же, как мост, `heard` говорит, слушают ли весть.
-- отдаёт: answering, held, listening, relisting, replying, rereading, roundGoes, saying, tracing
+- отдаёт: answering, awaitingNews, held, listening, relisting, replying, rereading, roundGoes, saying, tracing
 
 ### tests/calendar.test.js (60)
 - —
@@ -2058,7 +2058,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/vacancies.test.js (348)
 - * Черновик, ушедший боту, — каким его держит оболочка.
 
-### tests/vacancies_screen_new_live.test.js (599)
+### tests/vacancies_screen_new_live.test.js (585)
 - * Мост, отвечающий тем же, чем отвечает настоящий. * * Заведение чужой карточки отказывает: так ведёт себя настоящий, когда имя * занято или связь оборвалась, — и это единственный способ увидеть, что * остаётся в черновике после неудачи.
 
 ### tests/vacancy_actions.test.js (191)
@@ -2099,7 +2099,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/wizard.test.js (218)
 - —
 
-### tests/wizard_cv_live.test.js (135)
+### tests/wizard_cv_live.test.js (134)
 - * Шаг с подставным мостом: след зовов и способ доставить весть об исходе. * * Вести слушает учёт ожиданий, как в оболочке; весть доставляется с меткой * разбора резюме — чужие шаг не ловит. `during` доставляет весть посреди самого * зова разбора — так приходят мгновенные отказы: файл пропал, формат не * читается, текста в файле нет.
 
 ### tests/words.test.js (13)

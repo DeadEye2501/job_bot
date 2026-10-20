@@ -14,9 +14,9 @@ import { hearAwaited } from '../state/awaited.svelte.js';
 import { hearRound } from '../state/round.svelte.js';
 import { heldMemory, sectionMemory } from '../state/section_memory.svelte.js';
 import { settleHandMade } from '../state/vacancies.js';
-import { listening, roundGoes } from './bridge_stub.js';
+import { awaitingNews, roundGoes } from './bridge_stub.js';
 import { livingProps } from './live_props.svelte.js';
-import { buttonBy, press } from './press.js';
+import { buttonBy, press, typed } from './press.js';
 import { settled } from './settled.js';
 
 let mounted = null;
@@ -93,9 +93,7 @@ function screen({ lockedTip = '', memory = heldMemory() } = {}) {
   PASTED.length = 0;
   SAID.length = 0;
   OPENED.length = 0;
-  const events = listening();
-  NEWS = (payload) => events.fire('action_finished', payload);
-  hearAwaited(events);
+  NEWS = awaitingNews().finished;
   const [props] = livingProps({
     ask: bridge,
     say: (text) => SAID.push(text),
@@ -133,8 +131,7 @@ async function typeChip(row, text) {
   row.querySelector('.chip-add').click();
   await settled();
   const input = row.querySelector('.chip-input');
-  input.value = text;
-  input.dispatchEvent(new Event('input', { bubbles: true }));
+  typed(input, text);
   input.dispatchEvent(
     new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }),
   );
@@ -187,19 +184,15 @@ describe('живой экран вакансий', () => {
     page.querySelector('button[title="Добавить вакансию"]').click();
     await settled();
 
-    const title = page.querySelector('input[placeholder="Название (обязательно)"]');
-    title.value = 'Python-разработчик';
-    title.dispatchEvent(new Event('input', { bubbles: true }));
+    typed(page.querySelector('input[placeholder="Название (обязательно)"]'), 'Python-разработчик');
 
     const company = page.querySelector('input[placeholder="Компания"]');
     company.dispatchEvent(new Event('focus'));
-    company.value = 'Nitka';
-    company.dispatchEvent(new Event('input', { bubbles: true }));
+    typed(company, 'Nitka');
     company.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     await settled();
 
-    company.value = 'Acme';
-    company.dispatchEvent(new Event('input', { bubbles: true }));
+    typed(company, 'Acme');
     company.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     await settled();
 
@@ -220,9 +213,7 @@ describe('живой экран вакансий', () => {
     page.querySelector('button[title="Добавить вакансию"]').click();
     await settled();
 
-    const title = page.querySelector('input[placeholder="Название (обязательно)"]');
-    title.value = 'Python-разработчик';
-    title.dispatchEvent(new Event('input', { bubbles: true }));
+    typed(page.querySelector('input[placeholder="Название (обязательно)"]'), 'Python-разработчик');
 
     await typeChip(chipRow(page, 'Must:'), 'Python');
     await typeChip(chipRow(page, 'Nice:'), 'Docker');
@@ -246,15 +237,11 @@ describe('живой экран вакансий', () => {
     press('Текст', { exact: true });
     await settled();
 
-    const text = page.querySelector('textarea[placeholder="Текст объявления"]');
-    text.value = 'Ищем флориста в студию';
-    text.dispatchEvent(new Event('input', { bubbles: true }));
+    typed(page.querySelector('textarea[placeholder="Текст объявления"]'), 'Ищем флориста в студию');
 
     // Дату набирают тем же полем, что и на стороне полей; уедь она мимо
     // нагрузки, объявление выпало бы из отбора «за последние дни».
-    const when = page.querySelector('.date-picker input');
-    when.value = '20.08.2026';
-    when.dispatchEvent(new Event('input', { bubbles: true }));
+    typed(page.querySelector('.date-picker input'), '20.08.2026');
     await settled();
 
     press('Создать', { exact: true });
@@ -281,9 +268,7 @@ describe('живой экран вакансий', () => {
     press('Ссылка', { exact: true });
     await settled();
 
-    const link = page.querySelector('input[placeholder="Ссылка на объявление"]');
-    link.value = 'https://t.me/pyjobs/5';
-    link.dispatchEvent(new Event('input', { bubbles: true }));
+    typed(page.querySelector('input[placeholder="Ссылка на объявление"]'), 'https://t.me/pyjobs/5');
     await settled();
     press('Создать', { exact: true });
     await settled();
@@ -303,9 +288,7 @@ describe('живой экран вакансий', () => {
     const create = buttonBy('Создать', { exact: true });
     expect(create.disabled).toBe(true);
 
-    const link = page.querySelector('input[placeholder="Ссылка на объявление"]');
-    link.value = 'https://hh.ru/vacancy/1';
-    link.dispatchEvent(new Event('input', { bubbles: true }));
+    typed(page.querySelector('input[placeholder="Ссылка на объявление"]'), 'https://hh.ru/vacancy/1');
     await settled();
     expect(create.disabled).toBe(false);
 
@@ -321,9 +304,7 @@ describe('живой экран вакансий', () => {
     await settled();
     press('Ссылка', { exact: true });
     await settled();
-    const link = page.querySelector('input[placeholder="Ссылка на объявление"]');
-    link.value = 'https://hh.ru/vacancy/1';
-    link.dispatchEvent(new Event('input', { bubbles: true }));
+    typed(page.querySelector('input[placeholder="Ссылка на объявление"]'), 'https://hh.ru/vacancy/1');
     await settled();
 
     const create = page.querySelector('.modal-footer .btn.primary');
@@ -339,9 +320,7 @@ describe('живой экран вакансий', () => {
     page.querySelector('button[title="Добавить вакансию"]').click();
     await settled();
 
-    const title = page.querySelector('input[placeholder="Название (обязательно)"]');
-    title.value = 'Python-разработчик';
-    title.dispatchEvent(new Event('input', { bubbles: true }));
+    typed(page.querySelector('input[placeholder="Название (обязательно)"]'), 'Python-разработчик');
     await settled();
 
     press('Создать', { exact: true });
@@ -364,9 +343,7 @@ describe('живой экран вакансий', () => {
     const create = buttonBy('Создать', { exact: true });
     expect(create.disabled).toBe(true);
 
-    const text = page.querySelector('textarea[placeholder="Текст объявления"]');
-    text.value = 'Ищем повара';
-    text.dispatchEvent(new Event('input', { bubbles: true }));
+    typed(page.querySelector('textarea[placeholder="Текст объявления"]'), 'Ищем повара');
     await settled();
 
     expect(create.disabled).toBe(false);
@@ -415,9 +392,7 @@ describe('живой экран вакансий', () => {
     await settled();
     press('Текст', { exact: true });
     await settled();
-    const text = page.querySelector('textarea[placeholder="Текст объявления"]');
-    text.value = 'Ищем повара';
-    text.dispatchEvent(new Event('input', { bubbles: true }));
+    typed(page.querySelector('textarea[placeholder="Текст объявления"]'), 'Ищем повара');
     await settled();
 
     press('Создать', { exact: true });
@@ -447,9 +422,7 @@ describe('живой экран вакансий', () => {
     await settled();
     press('Текст', { exact: true });
     await settled();
-    const text = page.querySelector('textarea[placeholder="Текст объявления"]');
-    text.value = 'Ищем повара';
-    text.dispatchEvent(new Event('input', { bubbles: true }));
+    typed(page.querySelector('textarea[placeholder="Текст объявления"]'), 'Ищем повара');
     await settled();
     press('Создать', { exact: true });
     await settled();
@@ -467,9 +440,7 @@ describe('живой экран вакансий', () => {
     await settled();
     press('Текст', { exact: true });
     await settled();
-    const text = page.querySelector('textarea[placeholder="Текст объявления"]');
-    text.value = words;
-    text.dispatchEvent(new Event('input', { bubbles: true }));
+    typed(page.querySelector('textarea[placeholder="Текст объявления"]'), words);
     await settled();
   }
 
@@ -508,6 +479,29 @@ describe('живой экран вакансий', () => {
     expect(page.querySelector('textarea[placeholder="Текст объявления"]').value).toBe('');
   });
 
+  it('неудача при открытом снова окне — «Отмена» черновик стирает', async () => {
+    // Окно открыли, пока ждали итог; неудача пришла при открытом — дальше оно
+    // такое же, как открытое после неудачи.
+    const page = screen();
+    await settled();
+    await typedText(page, 'Ищем повара');
+    press('Создать', { exact: true });
+    await settled();
+    page.querySelector('button[title="Добавить вакансию"]').click();
+    await settled();
+
+    NEWS({ action: 'create_from_text', outcome: 'error', message: 'Модель не ответила', danger: true });
+    await settled();
+    press('Отмена', { exact: true });
+    await settled();
+    page.querySelector('button[title="Добавить вакансию"]').click();
+    await settled();
+    press('Текст', { exact: true });
+    await settled();
+
+    expect(page.querySelector('textarea[placeholder="Текст объявления"]').value).toBe('');
+  });
+
   it('после неудачи заведённые напрямую поля черновик не оставляют', async () => {
     const page = screen();
     await settled();
@@ -519,9 +513,7 @@ describe('живой экран вакансий', () => {
     await settled();
     press('Поля', { exact: true });
     await settled();
-    const title = page.querySelector('input[placeholder="Название (обязательно)"]');
-    title.value = 'Python';
-    title.dispatchEvent(new Event('input', { bubbles: true }));
+    typed(page.querySelector('input[placeholder="Название (обязательно)"]'), 'Python');
     await settled();
     press('Создать', { exact: true });
     await settled();
@@ -548,9 +540,7 @@ describe('живой экран вакансий', () => {
     page.querySelector('button[title="Добавить вакансию"]').click();
     await settled();
     page.querySelector('.choice-line input[type="checkbox"]').click();
-    const title = page.querySelector('input[placeholder="Название (обязательно)"]');
-    title.value = 'Python';
-    title.dispatchEvent(new Event('input', { bubbles: true }));
+    typed(page.querySelector('input[placeholder="Название (обязательно)"]'), 'Python');
     await settled();
 
     press('Создать', { exact: true });
@@ -566,9 +556,7 @@ describe('живой экран вакансий', () => {
     await settled();
     page.querySelector('button[title="Добавить вакансию"]').click();
     await settled();
-    const title = page.querySelector('input[placeholder="Название (обязательно)"]');
-    title.value = 'Повтор';
-    title.dispatchEvent(new Event('input', { bubbles: true }));
+    typed(page.querySelector('input[placeholder="Название (обязательно)"]'), 'Повтор');
     await settled();
 
     press('Создать', { exact: true });
@@ -587,9 +575,7 @@ describe('живой экран вакансий', () => {
     await settled();
     press('Текст', { exact: true });
     await settled();
-    const text = page.querySelector('textarea[placeholder="Текст объявления"]');
-    text.value = 'Ищем повара';
-    text.dispatchEvent(new Event('input', { bubbles: true }));
+    typed(page.querySelector('textarea[placeholder="Текст объявления"]'), 'Ищем повара');
     await settled();
 
     const create = page.querySelector('.modal-footer .btn.primary');
