@@ -1,4 +1,4 @@
-"""Порядок способов отклика: Telegram, кнопка агрегатора, форма, почта."""
+"""Порядок способов отклика: Telegram, кнопки агрегаторов, формы, почта."""
 
 from backend.domain.apply_order import KnownSite, VacancyFacts, Way, World, apply_ways
 from tests.factories_aggregators import world_of
@@ -81,6 +81,34 @@ def test_another_link_in_the_contacts_is_a_form():
     ways = apply_ways(_vacancy(contacts=["https://company.test/apply", "hr@company.test"]), _world())
     assert ways == [Way("form", "https://company.test/apply", None),
                     Way("email", "hr@company.test", None)]
+
+
+def test_every_other_link_is_its_own_form():
+    """Из двух страниц работодателя выбирает человек: способ — каждая, как каждый адрес почты."""
+    ways = apply_ways(_vacancy(contacts=["https://company.test/apply",
+                                         "https://jobs.company.test/7"]), _world())
+    assert ways == [Way("form", "https://company.test/apply", None),
+                    Way("form", "https://jobs.company.test/7", None)]
+
+
+def test_every_aggregator_link_is_its_own_button():
+    ways = apply_ways(_vacancy(contacts=["https://site.test/vacancy/1",
+                                         "https://site.test/vacancy/2"]), _world())
+    assert ways == [Way("aggregator", "https://site.test/vacancy/1", 1),
+                    Way("aggregator", "https://site.test/vacancy/2", 1)]
+
+
+def test_a_web_find_page_listed_in_the_contacts_too_is_offered_once():
+    page = "https://company.test/jobs/1"
+    ways = apply_ways(_vacancy(source_url=page, source_site=WEB,
+                               contacts=[page, "https://board.company.test/1"]), _world())
+    assert ways == [Way("form", page, None), Way("form", "https://board.company.test/1", None)]
+
+
+def test_the_same_page_written_two_ways_is_offered_once():
+    ways = apply_ways(_vacancy(source_url="https://company.test/jobs/1/", source_site=WEB,
+                               contacts=["https://company.test/jobs/1?utm_source=board"]), _world())
+    assert ways == [Way("form", "https://company.test/jobs/1/", None)]
 
 
 def test_mail_is_offered_only_when_set_up():

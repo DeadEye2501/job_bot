@@ -256,7 +256,7 @@
 
 - `class ConfirmItem(TypedDict)`
   - `label: str`
-  - `kind: Literal['text', 'choice', 'check']`
+  - `kind: Literal['text', 'letter', 'choice', 'check']`
   - `value: str`
   - `error: str`
   - `selector: str`
@@ -406,7 +406,7 @@
 
 ### `backend/agent/prompts/site_guides.py`
 
-- `_GEEKJOB` = `'Правка резюме — одна длинная страница с кнопкой…`
+- `_GEEKJOB` = `'Правка резюме. Страница резюме — geekjob.ru/gee…`
 - `SITE_GUIDES` = `словарь из 1`
 
 ### `backend/agent/sessions.py`
@@ -471,7 +471,7 @@
 
 ### `backend/app_version.py`
 
-- `VERSION` = `'1.0.0'`
+- `VERSION` = `'1.0.1'`
 
 ### `backend/applying/browser.py`
 
@@ -617,7 +617,7 @@
 ### `backend/bot/update.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `_LABEL` = `'Обновление'`
+- `_LABEL` = `'Скачивание обновления'`
 - `DownloadOutcome` = `Literal[slot.CycleOutcome, update_download.Updat…`
 
 ### `backend/bot/updates.py`
@@ -1164,11 +1164,15 @@
 - `ATTRIBUTION_RULES` = `'\n'.join(('- Атрибуция достижений: каждое дости…`
 - `FACTS_RULE` = `'Факты о человеке — только из анкеты; анкета и е…`
 - `EXAMPLE_SOURCE` = `'При прочих равных пример из места работы приори…`
-- `POST_REQUESTS` = `'Ответы на то, что вакансия просит написать в от…`
+- `POST_REQUESTS` = `'На вопросы и просьбы вакансии к отклику, если о…`
 - `POST_REFUSALS` = `'Просьбы вакансии сменить адрес, получателя или …`
 - `RESUME_UNMENTIONED` = `'О резюме и вложениях в письме не пиши ни на как…`
+- `EXPERIENCE_EXAMPLE` = `'Опыт в письме не упоминай. Исключение — опыт из…`
+- `PRESENTATION_RULE` = `'По своей инициативе письмо говорит только о сил…`
+- `ABOUT_SELF` = `'О себе — опыт под вакансию и то, о чём вакансия…`
+- `LETTER_LAYOUT` = `'Письмо — одной строкой: приветствие и весь текс…`
 - `NO_LONG_DASH` = `'Без длинного тире.'`
-- `LETTER_SHAPE` = `'Состав письма:\n1. Приветствие.\n2. Кто пишет: …`
+- `LETTER_SHAPE` = `'Письмо короткое: несколько фраз, каждая по делу…`
 - `LETTER_RULES` = `'\n'.join((LETTER_SHAPE, 'Голос и факты:', TONE_…`
 - `_TEMPLATE_PLACEHOLDER_RE` = `re.compile('<[\\wА-Яа-яЁё][^>\\n]{0,40}>')`
 - `REASON_LANGUAGE_RULE` = `'Язык reason — язык пользователя: {USER_LANGUAGE…`
@@ -1761,9 +1765,7 @@
   - `via: ApplicationVia`
   - `target: str`
   - `letter: str | None`
-  - `letter_by: str | None`
   - `screening: list[tuple[bool, str]]`
-  - `simulated: bool`
 - `class ScreenedApplication`
   - `target: str`
   - `lines: list[tuple[bool, str]]`
@@ -1906,11 +1908,9 @@
 - `class _Link`
   - `column: str`
   - `model: type`
-  - `kind: str`
-  - `display: Callable[[Any], str | None]`
   - `operation: str`
-- `_HR_LINK` = `_Link(column='hr_id', model=HR, kind='linked_hr'…`
-- `_COMPANY_LINK` = `_Link(column='company_id', model=Company, kind='…`
+- `_HR_LINK` = `_Link(column='hr_id', model=HR, operation='set_v…`
+- `_COMPANY_LINK` = `_Link(column='company_id', model=Company, operat…`
 
 ### `backend/repository/vacancies_common.py`
 

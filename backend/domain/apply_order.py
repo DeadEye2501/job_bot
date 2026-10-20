@@ -2,8 +2,9 @@
 
 from dataclasses import dataclass
 
-from backend.domain.contact_keys import is_address, is_link
+from backend.domain.contact_keys import contact_key, is_address, is_link
 from backend.domain.hosts import owning_host
+from backend.domain.spellings import dedupe_first_wins
 from backend.models import ApplicationVia
 
 VIA_TELEGRAM = ApplicationVia.TELEGRAM.value
@@ -55,10 +56,14 @@ class World:
 
 
 def apply_ways(vacancy: VacancyFacts, world: World) -> list[Way]:
-    """Способы по порядку: Telegram, кнопка агрегатора, форма, каждый адрес почты."""
+    """Способы по порядку: Telegram, кнопки агрегаторов, формы, почта.
+
+    Каждая ссылка — свой способ, как каждый адрес почты: из двух страниц
+    выбирает человек в окне, а откликатель при неудаче первой идёт ко второй.
+    """
     ways = [_telegram(vacancy, world)]
     if world.agent_ready:
-        ways += [_button(vacancy, world), _form(vacancy, world)]
+        ways += _buttons(vacancy, world) + _forms(vacancy, world)
     if world.mail_ready:
         ways += [Way(VIA_EMAIL, c.strip(), None) for c in vacancy.contacts if is_address(c)]
     return [way for way in ways if way is not None]
@@ -70,36 +75,42 @@ def _telegram(vacancy: VacancyFacts, world: World) -> Way | None:
     return Way(VIA_TELEGRAM, vacancy.hr_handle, None)
 
 
-def _button(vacancy: VacancyFacts, world: World) -> Way | None:
-    """Ссылка на вакансию на сайте агрегатора со входом, выбранным резюме и не закрытого.
+def _buttons(vacancy: VacancyFacts, world: World) -> list[Way]:
+    """Ссылки на вакансию на сайте агрегатора со входом, выбранным резюме и не закрытого.
 
     Без выбранного резюме откликаться нечем: угаданное резюме могло бы оказаться
     резюме другой профессии.
     """
+    ways = []
     for link in _links(vacancy):
         site = _owner(link, world.sites)
         if (site is not None and site.logged_in and site.resume_chosen
                 and site.id not in world.closed_sites):
-            return Way(VIA_AGGREGATOR, link, site.id)
-    return None
+            ways.append(Way(VIA_AGGREGATOR, link, site.id))
+    return ways
 
 
-def _form(vacancy: VacancyFacts, world: World) -> Way | None:
-    """Своя страница у находки поиска по сети, иначе любая ссылка не на агрегатор человека.
+def _forms(vacancy: VacancyFacts, world: World) -> list[Way]:
+    """Своя страница у находки поиска по сети и все ссылки не на агрегатор человека.
 
     Страница агрегатора человека формой не бывает и у находки сети: веб-поиск
-    обходит их по наставлению, а не по запрету, и принести может.
+    обходит их по наставлению, а не по запрету, и принести может. Страница-источник
+    вакансии с площадки формой не бывает тоже — это страница площадки.
     """
-    source = vacancy.source_site
-    web_find = source is not None and source.host is None and vacancy.source_url
-    candidates = [vacancy.source_url] if web_find else []
-    return next((Way(VIA_FORM, link, None) for link in candidates + _contact_links(vacancy)
-                 if _owner(link, world.sites) is None), None)
+    web_find = vacancy.source_site is not None and vacancy.source_site.host is None
+    return [Way(VIA_FORM, link, None) for link in _links(vacancy)
+            if (web_find or link != vacancy.source_url) and _owner(link, world.sites) is None]
 
 
 def _links(vacancy: VacancyFacts) -> list[str]:
+    """Страница-источник у вакансии с сайта, затем ссылки из контактов, без повторов.
+
+    Источник канала — пост в Telegram, а не страница вакансии, поэтому берётся
+    только у вакансии с площадки или из сети. Повтор — та же страница,
+    записанная ещё и контактом: два способа на один адрес были бы одним.
+    """
     from_source = [vacancy.source_url] if vacancy.source_site and vacancy.source_url else []
-    return from_source + _contact_links(vacancy)
+    return dedupe_first_wins(from_source + _contact_links(vacancy), key=contact_key)
 
 
 def _contact_links(vacancy: VacancyFacts) -> list[str]:
