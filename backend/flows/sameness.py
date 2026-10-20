@@ -28,5 +28,5 @@ async def known_or_new(pipeline, text: str, what: str) -> Match | None:
     similar = await embeddings.similar_vacancy_id(pipeline, embedding)
     if similar is None:
         return Match("new", None, embedding)
-    unparsed = await parse.is_unparsed_vacancy(pipeline, similar)
+    unparsed = await parse.is_parsed(pipeline.session_factory, similar) is False
     return Match("unparsed" if unparsed else "parsed", similar, embedding)

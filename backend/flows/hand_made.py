@@ -23,7 +23,7 @@ from backend.flows.handover import hand_over
 from backend.flows.parse import Judged
 from backend.payloads import ChannelPost
 from backend.repository.channels import find_channel_by_username
-from backend.repository.vacancies_life import vacancy_at_address
+from backend.repository.vacancies_life import vacancies_at_address
 from backend.repository.vacancies_new import create_vacancy
 from backend.telegram_lookup import read_post
 
@@ -59,7 +59,7 @@ async def ingest_by_hand(kit: AgentKit, request: HandRequest) -> None:
     статьи — не страница вакансии.
     """
     pipeline = kit.pipeline
-    if await _known_address(pipeline, _own_address(request)):
+    if await _known_address(pipeline, own_address(request)):
         return
     if request.tab == "text":
         await pasted.ingest_pasted_text(pipeline, request.value, request.posted_at, request.hands_over)
@@ -75,7 +75,7 @@ async def ingest_by_hand(kit: AgentKit, request: HandRequest) -> None:
         await _filed(pipeline, request.value, request.hands_over)
 
 
-def _own_address(request: HandRequest) -> str | None:
+def own_address(request: HandRequest) -> str | None:
     """Собственный адрес вакансии в заявке: у поста и страницы — сама ссылка,
     у полей — «Ссылка на объявление»; у текста и статьи его нет."""
     if request.tab in ("post", "page"):
@@ -86,16 +86,17 @@ def _own_address(request: HandRequest) -> str | None:
 
 
 async def known_at(session_factory, url: str | None, forget: Callable[[int], Awaitable[object]]) -> int | None:
-    """Номер разобранной вакансии с этим собственным адресом; недоразобранная
-    снесена (`handover.known_or_forgotten`). Одно правило у бота и у «Полей»
-    мимо бота — разные у них только руки сноса."""
+    """Номер первой разобранной вакансии с этим собственным адресом;
+    недоразобранные до неё снесены (`handover.known_or_forgotten`). Одно
+    правило у бота и у «Полей» мимо бота — разные у них только руки сноса."""
     if not url:
         return None
     async with session_factory() as session:
-        existing = await vacancy_at_address(session, url)
-    if existing is None or not await handover.known_or_forgotten(session_factory, existing, forget):
-        return None
-    return existing
+        existing = await vacancies_at_address(session, url)
+    for vacancy_id in existing:
+        if await handover.known_or_forgotten(session_factory, vacancy_id, forget):
+            return vacancy_id
+    return None
 
 
 async def _known_address(pipeline, url: str | None) -> bool:
@@ -136,7 +137,8 @@ async def _posted(pipeline, url: str, hands_over: bool) -> None:
         if vacancy_id is None:
             # Тот же пост завёл встречный обход его канала, пока шло чтение.
             async with pipeline.session_factory() as session:
-                tell(pipeline, "duplicate", await vacancy_at_address(session, url))
+                found = await vacancies_at_address(session, url)
+            tell(pipeline, "duplicate", found[0] if found else None)
         return vacancy_id
 
     await pasted.file_by_hand(pipeline, text, by_hand, save)

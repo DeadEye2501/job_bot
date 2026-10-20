@@ -235,14 +235,14 @@ async def test_an_article_link_goes_the_way_of_pasted_text(filing, session_facto
     assert filing.told == [HandResult("ok", saved.id)]
 
 
-@pytest.mark.parametrize("kind, url", [
-    ("post", "https://t.me/pyjobs/5"),
-    ("page", "https://hh.ru/vacancy/123"),
+@pytest.mark.parametrize("kind, url, msg_id", [
+    ("post", "https://t.me/pyjobs/5", 5),
+    ("page", "https://hh.ru/vacancy/123", None),
 ], ids=["пост", "страница"])
-async def test_a_link_filed_before_is_a_duplicate_before_anything_else(filing, session_factory, kind, url):
+async def test_a_link_filed_before_is_a_duplicate_before_anything_else(filing, session_factory, kind, url, msg_id):
     """Однозначный повтор узнаётся первым: ни Telegram, ни агента, ни строки, ни
     откликателя — окно переходит на существующую."""
-    existing = vacancy_row(is_parsed=True, source_url=url)
+    existing = vacancy_row(is_parsed=True, source_url=url, source_msg_id=msg_id)
     await put(session_factory, existing)
 
     await ingest_by_hand(kit_for(filing), HandRequest(kind, url, None, True))
@@ -255,7 +255,7 @@ async def test_a_link_filed_before_is_a_duplicate_before_anything_else(filing, s
 async def test_an_unparsed_row_at_the_same_address_is_replaced(filing, session_factory, monkeypatch, parsed):
     """Недоразобранная прав не имеет: повтор с ней её сносит, и пост заводится
     заново тем, что принёс человек."""
-    stale = vacancy_row(is_parsed=False, raw_text="шапка", source_url="https://t.me/PyJobs/5")
+    stale = vacancy_row(is_parsed=False, raw_text="шапка", source_url="https://t.me/PyJobs/5", source_msg_id=5)
     await put(session_factory, stale)
 
     await _post_filed(filing, monkeypatch, WithMessages(post=_public_post()), url="https://t.me/PyJobs/5")
@@ -264,6 +264,31 @@ async def test_an_unparsed_row_at_the_same_address_is_replaced(filing, session_f
     assert (saved.raw_text, saved.is_parsed) == ("Ищем QA в команду", False)
     assert parsed == [(saved.id, "Ищем QA в команду", "PyJobs", True)]
     assert filing.told == [HandResult("ok", saved.id)]
+
+
+async def test_the_parsed_row_behind_an_unparsed_one_is_the_duplicate(filing, session_factory):
+    """По адресу две строки: недоразобранная прав не имеет и сносится, повтор —
+    разобранная за ней, а не новая третья строка."""
+    stale = vacancy_row(is_parsed=False, source_url="https://hh.ru/vacancy/123")
+    kept = vacancy_row(is_parsed=True, source_url="https://hh.ru/vacancy/123?from=main")
+    await put(session_factory, stale, kept)
+
+    await ingest_by_hand(kit_for(filing), HandRequest("page", "https://hh.ru/vacancy/123", None, True))
+
+    assert [row.id for row in await all_rows(session_factory, Vacancy)] == [kept.id]
+    assert filing.told == [HandResult("duplicate", kept.id)]
+
+
+@pytest.mark.usefixtures("one_vector")
+async def test_a_post_linked_from_fields_is_filed_by_its_link(filing, session_factory, monkeypatch, parsed):
+    """Ссылка на пост у набранной в «Полях» — упоминание и для поста по ссылке:
+    вторая вакансия того же поста заводится, а не уводит на набранную."""
+    await put(session_factory, vacancy_row(is_parsed=True, source_url="https://t.me/PyJobs/5"))
+
+    await _post_filed(filing, monkeypatch, WithMessages(post=_public_post()), url="https://t.me/PyJobs/5")
+
+    assert len(await all_rows(session_factory, Vacancy)) == 2
+    assert filing.told[-1].outcome == "ok"
 
 
 @pytest.mark.usefixtures("one_vector")

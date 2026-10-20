@@ -61,31 +61,25 @@ async def test_a_cursor_for_a_missing_channel_is_not_created(
     assert await only_row(session_factory, TelegramChannel) is None
 
 
-async def test_an_unfinished_parse_is_recognised(make_pipeline, session_factory):
+async def test_an_unfinished_parse_is_recognised(session_factory):
     """Вакансия с неоконченным разбором опознаётся как недоразобранная.
 
     Такие остаются после падения на середине: строка есть, вектор есть, а
     разбор не дошёл до конца.
     """
     await put(session_factory, vacancy_row(title=None, is_parsed=False))
-    pipeline = await make_pipeline()
 
-    assert await parse.is_unparsed_vacancy(pipeline, 1) is True
+    assert await parse.is_parsed(session_factory, 1) is False
 
 
-async def test_a_finished_parse_is_not_mistaken_for_unfinished(
-    make_pipeline, session_factory
-):
+async def test_a_finished_parse_is_not_mistaken_for_unfinished(session_factory):
     """Разобранная вакансия недоразобранной не считается."""
     await put(session_factory, vacancy_row(title="разобрана", is_parsed=True))
-    pipeline = await make_pipeline()
 
-    assert await parse.is_unparsed_vacancy(pipeline, 1) is False
+    assert await parse.is_parsed(session_factory, 1) is True
 
 
-async def test_a_rejected_vacancy_without_a_title_is_still_parsed(
-    make_pipeline, session_factory
-):
+async def test_a_rejected_vacancy_without_a_title_is_still_parsed(session_factory):
     """Отбракованная вакансия без названия считается разобранной.
 
     Признак читается явным полем нарочно: у пустого объявления названия
@@ -101,17 +95,14 @@ async def test_a_rejected_vacancy_without_a_title_is_still_parsed(
             skip_reason="empty:нет текста",
         ),
     )
-    pipeline = await make_pipeline()
 
-    assert await parse.is_unparsed_vacancy(pipeline, 1) is False
+    assert await parse.is_parsed(session_factory, 1) is True
 
 
-async def test_a_vacancy_that_no_longer_exists_is_not_unfinished(make_pipeline):
-    """Исчезнувшая вакансия недоразобранной не считается.
+async def test_a_vacancy_that_no_longer_exists_is_neither(session_factory):
+    """Исчезнувшая вакансия ни разобранной, ни недоразобранной не считается.
 
     Её могли удалить из окна, пока подбор недоразобранного шёл по
     списку; браться за неё уже не за что.
     """
-    pipeline = await make_pipeline()
-
-    assert await parse.is_unparsed_vacancy(pipeline, 404) is False
+    assert await parse.is_parsed(session_factory, 404) is None

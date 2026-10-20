@@ -65,9 +65,7 @@ async def known_or_forgotten(
     а заведение идёт заново тем, что принёс человек. Сносят разные руки: у бота
     — вместе с отпечатком в его кэше, у моста без бота кэша нет вовсе.
     """
-    async with session_factory() as session:
-        row = await session.get(Vacancy, vacancy_id)
-        state = None if row is None else row.is_parsed
+    state = await parse.is_parsed(session_factory, vacancy_id)
     if state is False:
         await forget(vacancy_id)
     return bool(state)
