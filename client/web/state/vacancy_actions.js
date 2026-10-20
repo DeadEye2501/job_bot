@@ -4,7 +4,7 @@
 // разметки этот файл не знает.
 
 import { showStamp } from './dates.js';
-import { RUNNING } from './progress.js';
+import { sourceBlock } from './sources.js';
 import { atHandle } from './telegram.js';
 import { counted } from './words.js';
 
@@ -16,12 +16,13 @@ import { counted } from './words.js';
  *
  * Идущий обход запирает оба: прогон сам зовёт модель, а параллельной работы
  * модели не допускаем — даже отклика в Telegram, которому браузер не нужен.
+ * Старшинство причин то же, что у источников и окна заведения (`sourceBlock`).
  *
  * Есть ли куда откликаться, здесь не решается: это знает только мост, и
  * ответ его разбирает `applyChoices`.
  */
 export function actionBlocks(card, lockedTip, running) {
-  const busy = lockedTip || (running ? RUNNING : '');
+  const busy = sourceBlock({ barred: '', running, lock: '', lockedTip });
   return {
     send: busy,
     // Пустой текст разбор не запирает: его зовут как раз тогда, когда карточка

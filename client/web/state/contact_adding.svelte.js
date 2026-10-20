@@ -30,14 +30,18 @@
  *
  * `form.done(draft, answer)` — слово по удаче; пустое значит, что об исходе
  * скажет весть.
+ *
+ * `held` — где лежит черновик: у окон о человеке, компании, канале и контакте
+ * он свой и умирает с экраном, у окна вакансии его держит оболочка — набранное
+ * должно дожить до итога разбора. `keeps()` — ждут ли итога: тогда закрытое
+ * окно черновик не стирает.
  */
-export function contactAdding({ list, form, save, say }) {
+export function contactAdding({ list, form, save, say, held = ownDraft(form), keeps = () => false }) {
   let adding = $state(false);
   let saving = $state(false);
   let trouble = $state('');
-  let draft = $state(form.blank());
 
-  const ready = $derived(form.named(draft));
+  const ready = $derived(form.named(held.draft));
 
   return {
     /** Открыто ли окно заведения. */
@@ -50,7 +54,7 @@ export function contactAdding({ list, form, save, say }) {
       // Заведённые по дороге чужие записи это не отменяет — они уже легли в
       // базу, и черновик им не хозяин.
       if (!open) {
-        draft = form.blank();
+        if (!keeps()) held.draft = form.blank();
         trouble = '';
       }
       adding = open;
@@ -66,10 +70,10 @@ export function contactAdding({ list, form, save, say }) {
     /** Набранное в окне заведения. Форму правят на месте её поля; черновик
      *  строкой — у окна об одном поле — заменяется целиком. */
     get draft() {
-      return draft;
+      return held.draft;
     },
     set draft(value) {
-      draft = value;
+      held.draft = value;
     },
     /** Названа ли карточка хоть чем-нибудь — тем же заслоном, что и на мосту. */
     get ready() {
@@ -89,7 +93,7 @@ export function contactAdding({ list, form, save, say }) {
       trouble = '';
       let done;
       try {
-        done = await save(draft);
+        done = await save(held.draft);
       } catch (refusal) {
         trouble = refusal.message;
         return;
@@ -103,10 +107,23 @@ export function contactAdding({ list, form, save, say }) {
       // оно зависит от того, какой стороной её завели, а пустое значит, что
       // об исходе скажет весть. Спрашивается до закрытия окна: закрытие
       // чистит черновик, и спрошенное после относилось бы к пустому.
-      const word = form.done(draft, done);
+      const word = form.done(held.draft, done);
       this.adding = false;
       if (word) say(word);
       return list.again(done);
+    },
+  };
+}
+
+/** Черновик, который живёт с самим окном заведения. */
+function ownDraft(form) {
+  let draft = $state(form.blank());
+  return {
+    get draft() {
+      return draft;
+    },
+    set draft(value) {
+      draft = value;
     },
   };
 }

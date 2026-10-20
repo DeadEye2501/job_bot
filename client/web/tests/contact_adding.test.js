@@ -116,6 +116,27 @@ describe('окно заведения над списком', () => {
     expect(sent).toBe(1);
   });
 
+  it('черновик, который держат снаружи, закрытие окна не стирает, пока ждут итога', () => {
+    // Окно вакансии закрывается на «пущено», а набранное должно дожить до
+    // итога разбора: открыв окно снова, человек видит то, что ввёл.
+    const outside = { draft: '' };
+    let waiting = true;
+    const entry = contactAdding({
+      list: { again: () => {} }, form: ADDRESS, save: async () => ({}), say: () => {},
+      held: outside, keeps: () => waiting,
+    });
+    entry.adding = true;
+    entry.draft = 'example.test';
+
+    entry.adding = false;
+    expect(outside.draft).toBe('example.test');
+
+    waiting = false;
+    entry.adding = true;
+    entry.adding = false;
+    expect(outside.draft).toBe('');
+  });
+
   it('пустое слово формы не говорит ничего, а список всё равно перечитан', async () => {
     const quiet = { ...ADDRESS, done: () => '' };
     const { entry, said, again } = adding(async () => ({ name: 'Пример' }), quiet);

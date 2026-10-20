@@ -12,8 +12,10 @@
   import { call } from '$api/bridge.js';
   import { listener } from '$api/events.js';
   import { living } from '$state/alive.js';
+  import { hearAwaited } from '$state/awaited.svelte.js';
   import { blockedTip } from '$state/health.js';
   import { hearRound } from '$state/round.svelte.js';
+  import { settleHandMade } from '$state/vacancies.js';
   import BottomBar from './BottomBar.svelte';
   import ContactsScreen from './ContactsScreen.svelte';
   import LogsScreen from './LogsScreen.svelte';
@@ -145,6 +147,14 @@
     section = 'vacancies';
   }
 
+  /** Итог ручного заведения пришёл вестью: черновик по нему сбрасывается или
+   *  остаётся, а повтор уводит к существующей вакансии. Здесь, а не в экране:
+   *  к приходу вести человек мог уйти из раздела. */
+  function handMade(news) {
+    const open = settleHandMade(memory.newVacancy, news);
+    if (open !== null) goVacancy(open);
+  }
+
   /** Уйти в вакансии с готовым отбором — из строки статуса в статистике.
    *
    * Иначе число в карточке остаётся числом: чтобы посмотреть, что за девять
@@ -163,6 +173,7 @@
     // карточку, и уход на соседний экран, а сказать о ней надо всё равно.
     heard.on('action_finished', (done) => say(done.message, done.danger));
     const roundDeaf = hearRound(heard);
+    const awaitedDeaf = hearAwaited(heard);
     // Цикл вестей пускается здесь: подписки экранов и полосы встают в их
     // эффектах, а пропущенное между подъёмом и подпиской доберёт первый же
     // вопрос — очередь отдаёт всё, что накопилось после названного номера.
@@ -173,6 +184,7 @@
     return () => {
       settled();
       roundDeaf();
+      awaitedDeaf();
       heard.stop();
       clearInterval(setupClock);
       clearTimeout(plaqueTimer);
@@ -186,7 +198,6 @@
   <WizardScreen
     {ask}
     {say}
-    events={heard}
     completed={setup.completed}
     ondone={() => (setup = { ...setup, wizard_completed: true })}
   />
@@ -249,6 +260,9 @@
         onfiltered={() => (openFilter = null)}
         view={memory.views.vacancies}
         onview={memory.keepView('vacancies')}
+        newVacancy={memory.newVacancy}
+        onhandmade={handMade}
+        onvacancy={goVacancy}
       />
     {:else if section === 'system'}
       <TopTabs tabs={SYSTEM_TABS} active={memory.tabs.system} onpick={memory.pickTab('system')} />

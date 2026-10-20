@@ -11,8 +11,15 @@ import { cleanup, render, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import WizardCv from '../app/WizardCv.svelte';
+import { hearAwaited } from '../state/awaited.svelte.js';
+import { settled } from './settled.js';
 
-afterEach(cleanup);
+let deaf = () => {};
+
+afterEach(() => {
+  cleanup();
+  deaf();
+});
 
 const ANSWERS = {
   'profile.get': {
@@ -24,33 +31,36 @@ const ANSWERS = {
 
 /** Шаг с подставным мостом: след зовов и способ доставить весть об исходе.
  *
- * `during` доставляет весть посреди самого зова разбора — так приходят
- * мгновенные отказы: файл пропал, формат не читается, текста в файле нет.
+ * Вести слушает учёт ожиданий, как в оболочке; весть доставляется с меткой
+ * разбора резюме — чужие шаг не ловит. `during` доставляет весть посреди самого
+ * зова разбора — так приходят мгновенные отказы: файл пропал, формат не
+ * читается, текста в файле нет.
  */
 function step(during = null) {
   const trail = [];
   let hear = null;
+  deaf = hearAwaited({
+    on: (kind, heard) => {
+      hear = heard;
+      return () => {};
+    },
+  });
+  const finished = (payload) => hear({ action: 'parse_cv', ...payload });
   render(WizardCv, {
     props: {
       ask: async (path) => {
         trail.push(path);
-        if (path === 'profile.parse_cv' && during) hear(during);
+        if (path === 'profile.parse_cv' && during) finished(during);
         return ANSWERS[path];
       },
       busy: false,
-      events: {
-        on: (kind, heard) => {
-          hear = heard;
-          return () => {};
-        },
-      },
       onback: () => {},
       onnext: async () => {
         trail.push('ушли дальше');
       },
     },
   });
-  return { trail, finished: (payload) => hear(payload) };
+  return { trail, finished };
 }
 
 /** Выбрать разбор и нажать «Готово», дождавшись, что работа пущена. */
@@ -105,6 +115,16 @@ describe('живой шаг резюме', () => {
 
     await vi.waitFor(() => expect(screen.getByText(/не найден/)).toBeTruthy());
     expect(screen.queryByText(/Разбираем резюме/)).toBeNull();
+  });
+
+  it('чужая весть шаг не уводит', async () => {
+    const { trail, finished } = step();
+    await parsing(trail);
+
+    finished({ action: 'rerun', message: 'Вакансия разобрана заново', danger: false });
+    await settled();
+
+    expect(trail).not.toContain('ушли дальше');
   });
 
   it('сорвавшийся разбор возвращает шаг с причиной', async () => {

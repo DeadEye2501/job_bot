@@ -17,7 +17,7 @@
 import { blankCompany, companyNamed } from './companies.js';
 import { blankPerson, named } from './people.js';
 import { atHandle } from './telegram.js';
-import { blankVacancy, typed, vacancyNamed } from './vacancies.js';
+import { blankVacancy, vacancyNamed } from './vacancies.js';
 
 // Окна об одном поле — ник канала, адрес сайта, контакт вакансии: черновик
 // строкой, и пустая строка ничего не называет. Отказ моста у них остаётся в
@@ -59,10 +59,10 @@ export const NEW_CARD = {
     // Слово по удаче зависит от способа: набранные поля ложатся в строку тут
     // же, а вставленный текст только уходит на разбор — и чем тот кончился,
     // скажет весть. Скажи окно «заведена» сразу, на повторе и на молчащей
-    // модели человек прочёл бы подтверждение раньше отказа. У полей слово даёт
-    // мост — и удаче, и повтору: строки при повторе нет, и сказать «заведена»
-    // было бы неправдой.
-    done: (draft, answer) => (typed(draft) ? '' : answer.message),
+    // модели человек прочёл бы подтверждение раньше отказа. Слово даёт мост —
+    // и удаче, и повтору полей: строки при повторе нет, и сказать «заведена»
+    // было бы неправдой; у ушедшего боту его нет вовсе.
+    done: (_draft, answer) => answer.message ?? '',
     blank: blankVacancy,
     named: vacancyNamed,
   },

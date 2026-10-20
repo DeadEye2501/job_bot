@@ -7,13 +7,15 @@
 //
 // Строк списка здесь нет: за время отсутствия их успевает подвинуть бот, и
 // показанные из памяти, они врали бы о положении дел. Помнится только выбранное
-// человеком.
+// человеком — и то, что он завёл, но итога чего ещё не услышал: черновик окна
+// «Добавить вакансию» живёт до итога разбора, а положение «Отклик при
+// создании» — пока открыто окно приложения; после перезапуска он выключен.
 //
 // Правила — чистыми функциями; держатель — руной, один на оболочку и проверки:
 // связка экрана с памятью проверяется на нём, а не на подставке.
 
 import { CONTACTS_TABS, PROFILE_TABS, SYSTEM_TABS } from './sections.js';
-import { SORTS } from './vacancies.js';
+import { SORTS, blankVacancy } from './vacancies.js';
 import { blankFilter } from './vacancy_filter.js';
 
 /** Память свежего окна: первые вкладки, ни одной открытой карточки, пустой
@@ -59,7 +61,35 @@ export function withView(memory, section, view) {
 /** Держатель памяти: что запомнено и как запомнить новое. */
 export function heldMemory() {
   let memory = $state(sectionMemory());
+  let vacancyDraft = $state(blankVacancy());
+  let handsOver = $state(false);
+  let handed = $state(false);
+  // Окно заведения правит черновик на месте его полей, поэтому он держится
+  // руной целиком, а не сменой памяти, как отбор и вкладки. `handed` — черновик
+  // ушёл боту и его итог ещё не принят: закрытое окно его не стирает, даже если
+  // отказ пришёл вестью раньше ответа на сам зов.
+  const newVacancy = {
+    get draft() {
+      return vacancyDraft;
+    },
+    set draft(value) {
+      vacancyDraft = value;
+    },
+    get handsOver() {
+      return handsOver;
+    },
+    set handsOver(on) {
+      handsOver = on;
+    },
+    get handed() {
+      return handed;
+    },
+    set handed(on) {
+      handed = on;
+    },
+  };
   return {
+    newVacancy,
     get tabs() {
       return memory.tabs;
     },
