@@ -5,7 +5,10 @@
 Telegram, поэтому бот подделан.
 """
 
+import pytest
+
 from backend.models import TelegramChannel, Vacancy
+from client.bridge.refusals import PASTED_REFUSALS
 from tests.dbio import only_row, put
 from tests.factories import channel_row, vacancy_row
 
@@ -53,20 +56,18 @@ async def test_a_link_arrives_at_the_bot_as_a_bare_name(api, ask, with_bot):
     assert ("add_channel", "pyjobs") in bot.calls
 
 
-async def test_a_channel_telegram_does_not_know_is_named_in_the_answer(
-    api, ask, with_bot
+@pytest.mark.parametrize("trouble", ["tg_invalid", "tg_private", "tg_error"])
+async def test_a_telegram_trouble_is_said_as_in_the_new_vacancy_window(
+    api, ask, with_bot, trouble
 ):
-    """Про ненайденный канал говорят его же именем.
-
-    Ошибаются обычно в одной букве, и увидеть, каким именем искали, — самый
-    короткий путь понять, где опечатка.
-    """
-    with_bot(added=(None, "invalid"))
+    """Беды Telegram окно канала говорит теми же словами, что и заведение
+    вакансии по ссылке на пост: беда одна, и слова у неё одни."""
+    with_bot(added=(None, trouble))
 
     answer = await ask(api.channels.create, {"input": "@pyjobz"})
 
     assert answer["fail"] == "denied"
-    assert "pyjobz" in answer["detail"]
+    assert answer["detail"] == PASTED_REFUSALS[trouble]
 
 
 async def test_an_already_known_channel_is_not_an_error(api, ask, with_bot):

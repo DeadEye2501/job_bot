@@ -19,8 +19,9 @@ from backend.flows import embeddings, handover, linked_article
 from backend.flows.handover import Intake
 from backend.models import TelegramChannel
 from backend.models import Vacancy, VacancyStatus
+from backend.domain.telegram_identity import PostAddress, post_address
 from backend.repository.channels import list_named_channels
-from backend.telegram_lookup import say_flood_wait
+from backend.telegram_lookup import read_post
 from backend.telegram_time import utc_now
 from backend.repository.vacancy_status import (
     last_status_history_id,
@@ -42,9 +43,33 @@ class _Origin:
 
     raw_text: str
     channel_username: str
-    msg_id: int | None
+    post: PostAddress | None
     status: VacancyStatus
     history_id: int | None
+
+
+def _post_of(username: str, msg_id: int | None, source_url: str | None) -> PostAddress | None:
+    """Где перечитать пост вакансии; пусто — вакансия не из поста.
+
+    Из поста строка, у которой есть номер сообщения. По нику канала — у поста
+    заведённого канала; иначе по собственному адресу строки: у поста
+    незаведённого или закрытого канала, заведённого по ссылке, строки канала
+    нет, а адрес есть. Ссылка на пост у строки без номера — у набранной в
+    «Полях» — упоминание, а не её исходный текст.
+    """
+    if msg_id is None:
+        return None
+    if username:
+        return PostAddress(username, None, msg_id)
+    return post_address(source_url or "")
+
+
+def _nick(username: str, post: PostAddress | None) -> str:
+    """Ник канала для разбора: заведённого — его, иначе из адреса поста.
+
+    Без ника разбор не узнал бы канал в тексте и положил бы его в контакты HR.
+    """
+    return username or (post.channel if post is not None and post.channel else "")
 
 
 async def _vacancy_origin(pipeline, vacancy_id: int) -> _Origin | None:
@@ -61,12 +86,13 @@ async def _vacancy_origin(pipeline, vacancy_id: int) -> _Origin | None:
             )
             if named:
                 channel_username = named[0].username
+        post = _post_of(channel_username, v.source_msg_id, v.source_url)
         # Снимок собирается внутри сессии нарочно: за её пределами чтение
         # полей строки уже не чтение, а поведение сессии.
         return _Origin(
             raw_text=v.raw_text or "",
-            channel_username=channel_username,
-            msg_id=v.source_msg_id,
+            channel_username=_nick(channel_username, post),
+            post=post,
             status=v.status,
             history_id=await last_status_history_id(session, vacancy_id),
         )
@@ -86,39 +112,24 @@ async def _post_text(msg, where: str, vacancy_id: int) -> tuple[str, bool] | Non
     return fresh
 
 
-async def _fetch_fresh_text(
-    pipeline, channel_username: str, msg_id: int | None, vacancy_id: int
-):
+async def _fetch_fresh_text(pipeline, post: PostAddress | None, vacancy_id: int):
     """Перечитать исходный пост; пусто — перечитать не вышло.
 
     Недоступность поста тут не беда, а обычный исход: канал мог закрыться,
     пост — быть удалённым, Telegram — попросить подождать. Во всех этих
     случаях зовущему остаётся то, что уже лежит в базе.
     """
-    from pyrogram.errors import FloodWait
-
-    if not channel_username or msg_id is None:
+    if post is None:
         return None
-    where = f"@{channel_username}/{msg_id}"
-    try:
-        msg = await pipeline.client.get_messages(
-            channel_username, message_ids=msg_id
+    where = f"{post.chat_id}/{post.msg_id}"
+    msg, trouble = await read_post(pipeline.client, post)
+    if msg is None:
+        logger.info(
+            "rerun: vacancy %d msg %s not read (%s), keeping cached raw_text",
+            vacancy_id, where, trouble,
         )
-        if msg is None or getattr(msg, "empty", False):
-            logger.info(
-                "rerun: vacancy %d msg %s not available (deleted/empty), keeping cached raw_text",
-                vacancy_id, where,
-            )
-            return None
-        return await _post_text(msg, where, vacancy_id)
-    except FloodWait as e:
-        say_flood_wait(logger, f"rerun: vacancy {vacancy_id} {where}, keeping cached raw_text", e)
-    except Exception:
-        logger.exception(
-            "rerun: vacancy %d failed to refetch %s, keeping cached raw_text",
-            vacancy_id, where,
-        )
-    return None
+        return None
+    return await _post_text(msg, where, vacancy_id)
 
 
 async def _store(pipeline, vacancy_id: int, **fields) -> bool:
@@ -179,7 +190,7 @@ async def _note_rerun(pipeline, vacancy_id: int, origin: "_Origin") -> None:
 
 
 async def _reread_and_store(
-    pipeline, vacancy_id: int, was: str, where: tuple[str, int | None]
+    pipeline, vacancy_id: int, was: str, post: PostAddress | None
 ):
     """Перечитанный пост двумя значениями; пусто — перечитать не вышло.
 
@@ -190,8 +201,7 @@ async def _reread_and_store(
 
     Толковать недобор здесь нечем: у двух зовущих он значит разное.
     """
-    username, msg_id = where
-    fresh = await _fetch_fresh_text(pipeline, username, msg_id, vacancy_id)
+    fresh = await _fetch_fresh_text(pipeline, post, vacancy_id)
     if fresh is None:
         return None
     text, whole = fresh
@@ -207,10 +217,7 @@ async def _text_to_parse(pipeline, origin: "_Origin", vacancy_id: int) -> str:
     сохранённом статья уже есть, и переписать его постом без неё — значит
     потерять требования, по которым вакансию и отбирали.
     """
-    fresh = await _reread_and_store(
-        pipeline, vacancy_id, origin.raw_text,
-        (origin.channel_username, origin.msg_id),
-    )
+    fresh = await _reread_and_store(pipeline, vacancy_id, origin.raw_text, origin.post)
     if fresh is None:
         return origin.raw_text
     text, whole = fresh
@@ -284,6 +291,7 @@ async def _orphan_rows(pipeline) -> list:
                     Vacancy.id,
                     Vacancy.raw_text,
                     Vacancy.source_msg_id,
+                    Vacancy.source_url,
                     Vacancy.created_at,
                     TelegramChannel.username,
                 )
@@ -360,7 +368,7 @@ async def _text_to_judge_by(pipeline, row) -> tuple[str, bool] | None:
     if not linked_article.article_urls(row.raw_text):
         return row.raw_text, True
     fresh = await _reread_and_store(
-        pipeline, row.id, row.raw_text, (row.username or "", row.source_msg_id)
+        pipeline, row.id, row.raw_text, _post_of(row.username or "", row.source_msg_id, row.source_url)
     )
     if fresh is not None:
         text, whole = fresh
@@ -386,7 +394,8 @@ async def _recover_one(pipeline, row) -> bool:
         logger.info("recover: vacancy %d ждёт дочитывания статьи", row.id)
         return False
     text, allow_delete = judged
-    intake = Intake(channel=row.username or "", allow_delete=allow_delete)
+    post = _post_of(row.username or "", row.source_msg_id, row.source_url)
+    intake = Intake(channel=_nick(row.username or "", post), allow_delete=allow_delete)
     if not await handover.finish_orphan(pipeline, row.id, text, intake):
         return False
     await _refresh_embedding(pipeline, row.id, text)

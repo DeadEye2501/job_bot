@@ -28,7 +28,8 @@ from backend.repository.vacancy_status import (
     apply_parse_outcome,
     mark_vacancy_applied,
 )
-from tests.backend.fixtures.rerun import WithMessages, prepare
+from tests.backend.fixtures.rerun import prepare
+from tests.fakes.telegram import WithMessages
 from tests.dbio import all_rows, only_row, put
 from tests.factories import vacancy_row
 from tests.fakes.telegram_objects import link_entity, post
@@ -47,6 +48,48 @@ async def test_the_fresh_post_is_parsed_and_stored(monkeypatch, rerunning, sessi
 
     assert (await only_row(session_factory, Vacancy)).raw_text == "свежий текст"
     assert pipeline.parsed[-1] == (vacancy.id, "свежий текст", "jobs", False)
+
+
+async def test_a_post_of_a_closed_channel_is_reread_by_its_address(monkeypatch, make_pipeline, session_factory):
+    """Пост закрытого канала, заведённый по ссылке, канала в базе не имеет: его
+    перечитывают по адресу источника."""
+    await put(session_factory, vacancy_row(
+        raw_text="сохранённый текст", source_msg_id=42, source_url="https://t.me/c/123/42"))
+    vacancy = await only_row(session_factory, Vacancy)
+    client = WithMessages(post=post(42, text="свежий текст"))
+    pipeline = await prepare(monkeypatch, make_pipeline, client)
+
+    assert await pipeline.rerun_pipeline_for_vacancy(vacancy.id) == "ok"
+
+    assert client.asked == [(-100123, 42)]
+    assert (await only_row(session_factory, Vacancy)).raw_text == "свежий текст"
+
+
+async def test_a_post_of_an_unknown_channel_is_reread_with_its_nick(monkeypatch, make_pipeline, session_factory):
+    """Канал поста не заведён, но ник есть в адресе: разбор знает канал, и
+    его ник не уйдёт в контакты HR."""
+    await put(session_factory, vacancy_row(
+        raw_text="сохранённый текст", source_msg_id=42, source_url="https://t.me/pyjobs/42"))
+    vacancy = await only_row(session_factory, Vacancy)
+    pipeline = await prepare(monkeypatch, make_pipeline, WithMessages(post=post(42, text="свежий текст")))
+
+    await pipeline.rerun_pipeline_for_vacancy(vacancy.id)
+
+    assert pipeline.parsed[-1][2] == "pyjobs"
+
+
+async def test_fields_linking_a_post_are_not_reread_from_it(monkeypatch, make_pipeline, session_factory):
+    """У набранного в «Полях» ссылка на пост — упоминание, а не исходный текст:
+    перечитай её прогон, набранные поля переписал бы разбор чужого поста."""
+    await put(session_factory, vacancy_row(raw_text=None, source_url="https://t.me/pyjobs/42"))
+    vacancy = await only_row(session_factory, Vacancy)
+    client = WithMessages(post=post(42, text="чужой пост"))
+    pipeline = await prepare(monkeypatch, make_pipeline, client)
+
+    assert await pipeline.rerun_pipeline_for_vacancy(vacancy.id) == "no_text"
+    assert client.asked == []
+
+
 async def test_a_hidden_link_address_is_picked_up_on_a_rerun(monkeypatch, rerunning):
     """Прогон заново подбирает адрес спрятанной ссылки, как и первое чтение.
 

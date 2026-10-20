@@ -14,7 +14,8 @@ from tests.fakes.telegraph import serve_articles
 from backend.flows import embeddings as embeddings_mod
 from backend.flows import parse as parse_mod
 from backend.models import Vacancy
-from tests.backend.fixtures.rerun import WithMessages, prepare
+from tests.backend.fixtures.rerun import prepare
+from tests.fakes.telegram import WithMessages
 from tests.dbio import only_row
 from tests.fakes.telegram_objects import link_entity, post
 

@@ -1,21 +1,15 @@
 """Каналы по просьбе окна: заведение нового и чтение по требованию."""
 
-import logging
-
 from typing import Literal
-
-from pyrogram.errors import FloodWait, UsernameInvalid, UsernameNotOccupied
 
 from backend.bot import work
 from backend.flows import channels as flow_channels
-from backend.telegram_lookup import read_channel_metadata, say_flood_wait
+from backend.telegram_lookup import TelegramTrouble, ask_telegram, read_channel_metadata
 # из репозитория берутся тёзки методов бота — отсюда псевдонимы
 from backend.repository.channels import (
     create_channel,
     find_channel_by_username,
 )
-
-logger = logging.getLogger(__name__)
 
 ChannelPollOutcome = Literal[work.WorkOutcome, flow_channels.PollOutcome]
 """Чем кончился прогон одного канала, как это видит окно.
@@ -24,7 +18,7 @@ ChannelPollOutcome = Literal[work.WorkOutcome, flow_channels.PollOutcome]
 объявлены каждый у себя, и переписанные здесь значения разошлись бы с ними.
 """
 
-ChannelAddOutcome = Literal["created", "exists", "invalid", "error"]
+ChannelAddOutcome = Literal["created", "exists", TelegramTrouble]
 """Чем кончилось заведение канала."""
 
 
@@ -54,27 +48,6 @@ async def poll_channel_now(bot, channel_id: int) -> ChannelPollOutcome:
     )
 
 
-async def _ask_telegram_about(bot, username: str):
-    """Канал по имени и чем кончился вопрос; исход непустой — дальше не идём.
-
-    Спрашивается один `get_chat`, и он же и есть проверка существования.
-    «Не знает такого имени» и «спросить не вышло» разведены нарочно, а чем
-    эта разница оборачивается для человека — сказано у зовущего.
-    """
-    try:
-        chat = await bot.client.get_chat(username)
-    except (UsernameNotOccupied, UsernameInvalid):
-        logger.info("add_channel: Telegram не знает канала @%s", username)
-        return None, "invalid"
-    except FloodWait as e:
-        say_flood_wait(logger, f"add_channel @{username}", e)
-        return None, "error"
-    except Exception:
-        logger.exception("add_channel: get_chat(%s) failed", username)
-        return None, "error"
-    return chat, None
-
-
 async def add_channel(
     bot, username: str
 ) -> tuple[int | None, ChannelAddOutcome]:
@@ -83,12 +56,9 @@ async def add_channel(
     Returns a status tuple:
     - ``(id, "exists")`` — row уже была; UI выбирает её и тостит «уже добавлен».
     - ``(id, "created")`` — новая строка с подгруженными title/avatar.
-    - ``(None, "invalid")`` — Telegram не знает такого имени; ничего
-      не пишем в БД, чтобы пользователь не накапливал зомби-ряды без
-      title/avatar после опечаток.
-    - ``(None, "error")`` — спросить Telegram не вышло вовсе: сеть, запрет
-      частоты, закрытый канал. Имя при этом может быть верным, и говорить
-      человеку «проверьте имя» здесь нельзя.
+    - ``(None, беда)`` — слово беды Telegram (`ask_telegram`); ничего не пишем
+      в БД, чтобы пользователь не накапливал зомби-ряды без title/avatar
+      после опечаток.
 
     Метаданные тянем ДО инсёрта одним `get_chat`-вызовом — он же
     выступает валидатором существования.
@@ -98,9 +68,9 @@ async def add_channel(
         if existing is not None:
             return existing.id, "exists"
 
-    chat, refused = await _ask_telegram_about(bot, username)
-    if refused is not None:
-        return None, refused
+    chat, trouble = await ask_telegram(f"add_channel @{username}", lambda: bot.client.get_chat(username))
+    if trouble is not None:
+        return None, trouble
 
     title, avatar = await read_channel_metadata(bot.client, chat)
 

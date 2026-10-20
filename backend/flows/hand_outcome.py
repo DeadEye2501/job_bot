@@ -8,12 +8,18 @@
 from dataclasses import dataclass
 from typing import Literal
 
-HandOutcome = Literal["ok", "duplicate", "embed", "llm", "article"]
+from backend.telegram_lookup import TelegramTrouble
+
+HandOutcome = Literal[
+    "ok", "duplicate", "embed", "llm", "article",
+    TelegramTrouble, "no_post", "empty_post", "channel_link",
+]
 """Чем кончилось ручное заведение.
 
 Словами, а не «да/нет»: молчащий поставщик отпечатков, однозначный повтор, не
-дошедший разбор, не скачавшаяся статья и удача — разные вести человеку, и
-различить их после того, как ответ сведён к признаку, уже нечем.
+дошедший разбор, не скачавшаяся статья, беда Telegram, пропавший или пустой
+пост, ссылка на канал вместо поста и удача — разные вести человеку, и различить
+их после того, как ответ сведён к признаку, уже нечем.
 """
 
 

@@ -307,3 +307,19 @@ class FakeTelegramClient:
     async def export_session_string(self):
         self._fail_if_asked("export_session_string")
         return self.session_string
+
+
+class WithMessages(FakeTelegramClient):
+    """Клиент, который умеет отдать отдельное сообщение по номеру."""
+
+    def __init__(self, *, post=None, error=None, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self._post = post
+        self._error = error
+        self.asked: list[tuple] = []
+
+    async def get_messages(self, chat_id, message_ids=None):
+        self.asked.append((chat_id, message_ids))
+        if self._error is not None:
+            raise self._error
+        return self._post

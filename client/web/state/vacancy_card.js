@@ -47,8 +47,13 @@ function skipNote(raw) {
 // удлинял бы одну функцию.
 const EVENT_TEXT = {
   ingested: (payload) =>
-    `Поступила из канала ${atHandle(payload.channel) || 'неизвестного канала'}.`,
-  created_by_hand: () => 'Вакансия добавлена вручную.',
+    atHandle(payload?.channel) ? `Поступила из канала ${atHandle(payload.channel)}.` : 'Поступила из канала без ника.',
+  // Заведённое руками дорогой автоматики — пост по ссылке — несёт в
+  // нагрузке, откуда пришло (`via`): лента называет и это.
+  created_by_hand: (payload) => {
+    const via = EVENT_TEXT[payload?.via];
+    return via ? `Вакансия добавлена вручную. ${via(payload)}` : 'Вакансия добавлена вручную.';
+  },
   parsed: (payload) => skipNote(payload.skip_reason) || 'Без замечаний.',
   // «Поиск по сети» — способ поиска, а не место: «Найдена на Поиск по сети»
   // читалось бы как ошибка.

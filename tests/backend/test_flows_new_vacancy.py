@@ -23,9 +23,9 @@ from backend.models import TelegramChannel, Vacancy, VacancyEvent
 from backend.payloads import ChannelPost
 from tests.backend.fixtures.flows import similar_by_hand
 from tests.backend.fixtures.parse_stub import parse_into
-from tests.backend.fixtures.rerun import WithMessages
 from tests.dbio import all_rows, only_row, put
 from tests.factories import EPOCH, channel_row, vacancy_row
+from tests.fakes.telegram import WithMessages
 from tests.fakes.telegram_objects import post
 
 # Подделка отпечатка на весь файл, а не по месту: подбор недоразобранного
@@ -232,6 +232,24 @@ async def test_an_orphan_whose_article_arrived_is_judged_in_full(monkeypatch,
     whole = f"{WITH_ARTICLE}\n\nТребования: Python"
     assert parsed == [(1, whole, "jobs", True)]
     assert (await only_row(session_factory, Vacancy)).raw_text == whole
+
+
+async def test_an_orphan_post_of_a_closed_channel_is_reread_by_its_address(
+    monkeypatch, parsed, make_pipeline, session_factory
+):
+    """Пост закрытого канала, заведённый по ссылке, перечитывается по адресу
+    строки: строки канала у него нет."""
+    await put(session_factory, vacancy_row(
+        title=None, is_parsed=False, raw_text=WITH_ARTICLE, source_msg_id=42,
+        source_url="https://t.me/c/123/42",
+    ))
+    serve_articles(monkeypatch)
+    client = WithMessages(post=post(42, text=WITH_ARTICLE))
+    pipeline = await make_pipeline(client)
+
+    assert await pipeline.recover_orphan_vacancies() == 1
+
+    assert client.asked == [(-100123, 42)]
 
 
 async def test_a_dug_out_article_moves_the_fingerprint_too(monkeypatch,

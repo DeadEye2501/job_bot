@@ -1,4 +1,4 @@
-"""Приём объявления из канала с отсевом перепостов."""
+"""Приём объявления из поста канала: отсев перепостов и строка поста."""
 
 import logging
 
@@ -111,14 +111,18 @@ def _vacancy_row(post: ChannelPost, embedding: list[float]) -> Vacancy:
     """Строка вакансии из поста канала — ещё не разобранная.
 
     Ссылка собирается из ника и номера поста: по ней человек открывает
-    исходное объявление прямо из карточки.
+    исходное объявление прямо из карточки. У закрытого канала ника нет —
+    ссылкой остаётся та, по которой пост завёл человек.
     """
+    url = post.pasted_url
+    if post.channel_username:
+        url = f"https://t.me/{post.channel_username}/{post.msg.id}"
     return Vacancy(
         source_channel_id=post.channel_id,
         source_msg_id=post.msg.id,
         raw_text=post.text,
         embedding=embedding,
-        source_url=f"https://t.me/{post.channel_username}/{post.msg.id}",
+        source_url=url,
         posted_at=tg_moment(post.msg.date),
     )
 
@@ -127,14 +131,12 @@ async def save_new_vacancy(
     pipeline,
     post: ChannelPost,
     embedding: list[float],
+    intake_as: Intake = Intake(),
 ) -> int | None:
+    """Записать строку поста; пусто — та же строка уже есть (или канала нет)."""
+    kind, payload = intake_as.event("ingested", {"channel": post.channel_username or None, "msg_id": post.msg.id})
     try:
-        return await intake.save_new_vacancy(
-            pipeline,
-            _vacancy_row(post, embedding),
-            "ingested",
-            {"channel": post.channel_username, "msg_id": post.msg.id},
-        )
+        return await intake.save_new_vacancy(pipeline, _vacancy_row(post, embedding), kind, payload)
     except IntegrityError as trouble:
         # Целостность нарушается тут по-разному, и какое правило сработало —
         # говорит сама беда: обычное дело это тот же пост, заведённый

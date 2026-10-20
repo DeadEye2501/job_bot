@@ -571,9 +571,8 @@
 
 ### `backend/bot/channels.py`
 
-- `logger` = `logging.getLogger(__name__)`
 - `ChannelPollOutcome` = `Literal[work.WorkOutcome, flow_channels.PollOutc…`
-- `ChannelAddOutcome` = `Literal['created', 'exists', 'invalid', 'error']`
+- `ChannelAddOutcome` = `Literal['created', 'exists', TelegramTrouble]`
 
 ### `backend/bot/chat.py`
 
@@ -924,7 +923,7 @@
 
 ### `backend/flows/hand_made.py`
 
-- `HandTab` = `Literal['fields', 'text']`
+- `HandTab` = `Literal['fields', 'text', 'post', 'channel']`
 - `class HandRequest`
   - `tab: HandTab`
   - `value: str | dict`
@@ -945,6 +944,7 @@
   - `allow_delete: bool` = `True`
   - `hands_over: bool` = `True`
   - `tells_window: bool` = `False`
+  - `by_hand: bool` = `False`
 
 ### `backend/flows/ingest.py`
 
@@ -979,6 +979,7 @@
 
 - `logger` = `logging.getLogger(__name__)`
 - `WHAT` = `'вставленный текст'`
+- `BY_HAND` = `'заведённое человеком объявление'`
 
 ### `backend/flows/pipeline.py`
 
@@ -1002,7 +1003,7 @@
 - `class _Origin`
   - `raw_text: str`
   - `channel_username: str`
-  - `msg_id: int | None`
+  - `post: PostAddress | None`
   - `status: VacancyStatus`
   - `history_id: int | None`
 - `RerunPipelineOutcome` = `Literal['ok', 'missing', 'no_text', 'llm']`
@@ -1609,6 +1610,7 @@
   - `channel_username: str`
   - `msg: Any`
   - `text: str`
+  - `pasted_url: str | None` = `None`
 - `class OutgoingMessage`
   - `hr_id: int`
   - `text: str`
@@ -2028,6 +2030,8 @@
 ### `backend/telegram_lookup.py`
 
 - `logger` = `logging.getLogger(__name__)`
+- `T` = `TypeVar('T')`
+- `TelegramTrouble` = `Literal['tg_invalid', 'tg_private', 'tg_error']`
 
 ### `backend/tg_credentials.py`
 
@@ -2220,7 +2224,8 @@
 - `RUN_REFUSALS` = `словарь из 3 и раскрытых`
 - `POLL_REFUSALS` = `словарь из 5 и раскрытых`
 - `RERUN_REFUSALS` = `словарь из 6 и раскрытых`
-- `PASTED_REFUSALS` = `словарь из 7 и раскрытых`
+- `TELEGRAM_REFUSALS` = `словарь из 3`
+- `PASTED_REFUSALS` = `словарь из 10 и раскрытых`
 - `CALM` = `frozenset({'duplicate'})`
 - `PARSE_CV_REFUSALS` = `словарь из 5`
 - `NO_AGGREGATOR` = `'Агрегатор не найден'`
