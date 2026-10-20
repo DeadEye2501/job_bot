@@ -78,7 +78,7 @@
         onpick={(value) => (draft.mode = value)}
       />
       <RowToggle
-        look="box"
+        icon="send"
         checked={toggle.checked}
         disabled={toggle.disabled}
         title={toggle.title}

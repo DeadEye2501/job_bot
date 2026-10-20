@@ -14,9 +14,10 @@
   // `muted` — серый вид без запора: положение своё и нажимается, но работать по
   // нему сейчас ничего не будет (выключен общий выключатель над списком).
   //
-  // `look` — вид: пилюля в строке списка или квадратная галочка при ряде
-  // сегментов (`choice-line.css`). Положение держится одинаково у обоих.
-  let { checked, disabled = false, muted = false, title = null, look = 'toggle', ontoggle } = $props();
+  // `icon` — вид: без него пилюля строки списка, с ним — значок, который
+  // светится включённым (`choice-line.css`). Галочка под значком та же самая,
+  // и положение держится одинаково у обоих.
+  let { checked, disabled = false, muted = false, title = null, icon = null, ontoggle } = $props();
 
   let on = $state(untrack(() => checked));
 
@@ -34,14 +35,25 @@
 
 <!-- Нажатие дальше не идёт: строка вокруг переключателя бывает нажимаемой сама,
      и тогда переключение открывало бы её заодно с собой. -->
-<input
-  type="checkbox"
-  class={look === 'box' ? 'tab-check' : 'toggle'}
-  class:locked={disabled}
-  class:muted
-  checked={on}
-  {disabled}
-  {title}
-  onchange={(event) => flip(event.currentTarget.checked)}
-  onclick={(event) => event.stopPropagation()}
-/>
+{#snippet box(look)}
+  <input
+    type="checkbox"
+    class={look}
+    class:locked={disabled}
+    class:muted
+    checked={on}
+    {disabled}
+    {title}
+    onchange={(event) => flip(event.currentTarget.checked)}
+    onclick={(event) => event.stopPropagation()}
+  />
+{/snippet}
+
+{#if icon}
+  <label class="icon-check" class:on class:locked={disabled} {title}>
+    {@render box('icon-check-box')}
+    <span class="material-symbols-outlined">{icon}</span>
+  </label>
+{:else}
+  {@render box('toggle')}
+{/if}

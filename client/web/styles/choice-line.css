@@ -1,8 +1,10 @@
-/* Ряд сегментов и квадратная галочка при нём, в одну строку.
+/* Ряд сегментов и значок-переключатель при нём, в одну строку.
 
-   Галочка без подписи — пояснение у неё во всплывающей подсказке, — поэтому
-   ростом и рамкой она та же, что сегменты рядом: квадрат высотой с ряд, а не
-   пилюля из строки списка. Рамка — общая с полями формы (`input.css`). */
+   Значок без подписи — пояснение у него во всплывающей подсказке, — квадрат
+   высотой с ряд сегментов, в той же рамке, что поля формы (`input.css`).
+   Выключенный — тёмно-серый, при наведении светлеет,
+   включённый светится акцентом. Галочка под ним невидима, но нажимается вся:
+   положение и запор держит она. */
 
 .choice-line {
   display: flex;
@@ -10,35 +12,49 @@
   gap: 4px;
 }
 
-.tab-check {
-  appearance: none;
+.icon-check {
+  position: relative;
   flex-shrink: 0;
   align-self: stretch;
   aspect-ratio: 1;
-  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
   cursor: pointer;
-  position: relative;
+  transition: color 0.15s, border-color 0.15s;
 }
 
-/* Отметка — уголок, повёрнутый галкой: рисуется рамкой, без картинки. */
-.tab-check:checked::after {
-  content: '';
-  position: absolute;
-  left: 35%;
-  top: 18%;
-  width: 25%;
-  height: 45%;
-  border: solid var(--accent);
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
+.icon-check .material-symbols-outlined {
+  font-size: 18px;
 }
 
-.tab-check:checked {
+/* Рамка светится вместе со значком — и при наведении, и включённой. */
+.icon-check:hover {
+  border-color: var(--text-primary);
+  color: var(--text-primary);
+}
+
+.icon-check.on {
   border-color: var(--accent);
+  color: var(--accent);
 }
 
-/* Запертая — «нельзя», а не «жди»: ждать тут нечего, пока не загорятся лампы. */
-.tab-check:disabled {
+.icon-check-box {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+
+/* Запертый — «нельзя», а не «жди»: ждать тут нечего, пока не загорятся лампы. */
+.icon-check.locked {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.icon-check.locked:hover {
+  border-color: var(--border);
+  color: var(--text-tertiary);
 }
