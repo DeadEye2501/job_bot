@@ -915,6 +915,7 @@
 
 - `logger` = `logging.getLogger(__name__)`
 - `_EMBED_MAX_CHARS` = `6000`
+- `SAME_TEXT_COSINE` = `0.9999`
 
 ### `backend/flows/events.py`
 

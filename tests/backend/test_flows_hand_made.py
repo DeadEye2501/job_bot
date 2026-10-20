@@ -13,7 +13,6 @@ from backend.flows.hand_outcome import HandResult
 from backend.models import Vacancy, VacancyEvent
 from backend.repository.vacancies_new import HAND_MADE
 from backend.telegram_time import tg_moment
-from tests.backend.fixtures.parse_stub import parse_into
 from tests.dbio import all_rows, only_row, put
 from tests.factories import channel_row, vacancy_row
 from tests.fakes.agent import kit_for
@@ -162,7 +161,7 @@ async def test_a_post_whose_article_did_not_load_is_not_filed(filing, session_fa
 async def test_a_post_by_hand_does_not_merge_with_a_similar_row(filing, session_factory, monkeypatch, parsed):
     """Сходство однозначного повтора не даёт: пост заводится своей строкой, а
     брошенная похожая остаётся подбору недоразобранного."""
-    orphan = vacancy_row(is_parsed=False, embedding=[0.1, 0.2], raw_text="Ищем QA")
+    orphan = vacancy_row(is_parsed=False, embedding=[0.1, 0.25], raw_text="Ищем QA")
     await put(session_factory, orphan)
 
     await _post_filed(filing, monkeypatch, WithMessages(post=_public_post()))
@@ -181,12 +180,18 @@ async def test_a_post_without_a_fingerprint_is_not_filed(filing, session_factory
 @pytest.mark.usefixtures("one_vector")
 @pytest.mark.parametrize("known_channel", [True, False], ids=["канал заведён", "канал не заведён"])
 async def test_the_same_post_twice_is_a_duplicate(filing, session_factory, monkeypatch, parsed, known_channel):
-    """Повтор узнаётся по адресу поста, заведён ли его канал или нет."""
+    """Повтор узнаётся по адресу поста, заведён ли его канал или нет.
+
+    Первый заход разобран — подставной разбор строку не отмечает, и это
+    делается здесь: неразобранная повтором не считается."""
     if known_channel:
         await put(session_factory, channel_row(username="pyjobs"))
     client = WithMessages(post=_public_post())
     await _post_filed(filing, monkeypatch, client)
     first = await only_row(session_factory, Vacancy)
+    async with session_factory() as session:
+        (await session.get(Vacancy, first.id)).is_parsed = True
+        await session.commit()
 
     await _post_filed(filing, monkeypatch, client)
 
@@ -257,16 +262,53 @@ async def test_a_link_filed_before_is_a_duplicate_before_anything_else(filing, s
     assert filing.told == [HandResult("duplicate", existing.id)] and filing.applied == []
 
 
-async def test_a_duplicate_of_an_unparsed_row_finishes_it(filing, session_factory, parsed):
-    """Повтор неразобранной строки: она дочитывается своим текстом — без
-    сноса и без откликателя, — а окно переходит на неё."""
-    existing = vacancy_row(is_parsed=False, raw_text="Ищем QA", source_url="https://hh.ru/vacancy/123")
+@pytest.mark.usefixtures("one_vector")
+async def test_an_unparsed_row_at_the_same_address_is_replaced(filing, session_factory, monkeypatch, parsed):
+    """Недоразобранная прав не имеет: повтор с ней её сносит, и пост заводится
+    заново тем, что принёс человек."""
+    stale = vacancy_row(is_parsed=False, raw_text="шапка", source_url="https://t.me/PyJobs/5")
+    await put(session_factory, stale)
+
+    await _post_filed(filing, monkeypatch, WithMessages(post=_public_post()), url="https://t.me/PyJobs/5")
+
+    saved = await only_row(session_factory, Vacancy)
+    assert (saved.raw_text, saved.is_parsed) == ("Ищем QA в команду", False)
+    assert parsed == [(saved.id, "Ищем QA в команду", "PyJobs", True)]
+    assert filing.told == [HandResult("ok", saved.id)]
+
+
+@pytest.mark.usefixtures("one_vector")
+async def test_the_same_text_pasted_again_is_a_duplicate(filing, session_factory, parsed):
+    """Тот же текст даёт отпечаток не рядом, а в той же точке: это та же вакансия."""
+    existing = vacancy_row(is_parsed=True, embedding=[0.1, 0.2])
     await put(session_factory, existing)
 
-    await ingest_by_hand(kit_for(filing), HandRequest("page", "https://hh.ru/vacancy/123", None, True))
+    await ingest_by_hand(kit_for(filing), HandRequest("text", "Ищем QA", None, True))
 
-    assert parsed == [(existing.id, "Ищем QA", None, False)]
+    assert len(await all_rows(session_factory, Vacancy)) == 1
     assert filing.told == [HandResult("duplicate", existing.id)] and filing.applied == []
+
+
+@pytest.mark.usefixtures("one_vector")
+async def test_the_same_text_as_an_unparsed_row_replaces_it(filing, session_factory, parsed):
+    stale = vacancy_row(is_parsed=False, raw_text="Ищем QA", embedding=[0.1, 0.2], title="старая")
+    await put(session_factory, stale)
+
+    await ingest_by_hand(kit_for(filing), HandRequest("text", "Ищем QA", None, False))
+
+    saved = await only_row(session_factory, Vacancy)
+    assert saved.title is None and filing.told == [HandResult("ok", saved.id)]
+
+
+@pytest.mark.usefixtures("one_vector")
+async def test_a_text_only_like_a_filed_one_gets_its_own_row(filing, session_factory, parsed):
+    """Похожий, но не тот же текст повтором не считается: сходство однозначного
+    повтора не даёт."""
+    await put(session_factory, vacancy_row(is_parsed=True, embedding=[0.1, 0.25]))
+
+    await ingest_by_hand(kit_for(filing), HandRequest("text", "Ищем QA", None, False))
+
+    assert len(await all_rows(session_factory, Vacancy)) == 2
 
 
 async def test_fields_linking_a_post_of_another_vacancy_are_filed(filing, session_factory):
@@ -280,28 +322,3 @@ async def test_fields_linking_a_post_of_another_vacancy_are_filed(filing, sessio
     assert filing.told[0].outcome == "ok"
 
 
-async def test_a_duplicate_waiting_for_its_article_is_not_judged_by_its_header(
-    filing, session_factory, parsed
-):
-    """Неразобранная ждёт статью: дочитывать её одной шапкой нельзя, её дочитает
-    подбор недоразобранного. Окну — что статья ещё не пришла."""
-    existing = vacancy_row(is_parsed=False, raw_text="QA https://telegra.ph/QA-08-21",
-                           source_url="https://hh.ru/vacancy/123")
-    await put(session_factory, existing)
-
-    await ingest_by_hand(kit_for(filing), HandRequest("page", "https://hh.ru/vacancy/123", None, True))
-
-    assert parsed == []
-    assert filing.told == [HandResult("article", existing.id)]
-
-
-async def test_a_duplicate_that_could_not_be_finished_is_not_a_jump(filing, session_factory, monkeypatch):
-    """Дочитать неразобранную не вышло — окно не переходит на строку, которой в
-    списке не видно, а говорит, что модель не ответила."""
-    parse_into(monkeypatch, [], done=False)
-    existing = vacancy_row(is_parsed=False, raw_text="Ищем QA", source_url="https://hh.ru/vacancy/123")
-    await put(session_factory, existing)
-
-    await ingest_by_hand(kit_for(filing), HandRequest("page", "https://hh.ru/vacancy/123", None, True))
-
-    assert filing.told == [HandResult("llm", existing.id)]

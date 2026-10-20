@@ -5,6 +5,7 @@ import httpx
 import pytest
 
 from backend.flows import dm_classify
+from backend.flows.embeddings import SAME_TEXT_COSINE
 from backend.flows import parse as parse_mod
 from backend.flows.dm import DmHelpers, process_dm
 from backend.flows.pipeline import IngestionPipeline, LmProviders
@@ -167,17 +168,22 @@ def similar_by_hand(pipeline, monkeypatch) -> None:
 
     `pipeline.similar_id` — что найдёт поиск похожих, `pipeline.unparsed` —
     брошена ли она недоразобранной. Вместе они и есть ответ отсева повторов,
-    общего у вставки и приёма поста.
+    общего у вставки и приёма поста. `pipeline.same_text` — не просто похожа,
+    а тот же текст: только такую узнаёт ручное заведение (`SAME_TEXT_COSINE`).
     """
     pipeline.similar_id = None
     pipeline.unparsed = False
+    pipeline.same_text = False
 
     async def unparsed(_pipeline, _vacancy_id):
         return pipeline.unparsed
 
-    monkeypatch.setattr(
-        pipeline.embeddings, "match", lambda vector, threshold: pipeline.similar_id
-    )
+    def match(vector, threshold):
+        if threshold >= SAME_TEXT_COSINE and not pipeline.same_text:
+            return None
+        return pipeline.similar_id
+
+    monkeypatch.setattr(pipeline.embeddings, "match", match)
     monkeypatch.setattr(parse_mod, "is_unparsed_vacancy", unparsed)
 
 

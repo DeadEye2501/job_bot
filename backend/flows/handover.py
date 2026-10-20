@@ -6,10 +6,9 @@ from dataclasses import dataclass, replace
 from sqlalchemy import select
 
 from backend.applying.world import AWAITS_APPLICATION
-from backend.flows import parse
+from backend.flows import cleanup, parse
 from backend.flows.dm_backfill import spawn_hr_backfill
 from backend.flows.hand_outcome import tell
-from backend.flows.linked_article import article_urls
 from backend.flows.parse import Judged
 from backend.models import Vacancy
 from backend.repository.hr_card import LAST_VACANCY_ORDER
@@ -54,27 +53,22 @@ def hand_made_intake(hands_over: bool, channel: str | None = None) -> Intake:
     return Intake(channel=channel, hands_over=hands_over, tells_window=True, by_hand=True)
 
 
-async def tell_known(pipeline, vacancy_id: int) -> None:
-    """Окну — что вакансия уже заведена, с её номером.
+async def known_and_told(pipeline, vacancy_id: int) -> bool:
+    """Повтор ли эта вакансия для ручного заведения; да — окну сказано.
 
-    Неразобранную дочитывают её собственным текстом — без сноса и без
-    откликателя: окно переходит на неё, а отдавать ли её, решали, когда её
-    заводили. Дочитать не вышло — окну не повтор, а молчание модели: строки
-    без разбора в списке не видно, и переходить было бы некуда. Ждущую статью
-    одной шапкой не судят — её дочитает подбор недоразобранного, а окну
-    говорится, что статья ещё не пришла.
+    Разобранная — повтор: окно переходит на неё. Недоразобранная прав не имеет
+    — в списке её не видно, и переходить было бы некуда, — её сносят вместе с
+    отпечатком (`cleanup.forget_vacancy`), а заведение идёт заново тем, что
+    принёс человек.
     """
     async with pipeline.session_factory() as session:
         row = await session.get(Vacancy, vacancy_id)
-        unparsed, text = not row.is_parsed, row.raw_text
-    outcome = "duplicate"
-    if unparsed and text and article_urls(text):
-        outcome = "article"
-    elif unparsed and text:
-        await pipeline.reload_resources()
-        stored = await finish_orphan(pipeline, vacancy_id, text, Intake(allow_delete=False, hands_over=False))
-        outcome = "duplicate" if stored else "llm"
-    tell(pipeline, outcome, vacancy_id)
+        parsed = row.is_parsed
+    if not parsed:
+        await cleanup.forget_vacancy(pipeline, vacancy_id)
+        return False
+    tell(pipeline, "duplicate", vacancy_id)
+    return True
 
 
 async def orphan_intake(pipeline, vacancy_id: int, intake: Intake) -> Intake:

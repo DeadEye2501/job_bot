@@ -21,6 +21,20 @@ from client.bridge.refusals import (
 from client.bridge.vacancy_links import require_vacancy
 
 
+async def forgotten(hub, vacancy_id: int) -> bool:
+    """Снести вакансию; сказать, было ли что сносить.
+
+    Через конвейер, а не прямо в репозиторий: вместе со строкой уходит её
+    вектор из кэша отсева перепостов. Без бота кэша нет вовсе — тогда
+    довольно строки.
+    """
+    if hub.bot is not None:
+        return await hub.bot.ui_forget_vacancy(vacancy_id)
+    async with hub.session_factory() as session:
+        async with session.begin():
+            return await vacancies_life.delete_vacancy(session, vacancy_id)
+
+
 class VacancyActions:
     """Кнопки карточки вакансии — то, что меняет её судьбу, а не вид.
 
@@ -99,16 +113,7 @@ class VacancyActions:
             return refused
 
         async def run() -> dict:
-            # Через конвейер, а не прямо в репозиторий: вместе со строкой уходит
-            # её вектор из кэша отсева перепостов. Без бота кэша нет вовсе —
-            # тогда довольно строки.
-            bot = self._hub.bot
-            if bot is not None:
-                gone = await bot.ui_forget_vacancy(vacancy_id)
-            else:
-                async with self._hub.session_factory() as session:
-                    async with session.begin():
-                        gone = await vacancies_life.delete_vacancy(session, vacancy_id)
+            gone = await forgotten(self._hub, vacancy_id)
             if not gone:
                 raise Denied(NO_VACANCY, vacancy_id=vacancy_id, action="delete")
             self._hub.events.add(LIST_CHANGED)

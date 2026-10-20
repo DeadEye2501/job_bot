@@ -93,17 +93,25 @@ async def embed_or_none(pipeline, text: str, what: str) -> list[float] | None:
         return None
 
 
-async def similar_vacancy_id(pipeline, embedding: list[float]) -> int | None:
+SAME_TEXT_COSINE = 0.9999
+"""Близость, при которой отпечатки — та же точка, а не соседние: тот же текст.
+
+Модель отпечатков на одном тексте отвечает одним вектором, и отличаются они
+только округлением. Похожий текст — перепост с правкой, соседняя вакансия той
+же компании — до этой близости не дотягивает никогда.
+"""
+
+
+async def similar_vacancy_id(pipeline, embedding: list[float], threshold: float | None = None) -> int | None:
     """Номер уже заведённой вакансии с таким же отпечатком; пусто — такой нет.
 
-    Заводят вакансию из текста двое — обход канала и человек со вставленным
-    объявлением, — и отсев у них общий: перепост и повторная вставка одного и
-    того же объявления одинаково не должны давать второй строки. Порог
-    близости берётся из настроек, а не из довода: он один на оба входа, и
-    разъехавшись, они считали бы перепостом разное.
+    Порог по умолчанию — отсева перепостов, из настроек: он один у всех,
+    кто отсеивает похожее, и разъехавшись, они считали бы перепостом разное.
+    Ручное заведение похожее не отсеивает, а узнаёт только тот же текст
+    (`SAME_TEXT_COSINE`).
     """
     await ensure_embedding_cache(pipeline, len(embedding))
-    return pipeline.embeddings.match(embedding, pipeline.rs.dedup_cosine_threshold)
+    return pipeline.embeddings.match(embedding, threshold or pipeline.rs.dedup_cosine_threshold)
 
 
 async def ensure_embedding_cache(pipeline, width: int) -> None:

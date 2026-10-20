@@ -1,5 +1,7 @@
 """Порядок способов отклика: Telegram, кнопки агрегаторов, формы, почта."""
 
+import pytest
+
 from backend.domain.apply_order import KnownSite, VacancyFacts, Way, World, apply_ways
 from tests.factories_aggregators import world_of
 
@@ -81,6 +83,15 @@ def test_another_link_in_the_contacts_is_a_form():
     ways = apply_ways(_vacancy(contacts=["https://company.test/apply", "hr@company.test"]), _world())
     assert ways == [Way("form", "https://company.test/apply", None),
                     Way("email", "hr@company.test", None)]
+
+
+@pytest.mark.parametrize("link", [
+    "https://t.me/hr_name", "https://telegram.me/hr_name", "https://t.me/pyjobs/5", "https://telegra.ph/QA-08-21",
+], ids=["ник", "старый домен", "пост", "статья"])
+def test_a_telegram_link_in_the_contacts_is_not_a_form(link):
+    """Ссылка Telegram — контакт Telegram: из неё заводится HR, и пишут ему в
+    Telegram, а не открывают её формой в браузере."""
+    assert apply_ways(_vacancy(contacts=[link]), _world()) == []
 
 
 def test_every_other_link_is_its_own_form():

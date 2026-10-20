@@ -84,15 +84,12 @@ def _own_address(request: HandRequest) -> str | None:
 
 
 async def _known_address(pipeline, url: str | None) -> bool:
-    """Заведена ли уже вакансия с этим адресом; да — окну сказано (`tell_known`)."""
+    """Заведена ли уже вакансия с этим адресом; да — окну сказано (`known_and_told`)."""
     if not url:
         return False
     async with pipeline.session_factory() as session:
         existing = await vacancy_at_address(session, url)
-    if existing is None:
-        return False
-    await handover.tell_known(pipeline, existing)
-    return True
+    return existing is not None and await handover.known_and_told(pipeline, existing)
 
 
 async def _posted(pipeline, url: str, hands_over: bool) -> None:
