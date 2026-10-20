@@ -47,6 +47,28 @@ async def test_a_tool_call_may_wait_for_a_person_longer_than_an_hour(monkeypatch
     assert int(calls.spawned[0].env["MCP_TOOL_TIMEOUT"]) > 3600 * 1000
 
 
+async def test_a_session_may_lift_the_deadline_of_its_tool_calls(monkeypatch):
+    """Вызов инструмента у искателя ждёт целый цикл находки — разбор, отклик,
+    подтверждение человека: срок его вызова задаётся серверу, а не всему процессу."""
+    calls = claude_code.install(monkeypatch, [claude_code.result("готово")])
+
+    await run_agent(dataclasses.replace(RUN, tool_timeout_ms=2147483647))
+
+    argv = calls.spawned[0].argv
+    config = json.loads(argv[argv.index("--mcp-config") + 1])
+    assert config["mcpServers"]["jobbot"]["timeout"] == 2147483647
+
+
+async def test_other_sessions_keep_the_deadline_of_the_process(monkeypatch):
+    calls = claude_code.install(monkeypatch, [claude_code.result("готово")])
+
+    await run_agent(RUN)
+
+    argv = calls.spawned[0].argv
+    config = json.loads(argv[argv.index("--mcp-config") + 1])
+    assert "timeout" not in config["mcpServers"]["jobbot"]
+
+
 async def test_the_task_is_the_first_message_and_the_process_is_closed(monkeypatch):
     calls = claude_code.install(monkeypatch, [claude_code.result("готово")])
 
