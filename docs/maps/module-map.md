@@ -1097,7 +1097,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _word_match(text_lower: str, variant: str) -> bool` (4)
 - `def check_blacklist(raw_text: str, patterns: list[str]) -> str | None` (18)
 
-### `backend/domain/company_hosts.py` — 104 строк
+### `backend/domain/company_hosts.py` — 100 строк
 
 Хосты, которые не бывают домашним сайтом компании.
 
@@ -1106,12 +1106,13 @@ First-run bootstrap: ensure DB schema exists.
 - `def _is_brand_domain(host: str) -> bool` (15)
 - `def is_aggregator_host(host: str) -> bool` (11)
 
-### `backend/domain/company_names.py` — 39 строк
+### `backend/domain/company_names.py` — 48 строк
 
-Заглавная буква в названии компании.
+Заглавная буква в названии компании — и начало адреса, с которым её не путают.
 
 Зависит от: —
 
+- `def without_scheme(url: str) -> str` (7)
 - `def capitalized_company_name(name: str | None) -> str | None` (32)
 
 ### `backend/domain/contact_keys.py` — 70 строк
@@ -1165,11 +1166,11 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def percent_or_none(numerator: int, denominator: int) -> int | None` (14)
 
-### `backend/domain/hosts.py` — 148 строк
+### `backend/domain/hosts.py` — 219 строк
 
 Разбор адреса: нормальный хост, имя сайта, остаток, принадлежность сайту, номер страницы.
 
-Зависит от: `backend.domain.company_names`
+Зависит от: `backend.domain.company_names`, `backend.domain.telegram_identity`
 
 - `class AddressParts(NamedTuple)` (5)
 - `def normalize_host(url: str | None) -> str` (21)
@@ -1179,9 +1180,11 @@ First-run bootstrap: ensure DB schema exists.
 - `def owning_hosts(host: str) -> list[str]` (9)
 - `def owning_host(url: str, hosts: set[str]) -> str | None` (10)
 - `def source_key(url: str, aggregator_host: str | None) -> str | None` (15)
+- `class VacancyPage(NamedTuple)` (8)
+- `def vacancy_address_key(url: str) -> str | None` (30)
+- `def _page_number(page: VacancyPage, path: str, query: dict[str, str]) -> str | None` (7)
 - `def is_arrival_mark(name: str) -> bool` (7)
 - `def _numbering(query: str) -> str` (15)
-- `def _without_scheme(url: str) -> str` (3)
 
 ### `backend/domain/image_types.py` — 26 строк
 
@@ -1293,13 +1296,16 @@ First-run bootstrap: ensure DB schema exists.
 Зависит от: —
 
 
-### `backend/domain/telegram_identity.py` — 202 строк
+### `backend/domain/telegram_identity.py` — 241 строк
 
 Правила Telegram по написанному: чей это ник, куда ведёт адрес.
 
-Зависит от: —
+Зависит от: `backend.domain.company_names`
 
-- `def _strip_link_prefixes(s: str) -> str` (29)
+- `def _strip_link_prefixes(s: str) -> str` (22)
+- `def _link_path(s: str) -> str | None` (9)
+- `class PostAddress` (7)
+- `def post_address(url: str) -> PostAddress | None` (18)
 - `def normalize_username(hr_contact: str | None, *, typed_by_a_person: bool=False) -> str | None` (22)
 - `def typed_username(value) -> str | None` (24)
 - `def telegram_peer(hr) -> int | str | None` (9)
@@ -2856,16 +2862,17 @@ First-run bootstrap: ensure DB schema exists.
 - `def _last_activity(vacancy: Vacancy, last_msg_at, entered_at, touched_at)` (10)
 - `async def mark_ghosted_vacancies(session: AsyncSession, *, timeout_days: int) -> list[int]` (27)
 
-### `backend/repository/vacancies_life.py` — 177 строк
+### `backend/repository/vacancies_life.py` — 200 строк
 
 Что случается с вакансией после того, как её завели, кроме смены статуса.
 
-Зависит от: `backend.models`
+Зависит от: `backend.domain.hosts`, `backend.models`
 
 - `async def repoint_vacancies(session: AsyncSession, column, *, absorbed_id: int, survivor_id: int | None) -> int` (23)
 - `async def record_trash_event(session: AsyncSession, vacancy: Vacancy | None, reason: str | None) -> None` (20)
 - `async def source_trashed(session: AsyncSession, aggregator_id: int, key: str) -> bool` (7)
 - `async def source_seen(session: AsyncSession, aggregator_id: int, key: str) -> bool` (6)
+- `async def vacancy_at_address(session: AsyncSession, url: str) -> int | None` (20)
 - `async def _trash_noted(session: AsyncSession, mark: TrashEvent) -> bool` (11)
 - `async def _marked(session: AsyncSession, *same) -> bool` (2)
 - `async def delete_vacancy(session: AsyncSession, vacancy_id: int) -> bool` (41)
@@ -3940,7 +3947,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 343 модулей
+## tests — 344 модулей
 
 ### `tests/adapters/test_agent_mcp.py` — 85 строк
 
@@ -4942,13 +4949,13 @@ Runtime settings layer.
 Тестов: 9
 
 
-### `tests/backend/test_domain_hosts.py` — 98 строк
+### `tests/backend/test_domain_hosts.py` — 160 строк
 
 Адрес, разобранный на хост и остаток: по хосту сравнивают сайты, по остатку —
 
 Зависит от: `backend.domain.hosts`
 
-Тестов: 17
+Тестов: 21
 
 
 ### `tests/backend/test_domain_language_choice.py` — 50 строк
@@ -6053,7 +6060,7 @@ Runtime settings layer.
 Тестов: 8
 
 
-### `tests/backend/test_repository_company_keys.py` — 225 строк
+### `tests/backend/test_repository_company_keys.py` — 227 строк
 
 Следствия приведения имени и сайта компании к сравнимому виду.
 
@@ -6406,6 +6413,15 @@ Runtime settings layer.
 
 - `async def _noted(session, channel_id: int, msg_id: int, reason: str) -> None` (5)
 
+### `tests/backend/test_repository_vacancy_address.py` — 52 строк
+
+Вакансия по собственному адресу: есть ли в базе страница, которую завели снова.
+
+Зависит от: `backend.models`, `backend.repository.vacancies_life`, `tests.dbio`, `tests.factories`
+
+Тестов: 5
+
+
 ### `tests/backend/test_repository_vacancy_brief.py` — 34 строк
 
 Вакансия текстом для агента: чья она, где она и её текст — данными.
@@ -6603,13 +6619,13 @@ Runtime settings layer.
 - `def _raw_dialog(peer_id: int)` (11)
 - `def _raw_message(peer_id: int, message_id: int, *, date: int)` (4)
 
-### `tests/backend/test_telegram_identity.py` — 198 строк
+### `tests/backend/test_telegram_identity.py` — 221 строк
 
 Следствия, которые наблюдают тесты `backend/domain/telegram_identity.py`.
 
 Зависит от: `backend.domain.telegram_identity`
 
-Тестов: 10
+Тестов: 12
 
 - `class Contact` (7)
 

@@ -16,6 +16,8 @@ Telegram, а здесь только решают, годится ли напи�
 import re
 from dataclasses import dataclass
 
+from backend.domain.company_names import without_scheme
+
 TELEGRAM_LINK_HOSTS = frozenset({"t.me", "telegram.me"})
 """Хосты ссылок на канал, пост и собеседника."""
 
@@ -77,16 +79,53 @@ def _strip_link_prefixes(s: str) -> str:
     служебным путём, и без этой строки `t.me/s/канал` отсеивался бы наравне
     с `t.me/c/12345`, то есть ссылка на канал считалась бы негодной.
     """
-    for prefix in ("https://", "http://"):
-        if s.lower().startswith(prefix):
-            s = s[len(prefix):]
+    s = without_scheme(s)
+    path = _link_path(s)
+    return s if path is None else path
+
+
+def _link_path(s: str) -> str | None:
+    """Путь ссылки Telegram без домена и веб-просмотра; пусто — ссылка не на Telegram."""
     for host in _LINK_PREFIXES:
         if s.lower().startswith(host):
             s = s[len(host):]
             if s.lower().startswith("s/"):
                 s = s[len("s/"):]
-            break
-    return s
+            return s
+    return None
+
+
+@dataclass(frozen=True, slots=True)
+class PostAddress:
+    """Пост Telegram по ссылке: канал — ник в нижнем регистре или номер
+    закрытого канала, у которого ника нет, — и номер поста."""
+
+    channel: str | None
+    private_id: int | None
+    msg_id: int
+
+
+_POST_PATH_RE = re.compile(r"(?:c/(?P<private>\d+)|(?P<nick>[^/]+))/(?P<msg>\d+)/?")
+
+
+def post_address(url: str) -> PostAddress | None:
+    """Канал и номер поста из ссылки; пусто — ссылка не на пост.
+
+    Разбирается тем же снятием домена, что и ник собеседника: одна ссылка не
+    должна читаться двумя правилами. Хвост после номера — `?single`,
+    `?comment=` — поста не меняет.
+    """
+    path = _link_path(without_scheme(url))
+    if path is None:
+        return None
+    match = _POST_PATH_RE.fullmatch(path.split("?", 1)[0].split("#", 1)[0])
+    if match is None:
+        return None
+    msg_id = int(match["msg"])
+    if match["private"] is not None:
+        return PostAddress(None, int(match["private"]), msg_id)
+    nick = normalize_username(match["nick"])
+    return None if nick is None else PostAddress(nick.lower(), None, msg_id)
 
 
 def normalize_username(hr_contact: str | None, *, typed_by_a_person: bool = False) -> str | None:

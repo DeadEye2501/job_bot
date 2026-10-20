@@ -11,7 +11,7 @@
 `xing.com`, которого не было в коде.
 """
 
-from backend.domain.hosts import host_owns
+from backend.domain.hosts import VACANCY_PAGES, host_owns
 from backend.domain.telegram_identity import TELEGRAM_LINK_HOSTS, TELEGRAPH_HOSTS
 
 AGGREGATOR_HOSTS = frozenset({
@@ -19,9 +19,6 @@ AGGREGATOR_HOSTS = frozenset({
     # канал, профиль или пост говорит о компании не больше, чем её отсутствие.
     *TELEGRAM_LINK_HOSTS,
     "telegram.org",
-    "linkedin.com",
-    "hh.ru",
-    "habr.com",
     "vc.ru",
     "github.com",
     "gitlab.com",
@@ -40,18 +37,17 @@ AGGREGATOR_HOSTS = frozenset({
     "xing.com",
     # Шеринговые хостинги job-страниц и резидент-каталоги: на одном хосте
     # сидит много разных компаний, и `rule_website` свёл бы их в одну.
+    # Площадки, у которых страница вакансии узнаётся по номеру, — все такие.
+    *(page.host for page in VACANCY_PAGES),
     "potok.io",
     "huntflow.io",
     "huntflow.ru",
     "amazingjobs.ru",
-    "getmatch.ru",
     "jobs.ru",
     "talantix.ru",
     "rabota.ru",
     "trudvsem.ru",
     "career.ru",
-    "greenhouse.io",
-    "lever.co",
     # Общие хостинги ссылок, анкет и заметок: на таком хосте сидит кто угодно,
     # и одна ссылка на форму отклика склеила бы две разные компании.
     "docs.google.com",
