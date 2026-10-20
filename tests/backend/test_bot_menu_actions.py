@@ -65,7 +65,10 @@ async def test_pasted_text_reaches_the_intake_and_frees_the_slot(make_bot, reque
     ("https://t.me/pyjobs", "channel"),
 ], ids=["пост", "статья", "канал"])
 async def test_a_link_is_sorted_once_by_the_bot(make_bot, requests_seen, url, kind):
-    """Род ссылки бот решает один раз, и ниже заявка идёт уже своего рода."""
+    """Род ссылки бот решает один раз, и ниже заявка идёт уже своего рода.
+
+    Бот здесь без Claude Code (страницу он запирает, см. ниже): пост и статья
+    агента не ждут и заводятся без него."""
     bot = wire(await make_bot(), FakeIngestion())
 
     await bot.ui_ingest_pasted_text(HandRequest("link", url, None, True))

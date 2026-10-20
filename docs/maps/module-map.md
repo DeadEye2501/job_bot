@@ -4807,7 +4807,7 @@ Runtime settings layer.
 Тестов: 10
 
 
-### `tests/backend/test_bot_menu_actions.py` — 270 строк
+### `tests/backend/test_bot_menu_actions.py` — 273 строк
 
 Следствия команд из меню карточки вакансии.
 
