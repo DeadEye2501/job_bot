@@ -4,6 +4,7 @@ import asyncio
 
 import pytest
 
+from backend.agent.human_gate import LIMIT_SEC
 from backend.bot import aggregators, loop, slot, work
 from backend.bot.turn import launch_turn
 from backend.models import Aggregator, BotMode
@@ -267,21 +268,22 @@ async def test_a_login_the_agent_did_not_confirm_is_not_reported_as_done(make_bo
     assert await aggregators.login_aggregator(bot, sites.id) == "not_logged_in"
 
 
-async def test_a_login_opens_the_profile_for_a_human(make_bot, sites, agent):
-    """Входит человек руками, и браузер для входа открыт без пометки «управляется
-    программой»: с ней вход Google отказывает."""
+async def test_a_login_opens_the_site_to_a_human_before_the_agent_checks_it(make_bot, sites, agent):
+    """Входит человек руками в обычном браузере на профиле сайта — ведомый вход
+    Google отказывает, — и только после него агент проверяет вход."""
     bot = await make_bot()
     seen = []
 
     async def check(tools):
-        seen.append(kit.browser.as_person)
+        seen.append(list(kit.browser.calls))
         await login_step(True)(tools)
 
     kit = agent(bot, [check, resumes_step([])])
 
     await aggregators.login_aggregator(bot, sites.id)
 
-    assert seen == [True]
+    (before_check,) = seen
+    assert before_check == [("person", sites.id, f"https://{sites.host}/", LIMIT_SEC)]
 
 
 async def test_the_login_check_is_not_told_to_call_a_person(make_bot, sites, agent):

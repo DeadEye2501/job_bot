@@ -74,7 +74,7 @@ async def in_slot(bot, job: Callable[[AgentKit], Awaitable[str]], label: str,
 def _kit(bot) -> AgentKit:
     return AgentKit(
         pipeline=bot.ingestion,
-        browser=BrowserHost(find_browser(), bot.rs.show_browser),
+        browser=BrowserHost(find_browser(), bot.rs.show_browser, lambda: slot.cancel_current_poll(bot)),
         gate=bot.human_gate,
         run_session=live_session(bot.rs.chat.model),
         today=date.today(),

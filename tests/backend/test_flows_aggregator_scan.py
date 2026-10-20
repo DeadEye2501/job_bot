@@ -60,7 +60,7 @@ async def test_the_scan_works_in_the_agent_profile_of_its_site(make_pipeline, se
 
     await scan(kit, Source.of(site))
 
-    assert kit.browser.calls[-1] == ("profile", site.id) and kit.browser.as_person is False
+    assert kit.browser.calls[-1] == ("profile", site.id)
 
 
 async def test_a_finish_without_a_report_is_not_an_update(make_pipeline, session_factory):

@@ -1,18 +1,38 @@
-"""Браузер человека на движке Chromium под управлением Playwright."""
+"""Браузер на профилях агрегаторов: агент водит его через Playwright, человек
+входит в нём обычным процессом."""
 
+import asyncio
+import contextlib
 import logging
 import os
 import shutil
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from adapters.app_tied_process import tie_to_app
+from adapters.process_windows import has_window
 from backend.domain.hosts import host_owns
 from config import get_data_dir
 
 logger = logging.getLogger(__name__)
 
 BROWSER_DIR = get_data_dir() / "browser"
+
+# Как часто смотреть, открыто ли ещё окно входа: человеку закрытие видно сразу,
+# и полсекунды задержки он не заметит.
+_WINDOW_POLL_SEC = 0.5
+
+# Сколько ждать, пока закрытый окном браузер выйдет сам. Браузер на Chromium
+# копит куки до тридцати секунд, прежде чем записать их на диск; на выходе он
+# пишет их сразу, а оставшийся в фоне за это время успеет записать сам.
+_OWN_EXIT_SEC = 30
+
+
+class BrowserClosed(RuntimeError):
+    """Окно браузера агента закрыл человек: работа остановлена, и открывать его
+    снова нельзя до следующей работы."""
 
 _PROGRAMS = ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA")
 
@@ -26,22 +46,23 @@ BROWSER_NAMES = CHROME, OPERA, BRAVE, VIVALDI, YANDEX, EDGE = (
 class InstalledBrowser:
     name: str
     channel: str | None
-    executable: Path | None
+    executable: Path
 
 
 def find_browser() -> InstalledBrowser | None:
     """Первый найденный: Chrome, Opera, Brave, Vivaldi, Яндекс.Браузер, Edge.
 
     Chrome и Edge Playwright водит по имени канала, остальных — по пути к
-    исполняемому файлу.
+    исполняемому файлу. Путь известен у всех: человеку для входа браузер
+    запускается им самим, без Playwright (`BrowserHost.let_person_in`).
     """
     for found in (
-        _channel(CHROME, "chrome", "Google/Chrome/Application/chrome.exe"),
+        _installed(CHROME, "Google/Chrome/Application/chrome.exe", "chrome"),
         _opera(),
-        _by_path(BRAVE, "BraveSoftware/Brave-Browser/Application/brave.exe"),
-        _by_path(VIVALDI, "Vivaldi/Application/vivaldi.exe"),
-        _by_path(YANDEX, "Yandex/YandexBrowser/Application/browser.exe"),
-        _channel(EDGE, "msedge", "Microsoft/Edge/Application/msedge.exe"),
+        _installed(BRAVE, "BraveSoftware/Brave-Browser/Application/brave.exe"),
+        _installed(VIVALDI, "Vivaldi/Application/vivaldi.exe"),
+        _installed(YANDEX, "Yandex/YandexBrowser/Application/browser.exe"),
+        _installed(EDGE, "Microsoft/Edge/Application/msedge.exe", "msedge"),
     ):
         if found is not None:
             return found
@@ -56,13 +77,9 @@ def _first(relative: str) -> Path | None:
     return next((path for path in _candidates(relative) if path.is_file()), None)
 
 
-def _channel(name: str, channel: str, relative: str) -> InstalledBrowser | None:
-    return InstalledBrowser(name, channel, None) if _first(relative) else None
-
-
-def _by_path(name: str, relative: str) -> InstalledBrowser | None:
+def _installed(name: str, relative: str, channel: str | None = None) -> InstalledBrowser | None:
     found = _first(relative)
-    return InstalledBrowser(name, None, found) if found else None
+    return InstalledBrowser(name, channel, found) if found else None
 
 
 def _opera() -> InstalledBrowser | None:
@@ -90,41 +107,83 @@ def remove_profile(profile_id: int) -> None:
 class BrowserHost:
     """Один браузер приложения: профиль за профилем, развёрнутый или свёрнутый."""
 
-    def __init__(self, browser: InstalledBrowser, always_visible: bool) -> None:
+    def __init__(self, browser: InstalledBrowser, always_visible: bool, on_closed: Callable[[], None]) -> None:
+        """`on_closed` — человек закрыл окно браузера агента: он остановил работу,
+        и открывать окно снова нельзя — закрытое раз за разом возвращалось бы."""
         self._browser = browser
         self._always_visible = always_visible
+        self._on_closed = on_closed
         self._playwright = None
         self._context = None
         self._profile_id: int | None = None
         self._sending = True
-        self._as_person = False
         self._last_url = "about:blank"
+        self._stopped = False
 
-    async def open_profile(
-        self, profile_id: int, sending: bool = True, as_person: bool = False
-    ) -> None:
+    async def open_profile(self, profile_id: int, sending: bool = True) -> None:
         """Открыть профиль. `sending=False` — отклик под симуляцией: всё, что сайт
         отправил бы, обрывается в самом браузере (`hold_sending`), что бы ни нажали.
-
-        `as_person` — в окне работает человек, а не агент (вход на сайт): браузер
-        открыт без пометки «управляется программой». С ней вход Google отказывает
-        («браузер небезопасен»), а человеку, входящему руками, она не нужна.
         """
-        if (self._profile_id == profile_id and self._sending == sending
-                and self._as_person == as_person and self._context is not None):
+        self._stopped = False
+        if self._profile_id == profile_id and self._sending == sending and self._context is not None:
             return
         await self._close_context()
         if self._profile_id != profile_id:
             self._last_url = "about:blank"
         self._profile_id = profile_id
         self._sending = sending
-        self._as_person = as_person
         await self._launch()
 
+    async def let_person_in(self, profile_id: int, url: str, limit_sec: float) -> bool:
+        """Открыть человеку профиль на этом адресе обычным браузером и ждать, пока
+        он закроет окно; ответ — закрыл ли за срок.
+
+        Обычным процессом, а не через Playwright: вход Google отказывает браузеру,
+        которым управляет программа («браузер или приложение небезопасны»), и
+        узнаёт его не по одному признаку, который можно спрятать. Ведомый браузер
+        на профиле закрывается до запуска — профиль держит один браузер, — и
+        следующий зов агента открывает профиль там, где человек начинал.
+
+        Чем бы ни кончилось — закрытым окном, сроком, «Стопом», — процесс гасится:
+        иные браузеры после закрытия окна живут в фоне и держали бы профиль, а
+        брошенное окно приняло бы следующий вход себе, и тот кончился бы сразу.
+        Закрытому окном сперва дают выйти самому (`_OWN_EXIT_SEC`): окно пропадает
+        раньше, чем браузер допишет профиль, и погашенный в этот миг он унёс бы
+        куки входа с собой.
+        """
+        await self._close_context()
+        self._profile_id, self._sending, self._last_url = profile_id, True, url
+        self._stopped = False
+        process = await asyncio.create_subprocess_exec(
+            str(self._browser.executable), f"--user-data-dir={BROWSER_DIR / str(profile_id)}",
+            "--no-first-run", "--no-default-browser-check", url,
+        )
+        tie_to_app(process.pid)
+        try:
+            closed = await _window_closed(process, limit_sec)
+            if closed:
+                with contextlib.suppress(TimeoutError):
+                    await asyncio.wait_for(process.wait(), _OWN_EXIT_SEC)
+            return closed
+        finally:
+            if process.returncode is None:
+                process.terminate()
+                await process.wait()
+
     async def page(self):
-        """Последняя вкладка. Окно закрыл человек — профиль переоткрывается там же."""
-        if self._context is None or not self._context.pages:
+        """Последняя вкладка; профиль, ещё не открытый, открывается там, где был.
+
+        Браузер без вкладок, которого приложение не закрывало, закрыл человек:
+        Playwright сообщает о закрытии браузера позже, чем убирает вкладки, а
+        оставшийся в фоне не сообщает вовсе. Закрытое человеком не поднимается
+        до следующей работы (`BrowserClosed`).
+        """
+        if self._context is not None and not self._context.pages:
             await self._close_context()
+            self._closed_by_person()
+        if self._stopped:
+            raise BrowserClosed
+        if self._context is None:
             await self._launch()
         current = self._context.pages[-1]
         self._last_url = current.url
@@ -141,18 +200,6 @@ class BrowserHost:
         page = await self.page()
         cdp = await self._context.new_cdp_session(page)
         await cdp.send("Network.clearBrowserCache")
-
-    async def wait_closed(self, limit_sec: float) -> bool:
-        """Ждать, пока человек закроет окно. Ждётся вкладка, а не весь браузер:
-        иные браузеры после закрытия окна живут в фоне."""
-        from playwright.async_api import TimeoutError as PlaywrightTimeout
-
-        try:
-            await (await self.page()).wait_for_event("close", timeout=limit_sec * 1000)
-        except PlaywrightTimeout:
-            return False
-        await self._close_context()
-        return True
 
     async def close(self) -> None:
         try:
@@ -174,12 +221,10 @@ class BrowserHost:
         self._context = await self._playwright.chromium.launch_persistent_context(
             str(BROWSER_DIR / str(self._profile_id)),
             headless=False,
-            **context_options(self._browser, sending=self._sending, as_person=self._as_person),
+            **context_options(self._browser, sending=self._sending),
         )
         if not self._sending:
             await self._context.route("**/*", hold_sending)
-        if self._as_person:
-            await self._context.add_init_script(_HIDE_WEBDRIVER)
         self._context.on("close", self._forget_context)
         self._context.on("page", _accept_dialogs)
         for opened in self._context.pages:
@@ -211,14 +256,43 @@ class BrowserHost:
             await page.bring_to_front()
 
     def _forget_context(self, closed) -> None:
-        """Забыть закрытый контекст — если это нынешний, а не запоздалое событие прежнего."""
+        """Закрылся нынешний контекст — его закрыл человек: своё приложение забывает
+        контекст до закрытия (`_close_context`), и запоздалое событие прежнего
+        сюда не доходит. Человек этим остановил работу (`on_closed`)."""
         if closed is self._context:
             self._context = None
+            self._closed_by_person()
+
+    def _closed_by_person(self) -> None:
+        """Человек закрыл окно: работа остановлена — один раз, сколько бы
+        признаков закрытия ни пришло."""
+        if not self._stopped:
+            self._stopped = True
+            self._on_closed()
 
     async def _close_context(self) -> None:
         if self._context is not None:
             context, self._context = self._context, None
             await context.close()
+
+
+async def _window_closed(process, limit_sec: float) -> bool:
+    """Закрыл ли человек окно браузера за срок.
+
+    Ждётся окно, а не процесс: иные браузеры после закрытия окна живут в фоне.
+    Пока окно не показалось, закрытым оно не считается — браузер поднимается не
+    сразу; вышедший без окна процесс ждать нечего.
+    """
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + limit_sec
+    shown = False
+    while loop.time() < deadline:
+        if has_window(process.pid):
+            shown = True
+        elif shown or process.returncode is not None:
+            return True
+        await asyncio.sleep(_WINDOW_POLL_SEC)
+    return False
 
 
 _SENDING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
@@ -230,17 +304,7 @@ _GOOGLE_CAPTCHA_PATH = "/recaptcha/"
 _CLOUDFLARE_CHECK_PATH = "/cdn-cgi/challenge-platform/"
 
 
-# Запуск без пометки «управляется программой»: без флага `--enable-automation`,
-# который Playwright ставит сам. Песочница включена: без неё Playwright ставит
-# `--no-sandbox`, а на флаги, которых Chrome не поддерживает, он вешает над
-# страницей плашку.
-_PERSON_LAUNCH = {
-    "ignore_default_args": ["--enable-automation"],
-    "chromium_sandbox": True,
-}
-
-
-def context_options(browser: InstalledBrowser, *, sending: bool, as_person: bool) -> dict:
+def context_options(browser: InstalledBrowser, *, sending: bool) -> dict:
     """С чем запускается браузер агента.
 
     Загрузки запрещены всегда, и запрещены самим браузером, а не словами агенту:
@@ -250,16 +314,11 @@ def context_options(browser: InstalledBrowser, *, sending: bool, as_person: bool
     """
     return {
         "channel": browser.channel,
-        "executable_path": str(browser.executable) if browser.executable else None,
+        # Канал Playwright находит сам; путь ему нужен только без канала.
+        "executable_path": None if browser.channel else str(browser.executable),
         "service_workers": "allow" if sending else "block",
         "accept_downloads": False,
-        **(_PERSON_LAUNCH if as_person else {}),
     }
-
-# `navigator.webdriver` выставляет само подключение Playwright, и по нему вход
-# Google отказывает («браузер небезопасен»). Прячется скриптом страницы, а не
-# флагом `--disable-blink-features`: на тот Chrome тоже вешает плашку.
-_HIDE_WEBDRIVER = "Object.defineProperty(Navigator.prototype, 'webdriver', {get: () => false})"
 
 
 async def hold_sending(route) -> None:

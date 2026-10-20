@@ -5,6 +5,8 @@
 здесь смотрят на дорогу от формы до записи и обратно.
 """
 
+from pathlib import Path
+
 from backend.agent.availability import NO_DRIVER
 from backend.models import AppSetting
 
@@ -159,7 +161,7 @@ async def test_the_aggregator_snapshot_names_the_browser_and_what_locks_the_agen
     from adapters.browser import InstalledBrowser
 
     monkeypatch.setattr("client.bridge.settings.find_browser",
-                        lambda: InstalledBrowser("Opera", None, None))
+                        lambda: InstalledBrowser("Opera", None, Path("C:/Opera/opera.exe")))
     aggregators = (await ask(api.settings.get))["ok"]["aggregators"]
 
     assert aggregators["browser"] == "Opera" and aggregators["lock"] == NO_DRIVER
