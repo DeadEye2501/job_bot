@@ -1,4 +1,4 @@
-"""Вход на сайт агрегатора: человек входит в видимом браузере, агент проверяет вход.
+"""Вход на сайт агрегатора: человек входит в обычном браузере, агент проверяет вход.
 
 Подтверждённый вход сразу продолжается перечнем резюме (`aggregator_scan`):
 вход и есть тот момент, когда список на сайте впервые можно увидеть.
@@ -15,18 +15,15 @@ from backend.repository.aggregators import is_logged_in
 
 
 async def log_in(kit: AgentKit, source: Source) -> str:
-    """Видимый браузер на главной; человек входит и закрывает окно; агент отмечает
+    """Обычный браузер на главной; человек входит и закрывает окно; агент отмечает
     вход, а подтвердив его — перечисляет резюме на сайте (`aggregator_scan`).
 
     Ответ — `ok`, `not_logged_in` (агент входа не нашёл) или `login_timeout`
     (окно не закрыто за час). Судит отметка в базе, а не конец сессии: сессия
     кончается и тогда, когда входа нет.
     """
-    await kit.browser.open_profile(source.id, as_person=True)
-    await kit.browser.show()
-    await (await kit.browser.page()).goto(f"https://{source.host}/")
     # Вход — то же ожидание человека, что капча: срок у них один.
-    if not await kit.browser.wait_closed(LIMIT_SEC):
+    if not await kit.browser.let_person_in(source.id, f"https://{source.host}/", LIMIT_SEC):
         return "login_timeout"
     await run_on_site(kit, LoginJob(source), LOGIN_PROMPT, login_task(source.host),
                       *browser_tools(kit, None, None))

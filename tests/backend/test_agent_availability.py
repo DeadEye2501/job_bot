@@ -1,10 +1,8 @@
 """Агенту нужны водитель и браузер; без них агрегаторы заперты с подсказкой."""
 
-from adapters.browser import InstalledBrowser
 from backend.agent.availability import NO_BROWSER, NO_DRIVER, agent_refusal
 from backend.provider_config import CLAUDE_CODE_ADDRESS, LlmProviderConfig
-
-CHROME = InstalledBrowser("Chrome", "chrome", None)
+from tests.fakes.browser import CHROME
 
 
 def test_claude_code_and_a_browser_unlock_the_agent():

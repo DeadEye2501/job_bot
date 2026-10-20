@@ -15,7 +15,7 @@ async def test_a_file_the_page_offers_is_not_saved(tmp_path):
     browser = find_browser()
     if browser is None:
         pytest.skip("на машине нет Chrome или Edge — скачивать негде")
-    options = {**context_options(browser, sending=True, as_person=False), "headless": True}
+    options = {**context_options(browser, sending=True), "headless": True}
     async with async_playwright() as playwright:
         context = await playwright.chromium.launch_persistent_context(str(tmp_path / "profile"), **options)
         page = await context.new_page()

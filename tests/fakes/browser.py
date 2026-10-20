@@ -1,7 +1,14 @@
 """Браузер агента с заданными страницами: что открыто, что нажато, что отказало."""
 
+from pathlib import Path
+
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeout
+
+from adapters.browser import InstalledBrowser
+
+CHROME = InstalledBrowser("Chrome", "chrome", Path("C:/Chrome/chrome.exe"))
+"""Установленный браузер, какой находит `find_browser`: с каналом и путём."""
 
 
 class _Chooser:
@@ -128,7 +135,6 @@ class FakeBrowser:
         self.calls: list[str] = []
         self.closes = True
         self.sending: bool | None = None
-        self.as_person: bool | None = None
 
     async def page(self):
         return self._page
@@ -139,10 +145,9 @@ class FakeBrowser:
     async def hide_back(self):
         self.calls.append("hide")
 
-    async def open_profile(self, profile_id: int, sending: bool = True, as_person: bool = False):
+    async def open_profile(self, profile_id: int, sending: bool = True):
         self.calls.append(("profile", profile_id))
         self.sending = sending
-        self.as_person = as_person
 
     async def clear_cache(self):
         self.calls.append("clear_cache")
@@ -150,7 +155,7 @@ class FakeBrowser:
     async def close(self):
         self.calls.append("close")
 
-    async def wait_closed(self, limit_sec: float) -> bool:
+    async def let_person_in(self, profile_id: int, url: str, limit_sec: float) -> bool:
         """Закрыл ли человек окно за срок; ответ задаёт тест полем `closes`."""
-        self.calls.append(("wait_closed", limit_sec))
+        self.calls.append(("person", profile_id, url, limit_sec))
         return self.closes

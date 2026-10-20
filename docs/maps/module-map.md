@@ -34,7 +34,7 @@ Job Bot — single CLI entry point.
 - `def _started_or_told_why() -> int` (36)
 - `def main() -> int` (30)
 
-## adapters — 20 модулей
+## adapters — 21 модулей
 
 ### `adapters/agent_mcp.py` — 97 строк
 
@@ -66,33 +66,35 @@ MCP-сервер инструментов одной сессии агента: 
 - `def _children() -> list[tuple[int, str]]` (13)
 - `def _snapshot() -> list[tuple[int, int, str]]` (16)
 
-### `adapters/browser.py` — 293 строк
+### `adapters/browser.py` — 352 строк ⚠ подошёл к 300
 
-Браузер человека на движке Chromium под управлением Playwright.
+Браузер на профилях агрегаторов: агент водит его через Playwright, человек
 
-Зависит от: `adapters.app_tied_process`, `backend.domain.hosts`, `config`
+Зависит от: `adapters.app_tied_process`, `adapters.process_windows`, `backend.domain.hosts`, `config`
 
+- `class BrowserClosed(RuntimeError)` (3)
 - `class InstalledBrowser` (4)
-- `def find_browser() -> InstalledBrowser | None` (17)
+- `def find_browser() -> InstalledBrowser | None` (18)
 - `def _candidates(relative: str) -> list[Path]` (2)
 - `def _first(relative: str) -> Path | None` (2)
-- `def _channel(name: str, channel: str, relative: str) -> InstalledBrowser | None` (2)
-- `def _by_path(name: str, relative: str) -> InstalledBrowser | None` (3)
+- `def _installed(name: str, relative: str, channel: str | None=None) -> InstalledBrowser | None` (3)
 - `def _opera() -> InstalledBrowser | None` (10)
 - `def remove_profile(profile_id: int) -> None` (8)
-- `class BrowserHost` (132)
-  - `async def open_profile(self, profile_id: int, sending: bool=True, as_person: bool=False) -> None` (20)
-  - `async def page(self)` (8)
+- `class BrowserHost` (170)
+  - `async def open_profile(self, profile_id: int, sending: bool=True) -> None` (13)
+  - `async def let_person_in(self, profile_id: int, url: str, limit_sec: float) -> bool` (35)
+  - `async def page(self)` (18)
   - `async def show(self) -> None` (2)
   - `async def hide_back(self) -> None` (3)
   - `async def clear_cache(self) -> None` (4)
-  - `async def wait_closed(self, limit_sec: float) -> bool` (11)
   - `async def close(self) -> None` (7)
-  - `async def _launch(self) -> None` (36)
+  - `async def _launch(self) -> None` (34)
   - `async def _place(self, on_screen: bool) -> None` (10)
-  - `def _forget_context(self, closed) -> None` (4)
+  - `def _forget_context(self, closed) -> None` (7)
+  - `def _closed_by_person(self) -> None` (6)
   - `async def _close_context(self) -> None` (4)
-- `def context_options(browser: InstalledBrowser, *, sending: bool, as_person: bool) -> dict` (15)
+- `async def _window_closed(process, limit_sec: float) -> bool` (17)
+- `def context_options(browser: InstalledBrowser, *, sending: bool) -> dict` (15)
 - `async def hold_sending(route) -> None` (13)
 - `def _is_captcha(url: str) -> bool` (8)
 - `def _accept_dialogs(page) -> None` (4)
@@ -269,6 +271,15 @@ Claude через установленный Claude Code по подписке: 
 Зависит от: `adapters`, `backend.provider_config`
 
 - `def make_client(config: LlmProviderConfig) -> 'LmClient'` (20)
+
+### `adapters/process_windows.py` — 28 строк
+
+Видимые окна процесса Windows.
+
+Зависит от: —
+
+- `def has_window(pid: int) -> bool` (16)
+  - `def look(window, _param) -> bool` (6)
 
 ### `adapters/site_home.py` — 115 строк
 
@@ -1376,13 +1387,13 @@ First-run bootstrap: ensure DB schema exists.
 
 - `def spelled_alone(text: str, word: str) -> bool` (11)
 
-### `backend/flows/aggregator_login.py` — 40 строк
+### `backend/flows/aggregator_login.py` — 37 строк
 
-Вход на сайт агрегатора: человек входит в видимом браузере, агент проверяет вход.
+Вход на сайт агрегатора: человек входит в обычном браузере, агент проверяет вход.
 
 Зависит от: `backend.agent.human_gate`, `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.prompts.login`, `backend.agent.sessions`, `backend.agent.tools_browser`, `backend.flows.aggregator_scan`, `backend.repository.aggregators`
 
-- `async def log_in(kit: AgentKit, source: Source) -> str` (24)
+- `async def log_in(kit: AgentKit, source: Source) -> str` (21)
 
 ### `backend/flows/aggregator_name.py` — 89 строк
 
@@ -4031,7 +4042,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 349 модулей
+## tests — 352 модулей
 
 ### `tests/adapters/test_agent_mcp.py` — 80 строк
 
@@ -4065,6 +4076,15 @@ Runtime settings layer.
 - `def _install(root: Path, relative: str) -> Path` (5)
 - `def _roots(monkeypatch, tmp_path)` (4)
 
+### `tests/adapters/test_browser_closed.py` — 52 строк
+
+Окно браузера агента, закрытое человеком, — это «Стоп», а не повод открыть его снова.
+
+Зависит от: `adapters.browser`, `tests.fakes.playwright`
+
+Тестов: 4
+
+
 ### `tests/adapters/test_browser_downloads.py` — 29 строк
 
 Браузер агента не скачивает файлов: всякая загрузка обрывается самим браузером.
@@ -4074,29 +4094,35 @@ Runtime settings layer.
 Тестов: 1
 
 
-### `tests/adapters/test_browser_sending.py` — 139 строк
+### `tests/adapters/test_browser_person.py` — 128 строк
+
+Вход человека на сайт: обычный браузер на профиле агрегатора, а не ведомый.
+
+Зависит от: `adapters.browser`, `tests.fakes.browser`, `tests.fakes.playwright`
+
+Тестов: 6
+
+- `class _Process` (22)
+  - `async def wait(self) -> int` (3)
+  - `def terminate(self) -> None` (3)
+  - `def _exit(self) -> None` (3)
+- `def _host(monkeypatch, windows: list[bool], *, exits_with_window=True)` (26)
+  - `async def spawn(*argv, **_options)` (3)
+  - `def has_window(pid)` (8)
+
+### `tests/adapters/test_browser_sending.py` — 75 строк
 
 Профиль под симуляцией отклика: данные с сайта не уходят, капча проходится.
 
-Зависит от: `adapters.browser`
+Зависит от: `adapters.browser`, `tests.fakes.playwright`
 
-Тестов: 9
+Тестов: 8
 
 - `class _Request` (3)
 - `class _Route` (10)
   - `async def abort(self, *_reason)` (2)
   - `async def continue_(self, **_options)` (2)
 - `async def _fate(method, url)` (4)
-- `class _Context` (18)
-  - `async def route(self, pattern, handler)` (2)
-  - `async def add_init_script(self, script)` (2)
-  - `def on(self, *_event)` (2)
-  - `async def close(self)` (2)
-- `class _Page` (5)
-  - `def on(self, *_event)` (2)
-- `class _Playwright` (11)
-  - `async def start(self)` (2)
-  - `async def launch_persistent_context(self, _path, **options)` (3)
 
 ### `tests/adapters/test_claude.py` — 263 строк
 
@@ -4446,11 +4472,11 @@ Runtime settings layer.
 - `def _page(*, headline: str='Senior Manual QA', body: str='<p>Ищем QA</p>') -> str` (9)
 - `def _client(handler) -> httpx.AsyncClient` (3)
 
-### `tests/backend/test_agent_availability.py` — 23 строк
+### `tests/backend/test_agent_availability.py` — 21 строк
 
 Агенту нужны водитель и браузер; без них агрегаторы заперты с подсказкой.
 
-Зависит от: `adapters.browser`, `backend.agent.availability`, `backend.provider_config`
+Зависит от: `backend.agent.availability`, `backend.provider_config`, `tests.fakes.browser`
 
 Тестов: 4
 
@@ -4705,11 +4731,11 @@ Runtime settings layer.
 - `def _project_of_two_revisions(root, db_file) -> None` (20)
 - `def _revisions_in(paths) -> set[str]` (9)
 
-### `tests/backend/test_bot_aggregators.py` — 463 строк ⚠ подошёл к 300
+### `tests/backend/test_bot_aggregators.py` — 465 строк ⚠ подошёл к 300
 
 Обход агрегаторов в боте: место прогона, режимы, человек, сроки, ручные действия.
 
-Зависит от: `backend.bot`, `backend.bot.turn`, `backend.models`, `backend.repository.aggregator_resumes`, `tests.backend.fixtures.bot`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.agent`, `tests.fakes.browser`, `tests.waiting`
+Зависит от: `backend.agent.human_gate`, `backend.bot`, `backend.bot.turn`, `backend.models`, `backend.repository.aggregator_resumes`, `tests.backend.fixtures.bot`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.agent`, `tests.fakes.browser`, `tests.waiting`
 
 Тестов: 29
 
@@ -7111,7 +7137,7 @@ Runtime settings layer.
 - `def real_runner()` (16)
 - `def _troubled(real_runner, exc: BaseException) -> None` (11)
 
-### `tests/client/test_bridge_settings.py` — 165 строк
+### `tests/client/test_bridge_settings.py` — 167 строк
 
 Следствия экрана настроек: что записано и что показано на экране.
 
@@ -7501,11 +7527,11 @@ Runtime settings layer.
 - `def work_kit(bot) -> AgentKit` (3)
 - `def kit_for(pipeline, *, browser=None, gate=None, run_session=None) -> AgentKit` (3)
 
-### `tests/fakes/browser.py` — 156 строк
+### `tests/fakes/browser.py` — 161 строк
 
 Браузер агента с заданными страницами: что открыто, что нажато, что отказало.
 
-Зависит от: —
+Зависит от: `adapters.browser`
 
 - `class _Chooser` (6)
   - `async def set_files(self, files, **_options)` (2)
@@ -7532,14 +7558,14 @@ Runtime settings layer.
   - `async def set_input_files(self, selector, files, **_options)` (3)
   - `def expect_file_chooser(self, **_options)` (2)
   - `async def go_back(self, **_options)` (2)
-- `class FakeBrowser` (34)
+- `class FakeBrowser` (32)
   - `async def page(self)` (2)
   - `async def show(self)` (2)
   - `async def hide_back(self)` (2)
-  - `async def open_profile(self, profile_id: int, sending: bool=True, as_person: bool=False)` (4)
+  - `async def open_profile(self, profile_id: int, sending: bool=True)` (3)
   - `async def clear_cache(self)` (2)
   - `async def close(self)` (2)
-  - `async def wait_closed(self, limit_sec: float) -> bool` (4)
+  - `async def let_person_in(self, profile_id: int, url: str, limit_sec: float) -> bool` (4)
 
 ### `tests/fakes/claude.py` — 83 строк
 
@@ -7690,6 +7716,26 @@ Runtime settings layer.
 
 - `class LmClient` (9)
   - `async def aclose(self) -> None` (2)
+
+### `tests/fakes/playwright.py` — 64 строк
+
+Playwright под `BrowserHost`: запуск профиля и события его контекста, без браузера.
+
+Зависит от: `adapters.browser`, `tests.fakes.browser`
+
+- `class DrivenContext` (24)
+  - `async def route(self, pattern, handler)` (2)
+  - `def on(self, event, handler)` (2)
+  - `async def close(self)` (3)
+  - `def fire(self, event)` (4)
+- `class _DrivenPage` (8)
+  - `def on(self, *_event)` (2)
+  - `async def goto(self, url, **_options)` (2)
+- `class _Playwright` (14)
+  - `async def start(self)` (2)
+  - `async def stop(self)` (2)
+  - `async def launch_persistent_context(self, path, **options)` (3)
+- `def driven_host(monkeypatch, on_closed=lambda: None) -> tuple[BrowserHost, _Playwright]` (6)
 
 ### `tests/fakes/site_home.py` — 29 строк
 

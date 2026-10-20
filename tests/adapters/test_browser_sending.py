@@ -1,6 +1,7 @@
 """Профиль под симуляцией отклика: данные с сайта не уходят, капча проходится."""
 
-from adapters.browser import BrowserHost, InstalledBrowser, hold_sending
+from adapters.browser import hold_sending
+from tests.fakes.playwright import driven_host
 
 
 class _Request:
@@ -61,53 +62,10 @@ async def test_cloudflare_checking_a_human_on_the_site_itself_still_goes_out():
     assert await _fate("POST", url) == "passed"
 
 
-class _Context:
-    def __init__(self, options):
-        self.options = options
-        self.routes = []
-        self.init_scripts = []
-        self.pages = [_Page()]
-
-    async def route(self, pattern, handler):
-        self.routes.append((pattern, handler))
-
-    async def add_init_script(self, script):
-        self.init_scripts.append(script)
-
-    def on(self, *_event):
-        return None
-
-    async def close(self):
-        return None
-
-
-class _Page:
-    url = "about:blank"
-
-    def on(self, *_event):
-        return None
-
-
-class _Playwright:
-    def __init__(self):
-        self.contexts = []
-        self.chromium = self
-
-    async def start(self):
-        return self
-
-    async def launch_persistent_context(self, _path, **options):
-        self.contexts.append(_Context(options))
-        return self.contexts[-1]
-
-
 async def test_a_profile_opened_not_to_send_holds_every_request(monkeypatch):
     """Удержание ставится при запуске профиля, а не только объявлено: без него
     правило обрыва не видит ни одного запроса."""
-    playwright = _Playwright()
-    monkeypatch.setattr("playwright.async_api.async_playwright", lambda: playwright)
-    monkeypatch.setattr("adapters.app_tied_process.tie_children_named", lambda _name: None)
-    host = BrowserHost(InstalledBrowser("Chrome", "chrome", None), always_visible=True)
+    host, playwright = driven_host(monkeypatch)
 
     await host.open_profile(1, sending=False)
     await host.open_profile(1, sending=True)
@@ -115,25 +73,3 @@ async def test_a_profile_opened_not_to_send_holds_every_request(monkeypatch):
     held, free = playwright.contexts
     assert held.routes == [("**/*", hold_sending)] and held.options["service_workers"] == "block"
     assert free.routes == [] and free.options["service_workers"] == "allow"
-
-
-async def test_a_profile_opened_for_a_human_login_carries_no_automation_mark(monkeypatch):
-    """Вход Google отказывает браузеру с пометкой «управляется программой»; входит
-    же человек руками, и пометка ему не нужна. Обход идёт с ней, как шёл."""
-    playwright = _Playwright()
-    monkeypatch.setattr("playwright.async_api.async_playwright", lambda: playwright)
-    monkeypatch.setattr("adapters.app_tied_process.tie_children_named", lambda _name: None)
-    host = BrowserHost(InstalledBrowser("Chrome", "chrome", None), always_visible=True)
-
-    await host.open_profile(1, as_person=True)
-    await host.open_profile(1)
-
-    person, agent = playwright.contexts
-    assert "--enable-automation" in person.options["ignore_default_args"]
-    # `navigator.webdriver` прячет скрипт страницы, а не флаг: на флаги, которых
-    # Chrome не поддерживает, — и на `--no-sandbox` — он вешает над страницей плашку.
-    assert any("defineProperty(Navigator.prototype, 'webdriver'" in script
-               for script in person.init_scripts)
-    assert not person.options.get("args")
-    assert person.options["chromium_sandbox"] is True
-    assert not agent.options.get("ignore_default_args") and not agent.init_scripts

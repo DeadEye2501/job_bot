@@ -54,6 +54,8 @@
 
 - `logger` = `logging.getLogger(__name__)`
 - `BROWSER_DIR` = `get_data_dir() / 'browser'`
+- `_WINDOW_POLL_SEC` = `0.5`
+- `_OWN_EXIT_SEC` = `30`
 - `_PROGRAMS` = `набор из 3`
 - `BROWSER_NAMES` = `набор из 6`
 - `CHROME` = `набор из 6`
@@ -65,13 +67,11 @@
 - `class InstalledBrowser`
   - `name: str`
   - `channel: str | None`
-  - `executable: Path | None`
+  - `executable: Path`
 - `_SENDING_METHODS` = `frozenset({'POST', 'PUT', 'PATCH', 'DELETE'})`
 - `_CAPTCHA_HOSTS` = `набор из 4`
 - `_GOOGLE_CAPTCHA_PATH` = `'/recaptcha/'`
 - `_CLOUDFLARE_CHECK_PATH` = `'/cdn-cgi/challenge-platform/'`
-- `_PERSON_LAUNCH` = `словарь из 2`
-- `_HIDE_WEBDRIVER` = `"Object.defineProperty(Navigator.prototype, 'web…`
 
 ### `adapters/claude.py`
 
@@ -184,6 +184,10 @@
 
 - `LLM_REQUEST_TIMEOUT_SEC` = `180.0`
 - `LmClient` = `httpx.AsyncClient | claude.ClaudeClient | claude…`
+
+### `adapters/process_windows.py`
+
+- `_EnumProc` = `ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND,…`
 
 ### `adapters/site_home.py`
 
@@ -488,7 +492,7 @@
 
 ### `backend/app_version.py`
 
-- `VERSION` = `'1.0.1'`
+- `VERSION` = `'1.2.0'`
 
 ### `backend/applying/browser.py`
 
@@ -2346,11 +2350,6 @@
 - `_APP` = `'\nimport os, subprocess, sys\nfrom adapters imp…`
 - `_PARENT` = `'\nimport subprocess, sys, time\ngrandchild = su…`
 
-### `tests/adapters/test_browser_sending.py`
-
-- `class _Page`
-  - `url` = `'about:blank'`
-
 ### `tests/adapters/test_claude.py`
 
 - `LOG` = `logging.getLogger('tests.claude')`
@@ -2382,10 +2381,6 @@
 - `FORM` = `'https://company.test/apply'`
 - `TG` = `Way('telegram', '@hr_name', None)`
 - `MAIL` = `Way('email', 'hr@company.test', None)`
-
-### `tests/backend/test_agent_availability.py`
-
-- `CHROME` = `InstalledBrowser('Chrome', 'chrome', None)`
 
 ### `tests/backend/test_agent_confirm_page.py`
 
@@ -2630,6 +2625,10 @@
 
 - `TODAY` = `date(2026, 10, 9)`
 
+### `tests/fakes/browser.py`
+
+- `CHROME` = `InstalledBrowser('Chrome', 'chrome', Path('C:/Ch…`
+
 ### `tests/fakes/claude.py`
 
 - `MESSAGES` = `набор из 2`
@@ -2662,6 +2661,11 @@
 - `CHAT` = `набор из 2`
 - `EMBEDDINGS` = `набор из 2`
 - `MODELS` = `набор из 2`
+
+### `tests/fakes/playwright.py`
+
+- `class _DrivenPage`
+  - `url` = `'about:blank'`
 
 ### `tests/fakes/site_home.py`
 

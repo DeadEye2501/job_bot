@@ -25,10 +25,10 @@ def test_nothing_installed_means_no_browser(monkeypatch, tmp_path):
 
 def test_chrome_wins_and_goes_by_channel(monkeypatch, tmp_path):
     root = _roots(monkeypatch, tmp_path)
-    _install(root / "PROGRAMFILES", "Google/Chrome/Application/chrome.exe")
+    chrome = _install(root / "PROGRAMFILES", "Google/Chrome/Application/chrome.exe")
     _install(root / "LOCALAPPDATA", "Vivaldi/Application/vivaldi.exe")
     found = find_browser()
-    assert (found.name, found.channel, found.executable) == ("Chrome", "chrome", None)
+    assert (found.name, found.channel, found.executable) == ("Chrome", "chrome", chrome)
 
 
 def test_opera_is_driven_by_the_real_browser_not_its_launcher(monkeypatch, tmp_path):
