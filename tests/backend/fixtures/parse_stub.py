@@ -10,7 +10,17 @@
 проверяет.
 """
 
+import pytest
+
 from backend.flows import parse as parse_mod
+
+
+@pytest.fixture
+def parsed(monkeypatch) -> list:
+    """Подставной разбор на весь тест; ответ — зовы по порядку (`parse_into`)."""
+    calls: list[tuple] = []
+    parse_into(monkeypatch, calls)
+    return calls
 
 
 def parse_into(monkeypatch, calls: list, *, done=True, fails=()) -> None:
@@ -22,8 +32,8 @@ def parse_into(monkeypatch, calls: list, *, done=True, fails=()) -> None:
     `done` бывает и обёрткой: прогону заново нужно менять ответ разбора уже
     после того, как подделка поставлена.
 
-    `fails` — номера, на которых разбор бросает: очереди разбора надо видеть,
-    что одна сломанная вакансия не держит остальных. Упавший зов в список не
+    `fails` — номера, на которых разбор бросает: искателю надо видеть, что
+    беда на одной находке не останавливает поиск. Упавший зов в список не
     ложится — разбор до записи не дошёл.
     """
 

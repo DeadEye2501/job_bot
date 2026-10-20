@@ -96,13 +96,18 @@ class ScanJob:
 @dataclass
 class SeekJob:
     """Поиск на источнике. `refused` — модель эмбеддингов молчала: сессия — сбой,
-    что бы ни сказал агент."""
+    что бы ни сказал агент.
+
+    `nested` — идёт цикл находки, вложенный в вызов инструмента: срок искателя
+    стоит. `stopper` — беда, снявшая работу посреди этого цикла (`RUN_STOPPERS`);
+    поднимается после конца сессии, чтобы агент успел её закончить сам."""
 
     source: Source
     limit: int
     submitted: int = 0
-    found: list[int] = field(default_factory=list)
     refused: bool = False
+    nested: bool = False
+    stopper: Exception | None = None
     outcome: Outcome | None = None
 
 

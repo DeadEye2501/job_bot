@@ -1,30 +1,21 @@
-"""Обход источника: искатель находит, конвейер разбирает, отобранное уходит
-откликателю пулом после поиска; last_run_at двигается только по done."""
+"""Обход источника: искатель находит, и каждая находка проходит весь цикл до
+отклика, прежде чем он ищет дальше; last_run_at двигается только по done."""
 
 import pytest
 
 from backend.agent.jobs import Source
 from backend.agent.sessions import SEEKER_TOOL_TIMEOUT_MS
-from backend.agent.stops import HumanTimeout, LimitExhausted
+from backend.agent.stops import HumanTimeout, LimitExhausted, ResumeMissing
 from backend.flows.aggregator_round import seek_source
 from backend.models import Aggregator, ProfileLanguage, Vacancy
 from tests.backend.fixtures.applying import PAGE
 from tests.backend.fixtures.flows import similar_by_hand
-from tests.backend.fixtures.parse_stub import parse_into
 from tests.dbio import all_rows, put
 from tests.factories import blacklist_row, profile_row
 from tests.factories_aggregators import aggregator_row
 from tests.fakes.agent import LimitHit, captcha_step, finish_step, scripted_kit
 
 pytestmark = pytest.mark.usefixtures("one_vector")
-
-
-@pytest.fixture
-def parsed(monkeypatch):
-    """Номера вакансий, дошедших до разбора."""
-    calls = []
-    parse_into(monkeypatch, calls)
-    return calls
 
 
 @pytest.fixture
@@ -85,8 +76,8 @@ async def test_a_silent_embedding_model_is_a_failure_whatever_the_agent_says(
     assert found == [] and stored.last_run_at is None
 
 
-async def test_the_pool_is_handed_over_after_the_search(seek, parsed, monkeypatch):
-    """Три находки уходят откликателю одним перечнем — после того, как разобраны все."""
+async def test_each_find_is_handed_over_before_the_next_one(seek, parsed, monkeypatch):
+    """Три находки — три передачи по одной, каждая сразу после своего разбора."""
     parsed_when_applied = []
 
     async def step(tools):
@@ -104,26 +95,12 @@ async def test_the_pool_is_handed_over_after_the_search(seek, parsed, monkeypatc
 
     handed, _, kit = await seek([step], on_kit=watch)
 
-    assert len(kit.pipeline.applied) == 1 and len(handed) == 3
-    assert parsed_when_applied == [3]
+    assert [len(ids) for ids in kit.pipeline.applied] == [1, 1, 1] and len(handed) == 3
+    assert parsed_when_applied == [1, 2, 3]
 
 
-async def test_the_search_browser_is_closed_before_the_handover(seek, parsed):
-    """Поиск и отклик делят один профиль браузера: двух окон на него Chromium не откроет."""
-    calls_when_applied = []
-
-    async def watch(kit):
-        async def apply(ids):
-            calls_when_applied.append(list(kit.browser.calls))
-        kit.pipeline.apply = apply
-
-    await seek([_submit_and_finish], on_kit=watch)
-
-    assert calls_when_applied[0][-1] == "close"
-
-
-async def test_a_crash_mid_session_fails_the_source_not_the_round(seek, session_factory, parsed):
-    """Найденное до сбоя разбирается и уходит откликателю."""
+async def test_a_crash_mid_session_keeps_what_already_went_through(seek, session_factory, parsed):
+    """Найденное до сбоя уже прошло свой цикл; сбой кончает обход источника, не оборот."""
     async def step(tools):
         await _submit(tools)
         raise RuntimeError("сломалось")
@@ -141,6 +118,42 @@ async def test_an_exhausted_subscription_stops_the_round(seek, parsed):
 
     with pytest.raises(LimitExhausted):
         await seek([step])
+
+
+@pytest.mark.parametrize("stopper", [LimitExhausted, HumanTimeout], ids=["лимит", "срок человека"])
+async def test_a_stopper_inside_a_find_stops_the_round_after_the_session(seek, parsed, stopper):
+    """Беда, снимающая работу, посреди вложенного отклика: агенту — «заверши»,
+    а сама беда поднимается, когда сессия искателя кончилась."""
+    answers = []
+
+    async def step(tools):
+        answers.append(await tools["submit_vacancy"](text="Текст", url=PAGE, published="", contacts=[]))
+
+    async def watch(kit):
+        async def apply(ids):
+            raise stopper
+        kit.pipeline.apply = apply
+
+    with pytest.raises(stopper):
+        await seek([step], on_kit=watch)
+
+    assert answers[0].startswith("Работа остановлена")
+
+
+async def test_a_stopper_inside_a_find_outlives_a_crash_of_the_session(seek, parsed):
+    """Сессия упала уже после беды, снявшей работу: поднимается беда, а не
+    сбой источника — иначе обход пошёл бы к следующему источнику."""
+    async def step(tools):
+        await _submit(tools)
+        raise RuntimeError("сломалось")
+
+    async def watch(kit):
+        async def apply(ids):
+            raise ResumeMissing("site.test")
+        kit.pipeline.apply = apply
+
+    with pytest.raises(ResumeMissing):
+        await seek([step], on_kit=watch)
 
 
 async def test_an_expired_wait_for_a_person_stops_the_round(seek, parsed):
@@ -172,6 +185,20 @@ async def test_the_seekers_clock_stands_while_a_person_is_awaited(seek, parsed, 
     assert plan.paused() is kit.gate.waiting
 
 
+async def test_the_seekers_clock_stands_while_its_find_goes_through(seek, parsed):
+    """Вложенный цикл находки — разбор, отклик — в срок искателя не идёт."""
+    paused = []
+
+    async def watch(kit):
+        async def apply(ids):
+            paused.append(kit.run_session.plans[0].paused())
+        kit.pipeline.apply = apply
+
+    _, _, kit = await seek([_submit_and_finish], on_kit=watch)
+
+    assert paused == [True] and kit.run_session.plans[0].paused() is False
+
+
 async def test_the_web_seeker_is_told_to_keep_off_telegram(seek, parsed):
     _, _, kit = await seek([finish_step()], name="Поиск по сети", host=None)
 
@@ -192,6 +219,17 @@ async def test_the_seeker_is_told_how_to_call_a_person(seek, parsed, host):
     # Подстрока самого правила о зове человека: слово `need_human` называет и
     # промпт роли, и по нему пропажу правила не заметить.
     assert 'need_human с kind="captcha"' in plan.system_prompt
+
+
+@pytest.mark.parametrize("host", ["site.test", None], ids=["агрегатор", "поиск по сети"])
+async def test_the_seeker_is_told_what_to_do_after_each_answer(seek, parsed, host):
+    """После передачи вкладка бывает уже чужой: наставление велит вернуться к
+    выдаче по адресу, на «не вышло» — искать дальше, на остановку — кончать."""
+    _, _, kit = await seek([finish_step()], host=host)
+
+    (plan,) = kit.run_session.plans
+    assert "вернись к выдаче" in plan.system_prompt
+    assert "«не вышло»" in plan.system_prompt and "«Работа остановлена»" in plan.system_prompt
 
 
 async def test_the_web_seeker_hears_of_the_blacklisted_sites(seek, session_factory, parsed):

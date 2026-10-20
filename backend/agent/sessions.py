@@ -7,7 +7,7 @@ import anyio
 
 from adapters.agent_mcp import serve_tools
 from adapters.claude_code_agent import AgentEnd, AgentRun, run_agent
-from backend.agent.jobs import Finished
+from backend.agent.jobs import Finished, SeekJob
 from backend.agent.kit import AgentKit, RunSession, SessionPlan
 from backend.agent.prompts.frame import system_prompt
 from backend.agent.stops import HumanTimeout, LimitExhausted
@@ -48,13 +48,14 @@ async def run_guarded(kit: AgentKit, plan: SessionPlan) -> AgentEnd:
     try:
         done = await _raced(session, expiry, plan.paused)
     except asyncio.CancelledError:
-        with anyio.CancelScope(shield=True):
-            await put_out(session)
+        await _shielded_put_out(session)
         raise
     finally:
         expiry.cancel()
     if session not in done:
-        await put_out(session)
+        # Под щитом и здесь: истёкший срок человека гасит и сессию искателя, и
+        # вложенную в его вызов — гашение сверху застало бы нас посреди этого.
+        await _shielded_put_out(session)
     # Флаг, а не победитель гонки: получив «срок вышел», агент сам кончает
     # сессию, и она бывает готова раньше, чем ожидание срока проснётся.
     if kit.gate.expired.is_set():
@@ -62,6 +63,11 @@ async def run_guarded(kit: AgentKit, plan: SessionPlan) -> AgentEnd:
     if session in done:
         return session.result()
     return AgentEnd(False, "сессия агента превысила срок", False)
+
+
+async def _shielded_put_out(session: asyncio.Task) -> None:
+    with anyio.CancelScope(shield=True):
+        await put_out(session)
 
 
 async def _raced(session: asyncio.Task, expiry: asyncio.Task, paused) -> set:
@@ -84,25 +90,37 @@ async def _raced(session: asyncio.Task, expiry: asyncio.Task, paused) -> set:
     return set()
 
 
-def seeker_plan(kit: AgentKit, plan: SessionPlan) -> SessionPlan:
-    """План сессии искателя: его срок не течёт, пока ждут человека, и вызов
-    инструмента не ограничен сроком.
+def seeker_plan(kit: AgentKit, job: SeekJob, plan: SessionPlan) -> SessionPlan:
+    """План сессии искателя: его срок не течёт, пока идёт цикл находки или ждут
+    человека, и вызов инструмента не ограничен сроком.
 
     Ожидание человека — общее у искателя и вложенного в его вызов откликателя:
     набор у них один (`bot.kit`), и капча, вход и подтверждение равно не работа
     искателя.
     """
-    return replace(plan, paused=lambda: kit.gate.waiting, tool_timeout_ms=SEEKER_TOOL_TIMEOUT_MS)
+    return replace(plan, paused=lambda: job.nested or kit.gate.waiting,
+                   tool_timeout_ms=SEEKER_TOOL_TIMEOUT_MS)
 
 
 async def run_to_limit(kit: AgentKit, plan: SessionPlan) -> AgentEnd:
-    """Сессия, после которой исчерпанный лимит модели обрывает всю работу.
-
-    Обход источника проверяет лимит позже, после разбора найденного, и зовёт
-    `run_guarded` сам."""
+    """Сессия, после которой исчерпанный лимит модели обрывает всю работу."""
     end = await run_guarded(kit, plan)
     if end.limit_exhausted:
         raise LimitExhausted
+    return end
+
+
+async def run_seeker(kit: AgentKit, job: SeekJob, plan: SessionPlan) -> AgentEnd:
+    """Сессия искателя; беда, снявшая работу посреди цикла находки, поднимается
+    после её конца — агент к тому времени закончил сессию сам."""
+    try:
+        end = await run_to_limit(kit, plan)
+    except Exception as trouble:
+        # Сессия упала уже после беды: та важнее — без неё обход счёл бы
+        # снятую работу сбоем одного источника и пошёл к следующему.
+        raise job.stopper or trouble
+    if job.stopper is not None:
+        raise job.stopper
     return end
 
 

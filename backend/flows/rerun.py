@@ -379,17 +379,15 @@ async def _recover_one(pipeline, row) -> bool:
     завелось второй строкой.
 
     Заведённую человеком подбор дочитывает, но откликателю не отдаёт
-    (`handover.orphan_intake`).
+    (`handover.finish_orphan`).
     """
     judged = await _text_to_judge_by(pipeline, row)
     if judged is None:
         logger.info("recover: vacancy %d ждёт дочитывания статьи", row.id)
         return False
     text, allow_delete = judged
-    intake = await handover.orphan_intake(
-        pipeline, row.id, Intake(channel=row.username or "", allow_delete=allow_delete)
-    )
-    if not await handover.judge_and_hand_over(pipeline, row.id, text, intake):
+    intake = Intake(channel=row.username or "", allow_delete=allow_delete)
+    if not await handover.finish_orphan(pipeline, row.id, text, intake):
         return False
     await _refresh_embedding(pipeline, row.id, text)
     return True

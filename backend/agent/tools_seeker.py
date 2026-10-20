@@ -1,19 +1,24 @@
 """Инструменты искателя: известна ли вакансия и передача найденного в конвейер."""
 
-from collections.abc import Callable
+import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from backend.agent.jobs import SeekJob
 from backend.agent.kit import AgentKit
+from backend.agent.stops import RUN_STOPPERS
 from backend.domain.hosts import owning_host, source_key
 from backend.domain.telegram_identity import TELEGRAM_HOSTS
-from backend.flows import embeddings, intake, sameness
+from backend.flows import embeddings, handover, intake, sameness
+from backend.flows.handover import Intake
 from backend.incoming import moment_or_none, str_list
 from backend.models import ContactAddedBy, Vacancy
 from backend.repository.aggregators import barred_host_of
 from backend.repository.vacancies_life import source_seen
 from backend.repository.vacancy_contacts import add_contact
+
+logger = logging.getLogger(__name__)
 
 WHAT = "найденная агентом вакансия"
 
@@ -21,12 +26,22 @@ BARRED = "сайт в чёрном списке человека"
 
 TELEGRAM_OWN = "у Telegram свой обход"
 
+STOPPED = 'Работа остановлена: заверши сессию — finish с result="failed"'
 
-def seeker_tools(kit: AgentKit, job: SeekJob, queue) -> list[Callable]:
+LIMIT_REACHED = 'предел исчерпан; заверши работу: finish с result="done"'
+
+# Цикл находки уводит вкладку — у отклика свой профиль и свои страницы, — и
+# «назад» по её истории искатель пришёл бы не к выдаче.
+BACK = "вкладка могла уйти: вернись к выдаче — browser_open её адреса — и продолжай со следующей вакансии"
+
+
+def seeker_tools(kit: AgentKit, job: SeekJob) -> list[Callable]:
     """Инструменты искателя, привязанные к своему источнику."""
 
     async def is_known(url: str) -> str:
         """Есть ли вакансия по этому адресу на этом источнике — заведённая или удалённая как мусор."""
+        if job.stopper is not None:
+            return STOPPED
         key, why = await _numbered(kit, job, url)
         if key is None:
             return why
@@ -34,7 +49,7 @@ def seeker_tools(kit: AgentKit, job: SeekJob, queue) -> list[Callable]:
 
     async def submit_vacancy(text: str, url: str, published: str, contacts: list[str]) -> str:
         """Передать вакансию в конвейер: дословный текст страницы, её адрес, дата публикации YYYY-MM-DD или пусто, контакты со страницы."""
-        return await _submit(kit, job, queue, _Page(text, url, published, str_list(contacts)))
+        return await _submit(kit, job, _Page(text, url, published, str_list(contacts)))
 
     return [is_known, submit_vacancy]
 
@@ -47,19 +62,24 @@ class _Page:
     contacts: list[str]
 
 
-async def _submit(kit: AgentKit, job: SeekJob, queue, page: _Page) -> str:
+async def _submit(kit: AgentKit, job: SeekJob, page: _Page) -> str:
     """Повтор по номеру — до предела и до эмбеддинга: он не стоит ни места в пределе, ни вызова модели.
 
     Сайт из отсева — пропуск, а не отказ: отказ обрывает обход, а вакансий с
     других сайтов человек ждёт по-прежнему.
+
+    Новая и брошенная недоразобранной проходят весь цикл до ответа агенту
+    (`_through`): следующую он ищет, когда по этой всё кончено.
     """
+    if job.stopper is not None:
+        return STOPPED
     key, why = await _numbered(kit, job, page.url)
     if key is None:
         return f"пропущена: {why}; иди дальше"
     if await _known(kit, job.source.id, key):
         return _left("повтор", job)
     if job.submitted >= job.limit:
-        return "предел исчерпан; заверши работу: finish с result=\"done\""
+        return LIMIT_REACHED
     try:
         match = await sameness.known_or_new(kit.pipeline, page.text, WHAT)
     except embeddings.ProviderIsSilent:
@@ -67,17 +87,40 @@ async def _submit(kit: AgentKit, job: SeekJob, queue, page: _Page) -> str:
         return "отказ: модель эмбеддингов не отвечает; заверши работу: finish с result=\"failed\""
     if match is None:
         return "пропущена: по тексту не вышло отпечатка; иди дальше"
-    if match.kind == "unparsed" and match.vacancy_id not in job.found:
-        # Своя находка этой сессии недоразобрана лишь потому, что ещё ждёт в очереди.
-        queue.put(match.vacancy_id, page.text)
-    if match.kind != "new":
+    if match.kind == "parsed":
         return _left("повтор", job)
+    if match.kind == "unparsed":
+        return await _through(kit, job, "повтор", handover.finish_orphan(
+            kit.pipeline, match.vacancy_id, page.text, Intake()))
     vacancy_id = await _store(kit, job, page, key, match.embedding)
     job.submitted += 1
-    job.found.append(vacancy_id)
-    queue.put(vacancy_id, page.text)
+    return await _through(kit, job, "принята", handover.judge_and_hand_over(
+        kit.pipeline, vacancy_id, page.text, Intake()))
+
+
+async def _through(kit: AgentKit, job: SeekJob, answer: str, cycle: Awaitable) -> str:
+    """Провести находку по циклу — разбор, оценка, передача, отклик — и вернуть
+    искателю его браузер и полосу.
+
+    Беда, снимающая работу (`RUN_STOPPERS`), снимает и поиск: агент слышит
+    «заверши», а сама беда ждёт конца сессии в `job.stopper`. Прочая беда — одной
+    находки: запись в журнал, и поиск идёт дальше.
+    """
+    job.nested = True
+    try:
+        await cycle
+        said = _left(answer, job)
+    except RUN_STOPPERS as stopper:
+        job.stopper = stopper
+        return STOPPED
+    except Exception:
+        logger.exception("цикл находки искателя на %s: сбой", job.source.name)
+        said = "не вышло: на этой вакансии сбой приложения"
+    finally:
+        job.nested = False
+    await kit.browser.open_profile(job.source.id)
     kit.pipeline.emit_progress("aggregator", job.source.sweep, job.submitted, job.limit)
-    return _left("принята", job)
+    return f"{said}; {LIMIT_REACHED if job.submitted >= job.limit else BACK}"
 
 
 def _left(answer: str, job: SeekJob) -> str:
@@ -118,7 +161,7 @@ async def _store(kit: AgentKit, job: SeekJob, page: _Page, key: str, embedding: 
     Адрес самой страницы ложится и в контакты, первым: человек ищет ссылку на
     вакансию в её контактах, рядом с остальными, а не только в шапке карточки.
 
-    Контакты пишутся до очереди разбора: разбор трогает только свои строки.
+    Контакты пишутся до разбора: разбор трогает только свои строки.
     Одной транзакцией с вакансией их не сделать без пятого довода у
     `intake.save_new_vacancy`; оборвись запись между ними, вакансия останется
     без контактов со страницы, но ссылка на саму страницу — в `source_url`.
