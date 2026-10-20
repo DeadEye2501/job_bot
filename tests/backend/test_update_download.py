@@ -88,3 +88,11 @@ async def test_a_file_held_by_the_system_does_not_spoil_the_outcome(monkeypatch,
 
     assert await download_update(target, _quiet) == "broken"
     assert any("не удалось убрать" in r.getMessage() for r in caplog.records)
+
+
+@pytest.fixture(autouse=True)
+def windows_update_capability(monkeypatch):
+    """Здесь проверяется Windows-протокол скачивания, а не выбор платформы."""
+    monkeypatch.setattr("backend.update_download.supports_updates", lambda: True)
+    monkeypatch.setattr("backend.update_download.can_install_update", lambda: True)
+    monkeypatch.setattr("backend.updater.can_install_update", lambda: True)

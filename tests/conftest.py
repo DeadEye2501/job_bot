@@ -43,6 +43,13 @@ keyring.set_keyring(MEMORY_KEYRING)
 # тестов (до того как pytest-asyncio успевает это состояние сломать),
 # кладёт модуль в кэш `sys.modules` — повторный `import` в фикстуре ниже
 # просто берёт его оттуда.
+import config  # noqa: E402
+
+_NATIVE_USER_DATA_DIR = config._user_data_dir
+# APPDATA is only a test harness convention here, on every host OS.
+# Do this before adapters.telegram computes SESSIONS_DIR during import.
+config._user_data_dir = lambda: Path(os.environ.get("APPDATA", str(TMP_ROOT))) / config.APP_NAME
+
 import adapters.telegram  # noqa: E402, F401 — импорт только ради побочного эффекта
 import httpx2  # noqa: E402
 import pyrogram  # noqa: E402
@@ -77,11 +84,9 @@ def _data_dir_without_appdata() -> Path:
     его решение, и вторая запись разошлась бы с ним молча, оставив охрану
     ниже сторожить каталог, которого больше нет.
     """
-    import config
-
     saved = os.environ.pop("APPDATA", None)
     try:
-        return config._user_data_dir()
+        return _NATIVE_USER_DATA_DIR()
     finally:
         if saved is not None:
             os.environ["APPDATA"] = saved

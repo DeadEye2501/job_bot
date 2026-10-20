@@ -7,7 +7,7 @@ import sys
 
 import pytest
 
-from backend import updater
+from adapters.platforms.windows import updater
 
 REAL_POPEN = subprocess.Popen
 """Настоящий запуск процесса: подменщику его подменяют, а тесту он нужен живым."""
@@ -27,6 +27,8 @@ def app(tmp_path):
 def started(monkeypatch, tmp_path):
     """Что подменщик запустил после замены. Его журнал — в папке теста, и после
     теста обработчик снимается: открытый файл не дал бы её убрать."""
+    if sys.platform != "win32":
+        monkeypatch.setattr(updater, "_wait_for_exit", lambda _pid: None)
     launched = []
     monkeypatch.setattr(updater.subprocess, "Popen", lambda args, **kw: launched.append(args))
     monkeypatch.setattr(updater, "_PAUSE_SEC", 0)
@@ -38,6 +40,7 @@ def started(monkeypatch, tmp_path):
     updater.logger.propagate = True
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="ожидание PID через WinAPI")
 def test_the_copy_waits_for_the_app_to_exit(app, started):
     """Пока приложение не вышло, его exe занят: копия ждёт его процесса."""
     exe, new = app
@@ -111,6 +114,7 @@ def test_a_normal_start_clears_what_the_update_left(leftovers):
     assert not any(path.exists() for path in leftovers)
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows блокирует открытый exe")
 def test_a_copy_still_running_is_left_for_the_next_start(leftovers):
     """Копия выходит сразу после запуска нового exe, и её файл обычно ещё занят:
     запуск от этого не падает, а занятое уберёт следующий."""

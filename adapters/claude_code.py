@@ -8,7 +8,7 @@ API оплачивается отдельно от подписки, а Claude C
 """
 
 import shutil
-from pathlib import Path
+from adapters.platforms import cli as platform_cli
 
 from adapters import claude_code_process
 from adapters.claude import FINISH, split_system
@@ -47,17 +47,9 @@ def make_client(*, timeout: float) -> ClaudeCodeClient:
 
 
 def _find_cli() -> str | None:
-    """Путь к `claude.exe`; пусто — Claude Code не установлен.
-
-    npm кладёт в PATH `.cmd`-обёртку. Через неё доводы шли бы сквозь разбор
-    `cmd.exe`, а при снятии снимался бы `cmd.exe`, оставляя под ним сироту,
-    поэтому берётся настоящий `claude.exe` рядом с ней.
-    """
+    """Найти CLI в PATH и разрешить платформенную обёртку."""
     found = shutil.which("claude")
-    if found is None:
-        return None
-    beside = Path(found).parent / "node_modules" / "@anthropic-ai" / "claude-code" / "bin" / "claude.exe"
-    return str(beside) if beside.is_file() else found
+    return platform_cli.executable(found) if found is not None else None
 
 
 def cli() -> str:

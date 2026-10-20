@@ -106,7 +106,10 @@ def test_a_lock_the_system_will_not_give_does_not_stop_the_launch(
     # Подменяется сам системный зов, а не наш модуль: ввозится он внутри
     # объявления — на чужой системе его не существует вовсе, — и подмена по
     # имени модуля до него не дотянулась бы.
-    monkeypatch.setattr("msvcrt.locking", no_locks_here)
+    if sys.platform == "win32":
+        monkeypatch.setattr("msvcrt.locking", no_locks_here)
+    else:
+        monkeypatch.setattr("fcntl.flock", no_locks_here)
 
     with caplog.at_level(logging.ERROR, logger="backend.single_instance"):
         with hold_the_only_copy(tmp_path / "jobbot.lock"):

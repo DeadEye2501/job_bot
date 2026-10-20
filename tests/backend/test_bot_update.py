@@ -62,3 +62,11 @@ async def test_a_busy_slot_downloads_nothing(make_bot, monkeypatch, tmp_path, ha
 
     assert await download_update(bot) == "busy"
     assert not (tmp_path / "JobBot.exe.new").exists() and handed == []
+
+
+@pytest.fixture(autouse=True)
+def windows_update_capability(monkeypatch):
+    """Здесь проверяется Windows-протокол скачивания, а не выбор платформы."""
+    monkeypatch.setattr("backend.update_download.supports_updates", lambda: True)
+    monkeypatch.setattr("backend.update_download.can_install_update", lambda: True)
+    monkeypatch.setattr("backend.updater.can_install_update", lambda: True)

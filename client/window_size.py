@@ -8,6 +8,8 @@
 
 from __future__ import annotations
 
+from adapters.platforms import window as platform_window
+
 
 WIZARD = (640, 620)
 """Окно мастера.
@@ -46,29 +48,4 @@ def grow_to_main(window) -> None:
 
 
 def _unlock_frame(form) -> None:
-    """Разрешить окну тянуться и поднять ему наименьший размер.
-
-    Рамку, наименьший размер и растягиваемость pywebview отдаёт системе один
-    раз, когда создаёт форму, и своего способа передумать у него нет — отсюда и
-    правка самой формы WinForms напрямую.
-
-    Правится она из потока моста, а форма принимает правку только своим: у
-    WinForms доступ к живому окну не из его потока кончается броском. Отсюда
-    `Invoke` — тот же способ, которым ходит к форме сам pywebview.
-
-    Множитель `_scale` — доля экрана: размеры формы система считает в точках
-    самого экрана, а наши названы в тех, в которых нарисована разметка.
-    """
-    from webview.platforms.winforms import Func, Size, Type, WinForms
-
-    def apply() -> None:
-        form.FormBorderStyle = WinForms.FormBorderStyle.Sizable
-        form.MaximizeBox = True
-        form.MinimumSize = Size(
-            int(MAIN[0] * form._scale), int(MAIN[1] * form._scale)
-        )
-
-    if form.InvokeRequired:
-        form.Invoke(Func[Type](apply))
-    else:
-        apply()
+    platform_window.unlock_frame(form, MAIN)

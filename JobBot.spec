@@ -42,6 +42,9 @@ datas = [
 ]
 
 hiddenimports = [
+    # Реализация ОС выбирается через importlib, её не видно в статическом
+    # графе. Без этого после выделения Windows-модуля exe не найдёт его.
+    *collect_submodules('adapters.platforms.windows'),
     # Async SQLite driver — подгружается через DSN, граф импортов не видит.
     'aiosqlite',
     # Keyring-бэкенды на Windows: 'win32cred' / WinVaultKeyring подбираются

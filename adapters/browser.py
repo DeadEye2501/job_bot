@@ -4,15 +4,15 @@
 import asyncio
 import contextlib
 import logging
-import os
 import shutil
 from collections.abc import Callable
-from dataclasses import dataclass
-from pathlib import Path
 from urllib.parse import urlsplit
 
 from adapters.app_tied_process import tie_to_app
-from adapters.process_windows import has_window
+from adapters.platforms.browser import find_browser as find_browser, has_window as has_window
+from adapters.platforms.browser_types import (
+    BROWSER_NAMES as BROWSER_NAMES, InstalledBrowser as InstalledBrowser,
+)
 from backend.domain.hosts import host_owns
 from config import get_data_dir
 
@@ -34,65 +34,7 @@ class BrowserClosed(RuntimeError):
     """Окно браузера агента закрыл человек: работа остановлена, и открывать его
     снова нельзя до следующей работы."""
 
-_PROGRAMS = ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA")
-
-# Перечень один на поиск и на подсказку человеку: разойдись они — подсказка врала бы.
-BROWSER_NAMES = CHROME, OPERA, BRAVE, VIVALDI, YANDEX, EDGE = (
-    "Chrome", "Opera", "Brave", "Vivaldi", "Яндекс.Браузер", "Edge",
-)
-
-
-@dataclass(frozen=True)
-class InstalledBrowser:
-    name: str
-    channel: str | None
-    executable: Path
-
-
-def find_browser() -> InstalledBrowser | None:
-    """Первый найденный: Chrome, Opera, Brave, Vivaldi, Яндекс.Браузер, Edge.
-
-    Chrome и Edge Playwright водит по имени канала, остальных — по пути к
-    исполняемому файлу. Путь известен у всех: человеку для входа браузер
-    запускается им самим, без Playwright (`BrowserHost.let_person_in`).
-    """
-    for found in (
-        _installed(CHROME, "Google/Chrome/Application/chrome.exe", "chrome"),
-        _opera(),
-        _installed(BRAVE, "BraveSoftware/Brave-Browser/Application/brave.exe"),
-        _installed(VIVALDI, "Vivaldi/Application/vivaldi.exe"),
-        _installed(YANDEX, "Yandex/YandexBrowser/Application/browser.exe"),
-        _installed(EDGE, "Microsoft/Edge/Application/msedge.exe", "msedge"),
-    ):
-        if found is not None:
-            return found
-    return None
-
-
-def _candidates(relative: str) -> list[Path]:
-    return [Path(os.environ[root]) / relative for root in _PROGRAMS if os.environ.get(root)]
-
-
-def _first(relative: str) -> Path | None:
-    return next((path for path in _candidates(relative) if path.is_file()), None)
-
-
-def _installed(name: str, relative: str, channel: str | None = None) -> InstalledBrowser | None:
-    found = _first(relative)
-    return InstalledBrowser(name, channel, found) if found else None
-
-
-def _opera() -> InstalledBrowser | None:
-    """Opera: настоящий opera.exe лежит в папке версии, а верхний — запускающая обёртка."""
-    for home in _candidates("Programs/Opera"):
-        versions = sorted(
-            (d for d in home.glob("*") if d.is_dir() and (d / "opera.exe").is_file()),
-            key=lambda d: [int(p) for p in d.name.split(".") if p.isdigit()],
-        )
-        if versions:
-            return InstalledBrowser(OPERA, None, versions[-1] / "opera.exe")
-    return None
-
+# Общие типы оставлены доступными по прежнему пути импорта.
 
 def remove_profile(profile_id: int) -> None:
     """Снести профиль браузера агрегатора — при удалении агрегатора."""
@@ -213,11 +155,11 @@ class BrowserHost:
         from playwright.async_api import Error as PlaywrightError
         from playwright.async_api import async_playwright
 
-        from adapters.app_tied_process import tie_children_named
+        from adapters.platforms.processes import tie_browser_driver
 
         if self._playwright is None:
             self._playwright = await async_playwright().start()
-            tie_children_named("node.exe")
+            tie_browser_driver()
         self._context = await self._playwright.chromium.launch_persistent_context(
             str(BROWSER_DIR / str(self._profile_id)),
             headless=False,

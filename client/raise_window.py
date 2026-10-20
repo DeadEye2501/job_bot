@@ -35,6 +35,7 @@ import socketserver
 import sys
 import threading
 
+from adapters.platforms import window as platform_window
 from config import APP_NAME, get_data_dir
 
 logger = logging.getLogger(__name__)
@@ -57,11 +58,6 @@ _PORT_COUNT = 10000
 # без него «дозвонился» значило бы всего лишь «на порту кто-то есть».
 _ACK = b"1"
 
-# «Разрешаю кому угодно выйти на передний план» для Windows. Без этого система
-# отклоняет чужой запрос на передний план, и окно первой копии только мигает в
-# панели задач: право на передний план принадлежит той копии, поверх которой
-# человек нажал ярлык, и передать его надо явно.
-_ASFW_ANY = -1
 
 
 def socket_name() -> str:
@@ -180,19 +176,7 @@ def _bring_forward(window) -> None:
 
 
 def _let_the_other_copy_come_forward() -> None:
-    """Отдать право на передний план — иначе окно первой копии только мигнёт.
-
-    Только Windows: на прочих системах права переднего плана так не устроены,
-    и отдавать нечего.
-    """
-    if sys.platform != "win32":
-        return
-    import ctypes
-
-    try:
-        ctypes.windll.user32.AllowSetForegroundWindow(_ASFW_ANY)
-    except (AttributeError, OSError):
-        logger.exception("raise_window: не отдать право на передний план")
+    platform_window.allow_foreground()
 
 
 def ask_to_raise(name: str | None = None) -> bool:

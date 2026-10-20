@@ -60,5 +60,5 @@ def driven_host(monkeypatch, on_closed=lambda: None) -> tuple[BrowserHost, _Play
     """Хозяин браузера на подделке Playwright; второе — она, с запущенными профилями."""
     playwright = _Playwright()
     monkeypatch.setattr("playwright.async_api.async_playwright", lambda: playwright)
-    monkeypatch.setattr("adapters.app_tied_process.tie_children_named", lambda _name: None)
+    monkeypatch.setattr("adapters.platforms.processes.tie_browser_driver", lambda: None)
     return BrowserHost(CHROME, always_visible=True, on_closed=on_closed), playwright

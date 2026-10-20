@@ -96,6 +96,7 @@ async def test_an_unreachable_github_is_an_answer_not_a_refusal(api, ask, monkey
     assert any(r.name == "client.bridge.app_update" for r in caplog.records)
 
 
+@pytest.mark.usefixtures("frozen_app")
 async def test_an_update_before_the_bot_is_up_is_refused_by_name(api, ask):
     """Скачивание занимает место прогона, а оно живёт в боте."""
     answer = await ask(api.system.update)
@@ -111,6 +112,7 @@ def handed_over(hub):
     return done
 
 
+@pytest.mark.usefixtures("frozen_app")
 async def test_a_downloaded_update_closes_the_window(api, ask, with_bot, told, handed_over):
     """Копия-подменщик ждёт выхода приложения, поэтому окно закрывается штатно,
     как крестиком: закрытие гасит бота по-хорошему."""
@@ -124,6 +126,7 @@ async def test_a_downloaded_update_closes_the_window(api, ask, with_bot, told, h
     assert handed_over == ["окно закрыто"]
 
 
+@pytest.mark.usefixtures("frozen_app")
 async def test_a_copy_that_did_not_start_says_so_and_keeps_the_app(api, ask, with_bot, told, handed_over):
     with_bot(update="handoff_failed")
 
@@ -135,6 +138,7 @@ async def test_a_copy_that_did_not_start_says_so_and_keeps_the_app(api, ask, wit
     assert handed_over == []
 
 
+@pytest.mark.usefixtures("frozen_app")
 async def test_a_download_that_did_not_match_says_so_and_keeps_the_app(api, ask, with_bot, told, handed_over):
     with_bot(update="broken")
 
@@ -303,3 +307,18 @@ async def test_a_click_on_the_plate_reaches_the_bot(api, ask, with_bot):
     answer = await ask(api.system.reveal_browser)
 
     assert answer == {"ok": {}} and bot.calls == [("reveal_browser",)]
+
+
+@pytest.fixture(autouse=True)
+def windows_update_backend(monkeypatch):
+    """Сценарии этого файла проверяют поддержанное обновление Windows."""
+    from adapters.platforms import updater as platform_updater
+    from adapters.platforms.windows import updater as windows_updater
+
+    monkeypatch.setattr(platform_updater, "_backend", windows_updater)
+
+
+
+@pytest.fixture
+def frozen_app(monkeypatch):
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
