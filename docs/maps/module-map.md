@@ -681,7 +681,7 @@ init
 - `def scan_tools(kit: AgentKit, job: ScanJob) -> list[Callable]` (21)
   - `async def report_resumes(resumes: list[SeenResume], many_resumes: bool, signs_found: str) -> str` (7)
 
-### `backend/agent/tools_seeker.py` — 245 строк
+### `backend/agent/tools_seeker.py` — 241 строк
 
 Инструменты искателя: известна ли вакансия и передача найденного в конвейер.
 
@@ -691,10 +691,9 @@ init
   - `async def is_known(url: str) -> str` (8)
   - `async def submit_vacancy(text: str, url: str, published: str, contacts: list[str]) -> str` (4)
 - `class _Page` (5)
-- `async def _submit(kit: AgentKit, job: SeekJob, page: _Page) -> str` (31)
-- `async def _submit_page(kit: AgentKit, job: SeekJob, page: _Page) -> str` (29)
+- `async def _submit(kit: AgentKit, job: SeekJob, page: _Page) -> str` (34)
+- `async def _submit_page(kit: AgentKit, job: SeekJob, page: _Page) -> str` (30)
   - `async def save(embedding: list[float]) -> int` (2)
-- `async def _filed(kit: AgentKit, job: SeekJob, page: _Page, key: str, embedding: list[float]) -> str` (6)
 - `async def _through(kit: AgentKit, job: SeekJob, answer: str, cycle: Awaitable) -> str` (23)
 - `def _show_bar(kit: AgentKit, job: SeekJob) -> None` (7)
 - `def _left(answer: str, job: SeekJob) -> str` (2)
@@ -1313,7 +1312,7 @@ First-run bootstrap: ensure DB schema exists.
 Зависит от: —
 
 
-### `backend/domain/telegram_identity.py` — 252 строк
+### `backend/domain/telegram_identity.py` — 251 строк
 
 Правила Telegram по написанному: чей это ник, куда ведёт адрес.
 
@@ -1766,7 +1765,7 @@ First-run bootstrap: ensure DB schema exists.
   - `def dm_hooks(self) -> DmHooks` (6)
   - `async def cancel_pending_dm_classifications(self, *, drain=False) -> None` (2)
 
-### `backend/flows/rerun.py` — 448 строк ⚠ подошёл к 300
+### `backend/flows/rerun.py` — 449 строк ⚠ подошёл к 300
 
 Повторный разбор уже заведённой вакансии.
 
@@ -1786,7 +1785,7 @@ First-run bootstrap: ensure DB schema exists.
 - `async def rerun_pipeline_for_vacancy(pipeline, vacancy_id: int) -> RerunPipelineOutcome` (38)
 - `async def _orphan_rows(pipeline) -> list` (29)
 - `def _wait_is_over(created_at) -> bool` (9)
-- `async def _text_to_judge_by(pipeline, row) -> tuple[str, bool] | None` (27)
+- `async def _text_to_judge_by(pipeline, row) -> tuple[str, bool] | None` (28)
 - `async def _recover_one(pipeline, row) -> bool` (23)
 - `async def recover_orphan_vacancies(pipeline) -> int` (47)
 
@@ -5389,21 +5388,21 @@ Runtime settings layer.
 
 Страница вакансии по ссылке: агент открывает её и заводит вакансию теми же
 
-Зависит от: `backend.flows.hand_outcome`, `backend.flows.handover`, `backend.flows.linked_page`, `backend.models`, `backend.repository.vacancies_new`, `tests.backend.fixtures.parse_stub`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.agent`
+Зависит от: `backend.flows.hand_outcome`, `backend.flows.handover`, `backend.flows.linked_page`, `backend.models`, `backend.repository.vacancies_new`, `tests.backend.fixtures.flows`, `tests.backend.fixtures.parse_stub`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.agent`
 
 Тестов: 17
 
-- `async def page(make_pipeline, session_factory, parsed)` (16)
-  - `async def run(url, steps, hands_over=False, on_kit=None)` (8)
+- `async def page(make_pipeline, session_factory, parsed)` (15)
+  - `async def run(url, steps, hands_over=False, on_kit=None)` (7)
 - `def _submitting(url)` (2)
 
-### `tests/backend/test_flows_new_vacancy.py` — 435 строк ⚠ подошёл к 300
+### `tests/backend/test_flows_new_vacancy.py` — 449 строк ⚠ подошёл к 300
 
 Следствия заведения строки под новое объявление.
 
 Зависит от: `backend.flows`, `backend.models`, `backend.payloads`, `tests.backend.fixtures.flows`, `tests.backend.fixtures.parse_stub`, `tests.dbio`, `tests.factories`, `tests.fakes.telegram`, `tests.fakes.telegram_objects`, `tests.fakes.telegraph`
 
-Тестов: 22
+Тестов: 23
 
 - `async def _orphan_waiting_for_an_article(session_factory, created_at=None)` (15)
 

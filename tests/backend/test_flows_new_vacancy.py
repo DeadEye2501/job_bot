@@ -314,6 +314,20 @@ async def test_an_orphan_that_waited_too_long_is_judged_as_it_is(monkeypatch,
     assert parsed == [(1, WITH_ARTICLE, "jobs", False)]
 
 
+async def test_an_orphan_without_a_post_is_judged_at_once(parsed, make_pipeline, session_factory):
+    """Вставленный текст со статьёй, на котором модель не ответила: перечитывать
+    его неоткуда, и ждать нечего — текст уже собран целиком на приёме."""
+    whole = f"{WITH_ARTICLE}\n\nТребования: опыт от трёх лет"
+    await put(session_factory, vacancy_row(
+        title=None, is_parsed=False, raw_text=whole,
+        created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+    ))
+    pipeline = await make_pipeline()
+
+    assert await pipeline.recover_orphan_vacancies() == 1
+    assert parsed == [(1, whole, "", True)]
+
+
 async def test_a_parsed_vacancy_is_not_picked_up(parsed, make_pipeline, session_factory):
     """Разобранная вакансия повторно не подбирается."""
     await put(session_factory, vacancy_row(title="готова", is_parsed=True, raw_text="т"))

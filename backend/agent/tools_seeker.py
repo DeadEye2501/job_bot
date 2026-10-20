@@ -102,7 +102,10 @@ async def _submit(kit: AgentKit, job: SeekJob, page: _Page) -> str:
     if match.kind == "unparsed":
         return await _through(kit, job, "повтор", handover.finish_orphan(
             kit.pipeline, match.vacancy_id, page.text, job.intake))
-    return await _filed(kit, job, page, key, match.embedding)
+    vacancy_id = await _store(kit, job, page, key, match.embedding)
+    job.submitted += 1
+    return await _through(kit, job, "принята", handover.judge_and_hand_over(
+        kit.pipeline, vacancy_id, page.text, job.intake))
 
 
 async def _submit_page(kit: AgentKit, job: SeekJob, page: _Page) -> str:
@@ -124,8 +127,9 @@ async def _submit_page(kit: AgentKit, job: SeekJob, page: _Page) -> str:
     key = source_key(page.url, job.source.host) if host_owns(owner, normalize_host(page.url)) else None
     if key is None:
         return NOT_THIS_PAGE
-    # Одна страница — одна попытка: итог её окно слышит один раз, чем бы она ни кончилась.
-    job.submitted = job.limit
+    # Одна страница — одна попытка (предел задачи страницы — одна): итог её
+    # окно слышит один раз, чем бы она ни кончилась.
+    job.submitted += 1
     existing = await kit.read(lambda session: source_row(session, job.source.id, key))
     if existing is not None and await handover.known_and_told(kit.pipeline, existing):
         return f"повтор; {LIMIT_REACHED}"
@@ -134,14 +138,6 @@ async def _submit_page(kit: AgentKit, job: SeekJob, page: _Page) -> str:
         return await _store(kit, job, page, key, embedding)
 
     return await _through(kit, job, "принята", pasted.file_by_hand(kit.pipeline, page.text, job.intake, save))
-
-
-async def _filed(kit: AgentKit, job: SeekJob, page: _Page, key: str, embedding: list[float]) -> str:
-    """Завести находку и провести её по циклу."""
-    vacancy_id = await _store(kit, job, page, key, embedding)
-    job.submitted += 1
-    return await _through(kit, job, "принята", handover.judge_and_hand_over(
-        kit.pipeline, vacancy_id, page.text, job.intake))
 
 
 async def _through(kit: AgentKit, job: SeekJob, answer: str, cycle: Awaitable) -> str:

@@ -3,7 +3,7 @@
 
 import pytest
 
-from backend.flows.handover import Intake
+from backend.flows.handover import hand_made_intake
 from backend.flows.hand_outcome import HandResult
 from backend.flows.linked_page import ingest_page
 from backend.models import Vacancy, VacancyEvent, VacancyStatus
@@ -11,6 +11,7 @@ from backend.repository.vacancies_new import HAND_MADE
 from tests.dbio import all_rows, only_row, put
 from tests.factories import blacklist_row, vacancy_row
 from tests.factories_aggregators import aggregator_row, web_search_row
+from tests.backend.fixtures.flows import told_then_applied
 from tests.backend.fixtures.parse_stub import parse_into
 from tests.fakes.agent import finish_step, scripted_kit, submit_step
 
@@ -28,11 +29,10 @@ async def page(make_pipeline, session_factory, parsed):
 
     async def run(url, steps, hands_over=False, on_kit=None):
         kit = scripted_kit(await make_pipeline(), steps)
-        kit.pipeline.told = []
-        kit.pipeline.on_hand_made = kit.pipeline.told.append
+        told_then_applied(kit.pipeline)
         if on_kit is not None:
             on_kit(kit)
-        await ingest_page(kit, url, Intake(hands_over=hands_over, tells_window=True, by_hand=True))
+        await ingest_page(kit, url, hand_made_intake(hands_over))
         return kit
 
     run.web, run.hh = web, hh
