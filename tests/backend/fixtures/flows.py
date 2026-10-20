@@ -163,25 +163,42 @@ def one_vector(monkeypatch) -> list[str]:
     return seen
 
 
+def told_then_applied(pipeline) -> None:
+    """Вести окну (`pipeline.told`) и отклики — в один след `pipeline.order`:
+    по нему видно, что весть ушла раньше отклика. Нужно обоим приёмам ручного
+    заведения — вставленного текста и заявки окна."""
+    pipeline.told = []
+    pipeline.order = []
+
+    def told(result) -> None:
+        pipeline.told.append(result)
+        pipeline.order.append("весть")
+
+    async def apply(ids):
+        pipeline.applied.append(ids)
+        pipeline.order.append("отклик")
+
+    pipeline.on_hand_made = told
+    pipeline.apply = apply
+
+
 def similar_by_hand(pipeline, monkeypatch) -> None:
     """Похожую заведённую вакансию и её разобранность задаёт тест.
 
     `pipeline.similar_id` — что найдёт поиск похожих, `pipeline.unparsed` —
     брошена ли она недоразобранной. Вместе они и есть ответ отсева повторов,
-    общего у вставки и приёма поста. `pipeline.same_text` — не просто похожа,
-    а тот же текст: только такую узнаёт ручное заведение (`SAME_TEXT_COSINE`).
+    общего у вставки и приёма поста. Найденная — похожая, а не тот же текст:
+    тот же текст ручное заведение ищет своим порогом (`SAME_TEXT_COSINE`), и
+    на него подделка не отвечает.
     """
     pipeline.similar_id = None
     pipeline.unparsed = False
-    pipeline.same_text = False
 
     async def unparsed(_pipeline, _vacancy_id):
         return pipeline.unparsed
 
     def match(vector, threshold):
-        if threshold >= SAME_TEXT_COSINE and not pipeline.same_text:
-            return None
-        return pipeline.similar_id
+        return None if threshold >= SAME_TEXT_COSINE else pipeline.similar_id
 
     monkeypatch.setattr(pipeline.embeddings, "match", match)
     monkeypatch.setattr(parse_mod, "is_unparsed_vacancy", unparsed)

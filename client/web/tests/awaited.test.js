@@ -4,18 +4,12 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { awaited, hearAwaited } from '$state/awaited.svelte.js';
 
-/** Слушатель вестей, которым тест сам доставляет вести. */
+import { listening } from './bridge_stub.js';
+
+/** Слушатель вестей (`listening`), которым тест сам доставляет итог работы. */
 function news() {
-  const heard = new Map();
-  return {
-    events: {
-      on(kind, hear) {
-        heard.set(kind, hear);
-        return () => heard.delete(kind);
-      },
-    },
-    finished: (payload) => heard.get('action_finished')?.(payload),
-  };
+  const events = listening();
+  return { events, finished: (payload) => events.fire('action_finished', payload) };
 }
 
 let deaf = () => {};

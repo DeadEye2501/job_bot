@@ -90,18 +90,6 @@ async def _raced(session: asyncio.Task, expiry: asyncio.Task, paused) -> set:
     return set()
 
 
-def seeker_plan(kit: AgentKit, job: SeekJob, plan: SessionPlan) -> SessionPlan:
-    """План сессии искателя: его срок не течёт, пока идёт цикл находки или ждут
-    человека, и вызов инструмента не ограничен сроком.
-
-    Ожидание человека — общее у искателя и вложенного в его вызов откликателя:
-    набор у них один (`bot.kit`), и капча, вход и подтверждение равно не работа
-    искателя.
-    """
-    return replace(plan, paused=lambda: job.nested or kit.gate.waiting,
-                   tool_timeout_ms=SEEKER_TOOL_TIMEOUT_MS)
-
-
 async def run_to_limit(kit: AgentKit, plan: SessionPlan) -> AgentEnd:
     """Сессия, после которой исчерпанный лимит модели обрывает всю работу."""
     end = await run_guarded(kit, plan)
@@ -112,7 +100,15 @@ async def run_to_limit(kit: AgentKit, plan: SessionPlan) -> AgentEnd:
 
 async def run_seeker(kit: AgentKit, job: SeekJob, plan: SessionPlan) -> AgentEnd:
     """Сессия искателя; беда, снявшая работу посреди цикла находки, поднимается
-    после её конца — агент к тому времени закончил сессию сам."""
+    после её конца — агент к тому времени закончил сессию сам.
+
+    Срок искателя не течёт, пока идёт цикл находки или ждут человека, и вызов
+    инструмента сроком не ограничен. Ожидание человека — общее у искателя и
+    вложенного в его вызов откликателя: набор у них один (`bot.kit`), и капча,
+    вход и подтверждение равно не работа искателя.
+    """
+    plan = replace(plan, paused=lambda: job.nested or kit.gate.waiting,
+                   tool_timeout_ms=SEEKER_TOOL_TIMEOUT_MS)
     try:
         end = await run_to_limit(kit, plan)
     except Exception as trouble:

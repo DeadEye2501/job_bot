@@ -115,15 +115,9 @@ export function contactAdding({ list, form, save, say, held = ownDraft(form), ke
   };
 }
 
-/** Черновик, который живёт с самим окном заведения. */
+/** Черновик, который живёт с самим окном заведения, — того же вида, что держит
+ *  оболочка у окна вакансии (`heldMemory().newVacancy`). */
 function ownDraft(form) {
-  let draft = $state(form.blank());
-  return {
-    get draft() {
-      return draft;
-    },
-    set draft(value) {
-      draft = value;
-    },
-  };
+  const held = $state({ draft: form.blank() });
+  return held;
 }

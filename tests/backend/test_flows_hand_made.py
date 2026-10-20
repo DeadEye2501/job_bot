@@ -13,6 +13,7 @@ from backend.flows.hand_outcome import HandResult
 from backend.models import Vacancy, VacancyEvent
 from backend.repository.vacancies_new import HAND_MADE
 from backend.telegram_time import tg_moment
+from tests.backend.fixtures.flows import told_then_applied
 from tests.dbio import all_rows, only_row, put
 from tests.factories import channel_row, vacancy_row
 from tests.fakes.agent import kit_for
@@ -35,19 +36,7 @@ def _fields(**overrides) -> dict:
 async def filing(make_pipeline):
     """Конвейер, у которого весть окну и отклик пишутся в один след `order`."""
     pipeline = await make_pipeline()
-    pipeline.told = []
-    pipeline.order = []
-
-    def told(result):
-        pipeline.told.append(result)
-        pipeline.order.append("весть")
-
-    async def apply(ids):
-        pipeline.applied.append(ids)
-        pipeline.order.append("отклик")
-
-    pipeline.on_hand_made = told
-    pipeline.apply = apply
+    told_then_applied(pipeline)
     return pipeline
 
 

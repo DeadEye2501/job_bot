@@ -12,8 +12,6 @@ from backend.flows.hand_made import HandRequest
 
 logger = logging.getLogger(__name__)
 
-TOLD = work.TOLD
-
 PastedOutcome = Literal[work.WorkOutcome, "told", "locked"]
 """Чем кончилась работа заведения, как это видит окно.
 
@@ -43,11 +41,12 @@ async def ui_ingest_pasted_text(bot, request: HandRequest) -> PastedOutcome:
     logger.info("UI hand-made vacancy from tab %s", request.tab)
     bot.ingestion.hand_made_told = False
 
-    # Сказан ли итог, решается здесь одном: работа, кончившаяся без вести, —
-    # беда, которой окно иначе не услышало бы вовсе.
+    # Сказан ли итог, решается одной строкой ниже: работа, дошедшая до конца,
+    # отвечает бедой, и её перекрывает сказанный итог — без него кончившаяся
+    # молча работа осталась бы окну неслышной.
     async def job(kit) -> str:
         await hand_made.ingest_by_hand(kit, request)
-        return TOLD if bot.ingestion.hand_made_told else "error"
+        return "error"
 
     outcome = await work.in_slot(bot, job, "ingest by hand")
-    return TOLD if bot.ingestion.hand_made_told else outcome
+    return work.TOLD if bot.ingestion.hand_made_told else outcome
