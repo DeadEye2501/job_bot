@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 
 from backend.domain.contact_keys import contact_key, is_address, is_link
-from backend.domain.hosts import page_owner
+from backend.domain.hosts import on_telegram, page_owner
 from backend.domain.spellings import dedupe_first_wins
 from backend.models import ApplicationVia
 
@@ -114,4 +114,6 @@ def _links(vacancy: VacancyFacts) -> list[str]:
 
 
 def _contact_links(vacancy: VacancyFacts) -> list[str]:
-    return [c.strip() for c in vacancy.contacts if is_link(c)]
+    """Ссылки из контактов — кроме Telegram: та — контакт Telegram, из неё
+    заводится HR, и пишут ему письмом в Telegram, а не формой в браузере."""
+    return [c.strip() for c in vacancy.contacts if is_link(c) and not on_telegram(c)]

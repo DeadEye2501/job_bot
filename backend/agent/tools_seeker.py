@@ -127,8 +127,8 @@ async def _submit_page(kit: AgentKit, job: SeekJob, page: _Page) -> str:
     # Одна страница — одна попытка: итог её окно слышит один раз, чем бы она ни кончилась.
     job.submitted = job.limit
     existing = await kit.read(lambda session: source_row(session, job.source.id, key))
-    if existing is not None:
-        return await _through(kit, job, "повтор", handover.tell_known(kit.pipeline, existing))
+    if existing is not None and await handover.known_and_told(kit.pipeline, existing):
+        return f"повтор; {LIMIT_REACHED}"
 
     async def save(embedding: list[float]) -> int:
         return await _store(kit, job, page, key, embedding)

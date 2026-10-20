@@ -51,7 +51,7 @@ async def ingest_pasted_text(
     перепостов, и то же объявление, пришедшее следом из канала, завелось бы
     второй раз. Похожую заведённую он не ищет: сходство однозначного повтора
     не даёт, и вставленное человеком заводится своей строкой, а с чужой
-    брошенной не сливается — её доберёт подбор недоразобранного.
+    брошенной не сливается. Повтор — только тот же текст (`file_by_hand`).
 
     Отдавать ли откликателю (`hands_over`), решал человек переключателем окна.
     """
@@ -82,12 +82,18 @@ async def file_by_hand(
     `save` пишет строку по отпечатку и называет её номер; пусто — не
     записана, и сказал об этом уже он сам.
 
+    Отпечаток в той же точке, что у заведённой, — тот же текст, однозначный
+    повтор (`handover.known_and_told`); просто похожий — своя строка.
+
     Слепки перечитываются перед разбором: наполняет их только перечитывание,
     а зовут его не во всяком режиме бота, и балл по пустым вышел бы нулевым.
     """
     embedding = await embeddings.embed_or_none(pipeline, text, BY_HAND)
     if embedding is None:
         tell(pipeline, "embed")
+        return
+    same = await embeddings.similar_vacancy_id(pipeline, embedding, embeddings.SAME_TEXT_COSINE)
+    if same is not None and await handover.known_and_told(pipeline, same):
         return
     vacancy_id = await save(embedding)
     if vacancy_id is None:

@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import logging
 
+from backend.domain.hosts import typed_page
 from backend.domain.scoring import build_skill_lookup
 from backend.models import VacancyStatus
 from backend.repository import (
     applications,
     profile_skills as skills_repo,
     vacancies_card,
+    vacancies_life,
     vacancies_list,
     vacancy_status,
 )
@@ -37,7 +39,7 @@ from client.bridge.refusals import (
     agent_refusals,
 )
 from client.bridge.page import read_page
-from client.bridge.vacancy_actions import VacancyActions
+from client.bridge.vacancy_actions import VacancyActions, forgotten
 from client.bridge.vacancy_contacts import VacancyContacts
 from client.bridge.vacancy_filter import read_vacancy_filter
 from client.bridge.vacancy_links import VacancyLinks, require_vacancy
@@ -308,6 +310,12 @@ class Vacancies(VacancyActions, VacancyLinks, VacancyContacts):
             )
 
         async def run() -> dict:
+            # Недоразобранная на той же странице прав не имеет: набранное её
+            # затирает, а не уводит на карточку, которой в списке не видно.
+            async with self._hub.session_factory() as session:
+                stale = await vacancies_life.unparsed_at_address(session, typed_page(fields["source_url"]))
+            if stale is not None:
+                await forgotten(self._hub, stale)
             result = await hand_made.file_fields(self._hub.session_factory, fields)
             created = result.outcome == "ok"
             if created:

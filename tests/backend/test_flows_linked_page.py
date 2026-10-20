@@ -139,15 +139,17 @@ async def test_a_silent_embedder_tells_once_and_closes_the_page(page, session_fa
     assert "предел исчерпан" in answers[1]
 
 
-async def test_a_same_source_duplicate_of_an_unparsed_row_finishes_it(page, session_factory, parsed):
-    existing = vacancy_row(source_aggregator_id=page.web.id, source_key="company.test/careers/qa",
-                           is_parsed=False, raw_text="Ищем QA")
-    await put(session_factory, existing)
+async def test_a_same_source_unparsed_row_is_replaced(page, session_factory, parsed):
+    """Недоразобранная того же источника прав не имеет: её сносят и заводят
+    страницу заново."""
+    stale = vacancy_row(source_aggregator_id=page.web.id, source_key="company.test/careers/qa",
+                        is_parsed=False, raw_text="старый текст")
+    await put(session_factory, stale)
 
     kit = await page(COMPANY_PAGE, [_submitting(COMPANY_PAGE)])
 
-    assert [one[0] for one in parsed] == [existing.id]
-    assert kit.pipeline.told == [HandResult("duplicate", existing.id)] and kit.pipeline.applied == []
+    saved = await only_row(session_factory, Vacancy)
+    assert saved.raw_text == "Ищем QA в команду" and kit.pipeline.told == [HandResult("ok", saved.id)]
 
 
 async def test_a_vacancy_of_another_site_is_not_this_page(page, session_factory):
@@ -177,7 +179,7 @@ async def test_a_blacklisted_site_is_filed_by_hand(page, session_factory, parsed
 
 async def test_a_page_like_an_orphan_gets_its_own_row(page, session_factory, parsed):
     """Сходство однозначного повтора не даёт: своя строка, брошенная похожая цела."""
-    orphan = vacancy_row(is_parsed=False, embedding=[0.1, 0.2], raw_text="Ищем QA")
+    orphan = vacancy_row(is_parsed=False, embedding=[0.1, 0.25], raw_text="Ищем QA")
     await put(session_factory, orphan)
 
     await page(COMPANY_PAGE, [_submitting(COMPANY_PAGE)])

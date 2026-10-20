@@ -6,8 +6,9 @@
 """
 
 from backend.flows.hand_made import HandRequest
-from tests.dbio import put
-from tests.factories import company_row, hr_row, profile_row, profile_skill_row
+from backend.models import Vacancy
+from tests.dbio import all_rows, put
+from tests.factories import company_row, hr_row, profile_row, profile_skill_row, vacancy_row
 
 
 async def created(ask, api, **fields) -> int:
@@ -341,6 +342,19 @@ async def test_a_page_filed_before_is_not_filed_again(api, ask):
     assert answer["ok"]["message"] == "Такая вакансия уже существует"
     listed = await ask(api.vacancies.list, {})
     assert [row["id"] for row in listed["ok"]["vacancies"]] == [existing]
+
+
+async def test_an_unparsed_row_at_the_typed_page_is_replaced(api, ask, session_factory):
+    """Недоразобранная прав не имеет: набранное в «Полях» её затирает, а не
+    уводит на карточку, которой в списке не видно."""
+    stale = vacancy_row(is_parsed=False, raw_text="шапка", source_url="https://hh.ru/vacancy/5")
+    await put(session_factory, stale)
+
+    answer = await ask(api.vacancies.create, {"title": "Python", "source_url": "https://hh.ru/vacancy/5"})
+
+    assert answer["ok"]["created"] is True
+    (saved,) = await all_rows(session_factory, Vacancy)
+    assert (saved.id, saved.title) == (answer["ok"]["created_id"], "Python")
 
 
 async def test_a_new_page_is_filed(api, ask):
