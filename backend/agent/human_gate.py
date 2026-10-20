@@ -53,6 +53,11 @@ class HumanGate:
         self._showing: set[asyncio.Task] = set()
         self.expired = asyncio.Event()
 
+    @property
+    def waiting(self) -> bool:
+        """Ждёт ли сейчас кто-нибудь человека — по живым вызовам ожидания."""
+        return self._waiting > 0
+
     async def wait(self, kind: str, host: str, browser=None, payload=None) -> str | dict:
         """Ждать человека. Повторный зов во время ожидания ждёт того же срока.
 

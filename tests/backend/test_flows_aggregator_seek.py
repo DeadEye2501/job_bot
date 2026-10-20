@@ -4,6 +4,7 @@
 import pytest
 
 from backend.agent.jobs import Source
+from backend.agent.sessions import SEEKER_TOOL_TIMEOUT_MS
 from backend.agent.stops import HumanTimeout, LimitExhausted
 from backend.flows.aggregator_round import seek_source
 from backend.models import Aggregator, ProfileLanguage, Vacancy
@@ -158,6 +159,17 @@ async def test_the_web_seeker_searches_the_web_and_avoids_the_persons_aggregator
 
     (plan,) = kit.run_session.plans
     assert plan.web_search is True and "board.test" in plan.task
+
+
+@pytest.mark.parametrize("host", ["site.test", None], ids=["агрегатор", "поиск по сети"])
+async def test_the_seekers_clock_stands_while_a_person_is_awaited(seek, parsed, host):
+    """Срок искателя меряет только его работу: пока ждут человека, он стоит, а
+    вызов инструмента сроком не ограничен — в нём идёт весь цикл находки."""
+    _, _, kit = await seek([finish_step()], host=host)
+
+    (plan,) = kit.run_session.plans
+    assert plan.tool_timeout_ms == SEEKER_TOOL_TIMEOUT_MS
+    assert plan.paused() is kit.gate.waiting
 
 
 async def test_the_web_seeker_is_told_to_keep_off_telegram(seek, parsed):

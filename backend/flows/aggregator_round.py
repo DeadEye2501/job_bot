@@ -11,7 +11,7 @@ from backend.agent.prompts.frame import system_prompt
 from backend.agent.prompts.seeker import (
     SEEKER_PROMPT, WEB_SEEKER_PROMPT, SeekBounds, seeker_task, web_seeker_task,
 )
-from backend.agent.sessions import end_reason, run_guarded
+from backend.agent.sessions import end_reason, run_guarded, seeker_plan
 from backend.agent.stops import RUN_STOPPERS, LimitExhausted
 from backend.agent.tools_browser import browser_tools
 from backend.agent.tools_common import common_tools
@@ -76,12 +76,12 @@ async def _seek_plan(kit: AgentKit, job: SeekJob, queue: ParseQueue) -> SessionP
     bounds = SeekBounds(source.last_run_at, job.limit, kit.today, await kit.read(read_search_languages))
     if source.host is not None:
         task = seeker_task(source.host, bounds)
-        return SessionPlan(system_prompt(SEEKER_PROMPT, tools), task, tools, web_search=False)
+        return seeker_plan(kit, SessionPlan(system_prompt(SEEKER_PROMPT, tools), task, tools, web_search=False))
     async with kit.pipeline.session_factory() as session:
         hosts = [a.host for a in await list_aggregators(session) if a.host] + sorted(TELEGRAM_HOSTS)
         barred = sorted(await barred_hosts(session))
     task = web_seeker_task(hosts, barred, bounds)
-    return SessionPlan(system_prompt(WEB_SEEKER_PROMPT, tools), task, tools, web_search=True)
+    return seeker_plan(kit, SessionPlan(system_prompt(WEB_SEEKER_PROMPT, tools), task, tools, web_search=True))
 
 
 async def _settle(kit: AgentKit, job: SeekJob, end: AgentEnd, started: datetime) -> None:

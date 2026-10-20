@@ -28,13 +28,15 @@ class AgentEnd:
 
 @dataclass(frozen=True)
 class AgentRun:
-    """Одна сессия: наставление, задание, адрес MCP-сервера её инструментов, модель, поиск в сети."""
+    """Одна сессия: наставление, задание, адрес MCP-сервера её инструментов, модель,
+    поиск в сети и срок одного вызова инструмента (пусто — срок процесса)."""
 
     system_prompt: str
     task: str
     mcp_url: str
     model: str
     web_search: bool
+    tool_timeout_ms: int | None = None
 
 
 async def run_agent(run: AgentRun) -> AgentEnd:
@@ -74,10 +76,17 @@ def _argv(cli: str, run: AgentRun) -> list[str]:
 
     `--allowedTools` обязателен: без него каждый вызов инструмента ждал бы
     разрешения, а в режиме `-p` дать его некому.
+
+    Свой срок вызова задаётся ключом сервера, а не окружением: окружение общее
+    для всего процесса, а ключ сервера снимает у Claude Code и срок простоя
+    вызова — сервер отвечает одним ответом и о ходе работы не сообщает.
     """
     builtins = "WebSearch" if run.web_search else ""
     allowed = f"mcp__{SERVER_NAME}" + (",WebSearch" if run.web_search else "")
-    config = json.dumps({"mcpServers": {SERVER_NAME: {"type": "http", "url": run.mcp_url}}})
+    server = {"type": "http", "url": run.mcp_url}
+    if run.tool_timeout_ms is not None:
+        server["timeout"] = run.tool_timeout_ms
+    config = json.dumps({"mcpServers": {SERVER_NAME: server}})
     return [
         *claude_code_process.stream_argv(cli, run.model, run.system_prompt, builtins),
         "--allowedTools", allowed, "--mcp-config", config,

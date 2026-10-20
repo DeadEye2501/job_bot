@@ -14,14 +14,25 @@ from backend.flows.pipeline import IngestionPipeline
 from backend.repository.agent_profile import build_agent_profile
 
 
+def _never() -> bool:
+    return False
+
+
 @dataclass(frozen=True)
 class SessionPlan:
-    """Одна сессия агента: наставление, задание, инструменты с подписями, поиск в сети."""
+    """Одна сессия агента: наставление, задание, инструменты с подписями, поиск в сети.
+
+    `paused()` — стоит ли сейчас работа самой сессии: тогда её срок не течёт.
+    `tool_timeout_ms` — срок одного вызова инструмента; пусто — общий срок
+    процесса агента (`claude_code_agent`).
+    """
 
     system_prompt: str
     task: str
     tools: list[Callable]
     web_search: bool
+    paused: Callable[[], bool] = _never
+    tool_timeout_ms: int | None = None
 
 
 RunSession = Callable[[SessionPlan], Awaitable[AgentEnd]]

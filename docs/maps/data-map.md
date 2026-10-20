@@ -103,6 +103,7 @@
   - `mcp_url: str`
   - `model: str`
   - `web_search: bool`
+  - `tool_timeout_ms: int | None` = `None`
 
 ### `adapters/claude_code_process.py`
 
@@ -334,6 +335,8 @@
   - `task: str`
   - `tools: list[Callable]`
   - `web_search: bool`
+  - `paused: Callable[[], bool]` = `_never`
+  - `tool_timeout_ms: int | None` = `None`
 - `RunSession` = `Callable[[SessionPlan], Awaitable[AgentEnd]]`
 - `T` = `TypeVar('T')`
 - `class AgentKit`
@@ -411,6 +414,8 @@
 ### `backend/agent/sessions.py`
 
 - `SESSION_LIMIT_SEC` = `3 * 3600`
+- `_TICK_SEC` = `1.0`
+- `SEEKER_TOOL_TIMEOUT_MS` = `2 ** 31 - 1`
 
 ### `backend/agent/stops.py`
 

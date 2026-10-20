@@ -3,6 +3,8 @@
 import asyncio
 from dataclasses import replace
 
+import anyio
+
 from adapters.agent_mcp import serve_tools
 from adapters.claude_code_agent import AgentEnd, AgentRun, run_agent
 from backend.agent.jobs import Finished
@@ -18,12 +20,24 @@ from backend.task_stop import put_out
 # каналов, бессрочно. Час из срока может уйти на ожидание человека.
 SESSION_LIMIT_SEC = 3 * 3600
 
+# Шаг, которым отсчитывается срок: стоящая сессия (`SessionPlan.paused`) за
+# шаг не тратит ничего, и мельче он нужен только тестам.
+_TICK_SEC = 1.0
 
+# Срок вызова инструмента у искателя — снят: внутри вызова идёт весь цикл
+# находки до отклика и ожидания человека, у каждого способа отклика свой срок,
+# и верхней границы у их суммы нет. Выход из зависшего — «Стоп».
+SEEKER_TOOL_TIMEOUT_MS = 2**31 - 1
 
 
 async def run_guarded(kit: AgentKit, plan: SessionPlan) -> AgentEnd:
     """Сессия наперегонки со сроками. Отмена снаружи гасит сессию и ждёт её конца:
     агент не успеет записать отклик после остановки.
+
+    Ждётся конец под щитом: вложенную сессию — отклик посреди вызова инструмента
+    искателя — гасит закрытие его сервера, а отмена оттуда повторяется на каждом
+    ожидании, и без щита сессию отклика никто бы не дождался — она дорабатывала
+    бы в том же браузере, что и следующий поиск.
 
     Язык человека вписывается в рамку здесь: сюда приходит каждая сессия, а
     собирают рамку синхронно, без базы."""
@@ -32,11 +46,10 @@ async def run_guarded(kit: AgentKit, plan: SessionPlan) -> AgentEnd:
     session = asyncio.create_task(kit.run_session(plan))
     expiry = asyncio.create_task(kit.gate.expired.wait())
     try:
-        done, _ = await asyncio.wait(
-            {session, expiry}, timeout=SESSION_LIMIT_SEC, return_when=asyncio.FIRST_COMPLETED
-        )
+        done = await _raced(session, expiry, plan.paused)
     except asyncio.CancelledError:
-        await put_out(session)
+        with anyio.CancelScope(shield=True):
+            await put_out(session)
         raise
     finally:
         expiry.cancel()
@@ -49,6 +62,37 @@ async def run_guarded(kit: AgentKit, plan: SessionPlan) -> AgentEnd:
     if session in done:
         return session.result()
     return AgentEnd(False, "сессия агента превысила срок", False)
+
+
+async def _raced(session: asyncio.Task, expiry: asyncio.Task, paused) -> set:
+    """Дождаться сессии или истёкшего ожидания человека; пусто — срок вышел.
+
+    Срок отсчитывается шагами и тратится только на шаги, когда сессия не
+    стоит: стоящую ждут, сколько бы она ни стояла.
+    """
+    loop = asyncio.get_running_loop()
+    left = SESSION_LIMIT_SEC
+    while left > 0:
+        began = loop.time()
+        done, _ = await asyncio.wait(
+            {session, expiry}, timeout=min(_TICK_SEC, left), return_when=asyncio.FIRST_COMPLETED
+        )
+        if done:
+            return done
+        if not paused():
+            left -= loop.time() - began
+    return set()
+
+
+def seeker_plan(kit: AgentKit, plan: SessionPlan) -> SessionPlan:
+    """План сессии искателя: его срок не течёт, пока ждут человека, и вызов
+    инструмента не ограничен сроком.
+
+    Ожидание человека — общее у искателя и вложенного в его вызов откликателя:
+    набор у них один (`bot.kit`), и капча, вход и подтверждение равно не работа
+    искателя.
+    """
+    return replace(plan, paused=lambda: kit.gate.waiting, tool_timeout_ms=SEEKER_TOOL_TIMEOUT_MS)
 
 
 async def run_to_limit(kit: AgentKit, plan: SessionPlan) -> AgentEnd:
@@ -86,7 +130,7 @@ def live_session(model: str) -> RunSession:
         server = await serve_tools(plan.tools)
         try:
             return await run_agent(AgentRun(plan.system_prompt, plan.task, server.url,
-                                            model, plan.web_search))
+                                            model, plan.web_search, plan.tool_timeout_ms))
         finally:
             await server.close()
 

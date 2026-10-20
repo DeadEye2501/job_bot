@@ -29,6 +29,21 @@ async def test_ready_lets_the_agent_go_on():
     assert browser.calls == ["show", "hide"]
 
 
+async def test_the_gate_tells_whether_someone_is_waiting_for_the_person():
+    """Пока ждут человека, срок сессии искателя стоит: ждать его — не работа
+    искателя."""
+    gate, _told = _gate()
+    assert gate.waiting is False
+
+    waiting = asyncio.create_task(gate.wait("captcha", "site.test", FakeBrowser()))
+    await asyncio.sleep(0)
+    assert gate.waiting is True
+
+    gate.resolve()
+    await waiting
+    assert gate.waiting is False
+
+
 async def test_a_wait_with_data_returns_what_the_window_answered():
     """Данные уходят окну вместе с зовом, ответ окна возвращается ждавшему как есть."""
     gate, told = _gate()

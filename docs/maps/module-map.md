@@ -132,17 +132,17 @@ Claude через установленный Claude Code по подписке: 
 - `async def list_models(_client: ClaudeCodeClient) -> list[str]` (4)
 - `async def ping(client: ClaudeCodeClient, model: str, text: str) -> None` (3)
 
-### `adapters/claude_code_agent.py` — 89 строк
+### `adapters/claude_code_agent.py` — 98 строк
 
 Сессия агента в своём процессе Claude Code: инструменты приложения, без чужих настроек.
 
 Зависит от: `adapters`, `adapters.agent_mcp`
 
 - `class AgentEnd` (6)
-- `class AgentRun` (8)
+- `class AgentRun` (10)
 - `async def run_agent(run: AgentRun) -> AgentEnd` (19)
 - `def _end(data: dict) -> AgentEnd` (9)
-- `def _argv(cli: str, run: AgentRun) -> list[str]` (13)
+- `def _argv(cli: str, run: AgentRun) -> list[str]` (20)
 - `def _env() -> dict` (3)
 
 ### `adapters/claude_code_process.py` — 270 строк
@@ -383,7 +383,7 @@ init
 - `async def confirmed(kit: AgentKit, vacancy_id: int, items: list[ShownItem]) -> list[ShownItem] | Dropped` (6)
 - `async def ask_person(kit: AgentKit, vacancy_id: int, items: list[ShownItem]) -> list[ShownItem] | Dropped` (9)
 
-### `backend/agent/human_gate.py` — 170 строк
+### `backend/agent/human_gate.py` — 175 строк
 
 Ожидание человека: капча, слетевший вход или подтверждение отправки. Срок — час
 
@@ -392,7 +392,8 @@ init
 - `class _NoBrowser` (8)
   - `async def show(self) -> None` (2)
   - `async def hide_back(self) -> None` (2)
-- `class HumanGate` (140)
+- `class HumanGate` (145)
+  - `def waiting(self) -> bool` (3)
   - `async def wait(self, kind: str, host: str, browser=None, payload=None) -> str | dict` (27)
   - `async def ask(self, kind: str, host: str, payload: dict) -> dict | None` (11)
   - `async def _arm(self, kind: str, host: str, browser, payload) -> bool` (16)
@@ -422,13 +423,14 @@ init
 - `class ApplyJob` (29)
 - `class FillJob` (24)
 
-### `backend/agent/kit.py` — 61 строк
+### `backend/agent/kit.py` — 72 строк
 
 Набор, с которым работает сессия агента.
 
 Зависит от: `adapters.browser`, `adapters.claude_code_agent`, `backend.agent.human_gate`, `backend.flows.pipeline`, `backend.repository.agent_profile`
 
-- `class SessionPlan` (7)
+- `def _never() -> bool` (2)
+- `class SessionPlan` (14)
 - `class AgentKit` (29)
   - `async def written(self, write: Callable[[AsyncSession], Awaitable[T]]) -> T` (9)
   - `async def read(self, query: Callable[[AsyncSession], Awaitable[T]]) -> T` (4)
@@ -520,13 +522,15 @@ init
 
 - `def guide_lines(host: str | None) -> list[str]` (6)
 
-### `backend/agent/sessions.py` — 93 строк
+### `backend/agent/sessions.py` — 137 строк
 
 Сессия агента под надзором: сервер, водитель, срок человека и общий срок.
 
 Зависит от: `adapters.agent_mcp`, `adapters.claude_code_agent`, `backend.agent.jobs`, `backend.agent.kit`, `backend.agent.prompts.frame`, `backend.agent.stops`, `backend.agent.tools_common`, `backend.llm.rules`, `backend.repository.profile_languages`, `backend.task_stop`
 
-- `async def run_guarded(kit: AgentKit, plan: SessionPlan) -> AgentEnd` (28)
+- `async def run_guarded(kit: AgentKit, plan: SessionPlan) -> AgentEnd` (32)
+- `async def _raced(session: asyncio.Task, expiry: asyncio.Task, paused) -> set` (18)
+- `def seeker_plan(kit: AgentKit, plan: SessionPlan) -> SessionPlan` (9)
 - `async def run_to_limit(kit: AgentKit, plan: SessionPlan) -> AgentEnd` (9)
 - `async def run_on_site(kit: AgentKit, job, prompt: str, task: str, *own_tools) -> AgentEnd` (8)
 - `def end_reason(job, end: AgentEnd) -> str` (5)
@@ -4065,13 +4069,13 @@ Runtime settings layer.
 - `def _client() -> ClaudeCodeClient` (2)
 - `def _model_of(process) -> str` (3)
 
-### `tests/adapters/test_claude_code_agent.py` — 128 строк
+### `tests/adapters/test_claude_code_agent.py` — 150 строк
 
 Сессия агента: отдельный процесс Claude Code с инструментами приложения.
 
 Зависит от: `adapters.claude_code_agent`, `adapters.claude_code_process`, `backend.agent.prompts.applier`, `backend.agent.prompts.frame`, `tests.fakes`
 
-Тестов: 11
+Тестов: 13
 
 
 ### `tests/adapters/test_cv_text.py` — 299 строк
@@ -4397,13 +4401,13 @@ Runtime settings layer.
 
 - `async def _applier(make_pipeline, session_factory, answer, *, confirming=True, fields=None)` (10)
 
-### `tests/backend/test_agent_human_gate.py` — 271 строк
+### `tests/backend/test_agent_human_gate.py` — 286 строк
 
 Пауза на человека: браузер виден, окно знает, срок — час.
 
 Зависит от: `backend.agent.human_gate`, `backend.agent.stops`, `tests.fakes.browser`
 
-Тестов: 20
+Тестов: 21
 
 - `def _gate(limit=60.0)` (5)
 
@@ -4437,14 +4441,15 @@ Runtime settings layer.
 
 - `def _task(vacancy_text='Текст вакансии', profile_text='Анкета', method=ApplicationVia.FORM.value, **job) -> str` (6)
 
-### `tests/backend/test_agent_sessions.py` — 91 строк
+### `tests/backend/test_agent_sessions.py` — 169 строк
 
 Сессия агента под надзором: срок человека, общий срок, остановка.
 
-Зависит от: `backend.agent.kit`, `backend.agent.prompts.frame`, `backend.agent.sessions`, `backend.agent.stops`, `backend.models`, `tests.dbio`, `tests.factories`, `tests.fakes.agent`
+Зависит от: `adapters.agent_mcp`, `backend.agent.kit`, `backend.agent.prompts.frame`, `backend.agent.sessions`, `backend.agent.stops`, `backend.models`, `tests.dbio`, `tests.factories`, `tests.fakes.agent`
 
-Тестов: 5
+Тестов: 8
 
+- `def short_clock(monkeypatch)` (4)
 
 ### `tests/backend/test_agent_site_guides.py` — 60 строк
 
@@ -5112,13 +5117,13 @@ Runtime settings layer.
 
 - `async def _can_add_after(make_pipeline, session_factory, resumes: list[tuple], many_resumes: bool) -> bool` (6)
 
-### `tests/backend/test_flows_aggregator_seek.py` — 234 строк
+### `tests/backend/test_flows_aggregator_seek.py` — 246 строк
 
 Обход источника: искатель находит, конвейер разбирает, отобранное уходит
 
-Зависит от: `backend.agent.jobs`, `backend.agent.stops`, `backend.flows.aggregator_round`, `backend.models`, `tests.backend.fixtures.applying`, `tests.backend.fixtures.flows`, `tests.backend.fixtures.parse_stub`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.agent`
+Зависит от: `backend.agent.jobs`, `backend.agent.sessions`, `backend.agent.stops`, `backend.flows.aggregator_round`, `backend.models`, `tests.backend.fixtures.applying`, `tests.backend.fixtures.flows`, `tests.backend.fixtures.parse_stub`, `tests.dbio`, `tests.factories`, `tests.factories_aggregators`, `tests.fakes.agent`
 
-Тестов: 15
+Тестов: 16
 
 - `def parsed(monkeypatch)` (5)
 - `def seek(make_pipeline, session_factory)` (16)
