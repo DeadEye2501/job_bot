@@ -4,8 +4,6 @@ import asyncio
 import dataclasses
 
 import pytest
-from mcp import ClientSession
-from mcp.client.streamable_http import streamable_http_client
 
 from adapters.agent_mcp import serve_tools
 from backend.agent.kit import AgentEnd, SessionPlan
@@ -16,6 +14,7 @@ from backend.models import ProfileLanguage
 from tests.dbio import put
 from tests.factories import profile_row
 from tests.fakes.agent import kit_for, silent_gate
+from tests.mcp_call import call_tool
 
 PLAN = SessionPlan(system_prompt="", task="", tools=[], web_search=False)
 
@@ -78,13 +77,6 @@ async def test_a_session_past_its_limit_is_put_out(make_pipeline, monkeypatch):
     assert stopped.is_set()
 
 
-@pytest.fixture
-def short_clock(monkeypatch):
-    """Срок сессии в доли секунды и такой же мелкий шаг его отсчёта."""
-    monkeypatch.setattr("backend.agent.sessions.SESSION_LIMIT_SEC", 0.05)
-    monkeypatch.setattr("backend.agent.sessions._TICK_SEC", 0.01)
-
-
 async def test_a_paused_session_does_not_spend_its_limit(make_pipeline, short_clock):
     """Пока искатель стоит — идёт цикл находки или ждут человека, — три часа
     его сессии не текут: меряют они только его собственную работу."""
@@ -136,13 +128,7 @@ async def test_a_stop_through_the_tool_server_waits_for_the_nested_session(make_
 
     server = await serve_tools([submit_vacancy])
 
-    async def call():
-        async with streamable_http_client(server.url) as (read, write, _):
-            async with ClientSession(read, write) as client:
-                await client.initialize()
-                await client.call_tool("submit_vacancy", {})
-
-    caller = asyncio.create_task(call())
+    caller = asyncio.create_task(call_tool(server.url, "submit_vacancy", {}))
     await asyncio.wait_for(started.wait(), 10)
 
     await asyncio.wait_for(server.close(), 10)

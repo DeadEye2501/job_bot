@@ -61,12 +61,14 @@ def _post_of(username: str, msg_id: int | None, source_url: str | None) -> PostA
     return post_address(row_address(source_url, msg_id) or "")
 
 
-def _nick(username: str, post: PostAddress | None) -> str:
-    """Ник канала для разбора: заведённого — его, иначе из адреса поста.
+def _post_and_nick(username: str, msg_id: int | None, source_url: str | None) -> tuple[PostAddress | None, str]:
+    """Адрес поста строки (`_post_of`) и ник канала для разбора: заведённого —
+    его, иначе из адреса поста.
 
     Без ника разбор не узнал бы канал в тексте и положил бы его в контакты HR.
     """
-    return username or (post.channel if post is not None and post.channel else "")
+    post = _post_of(username, msg_id, source_url)
+    return post, username or (post.channel if post is not None and post.channel else "")
 
 
 async def _vacancy_origin(pipeline, vacancy_id: int) -> _Origin | None:
@@ -83,12 +85,12 @@ async def _vacancy_origin(pipeline, vacancy_id: int) -> _Origin | None:
             )
             if named:
                 channel_username = named[0].username
-        post = _post_of(channel_username, v.source_msg_id, v.source_url)
+        post, nick = _post_and_nick(channel_username, v.source_msg_id, v.source_url)
         # Снимок собирается внутри сессии нарочно: за её пределами чтение
         # полей строки уже не чтение, а поведение сессии.
         return _Origin(
             raw_text=v.raw_text or "",
-            channel_username=_nick(channel_username, post),
+            channel_username=nick,
             post=post,
             status=v.status,
             history_id=await last_status_history_id(session, vacancy_id),
@@ -345,7 +347,7 @@ def _wait_is_over(created_at) -> bool:
     return utc_now() - created_at >= LONGEST_WAIT
 
 
-async def _text_to_judge_by(pipeline, row) -> tuple[str, bool] | None:
+async def _text_to_judge_by(pipeline, row, post: PostAddress | None) -> tuple[str, bool] | None:
     """Текст, по которому судить недоразобранную строку, и можно ли удалять.
 
     Ссылок на статью в тексте нет — ждать нечего и перечитывать незачем:
@@ -364,7 +366,6 @@ async def _text_to_judge_by(pipeline, row) -> tuple[str, bool] | None:
     Ждать не бесконечно: прождавшую дольше `LONGEST_WAIT` судят по
     сохранённому, но удалять по нему не дают — целым он так и не собрался.
     """
-    post = _post_of(row.username or "", row.source_msg_id, row.source_url)
     if post is None or not linked_article.article_urls(row.raw_text):
         return row.raw_text, True
     fresh = await _reread_and_store(pipeline, row.id, row.raw_text, post)
@@ -387,13 +388,13 @@ async def _recover_one(pipeline, row) -> bool:
     Заведённую человеком подбор дочитывает, но откликателю не отдаёт
     (`handover.finish_orphan`).
     """
-    judged = await _text_to_judge_by(pipeline, row)
+    post, nick = _post_and_nick(row.username or "", row.source_msg_id, row.source_url)
+    judged = await _text_to_judge_by(pipeline, row, post)
     if judged is None:
         logger.info("recover: vacancy %d ждёт дочитывания статьи", row.id)
         return False
     text, allow_delete = judged
-    post = _post_of(row.username or "", row.source_msg_id, row.source_url)
-    intake = Intake(channel=_nick(row.username or "", post), allow_delete=allow_delete)
+    intake = Intake(channel=nick, allow_delete=allow_delete)
     if not await handover.finish_orphan(pipeline, row.id, text, intake):
         return False
     await _refresh_embedding(pipeline, row.id, text)

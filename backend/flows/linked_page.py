@@ -10,7 +10,7 @@ from backend.agent.kit import AgentKit, SessionPlan
 from backend.agent.prompts.frame import system_prompt
 from backend.agent.prompts.seeker import PAGE_PROMPT, page_task
 from backend.domain.hosts import page_owner
-from backend.flows.aggregator_round import run_seeker_on
+from backend.flows.seeker_run import run_seeker_on
 from backend.flows.hand_outcome import show_parsing, tell
 from backend.flows.handover import Intake
 from backend.repository.aggregators import list_aggregators, web_search_row

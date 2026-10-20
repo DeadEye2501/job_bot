@@ -17,7 +17,7 @@
 import { blankCompany, companyNamed } from './companies.js';
 import { blankPerson, named } from './people.js';
 import { atHandle } from './telegram.js';
-import { blankVacancy, vacancyNamed } from './vacancies.js';
+import { blankVacancy, vacancyNamed } from './new_vacancy.js';
 
 // Окна об одном поле — ник канала, адрес сайта, контакт вакансии: черновик
 // строкой, и пустая строка ничего не называет. Отказ моста у них остаётся в

@@ -16,7 +16,7 @@
   import { personName } from '$state/people.js';
   import { labels, sameName } from '$state/picker.js';
   import { round } from '$state/round.svelte.js';
-  import { handsOverToggle, isLink, isText, pasteLock, vacancyFields, viaBot } from '$state/vacancies.js';
+  import { handsOverToggle, isLink, isText, pasteLock, vacancyFields, viaBot } from '$state/new_vacancy.js';
 
   // `newVacancy` — черновик и положение «Отклик при создании»; держит их
   // оболочка, потому что оба переживают этот экран. `onhandmade(news)` — что
@@ -44,7 +44,6 @@
     // Держатель берётся один раз: он один на всю жизнь оболочки, и следить
     // за ним как за меняющимся параметром незачем.
     held: untrack(() => newVacancy),
-    keeps: () => newVacancy.handed,
   });
 
   /** Отправить черновик слотом его вкладки.

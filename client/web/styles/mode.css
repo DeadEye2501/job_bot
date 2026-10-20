@@ -35,8 +35,3 @@
 .mode-control[data-mode='Full'] .mode-knob { left: 29px; background: var(--accent); }
 .mode-control[data-mode='Full'] .mode-track { border-color: var(--accent-muted); }
 
-.mode-control.is-disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-

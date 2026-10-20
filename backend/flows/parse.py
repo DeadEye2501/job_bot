@@ -7,7 +7,7 @@
 """
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from backend.flows.fit_refusal import unanswered, unfit_refusal
 from backend.domain.blacklist import check_blacklist
@@ -34,10 +34,13 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class Judged:
-    """Итог разбора: записан ли исход и HR, заведённый этим разбором."""
+    """Итог разбора: записан ли исход, HR, заведённый этим разбором, и заведена
+    ли строка человеком — разбор читает это один раз, и передача решает по его
+    ответу, не перечитывая строку."""
 
     stored: bool
     fresh_hr: HR | None = None
+    by_hand: bool = False
 
 
 def _judged(written) -> "Judged":
@@ -166,14 +169,14 @@ async def _parsed_by_hand(
     if trouble is not None:
         _reason, unasked = trouble
         if unasked:
-            return Judged(False)
+            return Judged(False, by_hand=True)
         parsed = None
     score = 0 if parsed is None else _score(pipeline, parsed)
     outcome = Outcome(
         status=VacancyStatus.NEW, skip_reason=None, score=score,
         keep_previous_stack=parsed is not None,
     )
-    return await _finish_parse(pipeline, vacancy_id, parsed, outcome)
+    return replace(await _finish_parse(pipeline, vacancy_id, parsed, outcome), by_hand=True)
 
 
 async def _barred_site(pipeline, vacancy_id: int, found: list[str]) -> str | None:

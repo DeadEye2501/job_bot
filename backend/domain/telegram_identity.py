@@ -15,7 +15,7 @@ Telegram, а здесь только решают, годится ли напи�
 import re
 from dataclasses import dataclass
 
-from backend.domain.company_names import without_scheme
+from backend.domain.address_start import without_scheme
 
 TELEGRAM_LINK_HOSTS = frozenset({"t.me", "telegram.me"})
 """Хосты ссылок на канал, пост и собеседника."""

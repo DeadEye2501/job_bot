@@ -10,7 +10,8 @@ from backend.agent.jobs import Source
 from backend.agent.kit import AgentKit
 from backend.bot import slot, work
 from backend.flows.aggregator_login import log_in
-from backend.flows.aggregator_round import open_clean_profile, seek_source
+from backend.flows.aggregator_round import seek_source
+from backend.flows.seeker_run import open_clean_profile
 from backend.flows.aggregator_scan import scan
 from backend.flows.resume_fill import fill
 from backend.models import Aggregator

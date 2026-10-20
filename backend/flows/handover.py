@@ -1,21 +1,19 @@
 """Разобранная строка дальше по конвейеру: как её вести (`Intake`), разбор с
-передачей откликателю, дочитывание брошенной и догон новых HR после отклика."""
+передачей откликателю — у новой и у брошенной — и догон новых HR после отклика."""
 
-from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, replace
-from functools import partial
+from dataclasses import dataclass
 
 from sqlalchemy import select
 
 from backend.applying.world import AWAITS_APPLICATION
-from backend.flows import cleanup, parse
+from backend.flows import parse
 from backend.flows.dm_backfill import spawn_hr_backfill
 from backend.flows.hand_outcome import tell
 from backend.flows.parse import Judged
 from backend.models import Vacancy
 from backend.repository.hr_card import LAST_VACANCY_ORDER
 from backend.repository.vacancies_common import PARSED_ONLY
-from backend.repository.vacancies_new import HAND_MADE, made_by_hand
+from backend.repository.vacancies_new import HAND_MADE
 
 
 @dataclass(frozen=True)
@@ -25,16 +23,15 @@ class Intake:
 
     Решает это зовущий, а не разбор и не передача: каждый знает, ручается ли он
     за текст и просили ли отклика. По умолчанию — без канала, сносить можно,
-    отдавать; заведённую человеком разбор не сносит и так. `tells_window` —
-    окно ждёт итога этого разбора: он уходит вестью между разбором и передачей.
-    `by_hand` — строку заводит человек, хоть и дорогой автоматики (пост по
-    ссылке): событие заведения у неё ручное.
+    отдавать; заведённую человеком разбор не сносит и так. `by_hand` — строку
+    заводит человек из окна, хоть бы и дорогой автоматики (пост по ссылке,
+    страница): событие заведения у неё ручное, и окно ждёт итога разбора — он
+    уходит вестью между разбором и передачей.
     """
 
     channel: str | None = None
     allow_delete: bool = True
     hands_over: bool = True
-    tells_window: bool = False
     by_hand: bool = False
 
     def event(self, kind: str, payload: dict) -> tuple[str, dict]:
@@ -52,52 +49,7 @@ class Intake:
 def hand_made_intake(hands_over: bool, channel: str | None = None) -> Intake:
     """Как вести заведённое человеком из окна: окно ждёт итога, откликателю —
     по переключателю."""
-    return Intake(channel=channel, hands_over=hands_over, tells_window=True, by_hand=True)
-
-
-async def known_or_forgotten(
-    session_factory, vacancy_id: int, forget: Callable[[int], Awaitable[object]]
-) -> bool:
-    """Повтор ли эта вакансия для ручного заведения.
-
-    Разобранная — повтор: окно переходит на неё. Недоразобранная прав не имеет
-    — в списке её не видно, и переходить было бы некуда, — её сносят (`forget`),
-    а заведение идёт заново тем, что принёс человек. Сносят разные руки: у бота
-    — вместе с отпечатком в его кэше, у моста без бота кэша нет вовсе.
-    """
-    state = await parse.is_parsed(session_factory, vacancy_id)
-    if state is False:
-        await forget(vacancy_id)
-    return bool(state)
-
-
-async def known_and_told(pipeline, vacancy_id: int) -> bool:
-    """Повтор ли эта вакансия (`known_or_forgotten`); да — окну сказано."""
-    if not await known_or_forgotten(pipeline.session_factory, vacancy_id, partial(cleanup.forget_vacancy, pipeline)):
-        return False
-    tell(pipeline, "duplicate", vacancy_id)
-    return True
-
-
-async def finish_orphan(pipeline, vacancy_id: int, text: str, intake: Intake) -> bool:
-    """Дочитать брошенную недоразобранной строку этим текстом и провести дальше;
-    ответ — записан ли исход.
-
-    Текст бывает и чужой — перепост из другого источника: разбор идёт по нему
-    и с доводами зовущего, а ложится в ту строку — совпадение отпечатков
-    ручается, что тексты почти дословны. Полон ли текст, проверяет зовущий:
-    дочитывать шапкой без статьи нельзя.
-
-    Заведённую человеком — без передачи: отдавать ли её откликателю, человек
-    решал при заведении, и решение это жило только в окне. Дочитывают такую
-    строку подбор недоразобранного и все, кто наткнулся на её перепост, —
-    обход канала и искатель, — и правило у них одно.
-    """
-    async with pipeline.session_factory() as session:
-        by_hand = await made_by_hand(session, vacancy_id)
-    if by_hand:
-        intake = replace(intake, hands_over=False)
-    return await judge_and_hand_over(pipeline, vacancy_id, text, intake)
+    return Intake(channel=channel, hands_over=hands_over, by_hand=True)
 
 
 async def to_apply(session_factory, vacancy_ids: list[int]) -> list[int]:
@@ -145,9 +97,35 @@ async def hand_over(pipeline, judged: list[tuple[int, Judged]], *, applies: bool
 
 async def judge_and_hand_over(pipeline, vacancy_id: int, text: str, intake: Intake) -> bool:
     """Разбор одной вакансии и передача её итога; ответ — записан ли исход."""
-    judged = await parse.parse_and_update_vacancy(
-        pipeline, vacancy_id, text, intake.channel, allow_delete=intake.allow_delete)
-    if intake.tells_window:
-        tell(pipeline, "ok" if judged.stored else "llm", vacancy_id)
+    judged = await _judged(pipeline, vacancy_id, text, intake)
     await hand_over(pipeline, [(vacancy_id, judged)], applies=intake.hands_over)
     return judged.stored
+
+
+async def finish_orphan(pipeline, vacancy_id: int, text: str, intake: Intake) -> bool:
+    """Дочитать брошенную недоразобранной строку этим текстом и провести дальше;
+    ответ — записан ли исход.
+
+    Текст бывает и чужой — перепост из другого источника: разбор идёт по нему
+    и с доводами зовущего, а ложится в ту строку — совпадение отпечатков
+    ручается, что тексты почти дословны. Полон ли текст, проверяет зовущий:
+    дочитывать шапкой без статьи нельзя.
+
+    Заведённую человеком — без передачи: отдавать ли её откликателю, человек
+    решал при заведении, и решение это жило только в окне. Дочитывают такую
+    строку подбор недоразобранного и все, кто наткнулся на её перепост, —
+    обход канала и искатель, — и правило у них одно.
+    """
+    judged = await _judged(pipeline, vacancy_id, text, intake)
+    await hand_over(pipeline, [(vacancy_id, judged)], applies=intake.hands_over and not judged.by_hand)
+    return judged.stored
+
+
+async def _judged(pipeline, vacancy_id: int, text: str, intake: Intake) -> Judged:
+    """Разобрать строку по доводам зовущего; окну, которое её заводит, итог —
+    вестью до передачи."""
+    judged = await parse.parse_and_update_vacancy(
+        pipeline, vacancy_id, text, intake.channel, allow_delete=intake.allow_delete)
+    if intake.by_hand:
+        tell(pipeline, "ok" if judged.stored else "llm", vacancy_id)
+    return judged

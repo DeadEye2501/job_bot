@@ -16,7 +16,8 @@ from backend.telegram_time import tg_moment
 from tests.backend.fixtures.flows import told_then_applied
 from tests.dbio import all_rows, only_row, put
 from tests.factories import channel_row, vacancy_row
-from tests.fakes.agent import kit_for
+from tests.factories_aggregators import web_search_row
+from tests.fakes.agent import kit_for, scripted_kit, submit_step
 from tests.fakes.telegram import WithMessages
 from tests.fakes.telegram_objects import TG_EPOCH, chat, post
 from tests.fakes.telegraph import serve_articles
@@ -206,20 +207,22 @@ async def test_another_telegram_link_has_no_vacancy_and_no_agent(filing, session
     assert filing.told == [HandResult("no_vacancy")] and sessions == []
 
 
-async def test_a_page_goes_to_the_agent_as_made_by_hand(filing, monkeypatch):
-    """Страницу ведёт агент, и ведёт заведённой человеком — с переключателем окна."""
-    seen = []
+@pytest.mark.usefixtures("one_vector")
+@pytest.mark.parametrize("hands_over", [True, False], ids=["с откликом", "без отклика"])
+async def test_a_page_goes_to_the_agent_as_made_by_hand(make_pipeline, session_factory, parsed, hands_over):
+    """Страницу заводит агент, а строка — заведённая человеком: окно слышит
+    итог, откликатель зван по переключателю окна."""
+    url = "https://company.test/qa"
+    await put(session_factory, web_search_row())
+    kit = scripted_kit(await make_pipeline(), [submit_step(url, "Ищем QA в команду")])
+    told_then_applied(kit.pipeline)
 
-    async def ingest_page(kit, url, intake):
-        seen.append((url, intake))
+    await ingest_by_hand(kit, HandRequest("page", url, None, hands_over))
 
-    monkeypatch.setattr("backend.flows.linked_page.ingest_page", ingest_page)
-
-    await ingest_by_hand(kit_for(filing), HandRequest("page", "https://company.test/qa", None, True))
-
-    ((url, intake),) = seen
-    assert url == "https://company.test/qa"
-    assert (intake.by_hand, intake.hands_over, intake.tells_window) == (True, True, True)
+    saved = await only_row(session_factory, Vacancy)
+    (event,) = await all_rows(session_factory, VacancyEvent)
+    assert event.kind == HAND_MADE and kit.pipeline.told == [HandResult("ok", saved.id)]
+    assert kit.pipeline.applied == ([[saved.id]] if hands_over else [])
 
 
 @pytest.mark.usefixtures("one_vector")

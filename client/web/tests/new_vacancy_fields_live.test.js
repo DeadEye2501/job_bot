@@ -11,7 +11,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import NewCardDialog from '../components/NewCardDialog.svelte';
 import NewVacancyFields from '../components/NewVacancyFields.svelte';
-import { blankVacancy } from '../state/vacancies.js';
+import { blankVacancy } from '../state/new_vacancy.js';
 import { livingProps } from './live_props.svelte.js';
 import { settled } from './settled.js';
 

@@ -15,7 +15,8 @@
 // связка экрана с памятью проверяется на нём, а не на подставке.
 
 import { CONTACTS_TABS, PROFILE_TABS, SYSTEM_TABS } from './sections.js';
-import { SORTS, blankVacancy } from './vacancies.js';
+import { blankVacancy } from './new_vacancy.js';
+import { SORTS } from './vacancies.js';
 import { blankFilter } from './vacancy_filter.js';
 
 /** Память свежего окна: первые вкладки, ни одной открытой карточки, пустой

@@ -1,6 +1,8 @@
 """Страница вакансии по ссылке: агент открывает её и заводит вакансию теми же
 инструментами, что «Поиск по сети», заведённой человеком."""
 
+import asyncio
+
 import pytest
 
 from backend.flows.handover import hand_made_intake
@@ -207,17 +209,20 @@ async def test_the_switch_hands_the_page_over_after_new(page, session_factory, p
     assert kit.pipeline.applied == [[saved.id]]
 
 
-async def test_the_nested_apply_is_not_counted_in_the_session(page, parsed):
-    paused = []
+async def test_the_nested_apply_is_not_counted_in_the_session(page, parsed, short_clock):
+    """Отклик дольше всего срока сессии доходит до конца: вложенный цикл в срок
+    страницы не идёт, и гасить её посреди отклика некому."""
+    applied = []
 
     def watch(kit):
         async def apply(ids):
-            paused.append(kit.run_session.plans[0].paused())
+            await asyncio.sleep(0.2)
+            applied.append(ids)
         kit.pipeline.apply = apply
 
     await page(COMPANY_PAGE, [_submitting(COMPANY_PAGE)], hands_over=True, on_kit=watch)
 
-    assert paused == [True]
+    assert len(applied) == 1
 
 
 async def test_the_bar_shows_the_parse_of_an_ad(page, parsed):

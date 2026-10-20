@@ -48,12 +48,8 @@
   cursor: inherit;
 }
 
-/* Запертый — «нельзя», а не «жди»: ждать тут нечего, пока не загорятся лампы. */
-.icon-check.locked {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
+/* Запертый вид — в `disabled-look.css`; здесь только то, что наведение его не
+   подсвечивает. */
 .icon-check.locked:hover {
   border-color: var(--border);
   color: var(--text-tertiary);
