@@ -58,7 +58,7 @@ async def seek_source(kit: AgentKit, source: Source) -> None:
 
 async def _hand_over(kit: AgentKit, queue: ParseQueue) -> None:
     await kit.browser.close()
-    await hand_over(kit.pipeline, queue.judged)
+    await hand_over(kit.pipeline, queue.judged, applies=True)
 
 
 async def _search(kit: AgentKit, job: SeekJob, queue: ParseQueue) -> AgentEnd:

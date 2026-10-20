@@ -17,6 +17,7 @@ from datetime import datetime
 from typing import Literal
 
 from backend.flows import embeddings, handover, intake, linked_article, sameness
+from backend.flows.handover import Intake
 from backend.models import Vacancy
 from backend.repository.vacancies_new import HAND_MADE
 
@@ -58,9 +59,9 @@ async def ingest_pasted_text(
     перепостов, и то же объявление, пришедшее следом из канала, завелось бы
     второй раз.
 
-    Разбор зовётся с правом убрать непригодное — тем же, с каким его зовёт
-    приём поста: вставленный текст ничем не надёжнее опубликованного, и след
-    от рекламы засорял бы список.
+    Своя строка заводится заведённой человеком: разбор её не судит и не
+    сносит. Снести может только чужую брошенную строку, которую вставленный
+    текст дочитывает (`_finish_or_refuse`).
     """
     text, whole = await linked_article.with_linked_articles(text)
     if not whole:
@@ -108,13 +109,13 @@ async def _parsed(pipeline, vacancy_id: int, text: str) -> PastedIntakeOutcome:
     которой ничего нет.
 
     Удачей не зовут два исхода. Не дошедший разбор — строка осталась
-    неразобранной, а показывают только разобранные. И снесённое разбором:
-    «дошло» он отвечает и там, где сам убрал строку как рекламу, пост
-    соискателя или пустышку. Оба раза «объявление заведено» послало бы
-    человека искать то, чего он не найдёт.
+    неразобранной, а показывают только разобранные. И снесённая разбором
+    чужая брошенная строка: «дошло» он отвечает и там, где сам убрал её как
+    рекламу, пост соискателя или пустышку. Оба раза «объявление заведено»
+    послало бы человека искать то, чего он не найдёт.
     """
     await pipeline.reload_resources()
-    if not await handover.judge_and_hand_over(pipeline, vacancy_id, text, None):
+    if not await handover.judge_and_hand_over(pipeline, vacancy_id, text, Intake()):
         return "llm"
     return "ok" if await _still_there(pipeline, vacancy_id) else "trash"
 

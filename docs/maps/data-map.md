@@ -910,6 +910,13 @@
 
 - `logger` = `logging.getLogger(__name__)`
 
+### `backend/flows/handover.py`
+
+- `class Intake`
+  - `channel: str | None` = `None`
+  - `allow_delete: bool` = `True`
+  - `hands_over: bool` = `True`
+
 ### `backend/flows/ingest.py`
 
 - `logger` = `logging.getLogger(__name__)`

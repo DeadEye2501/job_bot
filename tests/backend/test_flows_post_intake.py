@@ -17,7 +17,12 @@ import pytest
 
 from tests.fakes.telegraph import serve_articles
 from backend.flows import embeddings, ingest
+from backend.models import VacancyStatus
+from backend.repository.vacancies_life import add_vacancy_event
+from backend.repository.vacancies_new import HAND_MADE
 from tests.backend.fixtures.flows import similar_by_hand
+from tests.dbio import put
+from tests.factories import vacancy_row
 from tests.backend.fixtures.parse_stub import parse_into
 from tests.fakes.llm import embeddings_refused
 from tests.fakes.telegram_objects import link_entity, post
@@ -230,6 +235,23 @@ async def test_a_repost_of_a_half_parsed_vacancy_finishes_it(intake):
 
     assert intake.saved == []
     assert intake.parsed == [(3, "Ищем Python-разработчика", "jobs", True)]
+
+
+async def test_a_repost_finishes_a_hand_made_row_without_handing_it_over(intake, session_factory):
+    """Брошенную строку человека перепост дочитывает, но откликателю не отдаёт:
+    отдавать ли, решал человек при заведении, а не обход."""
+    row = vacancy_row(status=VacancyStatus.NEW, is_parsed=False, raw_text="Ищем Python")
+    await put(session_factory, row)
+    async with session_factory() as session:
+        await add_vacancy_event(session, row.id, HAND_MADE)
+        await session.commit()
+    intake.similar_id = row.id
+    intake.unparsed = True
+
+    await ingest.ingest_post(intake, 1, "jobs", post(10, text="Ищем Python-разработчика"))
+
+    assert [one[0] for one in intake.parsed] == [row.id]
+    assert intake.applied == []
 
 
 async def test_a_post_the_model_could_not_embed_is_skipped(intake, monkeypatch):

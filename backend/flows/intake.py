@@ -5,15 +5,16 @@
 перепостов — то же объявление, пришедшее следом, заведётся второй раз, и
 заметит это только человек, у которого список забился одним и тем же.
 
-Заводят вакансию из текста двое — обход канала и человек со вставленным
-объявлением (`ingest.py`, `pasted.py`), — и оба зовут отсюда. Чем строки
+Заводят вакансию из текста трое — обход канала, искатель на сайте и человек
+со вставленным объявлением (`ingest.py`, `agent/tools_seeker.py`,
+`pasted.py`), — и все зовут отсюда. Чем строки
 отличаются, знает зовущий: он и собирает её сам, а сюда приносит готовую.
 """
 
 import logging
 
 from backend.models import Vacancy
-from backend.repository.vacancies_life import add_vacancy_event
+from backend.repository.vacancies_new import add_with_event
 
 logger = logging.getLogger(__name__)
 
@@ -33,9 +34,7 @@ async def save_new_vacancy(
     вектор в него уже не встал бы, и строка к тому мигу была бы записана.
     """
     async with pipeline.session_factory() as session:
-        session.add(vacancy)
-        await session.flush()
-        await add_vacancy_event(session, vacancy.id, kind, payload)
+        await add_with_event(session, vacancy, kind, payload)
         await session.commit()
     if vacancy.embedding is not None:
         pipeline.embeddings.append(vacancy.id, vacancy.embedding)

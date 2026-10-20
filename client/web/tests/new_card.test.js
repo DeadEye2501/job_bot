@@ -25,4 +25,11 @@ describe('окна заведения по адресу', () => {
       .toBe('Агрегатор добавлен: example.test');
     expect(NEW_CARD.aggregator.done('', answer('exists'))).toBe('example.test уже был заведён');
   });
+
+  it('вакансия по полям: повтор говорит словами моста, а не «заведена»', () => {
+    const fields = { mode: 'fields' };
+    expect(NEW_CARD.vacancy.done(fields, { created: true })).toBe('Вакансия заведена');
+    expect(NEW_CARD.vacancy.done(fields, { created: false, message: 'Такая вакансия уже существует' }))
+      .toBe('Такая вакансия уже существует');
+  });
 });

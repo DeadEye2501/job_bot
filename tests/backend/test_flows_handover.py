@@ -3,6 +3,7 @@
 
 from backend.flows import handover, parse
 from backend.flows.handover import judge_and_hand_over, new_to_apply
+from backend.flows.handover import Intake
 from backend.models import Vacancy, VacancyStatus
 from tests.dbio import put
 from tests.factories import at, parsed_vacancy, vacancy_row
@@ -16,14 +17,14 @@ async def _set_status(session_factory, vacancy_id, status):
 
 async def test_a_fit_vacancy_goes_to_the_applier(parsing):
     pipeline, vacancy = parsing
-    assert await judge_and_hand_over(pipeline, vacancy.id, "Python", "chan")
+    assert await judge_and_hand_over(pipeline, vacancy.id, "Python", Intake(channel="chan"))
     assert pipeline.applied == [[vacancy.id]]
 
 
 async def test_an_unfit_vacancy_stays_with_the_collection(parsing):
     pipeline, vacancy = parsing
     await pipeline.rs.set_app("scoring_threshold", "100")
-    await judge_and_hand_over(pipeline, vacancy.id, "Python", "chan")
+    await judge_and_hand_over(pipeline, vacancy.id, "Python", Intake(channel="chan"))
     assert pipeline.applied == []
 
 
@@ -31,7 +32,7 @@ async def test_with_auto_apply_off_a_fit_vacancy_stays_in_new(parsing, session_f
     """Выключенный автоотклик — после разбора откликатель не зовётся вовсе."""
     pipeline, vacancy = parsing
     await pipeline.rs.set_app("auto_apply", "false")
-    assert await judge_and_hand_over(pipeline, vacancy.id, "Python", "chan")
+    assert await judge_and_hand_over(pipeline, vacancy.id, "Python", Intake(channel="chan"))
     assert pipeline.applied == []
     async with session_factory() as session:
         assert (await session.get(Vacancy, vacancy.id)).status == VacancyStatus.NEW
@@ -41,7 +42,7 @@ async def test_with_confirmed_auto_apply_a_fit_vacancy_goes_to_the_applier(parsi
     """С подтверждением передача идёт как при включённом: ждёт человека уже откликатель."""
     pipeline, vacancy = parsing
     await pipeline.rs.set_app("auto_apply", "confirm")
-    assert await judge_and_hand_over(pipeline, vacancy.id, "Python", "chan")
+    assert await judge_and_hand_over(pipeline, vacancy.id, "Python", Intake(channel="chan"))
     assert pipeline.applied == [[vacancy.id]]
 
 
@@ -53,7 +54,21 @@ async def test_with_auto_apply_off_a_new_hr_is_still_caught_up(parsing, monkeypa
     await pipeline.rs.set_app("auto_apply", "false")
     caught = []
     monkeypatch.setattr(handover, "spawn_hr_backfill", lambda _p, hr: caught.append(hr))
-    await judge_and_hand_over(pipeline, vacancy.id, "Python", "chan")
+    await judge_and_hand_over(pipeline, vacancy.id, "Python", Intake(channel="chan"))
+    assert pipeline.applied == []
+    assert len(caught) == 1
+
+
+async def test_a_handover_that_is_not_asked_for_only_catches_up(parsing, monkeypatch):
+    """«Не отдавать» снимает отклик, но не догон переписки: догон — не отклик."""
+    pipeline, vacancy = parsing
+    pipeline.parsed = parsed_vacancy(
+        title="Python-разработчик", stack_required=["Python"], hr_contact="@maria")
+    caught = []
+    monkeypatch.setattr(handover, "spawn_hr_backfill", lambda _p, hr: caught.append(hr))
+
+    await judge_and_hand_over(pipeline, vacancy.id, "Python", Intake(hands_over=False))
+
     assert pipeline.applied == []
     assert len(caught) == 1
 
@@ -62,7 +77,7 @@ async def test_a_parse_the_model_never_answered_applies_nothing(parsing):
     """Без ответа модели вакансия остаётся в New неразобранной — откликаться рано."""
     pipeline, vacancy = parsing
     pipeline.parse_refusal = "модель не ответила"
-    assert not await judge_and_hand_over(pipeline, vacancy.id, "Python", "chan")
+    assert not await judge_and_hand_over(pipeline, vacancy.id, "Python", Intake(channel="chan"))
     assert pipeline.applied == []
 
 
@@ -84,7 +99,7 @@ async def test_a_new_hr_is_caught_up_after_the_application(parsing, monkeypatch)
 
     pipeline.apply = apply
     monkeypatch.setattr(handover, "spawn_hr_backfill", lambda _p, hr: order.append("backfill"))
-    await judge_and_hand_over(pipeline, vacancy.id, "Python", "chan")
+    await judge_and_hand_over(pipeline, vacancy.id, "Python", Intake(channel="chan"))
     assert order == ["apply", "backfill"]
 
 
@@ -102,5 +117,5 @@ async def test_new_vacancies_to_apply_are_parsed_ones_newest_first(session_facto
 async def test_a_rerun_of_an_applied_vacancy_applies_again(parsing, session_factory):
     pipeline, vacancy = parsing
     await _set_status(session_factory, vacancy.id, VacancyStatus.APPLIED)
-    await judge_and_hand_over(pipeline, vacancy.id, "Python", "chan", allow_delete=False)
+    await judge_and_hand_over(pipeline, vacancy.id, "Python", Intake(channel="chan", allow_delete=False))
     assert pipeline.applied == [[vacancy.id]]
