@@ -1,10 +1,10 @@
 """Что бот делает с объявлением, вставленным человеком.
 
 Предмет — второй вход в тот же конвейер: текст объявления человек приносит
-сам, потому что нашёл его глазами — на бирже, в почте, по наводке. Дальше
-строка идёт обычной дорогой поста канала: отпечаток, отсев перепостов, разбор
-моделью, балл и приговор. Отличие одно — источника нет, и всё, что о нём
-знали, приходится не знать.
+сам, потому что нашёл его глазами — на бирже, в почте, по наводке. Строка
+заводится заведённой человеком: отпечаток, разбор моделью и балл, но без
+приговора, и откликателю её отдают только по просьбе. Чем кончилось, окно
+узнаёт вестью сразу после разбора, до отклика.
 
 Приём поста проверяется своим слайсом (`test_flows_post_intake`): там предмет
 — курсор канала, а общего у двух приёмов отпечаток и дочитывание статей по
@@ -16,65 +16,72 @@ from datetime import datetime, timezone
 import httpx
 import pytest
 
-from tests.fakes.telegraph import serve_articles
-from backend.flows import cleanup
 from backend.flows import parse as parse_mod
 from backend.flows import pasted
+from backend.flows.hand_outcome import HandResult
 from backend.models import Vacancy, VacancyEvent
 from tests.backend.fixtures.flows import similar_by_hand
 from tests.dbio import all_rows, only_row, put
 from tests.factories import vacancy_row
+from tests.fakes.telegraph import serve_articles
 
 
 @pytest.fixture
 async def intake(make_pipeline, monkeypatch, one_vector):
-    """Конвейер с подставным переводом в вектор и подставным разбором."""
+    """Конвейер с подставным переводом в вектор и подставным разбором.
+
+    Вести окну и отклики ложатся в один след `order`: по нему видно, что весть
+    ушла раньше отклика.
+    """
     pipeline = await make_pipeline()
     pipeline.parsed = []
-    pipeline.reloaded = 0
+    pipeline.told = []
+    pipeline.order = []
     pipeline.parse_done = True
-    pipeline.parse_drops = False
     similar_by_hand(pipeline, monkeypatch)
 
     async def reload_resources():
-        pipeline.reloaded += 1
         # Отметка ложится в тот же список, что и зовы разбора: по её месту в
         # нём и видно, что слепки перечитаны до разбора, а не после.
         pipeline.parsed.append("слепки")
 
     monkeypatch.setattr(pipeline, "reload_resources", reload_resources)
+
     async def parse(pipeline_arg, vacancy_id, text, username, *, allow_delete=True):
         pipeline.parsed.append((vacancy_id, text, username, allow_delete))
-        if pipeline.parse_drops:
-            # Тем же, чем сносит непригодное настоящий разбор: строки не
-            # стало, событий её тоже, а ответ — «дошло».
-            await cleanup.delete_vacancy_as_trash(
-                pipeline, vacancy_id, reason="реклама"
-            )
         return parse_mod.Judged(pipeline.parse_done)
 
     monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)
+
+    def told(result: HandResult) -> None:
+        pipeline.told.append(result)
+        pipeline.order.append("весть")
+
+    async def apply(ids):
+        pipeline.applied.append(ids)
+        pipeline.order.append("отклик")
+
+    pipeline.on_hand_made = told
+    pipeline.apply = apply
     return pipeline
 
 
 def parse_calls(intake) -> list[tuple]:
-    """Зовы разбора без отметок о перечитывании слепков.
-
-    В один список ложатся оба: по их порядку и видно, что слепки перечитаны
-    до разбора, — а проверкам про сам разбор отметка мешает.
-    """
+    """Зовы разбора без отметок о перечитывании слепков."""
     return [one for one in intake.parsed if isinstance(one, tuple)]
 
 
-async def test_the_pasted_text_becomes_a_row_and_goes_to_the_parser(
-    intake, session_factory
-):
+async def _pasted(intake, text, *, posted_at=None, hands_over=False) -> None:
+    await pasted.ingest_pasted_text(intake, text, posted_at, hands_over)
+
+
+async def test_the_pasted_text_becomes_a_row_and_goes_to_the_parser(intake, session_factory):
     """Вставленный текст ложится строкой и уходит на разбор.
 
     Текст сохраняется целиком: по нему потом судят повторный прогон и подбор
     недоразобранного, и строка без исходника для них всё равно что пустая.
     """
-    assert await pasted.ingest_pasted_text(intake, "Ищем Python-разработчика", None) == "ok"
+    await _pasted(intake, "Ищем Python-разработчика")
 
     saved = await only_row(session_factory, Vacancy)
     assert saved.raw_text == "Ищем Python-разработчика"
@@ -82,16 +89,16 @@ async def test_the_pasted_text_becomes_a_row_and_goes_to_the_parser(
     assert [(text, username) for _, text, username, _ in parse_calls(intake)] == [
         ("Ищем Python-разработчика", None)
     ]
+    assert intake.told == [HandResult("ok", saved.id)]
 
 
 async def test_a_pasted_text_reads_its_linked_article(intake, session_factory, monkeypatch):
     """Вставленный текст дочитывает статью так же, как пост канала: шапка со
     ссылкой — объявление без требований, и разбирать в нём нечего."""
-
     serve_articles(monkeypatch)
     text = "Senior QA https://telegra.ph/QA-08-21"
 
-    assert await pasted.ingest_pasted_text(intake, text, None) == "ok"
+    await _pasted(intake, text)
 
     expected = f"{text}\n\nТребования: Python"
     assert (await only_row(session_factory, Vacancy)).raw_text == expected
@@ -103,51 +110,27 @@ async def test_a_pasted_text_whose_article_did_not_come_is_not_filed(
 ):
     """Статья не скачалась — строки нет: приём поста ждёт статью у заведённой
     строки, а человек может просто нажать ещё раз."""
-
     serve_articles(monkeypatch, httpx.ConnectError("сайт лежит"))
 
-    outcome = await pasted.ingest_pasted_text(intake, "Senior QA https://telegra.ph/QA-08-21", None)
+    await _pasted(intake, "Senior QA https://telegra.ph/QA-08-21")
 
-    assert outcome == "article"
+    assert intake.told == [HandResult("article")]
     assert (await all_rows(session_factory, Vacancy), parse_calls(intake)) == ([], [])
 
 
 async def test_the_new_vector_joins_the_cache(intake, session_factory):
-    """Отпечаток заведённой строки встаёт в кэш отсева сразу.
-
-    Кэш и есть то, чем отсекают перепосты. Не встань вектор в него, тот же
-    текст, вставленный второй раз или пришедший следом из канала, завёл бы
-    вторую строку — и список забился бы одним объявлением в двух видах.
-    """
-    await pasted.ingest_pasted_text(intake, "Ищем Python-разработчика", None)
+    """Отпечаток заведённой строки встаёт в кэш отсева сразу: то же объявление,
+    пришедшее следом из канала, иначе завелось бы второй строкой."""
+    await _pasted(intake, "Ищем Python-разработчика")
 
     saved = await only_row(session_factory, Vacancy)
     assert intake.embeddings.ids.tolist() == [saved.id]
 
 
-async def test_a_post_the_parser_threw_out_is_not_called_a_success(
-    intake, session_factory
-):
-    """Снесённое разбором удачей не зовут.
-
-    Разбор отвечает «дошло» и тогда, когда сам же снёс строку: пост оказался
-    резюме, рекламой или пустышкой. Скажи человеку «объявление заведено» —
-    он пойдёт искать в списке то, чего там нет и не будет.
-    """
-    intake.parse_drops = True
-
-    assert await pasted.ingest_pasted_text(intake, "Реклама курсов", None) == "trash"
-
-    assert await all_rows(session_factory, Vacancy) == []
-
-
 async def test_the_timeline_says_the_vacancy_came_from_a_human(intake, session_factory):
-    """Лента говорит, что вакансию принёс человек, а не обход каналов.
-
-    Лента объясняет, откуда строка взялась, и у вставленной источника нет
-    вовсе: пустая, она читалась бы как потерянный след обхода.
-    """
-    await pasted.ingest_pasted_text(intake, "Ищем повара", None)
+    """Лента говорит, что вакансию принёс человек, а не обход каналов — и по
+    этой же отметке разбор не выносит ей приговора."""
+    await _pasted(intake, "Ищем повара")
 
     event = await only_row(session_factory, VacancyEvent)
     assert event.kind == "created_by_hand"
@@ -157,141 +140,120 @@ async def test_a_pasted_vacancy_has_no_channel_behind_it(intake, session_factory
     """У вставленной вакансии источника нет, и притворяться им нечему.
 
     Колонки канала и поста держат связь со своим каналом: положи туда чужое
-    или выдуманное, и статистика канала посчитает эту строку своей, а отбор по
-    источнику покажет её среди пришедших из Telegram.
+    или выдуманное, и статистика канала посчитает эту строку своей.
     """
-    await pasted.ingest_pasted_text(intake, "Ищем флориста", None)
+    await _pasted(intake, "Ищем флориста")
 
     saved = await only_row(session_factory, Vacancy)
-    assert saved.source_channel_id is None
-    assert saved.source_msg_id is None
+    assert (saved.source_channel_id, saved.source_msg_id) == (None, None)
     # Дату тоже не выдумывают: проставленное «сегодня» подняло бы всякую
     # вставленную вакансию наверх в отборе за последние дни.
     assert saved.posted_at is None
 
 
 async def test_the_named_publication_date_lands_in_the_row(intake, session_factory):
-    """Названная дата публикации ложится в строку, а неназванная не выдумывается.
-
-    По дате идёт отбор «за последние дни» и сортировка списка: выдуманная
-    подняла бы старое объявление наверх, а пустая честно оставит его без
-    места в этой выдаче.
-    """
     when = datetime(2026, 8, 20, tzinfo=timezone.utc)
-    await pasted.ingest_pasted_text(intake, "Ищем сварщика", when)
 
-    saved = await only_row(session_factory, Vacancy)
-    assert saved.posted_at.date() == when.date()
+    await _pasted(intake, "Ищем сварщика", posted_at=when)
 
-
-async def test_a_text_that_repeats_a_known_vacancy_does_not_start_a_second_row(
-    intake, session_factory
-):
-    """Объявление, уже заведённое, вторую строку не заводит.
-
-    То же правило, что и у перепоста в канале: одно объявление — одна строка,
-    иначе список забивается одним и тем же в нескольких видах. Человеку об
-    этом говорят словом, а не молчанием: он вставил текст и вправе знать, что
-    строки не прибавилось.
-    """
-    intake.similar_id = 42
-
-    assert await pasted.ingest_pasted_text(intake, "Ищем Python-разработчика", None) == "duplicate"
-
-    assert await all_rows(session_factory, Vacancy) == []
-    assert parse_calls(intake) == []
+    assert (await only_row(session_factory, Vacancy)).posted_at.date() == when.date()
 
 
-async def test_a_text_matching_an_unfinished_row_finishes_it_instead_of_refusing(
-    intake, session_factory
-):
-    """Похожая, но недоразобранная строка дорзабирается вставленным текстом.
+async def test_a_text_like_a_known_vacancy_is_filed_as_its_own_row(intake, session_factory):
+    """Похожесть по отпечатку однозначного повтора не даёт: заведённое
+    человеком заводится своей строкой, а не отказом."""
+    known = vacancy_row(raw_text="Ищем Python-разработчика")
+    await put(session_factory, known)
+    intake.similar_id = known.id
 
-    Так делает и приём поста канала: иначе брошенная на полпути вакансия
-    пропускалась бы вечно. Ответь мы «уже заведено», человек пошёл бы искать
-    её в списке — а там показывают только разобранные, и он не нашёл бы
-    ничего.
-    """
+    await _pasted(intake, "Ищем Python-разработчика")
+
+    rows = await all_rows(session_factory, Vacancy)
+    (own,) = [row for row in rows if row.id != known.id]
+    assert intake.told == [HandResult("ok", own.id)]
+
+
+async def test_a_text_like_an_unfinished_row_does_not_touch_that_row(intake, session_factory):
+    """С чужой брошенной строкой вставленный текст не сливается: её доберёт
+    подбор недоразобранного, а человек получает свою."""
     brought_earlier = vacancy_row(raw_text="Ищем повара", is_parsed=False)
     await put(session_factory, brought_earlier)
     intake.similar_id = brought_earlier.id
     intake.unparsed = True
 
-    assert await pasted.ingest_pasted_text(intake, "Ищем повара", None) == "ok"
+    await _pasted(intake, "Ищем повара")
 
-    assert [row_id for row_id, _, _, _ in parse_calls(intake)] == [brought_earlier.id]
-    # Второй строки не завелось: дорзабрали ту, что уже была.
-    assert len(await all_rows(session_factory, Vacancy)) == 1
+    assert brought_earlier.id not in [row_id for row_id, _, _, _ in parse_calls(intake)]
+    assert len(await all_rows(session_factory, Vacancy)) == 2
 
 
 async def test_a_silent_provider_is_told_apart_from_a_text_that_did_not_count(
     intake, session_factory, silent_embedder
 ):
-    """Молчащий поставщик отпечатков не роняет заведение, а отвечает бедой.
+    """Молчащий поставщик отпечатков не роняет заведение, а отвечает бедой."""
+    await _pasted(intake, "Ищем сварщика")
 
-    Отличать его от несчитанного текста надо здесь, у самого обращения: выше
-    видно один и тот же пустой отпечаток. Пропусти бросок — и человек вместо
-    «Модель отпечатков не ответила» прочтёт общее «не удалось завести».
-    """
-
-    assert await pasted.ingest_pasted_text(intake, "Ищем сварщика", None) == "embed"
-
+    assert intake.told == [HandResult("embed")]
     assert await all_rows(session_factory, Vacancy) == []
 
 
 async def test_a_text_without_an_embedding_leaves_no_half_made_row(
     intake, session_factory, monkeypatch
 ):
-    """Без отпечатка строка не заводится вовсе.
-
-    Отпечаток — то, чем эту вакансию потом узнают среди перепостов. Строка без
-    него молча вышла бы из отсева, и то же объявление, пришедшее из канала,
-    завелось бы второй раз. Человеку отвечают бедой, а не тишиной: он ждёт
-    ответа на своё нажатие.
-    """
+    """Без отпечатка строка не заводится вовсе: она молча вышла бы из отсева
+    перепостов."""
 
     async def no_answer(client, model, text):
         return None
 
     monkeypatch.setattr("adapters.lm_embed.embed", no_answer)
 
-    assert await pasted.ingest_pasted_text(intake, "Ищем Python-разработчика", None) == "embed"
+    await _pasted(intake, "Ищем Python-разработчика")
 
+    assert intake.told == [HandResult("embed")]
     assert await all_rows(session_factory, Vacancy) == []
 
 
-async def test_the_parser_may_drop_a_pasted_post_it_finds_unfit(intake):
-    """Разбору дано право убрать непригодное — то же, что и на приёме поста.
+async def test_the_bottom_bar_names_the_parse(intake):
+    """Имя хода окно ловит по строке: опечатайся оно, человек увидел бы внизу
+    пустую полосу без слова о том, что идёт."""
+    steps = []
+    intake.on_progress = lambda *step: steps.append(step)
 
-    Судьбу мусора решает он сам, а вставленный текст ничем не надёжнее
-    опубликованного: оставленный след от рекламы засорял бы список.
-    """
-    await pasted.ingest_pasted_text(intake, "Реклама курсов", None)
+    await _pasted(intake, "Ищем повара")
 
-    assert [allow_delete for _, _, _, allow_delete in parse_calls(intake)] == [True]
+    assert steps[0] == ("pasted", "Разбор объявления", 0, 0)
 
 
 async def test_the_profile_and_the_blacklist_are_reloaded_before_the_parse(intake):
-    """Перед разбором конвейер перечитывает анкету, навыки и чёрный список.
-
-    Слепки эти наполняет только перечитывание, а зовёт его обход каналов — то
-    есть в режимах «Выключен» и «Только диалоги» они пусты. Разбери по пустым:
-    балл выйдет нулевым, чёрный список не сработает вовсе, а приговор о
-    пригодности вынесут по анкете, в которой ничего нет. Человек увидит
-    «Не подходит» на любой вакансии и причины не узнает.
-    """
-    await pasted.ingest_pasted_text(intake, "Ищем Python-разработчика", None)
+    """Слепки наполняет только перечитывание, а зовёт его обход каналов: разбери
+    по пустым — и балл выйдет нулевым."""
+    await _pasted(intake, "Ищем Python-разработчика")
 
     assert intake.parsed[0] == "слепки"
 
 
 async def test_a_parse_that_did_not_happen_is_not_called_a_success(intake):
-    """Не дошедший разбор удачей не зовут.
-
-    Модель молчит — строка остаётся неразобранной, и в списке её нет:
-    человеку показывают только разобранные. Скажи ему «Объявление заведено»,
-    и он пойдёт искать в списке то, чего там не появится.
-    """
+    """Не дошедший разбор удачей не зовут: строка неразобранная, и в списке её нет."""
     intake.parse_done = False
 
-    assert await pasted.ingest_pasted_text(intake, "Ищем повара", None) == "llm"
+    await _pasted(intake, "Ищем повара")
+
+    assert [one.outcome for one in intake.told] == ["llm"]
+
+
+async def test_without_the_switch_the_vacancy_is_only_filed(intake):
+    """Переключатель выключен — заводится в New, и больше ничего."""
+    await _pasted(intake, "Ищем повара", hands_over=False)
+
+    assert intake.applied == []
+
+
+async def test_with_the_switch_the_window_hears_before_the_applier_starts(intake, session_factory):
+    """Переключатель включён — откликатель по режиму отклика; весть «заведено»
+    уходит до отклика: окно ждёт New, а не конца отклика."""
+    await _pasted(intake, "Ищем повара", hands_over=True)
+
+    saved = await only_row(session_factory, Vacancy)
+    assert intake.applied == [[saved.id]]
+    assert intake.order == ["весть", "отклик"]

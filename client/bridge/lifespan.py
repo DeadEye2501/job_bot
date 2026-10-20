@@ -10,6 +10,7 @@ from client.bridge.bot_stop import detach_bot, stop_bot
 from client.bridge.events import LIST_CHANGED
 from client.bridge.hub import Hub
 from client.bridge.journal import close_journal
+from client.bridge.vacancies import tell_hand_made
 
 
 logger = logging.getLogger(__name__)
@@ -220,6 +221,7 @@ def _tell_the_window(bot, hub: Hub) -> None:
     )
     bot.on_human_resolved = lambda: events.add("human_resolved")
     bot.on_round_note = lambda text: events.add("round_note", {"text": text})
+    bot.on_hand_made = lambda result: tell_hand_made(events, result)
 
 
 def _restart_bot(hub: Hub) -> None:

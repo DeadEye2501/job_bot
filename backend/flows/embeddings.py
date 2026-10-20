@@ -79,6 +79,20 @@ async def embed_text(pipeline, text: str, what: str) -> list[float] | None:
         return None
 
 
+async def embed_or_none(pipeline, text: str, what: str) -> list[float] | None:
+    """Отпечаток текста; пусто — не дали, в том числе потому, что поставщик молчит.
+
+    Для тех, кому молчащий поставщик — не повод бросать дело: прогон заново
+    оставляет прежний вектор, ручное заведение отвечает человеку бедой.
+    Молчание пишется в журнал здесь, раз ловящий его не поднимает дальше.
+    """
+    try:
+        return await embed_text(pipeline, text, what)
+    except ProviderIsSilent:
+        logger.warning("%s: поставщик отпечатков молчит", what)
+        return None
+
+
 async def similar_vacancy_id(pipeline, embedding: list[float]) -> int | None:
     """Номер уже заведённой вакансии с таким же отпечатком; пусто — такой нет.
 

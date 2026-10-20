@@ -18,7 +18,6 @@ from backend.flows.dm_backfill import DmHooks
 from backend.flows.dm_debounce import DmDebounce
 from backend.notify import fire
 
-from backend.flows import pasted
 from backend.flows import dm_classify
 from backend.flows import channels
 from backend.flows import rerun
@@ -89,6 +88,12 @@ def _declare_window_hooks(pipeline) -> None:
     # Optional UI hook: called as on_new_message(hr_id) после persist'а
     # сообщения (в т.ч. backfill'ом нового HR'а из автоаплая).
     pipeline.on_new_message = None
+    # Итог ручного заведения — `on_hand_made(HandResult)`: толкается сразу
+    # после разбора, до передачи откликателю, — окно ждёт New, а не конца
+    # отклика. `hand_made_told` — сказан ли он в идущей работе: зовущий
+    # сбрасывает его перед работой и по нему не шлёт второй вести.
+    pipeline.on_hand_made = None
+    pipeline.hand_made_told = False
 
 
 def _declare_dm_debounce(pipeline) -> None:
@@ -230,6 +235,10 @@ class IngestionPipeline:
     def emit_progress(self, stage: str, label: str, current: int, total: int) -> None:
         fire(self.on_progress, "on_progress", stage, label, current, total)
 
+    def emit_hand_made(self, result) -> None:
+        self.hand_made_told = True
+        fire(self.on_hand_made, "on_hand_made", result)
+
     def fire_contacts_changed(self) -> None:
         fire(self.on_contacts_changed, "on_contacts_changed")
 
@@ -299,11 +308,6 @@ class IngestionPipeline:
 
     async def recover_orphan_vacancies(self) -> int:
         return await rerun.recover_orphan_vacancies(self)
-
-    async def ingest_pasted_text(
-        self, text, posted_at
-    ) -> pasted.PastedIntakeOutcome:
-        return await pasted.ingest_pasted_text(self, text, posted_at)
 
     async def poll_active_channels(self) -> None:
         return await channels.poll_active_channels(self)

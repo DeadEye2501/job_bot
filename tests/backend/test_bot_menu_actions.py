@@ -13,6 +13,9 @@ import asyncio
 
 import pytest
 
+from backend.bot import pasted as pasted_mod
+from backend.flows.hand_made import HandRequest
+from backend.flows.hand_outcome import HandResult
 from tests.fakes.ingestion import FakeIngestion, WindowHooks, wire
 
 
@@ -26,50 +29,87 @@ async def test_a_rerun_reaches_the_pipeline_and_frees_the_slot(make_bot):
     assert bot.current_poll_task is None
 
 
-async def test_pasted_text_reaches_the_pipeline_and_frees_the_slot(make_bot):
-    """Вставленный текст доходит до конвейера, называет себя и освобождает место.
+@pytest.fixture
+def requests_seen(monkeypatch):
+    """Заявки окна, дошедшие до ручного заведения, и набор агента при каждой."""
+    seen = []
+
+    async def ingest_by_hand(kit, request):
+        seen.append((kit, request))
+
+    monkeypatch.setattr(pasted_mod.hand_made, "ingest_by_hand", ingest_by_hand)
+    return seen
+
+
+TEXT = HandRequest("text", "Ищем повара", None, False)
+
+
+async def test_pasted_text_reaches_the_intake_and_frees_the_slot(make_bot, requests_seen):
+    """Заявка доходит до ручного заведения с набором агента и освобождает место.
 
     Место прогона одно на всех, и не освободи его приём — кнопка сбора и
     прогон вакансии замерли бы навсегда: занятость читается по тому же полю.
-    Имя ступени окно ловит по строке: опечатайся она здесь, человек увидел бы
-    внизу две пустые полосы без единого слова о том, что идёт.
     """
-    ingestion = FakeIngestion()
-    hooks = WindowHooks()
-    bot = wire(await make_bot(), ingestion, hooks)
+    bot = wire(await make_bot(), FakeIngestion())
 
-    assert await bot.ui_ingest_pasted_text("Ищем повара", None) == "ok"
-    assert ingestion.pasted_calls == [("Ищем повара", None)]
-    assert hooks.progress == [("pasted", "Разбор объявления", 0, 0)]
+    await bot.ui_ingest_pasted_text(TEXT)
+
+    (kit, request), = requests_seen
+    assert kit is not None and request == TEXT
     assert bot.current_poll_task is None
 
 
-async def test_the_word_of_the_pasted_intake_reaches_the_window_as_it_is(make_bot):
-    """Слово приёма доезжает до окна как есть.
+async def test_a_job_that_never_told_the_window_answers_with_its_own_end(make_bot, monkeypatch):
+    """Работа сорвалась до итога — окно слышит срыв: другой вести не будет."""
+    bot = wire(await make_bot(), FakeIngestion())
 
-    Повтор, молчащая модель отпечатков и не дошедший разбор — три разные
-    беды, и человеку про них говорят разное; сведи их к одному «не вышло», и
-    он не узнает, что вакансия давно в списке.
-    """
-    bot = wire(await make_bot(), FakeIngestion(word_outcome="duplicate"))
+    async def broke(kit, request):
+        raise RuntimeError("база не отвечает")
 
-    assert await bot.ui_ingest_pasted_text("Ищем повара", None) == "duplicate"
+    monkeypatch.setattr(pasted_mod.hand_made, "ingest_by_hand", broke)
+
+    assert await bot.ui_ingest_pasted_text(TEXT) == "error"
 
 
-async def test_a_paste_while_the_slot_is_busy_is_refused_without_calling_the_pipeline(
-    make_bot, busy_slot
+async def test_the_bot_forwards_the_end_of_an_intake_to_the_window(make_bot):
+    """Итог заведения от конвейера доезжает до окна: второй вести по концу
+    работы нет, и без этой пересылки окно ждало бы итога вечно."""
+    bot = await make_bot()
+    heard = []
+    bot.on_hand_made = heard.append
+
+    bot.ingestion.emit_hand_made(HandResult("ok", 7))
+
+    assert heard == [HandResult("ok", 7)]
+
+
+async def test_a_stop_after_the_window_was_told_sends_no_second_word(make_bot, monkeypatch):
+    """Итог заведения уже ушёл окну, а отклик после него сорвался — второй
+    вести нет: вакансия стоит в New, и «не удалось завести» было бы неправдой."""
+    bot = wire(await make_bot(), FakeIngestion())
+
+    async def told_then_broke(kit, request):
+        kit.pipeline.emit_hand_made(HandResult("ok", 7))
+        raise RuntimeError("отклик сорвался")
+
+    monkeypatch.setattr(pasted_mod.hand_made, "ingest_by_hand", told_then_broke)
+
+    assert await bot.ui_ingest_pasted_text(TEXT) == "told"
+
+
+async def test_a_paste_while_the_slot_is_busy_is_refused_without_calling_the_intake(
+    make_bot, busy_slot, requests_seen
 ):
     """Занятое место отбивает приём, не начиная работы.
 
     Два прогона разом подрались бы за кэш отпечатков: первый пишет в него
     заведённое, второй сверяется с ним же.
     """
-    ingestion = FakeIngestion()
-    bot = wire(await make_bot(), ingestion)
+    bot = wire(await make_bot(), FakeIngestion())
     busy_slot(bot)
 
-    assert await bot.ui_ingest_pasted_text("Ищем повара", None) == "busy"
-    assert ingestion.pasted_calls == []
+    assert await bot.ui_ingest_pasted_text(TEXT) == "busy"
+    assert requests_seen == []
 
 
 async def test_a_delete_from_the_window_reaches_the_pipeline(make_bot):

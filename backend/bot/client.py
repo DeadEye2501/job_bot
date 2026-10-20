@@ -141,9 +141,9 @@ def _declare_loop_controls(bot) -> None:
 def _declare_ui_hooks(bot) -> None:
     """Места, куда окно вписывает свои отклики на события бота.
 
-    Без окна все остаются пустыми, и бот работает молча. Их восемь: пять
-    приходят от конвейера — их пересылает `_forward_pipeline_hooks`, — а три
-    бот толкает сам: начало и конец оборота и отметку о прочтении.
+    Без окна все остаются пустыми, и бот работает молча. Шесть приходят от
+    конвейера — их пересылает `_forward_pipeline_hooks`, — остальные бот
+    толкает сам.
     """
     # Optional UI hooks fired around each Full-mode poll cycle.
     bot.on_cycle_start = None  # filled in by client.bridge.lifespan under the UI
@@ -179,6 +179,8 @@ def _declare_ui_hooks(bot) -> None:
     bot.on_human_needed = None
     bot.on_human_resolved = None
     bot.on_round_note = None
+    # Итог ручного заведения из окна — `on_hand_made(HandResult)`, от конвейера.
+    bot.on_hand_made = None
 
 
 def _forward_pipeline_hooks(bot) -> None:
@@ -197,6 +199,9 @@ def _forward_pipeline_hooks(bot) -> None:
     )
     bot.ingestion.on_new_message = lambda hr_id: (
         bot.on_new_message and bot.on_new_message(hr_id)
+    )
+    bot.ingestion.on_hand_made = lambda result: (
+        bot.on_hand_made and bot.on_hand_made(result)
     )
 
 
@@ -375,10 +380,8 @@ class Bot:
     ) -> rerun.RerunOutcome:
         return await rerun.ui_rerun_vacancy_pipeline(self, vacancy_id)
 
-    async def ui_ingest_pasted_text(
-        self, text, posted_at
-    ) -> pasted.PastedOutcome:
-        return await pasted.ui_ingest_pasted_text(self, text, posted_at)
+    async def ui_ingest_pasted_text(self, request) -> pasted.PastedOutcome:
+        return await pasted.ui_ingest_pasted_text(self, request)
 
     async def ui_forget_vacancy(self, vacancy_id) -> bool:
         return await self.ingestion.forget_vacancy(vacancy_id)

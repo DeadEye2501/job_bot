@@ -147,15 +147,15 @@ def provider_says(monkeypatch):
 
 
 @pytest.fixture
-def told(hub, runner):
-    """Что мост сказал окну об исходе пущенной работы.
+def heard(hub, runner):
+    """Последняя весть об исходе пущенной работы — целиком, с метками.
 
     Долгие кнопки — прогон канала, прогон вакансии, отправка отклика —
     отвечают «пущено» и уходят работать. Чем кончилось, человек узнаёт вестью,
     и другого места, где это видно, нет: дожидаемся работы и читаем очередь.
     """
 
-    async def _told():
+    async def _heard():
         await runner.drain()
         news = await hub.events.take(0, timeout=0.1)
         said = [
@@ -163,6 +163,21 @@ def told(hub, runner):
             if one["kind"] == "action_finished"
         ]
         return said[-1] if said else None
+
+    return _heard
+
+
+@pytest.fixture
+def told(heard):
+    """Что из вести видно человеку: слова и красная ли плашка.
+
+    Метки вести — чья она и о какой вакансии — нужны окну, а не человеку, и
+    проверкам слов они только мешали бы.
+    """
+
+    async def _told():
+        news = await heard()
+        return None if news is None else {key: news[key] for key in ("message", "danger")}
 
     return _told
 

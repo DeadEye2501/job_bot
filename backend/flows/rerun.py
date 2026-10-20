@@ -162,14 +162,7 @@ async def _refresh_embedding(pipeline, vacancy_id: int, text: str) -> None:
     из окна, пока отвечала модель, и вернувшийся в кэш вектор отсеивал бы
     будущие посты как повторы строки, которой уже нет.
     """
-    try:
-        vector = await embeddings.embed_text(pipeline, text, f"vacancy {vacancy_id}")
-    except embeddings.ProviderIsSilent:
-        logger.warning(
-            "rerun: vacancy %d поставщик отпечатков молчит, вектор остаётся прежним",
-            vacancy_id,
-        )
-        return
+    vector = await embeddings.embed_or_none(pipeline, text, f"rerun: vacancy {vacancy_id}")
     if vector is None:
         return
     if not await _store(pipeline, vacancy_id, embedding=vector):

@@ -11,15 +11,17 @@ from backend.repository import (
     profile_skills as skills_repo,
     vacancies_card,
     vacancies_list,
-    vacancies_new,
     vacancy_status,
 )
+from backend.flows import hand_made
+from backend.flows.hand_made import HandRequest
 from backend.incoming import moment_or_none, text_or_none
 from client.bridge.answer import (
     BAD_PAYLOAD,
     Denied,
     bad_fields,
     denied,
+    finished,
     launched_on_bot,
     reply,
 )
@@ -281,6 +283,9 @@ class Vacancies(VacancyActions, VacancyLinks, VacancyContacts):
         «Ссылке на объявление» отвечает номером существующей с `created: false`
         и фразой из набора отказов: доставить её окну иначе нечем.
 
+        С включённым переключателем «Отклик при создании» поля заводит бот:
+        отклик идёт через место прогона. Ответ тогда — «пущено», итог — вестью.
+
         Заслон здесь, а не в репозитории: пустое название — это про форму, а
         не про строку, и отвечать на него надо словами человеку.
         """
@@ -291,15 +296,22 @@ class Vacancies(VacancyActions, VacancyLinks, VacancyContacts):
         if not fields["title"]:
             return denied(NAME_REQUIRED, action="create_vacancy")
 
+        if bool(payload.get("hands_over")):
+            return launched_on_bot(
+                self._hub,
+                lambda bot: bot.ui_ingest_pasted_text(HandRequest("fields", fields, None, True)),
+                PASTED_REFUSALS,
+                FILED,
+                action=HAND_MADE_ACTION,
+            )
+
         async def run() -> dict:
-            async with self._hub.session_factory() as session:
-                async with session.begin():
-                    created_id, created = await vacancies_new.create_vacancy(session, fields)
-            if not created:
-                return {"action": "create_vacancy", "created_id": created_id, "created": False,
-                        "message": PASTED_REFUSALS["duplicate"]}
-            self._hub.events.add(LIST_CHANGED)
-            return {"action": "create_vacancy", "created_id": created_id, "created": True}
+            result = await hand_made.file_fields(self._hub.session_factory, fields)
+            created = result.outcome == "ok"
+            if created:
+                self._hub.events.add(LIST_CHANGED)
+            return {"action": "create_vacancy", "created_id": result.vacancy_id, "created": created,
+                    "message": FILED if created else PASTED_REFUSALS[result.outcome]}
 
         return reply(self._hub.runner, run())
 
@@ -313,17 +325,37 @@ class Vacancies(VacancyActions, VacancyLinks, VacancyContacts):
 
         Ответ говорит только «пущено»: разбор — это несколько обращений к
         модели, и ждать их значит держать окно. Чем кончилось, человек узнаёт
-        вестью.
+        вестью. Положение переключателя приходит видимым, как его видит
+        человек: запертый показан выключенным и выключенным уходит.
         """
         text = text_or_none(payload.get("raw_text"))
         if not text:
-            return denied(TEXT_REQUIRED, action="create_from_text")
+            return denied(TEXT_REQUIRED, action=HAND_MADE_ACTION)
 
-        posted_at = moment_or_none(payload.get("posted_at"))
+        request = HandRequest(
+            "text", text, moment_or_none(payload.get("posted_at")), bool(payload.get("hands_over")),
+        )
         return launched_on_bot(
             self._hub,
-            lambda bot: bot.ui_ingest_pasted_text(text, posted_at),
+            lambda bot: bot.ui_ingest_pasted_text(request),
             PASTED_REFUSALS,
-            "Объявление заведено",
-            action="create_from_text",
+            FILED,
+            action=HAND_MADE_ACTION,
         )
+
+
+HAND_MADE_ACTION = "create_from_text"
+"""Метка вестей ручного заведения: одна на все вкладки окна, по ней окно ждёт свою."""
+
+FILED = "Вакансия заведена"
+
+
+def tell_hand_made(events, result) -> None:
+    """Итог ручного заведения окну — вестью исхода с меткой и номером вакансии.
+
+    По номеру окно переходит на существующую при повторе.
+    """
+    finished(
+        events, result.outcome, PASTED_REFUSALS, FILED,
+        action=HAND_MADE_ACTION, outcome=result.outcome, vacancy_id=result.vacancy_id,
+    )

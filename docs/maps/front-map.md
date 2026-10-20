@@ -784,7 +784,7 @@
 - * Три положения слева направо. Порядок несущий: по нему считается, в какую * треть дорожки попало нажатие.
 - отдаёт: OFF, modeChosen, modeHintAt
 
-### state/new_card.js (101)
+### state/new_card.js (99)
 - * Обвязка формы заведения по роду карточки. * * `named` держится рядом с `blank` нарочно: пустой черновик и заслон, который * решает, что он уже не пустой, — две половины одного правила, и разъехавшись, * они дали бы кнопку, открытую над формой, которую мост отобьёт.
 - отдаёт: NEW_CARD
 
@@ -1892,7 +1892,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/markup.test.js (69)
 - —
 
-### tests/new_card.test.js (35)
+### tests/new_card.test.js (36)
 - —
 
 ### tests/new_vacancy_fields_live.test.js (84)

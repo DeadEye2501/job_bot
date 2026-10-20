@@ -598,7 +598,8 @@
 ### `backend/bot/pasted.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `PastedOutcome` = `Literal[work.WorkOutcome, flow_pasted.PastedInta…`
+- `TOLD` = `work.TOLD`
+- `PastedOutcome` = `Literal[work.WorkOutcome, 'told']`
 
 ### `backend/bot/rerun.py`
 
@@ -632,6 +633,7 @@
 - `RESUME_MISSING_NOTE` = `'Выбранное резюме не найдено на {site} — обновит…`
 - `AgentStop` = `Literal['human_timeout', 'limit', 'resume_missin…`
 - `WorkOutcome` = `Literal[slot.CycleOutcome, AgentStop]`
+- `TOLD` = `'told'`
 
 ### `backend/crypto.py`
 
@@ -910,12 +912,29 @@
 
 - `logger` = `logging.getLogger(__name__)`
 
+### `backend/flows/hand_made.py`
+
+- `HandTab` = `Literal['fields', 'text']`
+- `class HandRequest`
+  - `tab: HandTab`
+  - `value: str | dict`
+  - `posted_at: datetime | None`
+  - `hands_over: bool`
+
+### `backend/flows/hand_outcome.py`
+
+- `HandOutcome` = `Literal['ok', 'duplicate', 'embed', 'llm', 'arti…`
+- `class HandResult`
+  - `outcome: HandOutcome`
+  - `vacancy_id: int | None` = `None`
+
 ### `backend/flows/handover.py`
 
 - `class Intake`
   - `channel: str | None` = `None`
   - `allow_delete: bool` = `True`
   - `hands_over: bool` = `True`
+  - `tells_window: bool` = `False`
 
 ### `backend/flows/ingest.py`
 
@@ -953,7 +972,6 @@
 ### `backend/flows/pasted.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `PastedIntakeOutcome` = `Literal['ok', 'duplicate', 'embed', 'llm', 'tras…`
 - `WHAT` = `'вставленный текст'`
 
 ### `backend/flows/pipeline.py`
@@ -2196,7 +2214,8 @@
 - `RUN_REFUSALS` = `словарь из 3 и раскрытых`
 - `POLL_REFUSALS` = `словарь из 5 и раскрытых`
 - `RERUN_REFUSALS` = `словарь из 6 и раскрытых`
-- `PASTED_REFUSALS` = `словарь из 8 и раскрытых`
+- `PASTED_REFUSALS` = `словарь из 7 и раскрытых`
+- `CALM` = `frozenset({'duplicate'})`
 - `PARSE_CV_REFUSALS` = `словарь из 5`
 - `NO_AGGREGATOR` = `'Агрегатор не найден'`
 - `WEB_SEARCH_KEPT` = `'Поиск по сети удалить нельзя'`
@@ -2241,6 +2260,8 @@
 ### `client/bridge/vacancies.py`
 
 - `logger` = `logging.getLogger(__name__)`
+- `HAND_MADE_ACTION` = `'create_from_text'`
+- `FILED` = `'Вакансия заведена'`
 
 ### `client/bridge/vacancy_links.py`
 
@@ -2397,6 +2418,10 @@
 
 - `_ENV_PY` = `'\nfrom alembic import context\nfrom sqlalchemy …`
 - `_REVISION_PY` = `'\nrevision = "{revision}"\ndown_revision = {par…`
+
+### `tests/backend/test_bot_menu_actions.py`
+
+- `TEXT` = `HandRequest('text', 'Ищем повара', None, False)`
 
 ### `tests/backend/test_domain_apply_order.py`
 

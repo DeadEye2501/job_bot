@@ -7,6 +7,7 @@ from sqlalchemy import select
 from backend.applying.world import AWAITS_APPLICATION
 from backend.flows import parse
 from backend.flows.dm_backfill import spawn_hr_backfill
+from backend.flows.hand_outcome import tell
 from backend.flows.parse import Judged
 from backend.models import Vacancy
 from backend.repository.hr_card import LAST_VACANCY_ORDER
@@ -21,12 +22,14 @@ class Intake:
 
     Решает это зовущий, а не разбор и не передача: каждый знает, ручается ли он
     за текст и просили ли отклика. По умолчанию — без канала, сносить можно,
-    отдавать; заведённую человеком разбор не сносит и так.
+    отдавать; заведённую человеком разбор не сносит и так. `tells_window` —
+    окно ждёт итога этого разбора: он уходит вестью между разбором и передачей.
     """
 
     channel: str | None = None
     allow_delete: bool = True
     hands_over: bool = True
+    tells_window: bool = False
 
 
 async def orphan_intake(pipeline, vacancy_id: int, intake: Intake) -> Intake:
@@ -88,5 +91,7 @@ async def judge_and_hand_over(pipeline, vacancy_id: int, text: str, intake: Inta
     """Разбор одной вакансии и передача её итога; ответ — записан ли исход."""
     judged = await parse.parse_and_update_vacancy(
         pipeline, vacancy_id, text, intake.channel, allow_delete=intake.allow_delete)
+    if intake.tells_window:
+        tell(pipeline, "ok" if judged.stored else "llm", vacancy_id)
     await hand_over(pipeline, [(vacancy_id, judged)], applies=intake.hands_over)
     return judged.stored

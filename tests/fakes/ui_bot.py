@@ -22,7 +22,7 @@ class Sent:
 ANSWERS = {
     "poll": "ok",
     "rerun": "ok",
-    "pasted": "ok",
+    "pasted": "told",
     "forgotten": True,
     "read": 1,
     "sent": 1,
@@ -88,8 +88,8 @@ class UiBot:
         self.calls.append(("ui_rerun_vacancy_pipeline", vacancy_id))
         return self.answers["rerun"]
 
-    async def ui_ingest_pasted_text(self, text, posted_at) -> PastedOutcome:
-        self.calls.append(("ui_ingest_pasted_text", text, posted_at))
+    async def ui_ingest_pasted_text(self, request) -> PastedOutcome:
+        self.calls.append(("ui_ingest_pasted_text", request))
         return self.answers["pasted"]
 
     async def ui_forget_vacancy(self, vacancy_id: int) -> bool:
