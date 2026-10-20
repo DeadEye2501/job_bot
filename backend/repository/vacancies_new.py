@@ -34,8 +34,8 @@ HAND_MADE = "created_by_hand"
 async def made_by_hand(session: AsyncSession, vacancy_id: int) -> bool:
     """Заведена ли вакансия человеком — по событию её заведения в ленте.
 
-    Признак живёт у самой строки, а не в окне: разбор, подбор недоразобранного
-    и прогон заново узнают его отсюда, когда окна давно нет.
+    Признак живёт у самой строки, а не в окне: разбор узнаёт его отсюда и у
+    подбора недоразобранного, и у прогона заново, когда окна давно нет.
     """
     found = await session.scalar(select(VacancyEvent.id).where(
         VacancyEvent.vacancy_id == vacancy_id, VacancyEvent.kind == HAND_MADE
@@ -58,7 +58,7 @@ async def add_with_event(
 
 async def create_vacancy(session: AsyncSession, fields: dict) -> int:
     """Завести вакансию по набранному в окне и назвать номер. Повтор по
-    «Ссылке на объявление» зовущий проверил до этого (`hand_made.known_at`).
+    «Ссылке на объявление» зовущий проверил до этого (`hand_made.file_fields`).
 
     Поля приходят одним объектом, каким их прочитала форма
     (`bridge/form_payloads.read_new_vacancy_fields`): колонки они называют

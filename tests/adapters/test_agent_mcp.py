@@ -8,6 +8,7 @@ from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
 from adapters.agent_mcp import serve_tools
+from tests.mcp_call import call_tool
 
 
 async def _echo(text: str) -> str:
@@ -68,13 +69,7 @@ async def test_a_hanging_call_does_not_hold_the_close():
 
     server = await serve_tools([_wait])
 
-    async def call():
-        async with streamable_http_client(server.url) as (read, write, _):
-            async with ClientSession(read, write) as client:
-                await client.initialize()
-                await client.call_tool("_wait", {})
-
-    caller = asyncio.create_task(call())
+    caller = asyncio.create_task(call_tool(server.url, "_wait", {}))
     await asyncio.wait_for(started.wait(), 10)
     began = time.monotonic()
 

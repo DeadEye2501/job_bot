@@ -1,10 +1,12 @@
 """Обход источника: искатель находит, и каждая находка проходит весь цикл до
 отклика, прежде чем он ищет дальше; last_run_at двигается только по done."""
 
+import asyncio
+
 import pytest
 
 from backend.agent.jobs import Source
-from backend.agent.sessions import SEEKER_TOOL_TIMEOUT_MS
+from backend.agent.sessions import SESSION_LIMIT_SEC
 from backend.agent.stops import HumanTimeout, LimitExhausted, ResumeMissing
 from backend.flows.aggregator_round import seek_source
 from backend.models import Aggregator, ProfileLanguage, Vacancy
@@ -173,28 +175,45 @@ async def test_the_web_seeker_searches_the_web_and_avoids_the_persons_aggregator
 
 
 @pytest.mark.parametrize("host", ["site.test", None], ids=["агрегатор", "поиск по сети"])
-async def test_the_seekers_clock_stands_while_a_person_is_awaited(seek, parsed, host):
-    """Срок искателя меряет только его работу: пока ждут человека, он стоит, а
-    вызов инструмента сроком не ограничен — в нём идёт весь цикл находки."""
-    _, _, kit = await seek([finish_step()], host=host)
+async def test_the_seekers_clock_stands_while_a_person_is_awaited(seek, parsed, short_clock, host):
+    """Срок искателя меряет только его работу: человек, отвечающий дольше всего
+    срока, сессию не гасит, и искатель кончает её сам."""
+    gates = []
 
-    (plan,) = kit.run_session.plans
-    assert plan.tool_timeout_ms == SEEKER_TOOL_TIMEOUT_MS
-    assert plan.paused() is kit.gate.waiting
-
-
-async def test_the_seekers_clock_stands_while_its_find_goes_through(seek, parsed):
-    """Вложенный цикл находки — разбор, отклик — в срок искателя не идёт."""
-    paused = []
+    async def step(tools):
+        asyncio.get_running_loop().call_later(0.2, gates[0].resolve)
+        await tools["need_human"](kind="captcha")
+        await tools["finish"](result="done")
 
     async def watch(kit):
+        gates.append(kit.gate)
+
+    _, stored, _ = await seek([step], on_kit=watch, host=host)
+
+    assert stored.last_run_at is not None
+
+
+async def test_a_seekers_tool_call_outlasts_the_whole_session(seek, parsed):
+    """В вызове инструмента искателя идёт весь цикл находки до отклика: процесс
+    агента не обрывает его раньше, чем кончился бы срок всей сессии."""
+    _, _, kit = await seek([finish_step()])
+
+    (plan,) = kit.run_session.plans
+    assert plan.tool_timeout_ms >= SESSION_LIMIT_SEC * 1000
+
+
+async def test_the_seekers_clock_stands_while_its_find_goes_through(seek, parsed, short_clock):
+    """Вложенный цикл находки — разбор, отклик — в срок искателя не идёт:
+    отклик дольше всего срока доходит до конца, и обход кончается сам."""
+    async def watch(kit):
         async def apply(ids):
-            paused.append(kit.run_session.plans[0].paused())
+            await asyncio.sleep(0.2)
+            kit.pipeline.applied.append(list(ids))
         kit.pipeline.apply = apply
 
-    _, _, kit = await seek([_submit_and_finish], on_kit=watch)
+    found, stored, _ = await seek([_submit_and_finish], on_kit=watch)
 
-    assert paused == [True] and kit.run_session.plans[0].paused() is False
+    assert len(found) == 1 and stored.last_run_at is not None
 
 
 async def test_the_web_seeker_is_told_to_keep_off_telegram(seek, parsed):
@@ -217,17 +236,6 @@ async def test_the_seeker_is_told_how_to_call_a_person(seek, parsed, host):
     # Подстрока самого правила о зове человека: слово `need_human` называет и
     # промпт роли, и по нему пропажу правила не заметить.
     assert 'need_human с kind="captcha"' in plan.system_prompt
-
-
-@pytest.mark.parametrize("host", ["site.test", None], ids=["агрегатор", "поиск по сети"])
-async def test_the_seeker_is_told_what_to_do_after_each_answer(seek, parsed, host):
-    """После передачи вкладка бывает уже чужой: наставление велит вернуться к
-    выдаче по адресу, на «не вышло» — искать дальше, на остановку — кончать."""
-    _, _, kit = await seek([finish_step()], host=host)
-
-    (plan,) = kit.run_session.plans
-    assert "вернись к выдаче" in plan.system_prompt
-    assert "«не вышло»" in plan.system_prompt and "«Работа остановлена»" in plan.system_prompt
 
 
 async def test_the_web_seeker_hears_of_the_blacklisted_sites(seek, session_factory, parsed):

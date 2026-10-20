@@ -4,7 +4,7 @@ import re
 from typing import Literal, NamedTuple
 from urllib.parse import parse_qsl, urlsplit
 
-from backend.domain.company_names import without_scheme
+from backend.domain.address_start import without_scheme
 from backend.domain.telegram_identity import (
     ARTICLE_URL_RE, TELEGRAM_HOSTS, TELEGRAM_LINK_HOSTS, TELEGRAPH_HOSTS, post_address,
 )

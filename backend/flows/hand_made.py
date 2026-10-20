@@ -17,13 +17,12 @@ from typing import Literal
 from backend.agent.kit import AgentKit
 from backend.domain.hosts import LinkKind, article_address, typed_page
 from backend.domain.telegram_identity import post_address
-from backend.flows import cleanup, handover, ingest, linked_article, linked_page, pasted
+from backend.flows import cleanup, hand_repeat, handover, ingest, linked_article, linked_page, pasted
 from backend.flows.hand_outcome import show_parsing, tell
 from backend.flows.handover import hand_over
 from backend.flows.parse import Judged
 from backend.payloads import ChannelPost
 from backend.repository.channels import find_channel_by_username
-from backend.repository.vacancies_life import vacancies_at_address
 from backend.repository.vacancies_new import create_vacancy
 from backend.telegram_lookup import read_post
 
@@ -53,13 +52,17 @@ class HandRequest:
 async def ingest_by_hand(kit: AgentKit, request: HandRequest) -> None:
     """Довести заявку окна до строки; итог — вестью окну (`tell`).
 
-    Однозначный повтор узнаётся первым (`_known_address`): ни Telegram, ни
-    агент, ни модель ради уже заведённой вакансии не зовутся. Статья по ссылке
-    — тот же вставленный текст из одной ссылки, без проверки повтора: адрес
-    статьи — не страница вакансии.
+    Однозначный повтор по собственному адресу узнаётся первым
+    (`hand_repeat`): ни Telegram, ни агент, ни модель ради уже заведённой
+    вакансии не зовутся. У полей его узнаёт их же заведение (`file_fields`).
+    Статья по ссылке — тот же вставленный текст из одной ссылки, без проверки
+    повтора: адрес статьи — не страница вакансии.
     """
     pipeline = kit.pipeline
-    if await _known_address(pipeline, own_address(request)):
+    if request.tab == "fields":
+        await _filed(pipeline, request.value, request.hands_over)
+        return
+    if await hand_repeat.known_and_told(pipeline, await hand_repeat.addressed(pipeline.session_factory, _own_address(request))):
         return
     if request.tab == "text":
         await pasted.ingest_pasted_text(pipeline, request.value, request.posted_at, request.hands_over)
@@ -69,42 +72,14 @@ async def ingest_by_hand(kit: AgentKit, request: HandRequest) -> None:
         await _posted(pipeline, request.value, request.hands_over)
     elif request.tab == "page":
         await linked_page.ingest_page(kit, request.value, handover.hand_made_intake(request.hands_over))
-    elif request.tab in _NOTHING_TO_READ:
-        tell(pipeline, _NOTHING_TO_READ[request.tab])
     else:
-        await _filed(pipeline, request.value, request.hands_over)
+        tell(pipeline, _NOTHING_TO_READ[request.tab])
 
 
-def own_address(request: HandRequest) -> str | None:
-    """Собственный адрес вакансии в заявке: у поста и страницы — сама ссылка,
-    у полей — «Ссылка на объявление»; у текста и статьи его нет."""
-    if request.tab in ("post", "page"):
-        return request.value
-    if request.tab == "fields":
-        return typed_page(request.value.get("source_url"))
-    return None
-
-
-async def known_at(session_factory, url: str | None, forget: Callable[[int], Awaitable[object]]) -> int | None:
-    """Номер первой разобранной вакансии с этим собственным адресом;
-    недоразобранные до неё снесены (`handover.known_or_forgotten`). Одно
-    правило у бота и у «Полей» мимо бота — разные у них только руки сноса."""
-    if not url:
-        return None
-    async with session_factory() as session:
-        existing = await vacancies_at_address(session, url)
-    for vacancy_id in existing:
-        if await handover.known_or_forgotten(session_factory, vacancy_id, forget):
-            return vacancy_id
-    return None
-
-
-async def _known_address(pipeline, url: str | None) -> bool:
-    """Заведена ли уже вакансия с этим адресом (`known_at`); да — окну сказано."""
-    existing = await known_at(pipeline.session_factory, url, partial(cleanup.forget_vacancy, pipeline))
-    if existing is not None:
-        tell(pipeline, "duplicate", existing)
-    return existing is not None
+def _own_address(request: HandRequest) -> str | None:
+    """Собственный адрес вакансии в ссылке: у поста и страницы — сама ссылка;
+    у прочих родов его нет."""
+    return request.value if request.tab in ("post", "page") else None
 
 
 async def _posted(pipeline, url: str, hands_over: bool) -> None:
@@ -135,9 +110,9 @@ async def _posted(pipeline, url: str, hands_over: bool) -> None:
     async def save(embedding: list[float]) -> int | None:
         vacancy_id = await ingest.save_new_vacancy(pipeline, post, embedding, by_hand)
         if vacancy_id is None:
-            # Тот же пост завёл встречный обход его канала, пока шло чтение.
-            async with pipeline.session_factory() as session:
-                found = await vacancies_at_address(session, url)
+            # Тот же пост завёл встречный обход его канала, пока шло чтение;
+            # либо канала не стало, и тогда строки по адресу нет вовсе.
+            found = await hand_repeat.addressed(pipeline.session_factory, url)
             tell(pipeline, "duplicate", found[0] if found else None)
         return vacancy_id
 
@@ -153,18 +128,32 @@ async def _channel_id(pipeline, nick: str | None) -> int | None:
     return None if channel is None else channel.id
 
 
-async def file_fields(session_factory, fields: dict) -> int:
-    """Завести набранное в окне и назвать номер. Набранное — уже разбор, модели
-    оно не отдаётся; повтор по «Ссылке на объявление» зовущий проверил до
-    этого (`known_at`)."""
+async def file_fields(
+    session_factory, fields: dict, forget: Callable[[int], Awaitable[object]]
+) -> tuple[int, bool]:
+    """Завести набранное в окне: номер строки и заведена ли она сейчас.
+
+    Набранное — уже разбор, модели оно не отдаётся. Повтор по «Ссылке на
+    объявление» (`hand_repeat.known_among`) отвечает номером существующей.
+    Одно заведение у бота и у «Полей» мимо бота — разные у них только руки
+    сноса недоразобранной.
+    """
+    known = await hand_repeat.known_among(
+        session_factory, await hand_repeat.addressed(session_factory, typed_page(fields.get("source_url"))), forget)
+    if known is not None:
+        return known, False
     async with session_factory() as session:
         async with session.begin():
-            return await create_vacancy(session, fields)
+            return await create_vacancy(session, fields), True
 
 
 async def _filed(pipeline, fields: dict, hands_over: bool) -> None:
     """Завести набранное и отдать откликателю."""
-    vacancy_id = await file_fields(pipeline.session_factory, fields)
+    vacancy_id, created = await file_fields(
+        pipeline.session_factory, fields, partial(cleanup.forget_vacancy, pipeline))
+    if not created:
+        tell(pipeline, "duplicate", vacancy_id)
+        return
     pipeline.fire_vacancies_changed()
     tell(pipeline, "ok", vacancy_id)
     await hand_over(pipeline, [(vacancy_id, Judged(True))], applies=hands_over)

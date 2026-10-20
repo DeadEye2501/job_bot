@@ -19,7 +19,7 @@ import logging
 from collections.abc import Awaitable, Callable
 from datetime import datetime
 
-from backend.flows import embeddings, handover, intake, linked_article
+from backend.flows import embeddings, hand_repeat, handover, intake, linked_article
 from backend.flows.hand_outcome import show_parsing, tell
 from backend.flows.handover import Intake
 from backend.models import Vacancy
@@ -83,7 +83,7 @@ async def file_by_hand(
     записана, и сказал об этом уже он сам.
 
     Отпечаток в той же точке, что у заведённой, — тот же текст, однозначный
-    повтор (`handover.known_and_told`); просто похожий — своя строка.
+    повтор (`hand_repeat.known_and_told`); просто похожий — своя строка.
 
     Слепки перечитываются перед разбором: наполняет их только перечитывание,
     а зовут его не во всяком режиме бота, и балл по пустым вышел бы нулевым.
@@ -93,7 +93,7 @@ async def file_by_hand(
         tell(pipeline, "embed")
         return
     same = await embeddings.similar_vacancy_id(pipeline, embedding, embeddings.SAME_TEXT_COSINE)
-    if same is not None and await handover.known_and_told(pipeline, same):
+    if same is not None and await hand_repeat.known_and_told(pipeline, [same]):
         return
     vacancy_id = await save(embedding)
     if vacancy_id is None:

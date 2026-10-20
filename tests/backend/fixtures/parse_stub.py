@@ -13,6 +13,7 @@
 import pytest
 
 from backend.flows import parse as parse_mod
+from backend.repository.vacancies_new import made_by_hand
 
 
 @pytest.fixture
@@ -35,12 +36,17 @@ def parse_into(monkeypatch, calls: list, *, done=True, fails=()) -> None:
     `fails` — номера, на которых разбор бросает: искателю надо видеть, что
     беда на одной находке не останавливает поиск. Упавший зов в список не
     ложится — разбор до записи не дошёл.
+
+    Заведена ли строка человеком, подделка отвечает, как настоящий разбор, —
+    по ленте строки: по этому ответу передача решает, отдавать ли брошенную.
     """
 
     async def parse(pipeline, vacancy_id, text, username, *, allow_delete=True):
         if vacancy_id in fails:
             raise RuntimeError("разбор упал")
         calls.append((vacancy_id, text, username, allow_delete))
-        return parse_mod.Judged(done() if callable(done) else done)
+        async with pipeline.session_factory() as session:
+            by_hand = await made_by_hand(session, vacancy_id)
+        return parse_mod.Judged(done() if callable(done) else done, by_hand=by_hand)
 
     monkeypatch.setattr(parse_mod, "parse_and_update_vacancy", parse)

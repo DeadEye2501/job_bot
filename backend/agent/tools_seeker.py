@@ -9,7 +9,7 @@ from backend.agent.jobs import SeekJob
 from backend.agent.kit import AgentKit
 from backend.agent.stops import RUN_STOPPERS
 from backend.domain.hosts import host_owns, normalize_host, on_telegram, source_key
-from backend.flows import embeddings, handover, intake, pasted, sameness
+from backend.flows import embeddings, hand_repeat, handover, intake, pasted, sameness
 from backend.flows.hand_outcome import show_parsing
 from backend.incoming import moment_or_none, str_list
 from backend.models import ContactAddedBy, Vacancy
@@ -77,9 +77,6 @@ async def _submit(kit: AgentKit, job: SeekJob, page: _Page) -> str:
 
     Сайт из отсева — пропуск, а не отказ: отказ обрывает обход, а вакансий с
     других сайтов человек ждёт по-прежнему.
-
-    Новая и брошенная недоразобранной проходят весь цикл до ответа агенту
-    (`_through`): следующую он ищет, когда по этой всё кончено.
     """
     if job.stopper is not None:
         return STOPPED
@@ -90,6 +87,16 @@ async def _submit(kit: AgentKit, job: SeekJob, page: _Page) -> str:
         return _left("повтор", job)
     if job.submitted >= job.limit:
         return LIMIT_REACHED
+    return await _by_fingerprint(kit, job, page, key)
+
+
+async def _by_fingerprint(kit: AgentKit, job: SeekJob, page: _Page, key: str) -> str:
+    """Судьба находки по отпечатку: разобранная — повтор, брошенная — дочитать,
+    новая — завести.
+
+    Новая и брошенная недоразобранной проходят весь цикл до ответа агенту
+    (`_through`): следующую он ищет, когда по этой всё кончено.
+    """
     try:
         match = await sameness.known_or_new(kit.pipeline, page.text, WHAT)
     except embeddings.ProviderIsSilent:
@@ -121,17 +128,17 @@ async def _submit_page(kit: AgentKit, job: SeekJob, page: _Page) -> str:
         return STOPPED
     if job.submitted >= job.limit:
         return LIMIT_REACHED
-    # Переадресация внутри площадки — её же страница: хозяин — хост источника,
-    # а у «Поиска по сети» — сайт вставленной страницы.
-    owner = job.source.host or normalize_host(job.page)
-    key = source_key(page.url, job.source.host) if host_owns(owner, normalize_host(page.url)) else None
+    # Переадресацию на чужой сайт у площадки отсекает сам `source_key`; у
+    # «Поиска по сети» хозяина нет, и им становится сайт вставленной страницы.
+    same_site = job.source.host is not None or host_owns(normalize_host(job.page), normalize_host(page.url))
+    key = source_key(page.url, job.source.host) if same_site else None
     if key is None:
         return NOT_THIS_PAGE
     # Одна страница — одна попытка (предел задачи страницы — одна): итог её
     # окно слышит один раз, чем бы она ни кончилась.
     job.submitted += 1
     existing = await kit.read(lambda session: source_row(session, job.source.id, key))
-    if existing is not None and await handover.known_and_told(kit.pipeline, existing):
+    if existing is not None and await hand_repeat.known_and_told(kit.pipeline, [existing]):
         return f"повтор; {LIMIT_REACHED}"
 
     async def save(embedding: list[float]) -> int:
@@ -168,7 +175,7 @@ async def _through(kit: AgentKit, job: SeekJob, answer: str, cycle: Awaitable) -
 def _show_bar(kit: AgentKit, job: SeekJob) -> None:
     """Нижняя полоса снова за искателем: у обхода — ход обхода, а там, где
     итога ждёт окно, — разбор объявления, как у вставленного текста."""
-    if job.intake.tells_window:
+    if job.intake.by_hand:
         show_parsing(kit.pipeline)
     else:
         kit.pipeline.emit_progress("aggregator", job.source.sweep, job.submitted, job.limit)

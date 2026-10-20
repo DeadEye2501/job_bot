@@ -62,7 +62,7 @@
 - —
 - принимает: ask, events, say
 
-### app/NewVacancy.svelte (215)
+### app/NewVacancy.svelte (214)
 - —
 - принимает: ask, say, lockedTip, newVacancy, onhandmade, onvacancy, onfiled
 
@@ -662,7 +662,7 @@
 - —
 - принимает: marks, dimmed
 
-## state — 72 файлов
+## state — 73 файлов
 
 ### state/aggregators.js (89)
 - * Где агрегатор ищет — подпись под именем. * * У «Поиска по сети» адреса нет — его место занимает то, где он ищет: пустое * место под именем читалось бы как недозаведённый агрегатор.
@@ -748,8 +748,8 @@
 - * Чем подписать компанию в списке. * * Имя — сверху, сайт и алиасы — под ним: по имени компанию узнают, по * домену различают. Две «Ромашки» с разными сайтами — разные компании, и без * второй строки они неотличимы. * * Имени может не быть — оно приходит из объявления, — и тогда компания названа * номером: показать нечего, но строка должна остаться нажимаемой.
 - отдаёт: blankCompany, companyCandidate, companyLine, companyNamed, companyTitle
 
-### state/contact_adding.svelte.js (123)
-- * Заводит окно заведения. * * `list.again(answer)` — что сделать по удаче: перечитать список вкладки или * положить список, пришедший в ответе моста. * * `save` отправляет черновик; отказ — пустота (уже показан плашкой) или * брошенная ошибка (остаётся в окне, см. `trouble`). * * `form.done(draft, answer)` — слово по удаче; пустое значит, что об исходе * скажет весть. * * `held` — где лежит черновик: у окон о человеке, компании, канале и контакте * он свой и умирает с экраном, у окна вакансии его держит оболочка — набранное * должно дожить до итога разбора. `keeps()` — ждут ли итога: тогда закрытое * окно черновик не стирает.
+### state/contact_adding.svelte.js (124)
+- * Заводит окно заведения. * * `list.again(answer)` — что сделать по удаче: перечитать список вкладки или * положить список, пришедший в ответе моста. * * `save` отправляет черновик; отказ — пустота (уже показан плашкой) или * брошенная ошибка (остаётся в окне, см. `trouble`). * * `form.done(draft, answer)` — слово по удаче; пустое значит, что об исходе * скажет весть. * * `held` — где лежит черновик: у окон о человеке, компании, канале и контакте * он свой и умирает с экраном, у окна вакансии его держит оболочка — набранное * должно дожить до итога разбора. `held.handed` — ждут ли итога: тогда * закрытое окно черновик не стирает.
 - отдаёт: contactAdding
 
 ### state/contacts_watch.js (23)
@@ -799,6 +799,10 @@
 ### state/new_card.js (99)
 - * Обвязка формы заведения по роду карточки. * * `named` держится рядом с `blank` нарочно: пустой черновик и заслон, который * решает, что он уже не пустой, — две половины одного правила, и разъехавшись, * они дали бы кнопку, открытую над формой, которую мост отобьёт.
 - отдаёт: NEW_CARD
+
+### state/new_vacancy.js (156)
+- * Способы завести вакансию руками: набрать поля самому, отдать боту текст * или ссылку на объявление. * * Значение решает, каким слотом уедет набранное (`NewVacancy`): поля ложатся в * строку как есть, текст и ссылка идут в конвейер на разбор. Словом «сторона» * на этом экране зовут другое — связь вакансии с компанией и человеком.
+- отдаёт: VACANCY_MODES, blankVacancy, handsOverToggle, isLink, isText, pasteLock, settleHandMade, vacancyFields, vacancyNamed, viaBot
 
 ### state/one_write.js (49)
 - * Заводит запись, у которой в полёте не бывает двух снимков. * * `write` отвечает, а не бросает: отказ моста — обычное дело для анкеты, и все * трое зовущих ловят его у себя, каждый своими словами человеку. * * Отдаёт обещание, которое кончается вместе с отправкой снимка: на нём держится * и уход с вкладки — набранное должно успеть уехать. * * Кончается оно исходом последней уехавшей записи, а не своей: сведённый снимок * включает в себя все, что были до него, и «легло ли» — это про него.
@@ -868,7 +872,7 @@
 - * Что из списка остаётся видно под набранное. * * Пустое набранное оставляет список целым: поле поиска стоит над уже открытым * списком, и до первого знака резать нечего. Одни пробелы — то же самое: их * набирают между словами и стирают последними, и схлопнутый на них список * мигал бы под руками. * * Регистр не различается — человек набирает как придётся, а значения приходят * как записаны. Вхождением, а не началом строки: имена приходят с приставками * («qwen/qwen3-4b», «@ник · компания»), и отбор по началу прятал бы строку от * того, кто набирает её собственное имя. * * `text` называет, где искать: у строки списка полей несколько, и по какому из * них её вспоминают, знает не этот файл, а тот, кто её показывает.
 - отдаёт: matching
 
-### state/section_memory.svelte.js (84)
+### state/section_memory.svelte.js (85)
 - * Память свежего окна: первые вкладки, ни одной открытой карточки, пустой * отбор и первый порядок. * * Порядок хранится подписью, а не ключом: подписью его выбирают в меню и * подписью же показывают в подсказке кнопки.
 - отдаёт: heldMemory, sectionMemory, withCard, withTab, withView
 
@@ -924,9 +928,9 @@
 - * Чем подписана запись без названия. Показывают её приглушённой * (`styles/unnamed.css`) — так видно, что это не название, а его отсутствие.
 - отдаёт: UNNAMED, titled
 
-### state/vacancies.js (349)
+### state/vacancies.js (203)
 - * Порядки списка в том виде, в каком их выбирают. Ключи уезжают на мост и * разбираются там `backend/repository/vacancies_list._order_for`; незнакомый * ему ключ сводится к «сначала новые». Первый здесь — тот, в котором список * открывается.
-- отдаёт: SORTS, VACANCY_MODES, ago, blankVacancy, emptyNote, gradeLabel, handsOverToggle, isLink, isText, pasteLock, remoteLabel, salaryLabel, scoreTone, settleHandMade, shortAgo, shownStack, sortKey, vacancyFields, vacancyLine, vacancyNamed, viaBot
+- отдаёт: SORTS, ago, emptyNote, gradeLabel, remoteLabel, salaryLabel, scoreTone, shortAgo, shownStack, sortKey, vacancyLine
 
 ### state/vacancy_actions.js (98)
 - * Почему отклик и переразбор сейчас недоступны. * * Пустая фраза значит «доступно». Обе просьбы уходят боту, поэтому неживое * окружение запирает оба и объясняется теми же словами, что и кнопка обхода * внизу окна: две разные фразы об одной беде человек читает как две беды. * * Идущий обход запирает оба: прогон сам зовёт модель, а параллельной работы * модели не допускаем — даже отклика в Telegram, которому браузер не нужен. * Старшинство причин то же, что у источников и окна заведения (`sourceBlock`). * * Есть ли куда откликаться, здесь не решается: это знает только мост, и * ответ его разбирает `applyChoices`.
@@ -1072,9 +1076,9 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 - селекторы (7): .chips, .chip, .chip-x, .chip:hover .chip-x, .chip-add, .chip-input, .chip-input:focus
 - берёт: --accent, --bg-secondary, --border, --danger, --text-primary, --text-tertiary
 
-### styles/choice-line.css (60)
+### styles/choice-line.css (56)
 - Ряд сегментов и значок-переключатель при нём, в одну строку. Значок без подписи — пояснение у него во всплывающей подсказке, — квадрат высотой с ряд сегментов, в той же рамке, что поля формы (`input.css`). Выключенный — тёмно-серый, при наведении светлеет, включённый светится акцентом. Галочка под ним невидима, но нажимается вся: положение и запор держит она.
-- селекторы (8): .choice-line, .icon-check, .icon-check .material-symbols-outlined, .icon-check:hover, .icon-check.on, .icon-check-box, .icon-check.locked, .icon-check.locked:hover
+- селекторы (7): .choice-line, .icon-check, .icon-check .material-symbols-outlined, .icon-check:hover, .icon-check.on, .icon-check-box, .icon-check.locked:hover
 - берёт: --accent, --border, --text-primary, --text-tertiary
 
 ### styles/choice-row.css (99)
@@ -1170,13 +1174,15 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 - селекторы (13): .date-picker, .input-date-text.invalid, .date-panel, .date-panel.up, .date-head, .date-head .icon-btn:hover, .date-title, .date-week, .date-weekday, .date-cell, .date-day, .date-day:hover, .date-day.today
 - берёт: --accent, --bg-tertiary, --err, --scrim, --selected-bg, --text-primary, --text-secondary
 
-### styles/disabled-look.css (37)
-- Как выглядит запертое: не даёт себя нажать и говорит об этом видом. Одним файлом на все места, где запертость показывают, — иначе одинаково запертые соседи гаснут по-разному, и разница читается как разная запертость. Глубин здесь три, и делит их не прихоть, а то, что заперто: — кнопка гаснет заметнее всех: она сплошная, и лёгкое приглушение на ней не читается; — пункт меню и карточка выбора приглушены мягче: они стоят в ряду таких же, и глубокая тень выбила бы ряд; — поле и кнопка отправки в переписке не гаснут вовсе, а гасят свои буквы: они и так на приглушённом полотне, а прозрачное поле читалось бы как пропавшее. Переключатель режима (`mode.css`) сюда не сведён: у него глубина своя и ни с одной из этих трёх не совпадает.
-- селекторы (3): .btn:disabled,
+### styles/disabled-look.css (44)
+- Как выглядит запертое: не даёт себя нажать и говорит об этом видом. Одним файлом на все места, где запертость показывают, — иначе одинаково запертые соседи гаснут по-разному, и разница читается как разная запертость. Глубин здесь четыре, и делит их не прихоть, а то, что заперто: — кнопка гаснет заметнее всех: она сплошная, и лёгкое приглушение на ней не читается; — переключатель — режима, строки, галочка окна — гаснет наполовину. Курсор у него «нельзя», а не «жди»: ждать тут нечего, пока не загорятся лампы или не снимут запись из отсева; — пункт меню и карточка выбора приглушены мягче: они стоят в ряду таких же, и глубокая тень выбила бы ряд; — поле и кнопка отправки в переписке не гаснут вовсе, а гасят свои буквы: они и так на приглушённом полотне, а прозрачное поле читалось бы как пропавшее.
+- селекторы (4): .btn:disabled,
 .icon-btn.is-disabled,
 .badge-unread[data-has-unread='false'],
 .cnt-chat-attach:disabled,
-.human-plate-done:disabled, .menu-item.blocked,
+.human-plate-done:disabled, .mode-control.is-disabled,
+.toggle.locked:disabled,
+.icon-check.locked, .menu-item.blocked,
 .radio-card.disabled, .cnt-chat-input:disabled,
 .cnt-chat-send:disabled
 - берёт: --text-tertiary
@@ -1384,9 +1390,9 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 .modal-footer, .modal-footer, .modal-footer .btn, .modal-subtitle, .modal-error
 - берёт: --bg-tertiary, --border, --danger, --scrim, --shadow-modal, --text-primary, --text-secondary, --text-tertiary
 
-### styles/mode.css (42)
+### styles/mode.css (37)
 - Переключатель режима бота: дорожка и бегунок на ней. Режим читается по месту бегунка и его цвету, слова у переключателя нет.
-- селекторы (10): .mode-control, .mode-track, .mode-knob, .mode-control[data-mode='Off'] .mode-knob, .mode-control[data-mode='Off'] .mode-track, .mode-control[data-mode='DM Only'] .mode-knob, .mode-control[data-mode='DM Only'] .mode-track, .mode-control[data-mode='Full'] .mode-knob, .mode-control[data-mode='Full'] .mode-track, .mode-control.is-disabled
+- селекторы (9): .mode-control, .mode-track, .mode-knob, .mode-control[data-mode='Off'] .mode-knob, .mode-control[data-mode='Off'] .mode-track, .mode-control[data-mode='DM Only'] .mode-knob, .mode-control[data-mode='DM Only'] .mode-track, .mode-control[data-mode='Full'] .mode-knob, .mode-control[data-mode='Full'] .mode-track
 - берёт: --accent, --accent-muted, --bg-tertiary, --border, --err, --err-muted, --text-tertiary, --warn, --warn-muted
 
 ### styles/name-grid.css (20)
@@ -1716,9 +1722,9 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 .vac-title
 - берёт: --text-primary
 
-### styles/toggle.css (63)
+### styles/toggle.css (58)
 - Переключатель-пилюля: дорожка и шарик на ней. Стоит в строке списка, где делит место с именем, счётом и значком отсева, — отсюда малый рост. Числа лежат переменными, чтобы шарик не пришлось пересчитывать руками.
-- селекторы (7): .toggle, .toggle::after, .toggle:checked, .toggle:checked::after, .toggle:disabled, .toggle.locked:disabled, .toggle.muted:checked
+- селекторы (6): .toggle, .toggle::after, .toggle:checked, .toggle:checked::after, .toggle:disabled, .toggle.muted:checked
 - объявляет: --toggle-gap, --toggle-h, --toggle-knob, --toggle-w
 - берёт: --accent, --bg-primary, --bg-tertiary, --text-tertiary, --toggle-gap, --toggle-h, --toggle-knob, --toggle-w
 
@@ -1771,7 +1777,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 .wiz-body > .warning-card, .wiz-fields, .wiz-modes, .wiz-fields .help
 - берёт: --accent, --accent-chip-selected, --bg-secondary, --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
 
-## tests — 107 файлов
+## tests — 108 файлов
 
 ### tests/aggregator_card_live.test.js (223)
 - —
@@ -1871,7 +1877,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/confirm_send_live.test.js (188)
 - * Полоса, ждущая подтверждения: прогон идёт, пришла весть с пунктами.
 
-### tests/contact_adding.test.js (151)
+### tests/contact_adding.test.js (150)
 - —
 
 ### tests/creds.js (7)
@@ -1915,6 +1921,9 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 
 ### tests/new_card.test.js (36)
 - —
+
+### tests/new_vacancy.test.js (86)
+- * Черновик, ушедший боту, — каким его держит оболочка.
 
 ### tests/new_vacancy_fields_live.test.js (86)
 - —
@@ -1996,7 +2005,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/search.test.js (49)
 - —
 
-### tests/section_memory.test.js (67)
+### tests/section_memory.test.js (42)
 - —
 
 ### tests/section_tabs_live.test.js (68)
@@ -2055,8 +2064,8 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/tg_login_dialog_live.test.js (52)
 - —
 
-### tests/vacancies.test.js (348)
-- * Черновик, ушедший боту, — каким его держит оболочка.
+### tests/vacancies.test.js (263)
+- —
 
 ### tests/vacancies_screen_new_live.test.js (585)
 - * Мост, отвечающий тем же, чем отвечает настоящий. * * Заведение чужой карточки отказывает: так ведёт себя настоящий, когда имя * занято или связь оборвалась, — и это единственный способ увидеть, что * остаётся в черновике после неудачи.

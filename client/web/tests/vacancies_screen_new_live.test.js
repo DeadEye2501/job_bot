@@ -13,7 +13,7 @@ import VacanciesScreen from '../app/VacanciesScreen.svelte';
 import { hearAwaited } from '../state/awaited.svelte.js';
 import { hearRound } from '../state/round.svelte.js';
 import { heldMemory, sectionMemory } from '../state/section_memory.svelte.js';
-import { settleHandMade } from '../state/vacancies.js';
+import { settleHandMade } from '../state/new_vacancy.js';
 import { awaitingNews, roundGoes } from './bridge_stub.js';
 import { livingProps } from './live_props.svelte.js';
 import { buttonBy, press, typed } from './press.js';

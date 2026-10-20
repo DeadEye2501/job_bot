@@ -1,12 +1,6 @@
-"""Обход источника-агрегатора: поиск, где каждая находка проходит весь цикл до отклика.
-
-Здесь же живёт запуск сессии искателя (`run_seeker_on`, `open_clean_profile`):
-страница, принесённая человеком (`linked_page`), идёт той же сессией, только
-со своим наставлением и заданием.
-"""
+"""Обход источника-агрегатора: поиск, где каждая находка проходит весь цикл до отклика."""
 
 import logging
-from collections.abc import Awaitable, Callable
 from datetime import datetime
 
 from backend.agent.jobs import Finished, SeekJob, Source
@@ -16,12 +10,10 @@ from backend.agent.prompts.frame import system_prompt
 from backend.agent.prompts.seeker import (
     SEEKER_PROMPT, WEB_SEEKER_PROMPT, SeekBounds, seeker_task, web_seeker_task,
 )
-from backend.agent.sessions import end_reason, run_seeker
+from backend.agent.sessions import end_reason
 from backend.agent.stops import RUN_STOPPERS
-from backend.agent.tools_browser import browser_tools
-from backend.agent.tools_common import common_tools
-from backend.agent.tools_seeker import seeker_tools
 from backend.domain.telegram_identity import TELEGRAM_HOSTS
+from backend.flows.seeker_run import run_seeker_on
 from backend.repository.aggregators import barred_hosts, list_aggregators, mark_run
 from backend.repository.profile_languages import read_search_languages
 from backend.telegram_time import utc_now
@@ -49,32 +41,8 @@ async def seek_source(kit: AgentKit, source: Source) -> None:
     await _settle(kit, job, end, started)
 
 
-async def open_clean_profile(kit: AgentKit, source_id: int) -> None:
-    """Профиль источника с чистым кешем: выдача приходит свежей, а не из
-    прошлого обхода."""
-    await kit.browser.open_profile(source_id)
-    await kit.browser.clear_cache()
-
-
 async def _search(kit: AgentKit, job: SeekJob) -> AgentEnd:
     return await run_seeker_on(kit, job, lambda tools: _seek_plan(kit, job, tools))
-
-
-async def run_seeker_on(
-    kit: AgentKit, job: SeekJob, plan_of: Callable[[list], Awaitable[SessionPlan]]
-) -> AgentEnd:
-    """Сессия искателя на профиле его источника — у обхода и у страницы
-    человека одна: чистый кеш, свежие слепки, инструменты, сроки искателя.
-
-    `plan_of(tools)` собирает план из инструментов — наставление и задание у
-    каждого своё. Слепки конвейера освежаются до сессии: обход идёт без приёма
-    каналов, который их освежает, и без этого балл был бы нулевым, а чёрный
-    список молчал.
-    """
-    await open_clean_profile(kit, job.source.id)
-    await kit.pipeline.reload_resources()
-    tools = [*common_tools(kit, job), *seeker_tools(kit, job), *browser_tools(kit, None, None)]
-    return await run_seeker(kit, job, await plan_of(tools))
 
 
 async def _seek_plan(kit: AgentKit, job: SeekJob, tools: list) -> SessionPlan:

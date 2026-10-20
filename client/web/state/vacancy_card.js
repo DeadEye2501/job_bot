@@ -47,7 +47,7 @@ function skipNote(raw) {
 // удлинял бы одну функцию.
 const EVENT_TEXT = {
   ingested: (payload) =>
-    atHandle(payload?.channel) ? `Поступила из канала ${atHandle(payload.channel)}.` : 'Поступила из канала без ника.',
+    atHandle(payload.channel) ? `Поступила из канала ${atHandle(payload.channel)}.` : 'Поступила из канала без ника.',
   // Заведённое руками дорогой автоматики — пост по ссылке — несёт в
   // нагрузке, откуда пришло (`via`): лента называет и это.
   created_by_hand: (payload) => {

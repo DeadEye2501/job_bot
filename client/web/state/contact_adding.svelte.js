@@ -33,10 +33,10 @@
  *
  * `held` — где лежит черновик: у окон о человеке, компании, канале и контакте
  * он свой и умирает с экраном, у окна вакансии его держит оболочка — набранное
- * должно дожить до итога разбора. `keeps()` — ждут ли итога: тогда закрытое
- * окно черновик не стирает.
+ * должно дожить до итога разбора. `held.handed` — ждут ли итога: тогда
+ * закрытое окно черновик не стирает.
  */
-export function contactAdding({ list, form, save, say, held = ownDraft(form), keeps = () => false }) {
+export function contactAdding({ list, form, save, say, held = ownDraft(form) }) {
   let adding = $state(false);
   let saving = $state(false);
   let trouble = $state('');
@@ -54,7 +54,7 @@ export function contactAdding({ list, form, save, say, held = ownDraft(form), ke
       // Заведённые по дороге чужие записи это не отменяет — они уже легли в
       // базу, и черновик им не хозяин.
       if (!open) {
-        if (!keeps()) held.draft = form.blank();
+        if (!held.handed) held.draft = form.blank();
         trouble = '';
       }
       adding = open;
@@ -116,8 +116,9 @@ export function contactAdding({ list, form, save, say, held = ownDraft(form), ke
 }
 
 /** Черновик, который живёт с самим окном заведения, — того же вида, что держит
- *  оболочка у окна вакансии (`heldMemory().newVacancy`). */
+ *  оболочка у окна вакансии (`heldMemory().newVacancy`); итога своего окна
+ *  он не ждёт никогда. */
 function ownDraft(form) {
-  const held = $state({ draft: form.blank() });
+  const held = $state({ draft: form.blank(), handed: false });
   return held;
 }

@@ -657,6 +657,10 @@
 - `_KEYRING_KEY` = `'master_key'`
 - `_REJECTED_KEYRING_BACKENDS` = `набор из 5`
 
+### `backend/domain/address_start.py`
+
+- `ADDRESS_START_RE` = `re.compile('^[a-z][a-z0-9+.\\-]*://', re.IGNOREC…`
+
 ### `backend/domain/alphabet.py`
 
 - `CYRILLIC_LETTER` = `re.compile('[а-яёА-ЯЁ]')`
@@ -694,10 +698,6 @@
 
 - `AGGREGATOR_HOSTS` = `frozenset({*TELEGRAM_LINK_HOSTS, 'telegram.org',…`
 - `AGGREGATOR_BRANDS` = `frozenset({'indeed', 'stepstone'})`
-
-### `backend/domain/company_names.py`
-
-- `ADDRESS_START_RE` = `re.compile('^[a-z][a-z0-9+.\\-]*://', re.IGNOREC…`
 
 ### `backend/domain/contact_keys.py`
 
@@ -952,7 +952,6 @@
   - `channel: str | None` = `None`
   - `allow_delete: bool` = `True`
   - `hands_over: bool` = `True`
-  - `tells_window: bool` = `False`
   - `by_hand: bool` = `False`
 
 ### `backend/flows/ingest.py`
@@ -974,6 +973,7 @@
 - `class Judged`
   - `stored: bool`
   - `fresh_hr: HR | None` = `None`
+  - `by_hand: bool` = `False`
 
 ### `backend/flows/parse_write.py`
 

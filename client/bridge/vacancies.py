@@ -304,12 +304,11 @@ class Vacancies(VacancyActions, VacancyLinks, VacancyContacts):
             return self._handed(request)
 
         async def run() -> dict:
-            known = await hand_made.known_at(
-                self._hub.session_factory, hand_made.own_address(request), partial(forgotten, self._hub))
-            if known is not None:
-                return {"action": "create_vacancy", "created_id": known, "created": False,
+            vacancy_id, created = await hand_made.file_fields(
+                self._hub.session_factory, fields, partial(forgotten, self._hub))
+            if not created:
+                return {"action": "create_vacancy", "created_id": vacancy_id, "created": False,
                         "message": PASTED_REFUSALS["duplicate"]}
-            vacancy_id = await hand_made.file_fields(self._hub.session_factory, fields)
             self._hub.events.add(LIST_CHANGED)
             return {"action": "create_vacancy", "created_id": vacancy_id, "created": True, "message": FILED}
 

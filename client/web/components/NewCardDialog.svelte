@@ -13,7 +13,7 @@
   // Черновик приходит своим объектом и правится на месте: отправляет его тот,
   // кто его завёл.
   import { NEW_CARD } from '$state/new_card.js';
-  import { VACANCY_MODES, isLink, isText } from '$state/vacancies.js';
+  import { VACANCY_MODES, isLink, isText } from '$state/new_vacancy.js';
 
   import AskDialog from './AskDialog.svelte';
   import ChoiceRow from './ChoiceRow.svelte';

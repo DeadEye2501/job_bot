@@ -15,7 +15,7 @@
   import { hearAwaited } from '$state/awaited.svelte.js';
   import { blockedTip } from '$state/health.js';
   import { hearRound } from '$state/round.svelte.js';
-  import { settleHandMade } from '$state/vacancies.js';
+  import { settleHandMade } from '$state/new_vacancy.js';
   import BottomBar from './BottomBar.svelte';
   import ContactsScreen from './ContactsScreen.svelte';
   import LogsScreen from './LogsScreen.svelte';

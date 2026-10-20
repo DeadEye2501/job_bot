@@ -43,6 +43,7 @@ from tests.backend.fixtures.listing import channel_titles, hr_names, titles
 from tests.backend.fixtures.logs import clean_log_file, clean_root_logger
 from tests.backend.fixtures.parse_stub import parsed
 from tests.backend.fixtures.rerun import rerunning
+from tests.backend.fixtures.sessions import short_clock
 from tests.backend.fixtures.stats import applied
 
 __all__ = [
@@ -75,6 +76,7 @@ __all__ = [
     "ready_to_send",
     "rerunning",
     "sending_unlocked",
+    "short_clock",
     "silent_embedder",
     "telegram_case",
     "titles",
