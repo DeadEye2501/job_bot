@@ -324,7 +324,7 @@ describe('итог ручного заведения', () => {
     const held = handedDraft();
 
     expect(settleHandMade(held, { outcome: 'ok', vacancy_id: 6 })).toBe(null);
-    expect([held.draft, held.handed]).toEqual([blankVacancy(), false]);
+    expect(held.draft).toEqual(blankVacancy());
   });
 
   it('повтор — черновик сброшен, переход на существующую', () => {

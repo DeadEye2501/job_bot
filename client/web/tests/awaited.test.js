@@ -2,23 +2,23 @@
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { awaited, hearAwaited } from '$state/awaited.svelte.js';
+import { awaited } from '$state/awaited.svelte.js';
 
-import { listening } from './bridge_stub.js';
-
-/** Слушатель вестей (`listening`), которым тест сам доставляет итог работы. */
-function news() {
-  const events = listening();
-  return { events, finished: (payload) => events.fire('action_finished', payload) };
-}
+import { awaitingNews } from './bridge_stub.js';
 
 let deaf = () => {};
 afterEach(() => deaf());
 
+/** Подписать учёт на подставные вести; ответ — доставка итога работы. */
+function news() {
+  const heard = awaitingNews();
+  deaf = heard.deaf;
+  return heard.finished;
+}
+
 describe('ожидание своей вести', () => {
   it('ждущий получает только свою весть, и ожидание с ней гаснет', () => {
-    const { events, finished } = news();
-    deaf = hearAwaited(events);
+    const finished = news();
     const got = [];
     awaited.start('parse_cv', (payload) => got.push(payload));
 
@@ -31,8 +31,7 @@ describe('ожидание своей вести', () => {
   });
 
   it('весть без ожидания никого не зовёт', () => {
-    const { events, finished } = news();
-    deaf = hearAwaited(events);
+    const finished = news();
     const got = [];
     awaited.start('parse_cv', (payload) => got.push(payload));
     finished({ action: 'parse_cv' });
@@ -43,8 +42,7 @@ describe('ожидание своей вести', () => {
   });
 
   it('отказанный до пуска зов снимает ожидание', () => {
-    const { events } = news();
-    deaf = hearAwaited(events);
+    news();
     awaited.start('create_from_text', () => {});
 
     awaited.cancel('create_from_text');
@@ -54,9 +52,8 @@ describe('ожидание своей вести', () => {
 
   it('свежая подписка начинает без ожиданий: прошлое окно своих вестей не дождётся', () => {
     awaited.start('parse_cv', () => {});
-    const { events } = news();
 
-    deaf = hearAwaited(events);
+    news();
 
     expect(awaited.pending('parse_cv')).toBe(false);
   });

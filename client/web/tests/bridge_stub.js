@@ -1,6 +1,7 @@
 // Подставной мост для проверок: отвечает заготовленным, помнит зовы и шлёт
 // вести так же, как настоящий.
 
+import { hearAwaited } from '../state/awaited.svelte.js';
 import { hearRound } from '../state/round.svelte.js';
 
 /** Подписка на вести моста: обработчики копятся по имени в `handlers`, `fire`
@@ -24,6 +25,14 @@ export function roundGoes() {
   const events = listening();
   hearRound(events);
   events.fire('ingestion_started');
+}
+
+/** Подписать учёт ожиданий на подставные вести, как это делает оболочка.
+ *  Ответ — доставка вести об исходе (`finished`) и отписка учёта (`deaf`). */
+export function awaitingNews() {
+  const events = listening();
+  const deaf = hearAwaited(events);
+  return { finished: (payload) => events.fire('action_finished', payload), deaf };
 }
 
 /** Мост, отвечающий заготовленным по очереди; зовы копятся в `asked`.
