@@ -62,6 +62,8 @@ describe('живые поля новой вакансии', () => {
       busy: false,
       ready: false,
       options: { companies: [], hrs: [] },
+      toggle: { checked: false, disabled: false, title: 'Отклик при создании' },
+      ontoggle: () => true,
       oncompany: () => {},
       onhr: () => {},
       onconfirm: () => {},

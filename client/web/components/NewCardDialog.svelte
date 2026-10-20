@@ -13,7 +13,7 @@
   // Черновик приходит своим объектом и правится на месте: отправляет его тот,
   // кто его завёл.
   import { NEW_CARD } from '$state/new_card.js';
-  import { VACANCY_MODES, typed } from '$state/vacancies.js';
+  import { VACANCY_MODES, isText } from '$state/vacancies.js';
 
   import AskDialog from './AskDialog.svelte';
   import ChoiceRow from './ChoiceRow.svelte';
@@ -21,6 +21,7 @@
   import NewPersonFields from './NewPersonFields.svelte';
   import NewVacancyFields from './NewVacancyFields.svelte';
   import PastedVacancyFields from './PastedVacancyFields.svelte';
+  import RowToggle from './RowToggle.svelte';
 
   // Подсказки и приём набранного нужны одной форме из трёх — вакансии: она
   // называет компанию и человека словами, а узнаёт их и заводит тот, кто
@@ -28,6 +29,9 @@
   //
   // `locked` — почему заводить сейчас нельзя; пусто — можно. Кнопка заперта и
   // говорит причину своей подписью, как говорит, что работа идёт.
+  //
+  // `toggle` — «Отклик при создании» у вакансии готовым видом (`sourceToggle`):
+  // положение, запор и подсказка; `ontoggle(next)` его переключает.
   let {
     kind,
     draft,
@@ -35,6 +39,8 @@
     ready,
     locked = '',
     options = null,
+    toggle = null,
+    ontoggle = null,
     oncompany = null,
     onhr = null,
     onconfirm,
@@ -64,13 +70,22 @@
          или отдают боту текст объявления. У человека и компании второго нет
          вовсе. Ряд тот же, что у грейда и формата: свой разошёлся бы с ними
          видом. -->
-    <ChoiceRow
-      options={VACANCY_MODES}
-      chosen={new Set([draft.mode])}
-      look="seg"
-      onpick={(value) => (draft.mode = value)}
-    />
-    {#if typed(draft)}
+    <div class="choice-line">
+      <ChoiceRow
+        options={VACANCY_MODES}
+        chosen={new Set([draft.mode])}
+        look="seg"
+        onpick={(value) => (draft.mode = value)}
+      />
+      <RowToggle
+        look="box"
+        checked={toggle.checked}
+        disabled={toggle.disabled}
+        title={toggle.title}
+        {ontoggle}
+      />
+    </div>
+    {#if isText(draft)}
       <PastedVacancyFields {draft} />
     {:else}
       <NewVacancyFields {draft} {options} {oncompany} {onhr} />

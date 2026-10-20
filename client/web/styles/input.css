@@ -9,6 +9,7 @@
 .cdd-btn,
 .choice-row[data-look='seg'],
 .choice-row[data-look='tile'],
+.tab-check,
 .pdf-row,
 .photo-frame {
   background: var(--bg-secondary);

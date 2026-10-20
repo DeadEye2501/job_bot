@@ -6,7 +6,7 @@
 
 import { GRADES as PROFILE_GRADES } from './profile.js';
 import { REMOTE_CHOICES } from './vacancy_filter.js';
-import { RUNNING } from './progress.js';
+import { sourceBlock, sourceToggle } from './sources.js';
 import { counted } from './words.js';
 
 /** Порядки списка в том виде, в каком их выбирают. Ключи уезжают на мост и
@@ -279,23 +279,62 @@ export function vacancyFields({ mode, raw_text, ...fields }) {
 
 /** Отдают ли боту текст объявления вместо набранных полей.
  *
- * Сравнение с именем способа одно на весь фронт: написанное в каждом месте
- * своей рукой, оно молча переживёт переименование самого способа.
+ * Сравнения с именами способов — по одному на весь фронт: написанное в каждом
+ * месте своей рукой, оно молча переживёт переименование самого способа.
  */
-export function typed(draft) {
+export function isText(draft) {
   return draft.mode === 'text';
 }
 
-/** Почему вставленное объявление сейчас не завести; пусто — можно.
+/** Пойдёт ли заявка через бота: текст разбирает конвейер, а поля с откликом
+ *  отдаются откликателю через место прогона. Поля без отклика ложатся в базу
+ *  мимо бота. `handsOver` — видимое положение «Отклик при создании». */
+export function viaBot(draft, handsOver) {
+  return isText(draft) || handsOver;
+}
+
+/** Почему вакансию сейчас не завести; пусто — можно.
  *
- * Вставленный текст разбирает конвейер на месте прогона, и во время обхода мост
- * его не пустит. Набранные поля ложатся в базу мимо конвейера и обходу не мешают.
+ * Идущая через бота заявка подчиняется тому же правилу запора, что кнопки бота
+ * (`sourceBlock`): ей нужны все системы и свободное место прогона. Мимо бота
+ * заводится всегда.
  */
-export function pasteLock(draft, running) {
-  return typed(draft) && running ? RUNNING : '';
+export function pasteLock(draft, handsOver, { running, lockedTip }) {
+  if (!viaBot(draft, handsOver)) return '';
+  return sourceBlock({ barred: '', running, lock: '', lockedTip });
+}
+
+/** Галочка «Отклик при создании»: как её показать и что из неё уходит мосту.
+ *
+ * Без живых систем она заперта и показана выключенной — заведение текстом
+ * всё равно не пойдёт, а включённая обещала бы отклик, которого не будет; мосту
+ * уходит видимое положение. Запомненное при этом не стирается: загорятся лампы —
+ * галочка вернётся в него. Подсказка — пояснение или причина запора.
+ */
+export function handsOverToggle(handsOver, lockedTip) {
+  const shown = sourceToggle({ active: handsOver, open: !lockedTip, lockTitle: lockedTip }, true);
+  return { checked: shown.checked, disabled: shown.disabled, title: shown.title || HANDS_OVER_TITLE };
+}
+
+const HANDS_OVER_TITLE = 'Отклик при создании';
+
+/** Принять итог ручного заведения: что с черновиком и куда перейти.
+ *
+ * Заведено или такая уже есть — набранное больше не нужно, и черновик
+ * сбрасывается вместе с отметкой «отдано боту» (`held` — держатель оболочки,
+ * `heldMemory().newVacancy`). Неудача оставляет и то и другое: человеку есть что
+ * поправить и отправить снова, а окно закрывается позже вести и стёрло бы
+ * набранное, сними мы отметку здесь. Ответ — номер вакансии, к которой
+ * перейти (при повторе), иначе пусто.
+ */
+export function settleHandMade(held, news) {
+  if (news.outcome !== 'ok' && news.outcome !== 'duplicate') return null;
+  held.draft = blankVacancy();
+  held.handed = false;
+  return news.outcome === 'duplicate' ? news.vacancy_id : null;
 }
 
 export function vacancyNamed(draft) {
-  if (typed(draft)) return Boolean(draft.raw_text.trim());
+  if (isText(draft)) return Boolean(draft.raw_text.trim());
   return Boolean(draft.title.trim());
 }

@@ -10,6 +10,7 @@ import {
   pasteLock,
   salaryLabel,
   scoreTone,
+  settleHandMade,
   shortAgo,
   shownStack,
   sortKey,
@@ -285,13 +286,63 @@ describe('заслон формы заведения вакансии', () => {
   });
 });
 
-describe('запор вставленного объявления', () => {
+describe('запор формы заведения вакансии', () => {
+  const quiet = { running: false, lockedTip: '' };
+
   it('во время обхода текст не заводится: его разбирает конвейер на месте прогона', () => {
-    expect(pasteLock({ mode: 'text' }, true)).toBe('Идёт обход');
+    expect(pasteLock({ mode: 'text' }, false, { ...quiet, running: true })).toBe('Идёт обход');
   });
 
-  it('набранные поля обходу не мешают', () => {
-    expect(pasteLock({ mode: 'fields' }, true)).toBe('');
-    expect(pasteLock({ mode: 'text' }, false)).toBe('');
+  it('без живых систем текст не заводится, и слова — те же, что у кнопок бота', () => {
+    expect(pasteLock({ mode: 'text' }, false, { ...quiet, lockedTip: 'Нет модели' })).toBe('Нет модели');
+  });
+
+  it('обход старше погасшей лампы: он кончится сам', () => {
+    expect(pasteLock({ mode: 'text' }, false, { running: true, lockedTip: 'Нет модели' }))
+      .toBe('Идёт обход');
+  });
+
+  it('поля без отклика обходу и лампам не мешают: ложатся в базу мимо бота', () => {
+    expect(pasteLock({ mode: 'fields' }, false, { running: true, lockedTip: 'Нет модели' })).toBe('');
+  });
+
+  it('поля с откликом заперты обходом: передача идёт через место прогона', () => {
+    expect(pasteLock({ mode: 'fields' }, true, { ...quiet, running: true })).toBe('Идёт обход');
+    expect(pasteLock({ mode: 'fields' }, true, quiet)).toBe('');
+  });
+
+  it('текст свободен, когда всё живо и обхода нет', () => {
+    expect(pasteLock({ mode: 'text' }, false, quiet)).toBe('');
+  });
+});
+
+describe('итог ручного заведения', () => {
+  /** Черновик, ушедший боту, — каким его держит оболочка. */
+  const handedDraft = () => ({ draft: { ...blankVacancy(), raw_text: 'Ищем повара' }, handed: true });
+
+  it('заведено — черновик сброшен, окно никуда не переходит', () => {
+    const held = handedDraft();
+
+    expect(settleHandMade(held, { outcome: 'ok', vacancy_id: 6 })).toBe(null);
+    expect([held.draft, held.handed]).toEqual([blankVacancy(), false]);
+  });
+
+  it('повтор — черновик сброшен, переход на существующую', () => {
+    const held = handedDraft();
+
+    expect(settleHandMade(held, { outcome: 'duplicate', vacancy_id: 5 })).toBe(5);
+    expect(held.draft).toEqual(blankVacancy());
+  });
+
+  it('неудача — черновик цел и по-прежнему не стирается закрытием окна', () => {
+    // Отказ места прогона приходит вестью раньше ответа на зов, и окно
+    // закрывается уже после него: сними оболочка тут отметку «отдано боту», и
+    // закрытие стёрло бы набранное.
+    for (const outcome of ['llm', 'embed', 'article', undefined]) {
+      const held = handedDraft();
+
+      expect(settleHandMade(held, { outcome, vacancy_id: null })).toBe(null);
+      expect([held.draft.raw_text, held.handed]).toEqual(['Ищем повара', true]);
+    }
   });
 });

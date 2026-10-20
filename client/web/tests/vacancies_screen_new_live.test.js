@@ -10,8 +10,10 @@ import { flushSync, mount, unmount } from 'svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import VacanciesScreen from '../app/VacanciesScreen.svelte';
+import { hearAwaited } from '../state/awaited.svelte.js';
 import { hearRound } from '../state/round.svelte.js';
-import { sectionMemory } from '../state/section_memory.svelte.js';
+import { heldMemory, sectionMemory } from '../state/section_memory.svelte.js';
+import { settleHandMade } from '../state/vacancies.js';
 import { roundGoes } from './bridge_stub.js';
 import { livingProps } from './live_props.svelte.js';
 import { buttonBy, press } from './press.js';
@@ -22,6 +24,7 @@ let host = null;
 
 afterEach(() => {
   hearRound({ on: () => () => {} });
+  hearAwaited({ on: () => () => {} });
   if (mounted) flushSync(() => unmount(mounted));
   host?.remove();
   mounted = null;
@@ -39,9 +42,27 @@ const SAID = [];
  * остаётся в черновике после неудачи.
  */
 async function bridge(method, payload) {
+  if (method === 'vacancies.create' && payload.title === 'Повтор') {
+    SENT.push(payload);
+    return { created_id: 5, created: false, message: 'Такая вакансия уже существует' };
+  }
+  if (method === 'vacancies.create' && payload.hands_over) {
+    SENT.push(payload);
+    return { started: true, action: 'create_from_text' };
+  }
   if (method === 'vacancies.create') {
     SENT.push(payload);
     return { created_id: 77, created: true, message: 'Вакансия заведена' };
+  }
+  if (method === 'vacancies.create_from_text' && payload.raw_text === 'Отказ') {
+    PASTED.push(payload);
+    return null;
+  }
+  if (method === 'vacancies.create_from_text' && payload.raw_text === 'Занято') {
+    // Место прогона занято: отказ приходит вестью раньше ответа на сам зов.
+    PASTED.push(payload);
+    NEWS?.({ action: 'create_from_text', message: 'Идёт другой прогон', danger: true });
+    return { started: true };
   }
   if (method === 'vacancies.create_from_text') {
     PASTED.push(payload);
@@ -63,14 +84,29 @@ async function bridge(method, payload) {
   return null;
 }
 
-function screen() {
+const OPENED = [];
+// Доставка вести об исходе — как её доставляет оболочка: через учёт ожиданий.
+let NEWS = null;
+
+function screen({ lockedTip = '', memory = heldMemory() } = {}) {
   SENT.length = 0;
   PASTED.length = 0;
   SAID.length = 0;
+  OPENED.length = 0;
+  hearAwaited({
+    on: (kind, hear) => {
+      NEWS = hear;
+      return () => {};
+    },
+  });
   const [props] = livingProps({
     ask: bridge,
     say: (text) => SAID.push(text),
-    lockedTip: '',
+    lockedTip,
+    newVacancy: memory.newVacancy,
+    // Итог принимает то же правило, что и оболочка.
+    onhandmade: (news) => settleHandMade(memory.newVacancy, news),
+    onvacancy: (id) => OPENED.push(id),
     events: { on: () => () => {} },
     oncontacts: () => {},
     open: null,
@@ -299,6 +335,145 @@ describe('живой экран вакансий', () => {
     await settled();
 
     expect(page.querySelector('input[placeholder="Название (обязательно)"]')).toBeTruthy();
+  });
+
+  it('галочка «Отклик при создании» стоит рядом с вкладками, выключена, с пояснением', async () => {
+    const page = screen();
+    await settled();
+    page.querySelector('button[title="Добавить вакансию"]').click();
+    await settled();
+
+    const box = page.querySelector('.choice-line input[type="checkbox"]');
+    expect(box.checked).toBe(false);
+    expect(box.title).toBe('Отклик при создании');
+  });
+
+  it('включённая галочка уезжает на мост с текстом', async () => {
+    const page = screen();
+    await settled();
+    page.querySelector('button[title="Добавить вакансию"]').click();
+    await settled();
+    page.querySelector('.choice-line input[type="checkbox"]').click();
+    await settled();
+    press('Текст', { exact: true });
+    await settled();
+    const text = page.querySelector('textarea[placeholder="Текст объявления"]');
+    text.value = 'Ищем повара';
+    text.dispatchEvent(new Event('input', { bubbles: true }));
+    await settled();
+
+    press('Создать', { exact: true });
+    await settled();
+
+    expect(PASTED[0].hands_over).toBe(true);
+  });
+
+  it('без живых систем галочка заперта и показана выключенной, а запомненное цело', async () => {
+    const memory = heldMemory();
+    memory.newVacancy.handsOver = true;
+    const page = screen({ lockedTip: 'Нужны все системы, сейчас недоступно: LLM.', memory });
+    await settled();
+    page.querySelector('button[title="Добавить вакансию"]').click();
+    await settled();
+
+    const box = page.querySelector('.choice-line input[type="checkbox"]');
+    expect([box.checked, box.disabled]).toEqual([false, true]);
+    expect(box.title).toBe('Нужны все системы, сейчас недоступно: LLM.');
+    expect(memory.newVacancy.handsOver).toBe(true);
+  });
+
+  it('введённый текст доживает до итога: окно закрыто — открыто снова, а «Создать» заперта', async () => {
+    const page = screen();
+    await settled();
+    page.querySelector('button[title="Добавить вакансию"]').click();
+    await settled();
+    press('Текст', { exact: true });
+    await settled();
+    const text = page.querySelector('textarea[placeholder="Текст объявления"]');
+    text.value = 'Ищем повара';
+    text.dispatchEvent(new Event('input', { bubbles: true }));
+    await settled();
+    press('Создать', { exact: true });
+    await settled();
+
+    page.querySelector('button[title="Добавить вакансию"]').click();
+    await settled();
+
+    expect(page.querySelector('textarea[placeholder="Текст объявления"]').value).toBe('Ищем повара');
+    expect(page.querySelector('.modal-footer .btn.primary').disabled).toBe(true);
+  });
+
+  /** Открыть окно на вкладке текста и набрать объявление. */
+  async function typedText(page, words) {
+    page.querySelector('button[title="Добавить вакансию"]').click();
+    await settled();
+    press('Текст', { exact: true });
+    await settled();
+    const text = page.querySelector('textarea[placeholder="Текст объявления"]');
+    text.value = words;
+    text.dispatchEvent(new Event('input', { bubbles: true }));
+    await settled();
+  }
+
+  it('отказ, пришедший вестью раньше ответа, черновика не стирает', async () => {
+    const page = screen();
+    await settled();
+    await typedText(page, 'Занято');
+
+    press('Создать', { exact: true });
+    await settled();
+    page.querySelector('button[title="Добавить вакансию"]').click();
+    await settled();
+
+    expect(page.querySelector('textarea[placeholder="Текст объявления"]').value).toBe('Занято');
+    expect(page.querySelector('.modal-footer .btn.primary').disabled).toBe(false);
+  });
+
+  it('отказ зова снимает ожидание: «Создать» снова доступна', async () => {
+    const page = screen();
+    await settled();
+    await typedText(page, 'Отказ');
+
+    press('Создать', { exact: true });
+    await settled();
+
+    expect(page.querySelector('.modal-footer .btn.primary').disabled).toBe(false);
+  });
+
+  it('поля с галочкой уходят боту с просьбой отклика', async () => {
+    const page = screen();
+    await settled();
+    page.querySelector('button[title="Добавить вакансию"]').click();
+    await settled();
+    page.querySelector('.choice-line input[type="checkbox"]').click();
+    const title = page.querySelector('input[placeholder="Название (обязательно)"]');
+    title.value = 'Python';
+    title.dispatchEvent(new Event('input', { bubbles: true }));
+    await settled();
+
+    press('Создать', { exact: true });
+    await settled();
+
+    expect(SENT[0].hands_over).toBe(true);
+    // Слово скажет весть: ответ «пущено» ничего не заводит.
+    expect(SAID).toEqual([]);
+  });
+
+  it('повтор у полей переводит на существующую вакансию и говорит это словами', async () => {
+    const page = screen();
+    await settled();
+    page.querySelector('button[title="Добавить вакансию"]').click();
+    await settled();
+    const title = page.querySelector('input[placeholder="Название (обязательно)"]');
+    title.value = 'Повтор';
+    title.dispatchEvent(new Event('input', { bubbles: true }));
+    await settled();
+
+    press('Создать', { exact: true });
+    await settled();
+
+    expect(OPENED).toEqual([5]);
+    expect(SAID).toEqual(['Такая вакансия уже существует']);
   });
 
   it('во время обхода вставленный текст не заводится, и кнопка говорит почему', async () => {

@@ -1,0 +1,44 @@
+/* Ряд сегментов и квадратная галочка при нём, в одну строку.
+
+   Галочка без подписи — пояснение у неё во всплывающей подсказке, — поэтому
+   ростом и рамкой она та же, что сегменты рядом: квадрат высотой с ряд, а не
+   пилюля из строки списка. Рамка — общая с полями формы (`input.css`). */
+
+.choice-line {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.tab-check {
+  appearance: none;
+  flex-shrink: 0;
+  align-self: stretch;
+  aspect-ratio: 1;
+  margin: 0;
+  cursor: pointer;
+  position: relative;
+}
+
+/* Отметка — уголок, повёрнутый галкой: рисуется рамкой, без картинки. */
+.tab-check:checked::after {
+  content: '';
+  position: absolute;
+  left: 35%;
+  top: 18%;
+  width: 25%;
+  height: 45%;
+  border: solid var(--accent);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.tab-check:checked {
+  border-color: var(--accent);
+}
+
+/* Запертая — «нельзя», а не «жди»: ждать тут нечего, пока не загорятся лампы. */
+.tab-check:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

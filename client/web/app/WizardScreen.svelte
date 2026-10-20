@@ -19,7 +19,7 @@
   import WizardLlm from './WizardLlm.svelte';
   import WizardTelegram from './WizardTelegram.svelte';
 
-  let { ask, say, events, ondone, completed } = $props();
+  let { ask, say, ondone, completed } = $props();
 
   // Начальное берётся один раз, нарочно: мастер стоит на своём экране, пока его
   // проходят, — следи эти двое за доводом, уход вперёд сбрасывал бы человека
@@ -135,7 +135,6 @@
   {:else if screen === 'cv'}
     <WizardCv
       {ask}
-      {events}
       busy={finishing}
       onback={() => (screen = back)}
       onnext={finish}

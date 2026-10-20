@@ -7,12 +7,16 @@
   // молчаливо пройденный шаг человек считал бы приложенным резюме.
   import { call } from '$api/bridge.js';
   import { living } from '$state/alive.js';
+  import { awaited } from '$state/awaited.svelte.js';
   import CvFileRow from '$components/CvFileRow.svelte';
   import WizardFoot from '$components/WizardFoot.svelte';
   import WizardStatus from '$components/WizardStatus.svelte';
   import { cvModes, cvReady } from '$state/wizard.js';
 
-  let { ask, busy, events, onback, onnext } = $props();
+  let { ask, busy, onback, onnext } = $props();
+
+  // Метка вести разбора резюме: её ставит мост, по ней шаг ждёт свою весть.
+  const PARSE_CV = 'parse_cv';
 
   const MODES = cvModes();
 
@@ -21,7 +25,6 @@
   let mode = $state('attach');
   let loaded = $state(false);
   let saving = $state(false);
-  let parsing = $state(false);
   let status = $state(null);
 
   const alive = living();
@@ -93,26 +96,24 @@
    * работы, а анкета доехала бы уже после.
    */
   async function parse() {
-    parsing = true;
     status = { tone: 'busy', text: 'Разбираем резюме — это займёт около минуты.' };
+    // Ждать начинают до зова: исход успевает прийти раньше ответа на сам зов —
+    // пропавший файл и нечитаемый формат отвечают вестью сразу. Сказанное им —
+    // последнее слово о шаге, и дописывать после него нечего.
+    awaited.start(PARSE_CV, parsed);
     const started = await ask('profile.parse_cv');
-    // Исход успевает прийти раньше ответа на сам зов: пропавший файл и
-    // нечитаемый формат отвечают вестью сразу. Сказанное им — последнее слово
-    // о шаге, и дописывать после него нечего.
     if (!alive.now || started !== null) return;
-    parsing = false;
+    awaited.cancel(PARSE_CV);
     saving = false;
     status = null;
   }
 
   /** Разбор кончился: удавшийся уводит дальше, сорвавшийся отдаёт шаг обратно.
    *
-   * Слушаем только пока сами разбираем: весть эта общая на все долгие работы,
-   * и чужая увела бы человека с шага, которого он не заканчивал.
+   * Зовут только свою весть: весть эта общая на все долгие работы, и чужая
+   * увела бы человека с шага, которого он не заканчивал.
    */
   async function parsed(done) {
-    if (!parsing) return;
-    parsing = false;
     if (done.danger) {
       saving = false;
       status = { tone: 'err', text: done.message };
@@ -128,9 +129,8 @@
     return alive.entered(refresh);
   });
 
-  $effect(() => {
-    return events.on('action_finished', parsed);
-  });
+  // Ушли с шага — ждать его вести больше некому.
+  $effect(() => () => awaited.cancel(PARSE_CV));
 </script>
 
 <div class="wiz-body">
