@@ -27,7 +27,7 @@
 - —
 - принимает: ask, say, events
 
-### app/BottomBar.svelte (392)
+### app/BottomBar.svelte (406)
 - Полоса даёт переключателю подсказку только запертому — почему заперт; отпертый называет режим под курсором сам.
 - принимает: ask, say, events, onlocked, oncontact, app
 
@@ -256,7 +256,7 @@
 - принимает: message, confirmLabel, locked, onconfirm, oncancel
 - берёт: ./ModalShell.svelte
 
-### components/ConfirmSendDialog.svelte (79)
+### components/ConfirmSendDialog.svelte (76)
 - —
 - принимает: url, items, blocked, onedit, onopen, onconfirm, ondrop, onfold
 - берёт: ./ModalFoot.svelte, ./ModalHead.svelte, ./ModalShell.svelte
@@ -487,9 +487,9 @@
 - принимает: form, field, onset, onpickone
 - берёт: ./ChoiceRow.svelte, ./DatePicker.svelte, ./Dropdown.svelte
 
-### components/ProgressBars.svelte (25)
+### components/ProgressBars.svelte (24)
 - —
-- принимает: channels, messages, text
+- принимает: channels, messages
 
 ### components/ProjectCard.svelte (42)
 - —
@@ -828,9 +828,9 @@
 - * Грейды, какими их выбирают в анкете. Значения едут на мост и совпадают с * перечнем `backend/domain/taxonomy.py`.
 - отдаёт: CURRENCIES, GENDERS, GRADES, LANG_LEVELS, SALARY_PERIODS, WORK_FORMATS, blankProfile, cvNote, cvOpenable, fileSize, langRow, named, profileSheet, updatedNote
 
-### state/progress.js (106)
+### state/progress.js (112)
 - * Чем заперто то, что занимает место прогона, пока он идёт: мост второй прогон * не пустит.
-- отдаёт: COUNTLESS_STAGES, RUNNING, STARTING, applyNote, bar, caption, countlessNote, humanText, recoverNote, updateNote
+- отдаёт: COUNTLESS_STAGES, RUNNING, STARTING, applyNote, bar, countlessNote, humanText, recoverNote, sweepNote, updateNote
 
 ### state/projects.js (45)
 - * Какие обязательные поля проекта пусты: обязательно одно название, как требует мост.
@@ -920,8 +920,8 @@
 - * Почему отклик и переразбор сейчас недоступны. * * Пустая фраза значит «доступно». Обе просьбы уходят боту, поэтому неживое * окружение запирает оба и объясняется теми же словами, что и кнопка обхода * внизу окна: две разные фразы об одной беде человек читает как две беды. * * Идущий обход запирает оба: прогон сам зовёт модель, а параллельной работы * модели не допускаем — даже отклика в Telegram, которому браузер не нужен. * * Есть ли куда откликаться, здесь не решается: это знает только мост, и * ответ его разбирает `applyChoices`.
 - отдаёт: NO_WAYS, actionBlocks, applyChoices, rawChips, sourcePill
 
-### state/vacancy_card.js (166)
-- * Способ отклика словами; незнакомый код называется сам собой — коды заводит * бэкенд, и новый приедет раньше, чем окно про него узнает.
+### state/vacancy_card.js (126)
+- * Своя запись правится, чужая читается: пояснение бота — след его работы, а не * заметка, и правка стирала бы то, по чему потом разбираются.
 - отдаёт: timelineRows
 
 ### state/vacancy_contacts.js (27)
@@ -1112,9 +1112,9 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 - селекторы (3): .confirm-field, .confirm-field .input, .confirm-field .icon-btn:hover
 - берёт: --accent
 
-### styles/confirm-send.css (21)
+### styles/confirm-send.css (28)
 - Окно подтверждения отправки: ссылка на вакансию и пункты.
-- селекторы (3): .confirm-send-link, .confirm-item-required, .confirm-item
+- селекторы (4): .confirm-send-link, .confirm-item-required, .confirm-item, .confirm-item .textarea
 - берёт: --danger, --text-secondary
 
 ### styles/contact-block.css (50)
@@ -1200,9 +1200,10 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 - селекторы (3): .filter-group, .filter-group:last-child, .filter-label
 - берёт: --border
 
-### styles/footer.css (40)
+### styles/footer.css (44)
 - Рама нижней полосы: три её места и то, как они делят ширину. Что стоит внутри — лампочки, режим, ход обхода, счётчик — своими файлами.
 - селекторы (4): .bottom-bar, .bb-left, .bb-right, .bb-center
+- объявляет: --bars-width
 - берёт: --bg-secondary, --border
 
 ### styles/form-grid.css (68)
@@ -1482,11 +1483,11 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 .vac-sort-option,
 .unread-popup-row
 
-### styles/progress.css (61)
-- Ход обхода: две полосы и подпись рядом с ними.
-- селекторы (7): .bb-center .progress-wrap, .progress-bars, .progress-caption, .progress-bar, .progress-fill, .progress-bar[data-indeterminate='true'] .progress-fill, @keyframes slide
-- объявляет: --bars-shift, --bars-width
-- берёт: --accent, --bars-shift, --bars-width, --text-secondary
+### styles/progress.css (72)
+- Ход обхода: две полосы по оси полосы окна и подписи по их бокам.
+- селекторы (9): .bb-center .progress-wrap, .progress-bars, .progress-what,
+.progress-count, .progress-what, .progress-count, .progress-bar, .progress-fill, .progress-bar[data-indeterminate='true'] .progress-fill, @keyframes slide
+- берёт: --accent, --bars-width, --text-secondary
 
 ### styles/quiet-number.css (14)
 - Тихое число в хвосте строки: давность и уровень. Одним правилом, потому что читают его последним и одинаково — приглушённым, мельче соседей и моноширинными цифрами. Цифры моноширинные не для красоты: числа стоят одно под другим, и пропорциональные дёргали бы хвост строки от записи к записи.
@@ -1790,8 +1791,8 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/blacklist_menu_item_live.test.js (67)
 - * Пункт с записанным за ним следом нажатий.
 
-### tests/bottom_bar_live.test.js (422)
-- —
+### tests/bottom_bar_live.test.js (450)
+- * Подписи по бокам полос: что идёт — слева, счёт — справа.
 
 ### tests/bottom_bar_stub.js (51)
 - * Полоса со здоровьем `health`; ответ — зовы моста, подсказки запора, плашки * и обработчики вестей. * * `counts` — что по очереди отвечает число новых вакансий; последнее держится. * `app` — запущенная версия и может ли копия обновиться; `updates` — что по * очереди отвечает проверка обновления, последнее держится.
@@ -2045,7 +2046,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/vacancy_apply_live.test.js (151)
 - * Карточка, у которой мост отдаёт эти способы; `ways` может быть обещанием.
 
-### tests/vacancy_card.test.js (291)
+### tests/vacancy_card.test.js (230)
 - —
 
 ### tests/vacancy_card_live.test.js (102)
