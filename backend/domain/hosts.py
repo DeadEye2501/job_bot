@@ -137,6 +137,16 @@ def typed_page(url: str | None) -> str | None:
     return url if url and post_address(url) is None else None
 
 
+def row_address(source_url: str | None, msg_id: int | None) -> str | None:
+    """Собственный адрес заведённой строки; пусто — его нет.
+
+    Строка из поста — та, у которой есть номер сообщения: её ссылка на пост и
+    есть её адрес. У строки без номера ссылка на пост — набранная в «Полях»
+    (`typed_page`).
+    """
+    return source_url if msg_id is not None else typed_page(source_url)
+
+
 def on_telegram(url: str) -> bool:
     """Ведёт ли адрес в Telegram или на его статьи — туда, что читает приём постов."""
     return owning_host(url, set(TELEGRAM_HOSTS)) is not None

@@ -18,7 +18,7 @@ import logging
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.domain.hosts import vacancy_address_key
+from backend.domain.hosts import row_address, vacancy_address_key
 from backend.models import (
     Application,
     Message,
@@ -102,12 +102,13 @@ async def source_seen(session: AsyncSession, aggregator_id: int, key: str) -> bo
     return stored is not None or await source_trashed(session, aggregator_id, key)
 
 
-async def vacancy_at_address(session: AsyncSession, url: str) -> int | None:
-    """Вакансия, чей собственный адрес — та же страница; пусто — такой нет.
+async def vacancies_at_address(session: AsyncSession, url: str) -> list[int]:
+    """Вакансии, чей собственный адрес — та же страница, по номеру.
 
     Сравниваются только собственные адреса строк (`source_url`): ссылки в
-    тексте и контактах — упоминания, а не страница вакансии. Из нескольких —
-    первая по номеру: повтор, заведённый раньше, всё равно та же вакансия.
+    тексте и контактах — упоминания, а не страница вакансии. Ссылка на пост у
+    строки без номера сообщения — у набранной в «Полях» — тоже упоминание
+    (`row_address`): в посте бывает несколько вакансий.
 
     Ключ считается на лету по каждой строке, а не хранится колонкой: колонка
     стала бы третьим ключом источника рядом с `source_key` и парой канала, а
@@ -115,13 +116,16 @@ async def vacancy_at_address(session: AsyncSession, url: str) -> int | None:
     """
     key = vacancy_address_key(url)
     if key is None:
-        return None
+        return []
     rows = await session.execute(
-        select(Vacancy.id, Vacancy.source_url)
+        select(Vacancy.id, Vacancy.source_url, Vacancy.source_msg_id)
         .where(Vacancy.source_url.is_not(None))
         .order_by(Vacancy.id)
     )
-    return next((vid for vid, own in rows if vacancy_address_key(own) == key), None)
+    return [
+        vid for vid, url, msg_id in rows
+        if (own := row_address(url, msg_id)) is not None and vacancy_address_key(own) == key
+    ]
 
 
 async def _trash_noted(session: AsyncSession, mark: TrashEvent) -> bool:

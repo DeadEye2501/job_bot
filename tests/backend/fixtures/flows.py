@@ -194,14 +194,14 @@ def similar_by_hand(pipeline, monkeypatch) -> None:
     pipeline.similar_id = None
     pipeline.unparsed = False
 
-    async def unparsed(_pipeline, _vacancy_id):
-        return pipeline.unparsed
+    async def parsed(_session_factory, _vacancy_id):
+        return not pipeline.unparsed
 
     def match(vector, threshold):
         return None if threshold >= SAME_TEXT_COSINE else pipeline.similar_id
 
     monkeypatch.setattr(pipeline.embeddings, "match", match)
-    monkeypatch.setattr(parse_mod, "is_unparsed_vacancy", unparsed)
+    monkeypatch.setattr(parse_mod, "is_parsed", parsed)
 
 
 @pytest.fixture

@@ -304,17 +304,17 @@ async def parse_and_update_vacancy(
     )
 
 
-async def is_unparsed_vacancy(pipeline, vacancy_id: int) -> bool:
-    """A vacancy is 'orphaned' when its embedding row is in the cache
-    but the LLM-pipeline never finished (parser cancelled, process
-    crashed, LLM call failed silently). Reads the explicit
-    ``is_parsed`` flag instead of inferring from ``title is None``
-    because rerun-path empty/trash rows legitimately have no title
-    but ARE parsed (status=NotFit, skip_reason='empty:...').
+async def is_parsed(session_factory, vacancy_id: int) -> bool | None:
+    """Разобрана ли строка; пусто — строки нет.
+
+    Недоразобранная — брошенная: строка и вектор есть, а разбор не кончился
+    (процесс упал, модель промолчала). Читается явное поле, а не отсутствие
+    названия: у отбракованного пустого объявления названия нет, а разобрано оно
+    до конца.
     """
-    async with pipeline.session_factory() as session:
+    async with session_factory() as session:
         v = await session.get(Vacancy, vacancy_id)
-    return v is not None and not v.is_parsed
+    return None if v is None else v.is_parsed
 
 
 async def save_empty_vacancy(

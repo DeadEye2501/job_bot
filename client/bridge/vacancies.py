@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 from functools import partial
 
-from backend.domain.hosts import typed_page
 from backend.domain.scoring import build_skill_lookup
 from backend.models import VacancyStatus
 from backend.repository import (
@@ -300,18 +299,13 @@ class Vacancies(VacancyActions, VacancyLinks, VacancyContacts):
         if not fields["title"]:
             return denied(NAME_REQUIRED, action="create_vacancy")
 
-        if bool(payload.get("hands_over")):
-            return launched_on_bot(
-                self._hub,
-                lambda bot: bot.ui_ingest_pasted_text(HandRequest("fields", fields, None, True)),
-                PASTED_REFUSALS,
-                FILED,
-                action=HAND_MADE_ACTION,
-            )
+        request = HandRequest("fields", fields, None, bool(payload.get("hands_over")))
+        if request.hands_over:
+            return self._handed(request)
 
         async def run() -> dict:
             known = await hand_made.known_at(
-                self._hub.session_factory, typed_page(fields["source_url"]), partial(forgotten, self._hub))
+                self._hub.session_factory, hand_made.own_address(request), partial(forgotten, self._hub))
             if known is not None:
                 return {"action": "create_vacancy", "created_id": known, "created": False,
                         "message": PASTED_REFUSALS["duplicate"]}
@@ -347,6 +341,10 @@ class Vacancies(VacancyActions, VacancyLinks, VacancyContacts):
             if not text:
                 return denied(TEXT_REQUIRED, action=HAND_MADE_ACTION)
             request = HandRequest("text", text, moment_or_none(payload.get("posted_at")), hands_over)
+        return self._handed(request)
+
+    def _handed(self, request: HandRequest) -> dict:
+        """Отдать заявку окна боту: ответ — «пущено», итог — вестью."""
         return launched_on_bot(
             self._hub,
             lambda bot: bot.ui_ingest_pasted_text(request),

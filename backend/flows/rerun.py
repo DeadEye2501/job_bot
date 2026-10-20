@@ -19,6 +19,7 @@ from backend.flows import embeddings, handover, linked_article
 from backend.flows.handover import Intake
 from backend.models import TelegramChannel
 from backend.models import Vacancy, VacancyStatus
+from backend.domain.hosts import row_address
 from backend.domain.telegram_identity import PostAddress, post_address
 from backend.repository.channels import list_named_channels
 from backend.telegram_lookup import read_post
@@ -51,17 +52,13 @@ class _Origin:
 def _post_of(username: str, msg_id: int | None, source_url: str | None) -> PostAddress | None:
     """Где перечитать пост вакансии; пусто — вакансия не из поста.
 
-    Из поста строка, у которой есть номер сообщения. По нику канала — у поста
-    заведённого канала; иначе по собственному адресу строки: у поста
-    незаведённого или закрытого канала, заведённого по ссылке, строки канала
-    нет, а адрес есть. Ссылка на пост у строки без номера — у набранной в
-    «Полях» — упоминание, а не её исходный текст.
+    По нику канала — у поста заведённого канала; иначе по собственному адресу
+    строки (`row_address`): у поста незаведённого или закрытого канала,
+    заведённого по ссылке, строки канала нет, а адрес есть.
     """
-    if msg_id is None:
-        return None
-    if username:
+    if username and msg_id is not None:
         return PostAddress(username, None, msg_id)
-    return post_address(source_url or "")
+    return post_address(row_address(source_url, msg_id) or "")
 
 
 def _nick(username: str, post: PostAddress | None) -> str:
