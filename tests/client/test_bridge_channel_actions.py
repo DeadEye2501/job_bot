@@ -8,7 +8,7 @@ Telegram, поэтому бот подделан.
 import pytest
 
 from backend.models import TelegramChannel, Vacancy
-from client.bridge.refusals import PASTED_REFUSALS
+from client.bridge.refusals import TELEGRAM_REFUSALS
 from tests.dbio import only_row, put
 from tests.factories import channel_row, vacancy_row
 
@@ -67,7 +67,7 @@ async def test_a_telegram_trouble_is_said_as_in_the_new_vacancy_window(
     answer = await ask(api.channels.create, {"input": "@pyjobz"})
 
     assert answer["fail"] == "denied"
-    assert answer["detail"] == PASTED_REFUSALS[trouble]
+    assert answer["detail"] == TELEGRAM_REFUSALS[trouble]
 
 
 async def test_an_already_known_channel_is_not_an_error(api, ask, with_bot):

@@ -31,8 +31,8 @@ from client.bridge.form_payloads import read_new_vacancy_fields
 from client.bridge.hub import Hub
 from client.bridge.refusals import (
     NAME_REQUIRED,
+    HAND_MADE_REFUSALS,
     NO_VACANCY,
-    PASTED_REFUSALS,
     TEXT_REQUIRED,
     URL_REQUIRED,
     agent_refusals,
@@ -308,13 +308,13 @@ class Vacancies(VacancyActions, VacancyLinks, VacancyContacts):
                 self._hub.session_factory, fields, partial(forgotten, self._hub))
             if not created:
                 return {"action": "create_vacancy", "created_id": vacancy_id, "created": False,
-                        "message": PASTED_REFUSALS["duplicate"]}
+                        "message": HAND_MADE_REFUSALS["duplicate"]}
             self._hub.events.add(LIST_CHANGED)
             return {"action": "create_vacancy", "created_id": vacancy_id, "created": True, "message": FILED}
 
         return reply(self._hub.runner, run())
 
-    def create_from_text(self, payload: dict) -> dict:
+    def create_from_ad(self, payload: dict) -> dict:
         """Завести вакансию по вставленному тексту объявления или по ссылке на него.
 
         Вторая и третья вкладки того же окна: человек приносит текст или
@@ -346,14 +346,14 @@ class Vacancies(VacancyActions, VacancyLinks, VacancyContacts):
         """Отдать заявку окна боту: ответ — «пущено», итог — вестью."""
         return launched_on_bot(
             self._hub,
-            lambda bot: bot.ui_ingest_pasted_text(request),
-            agent_refusals(PASTED_REFUSALS, self._hub.rs.chat),
+            lambda bot: bot.ui_ingest_by_hand(request),
+            agent_refusals(HAND_MADE_REFUSALS, self._hub.rs.chat),
             FILED,
             action=HAND_MADE_ACTION,
         )
 
 
-HAND_MADE_ACTION = "create_from_text"
+HAND_MADE_ACTION = "create_by_hand"
 """Метка вестей ручного заведения: одна на все вкладки окна, по ней окно ждёт свою."""
 
 FILED = "Вакансия заведена"
@@ -365,6 +365,6 @@ def tell_hand_made(events, result) -> None:
     По номеру окно переходит на существующую при повторе.
     """
     finished(
-        events, result.outcome, PASTED_REFUSALS, FILED,
+        events, result.outcome, HAND_MADE_REFUSALS, FILED,
         action=HAND_MADE_ACTION, outcome=result.outcome, vacancy_id=result.vacancy_id,
     )

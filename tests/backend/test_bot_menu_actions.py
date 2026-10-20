@@ -13,7 +13,7 @@ import asyncio
 
 import pytest
 
-from backend.bot import pasted as pasted_mod
+from backend.bot import hand_made as bot_hand_made
 from backend.flows.hand_made import HandRequest
 from backend.flows.hand_outcome import HandResult
 from tests.fakes.ingestion import FakeIngestion, WindowHooks, wire
@@ -37,7 +37,7 @@ def requests_seen(monkeypatch):
     async def ingest_by_hand(kit, request):
         seen.append((kit, request))
 
-    monkeypatch.setattr(pasted_mod.hand_made, "ingest_by_hand", ingest_by_hand)
+    monkeypatch.setattr(bot_hand_made.flow_hand_made, "ingest_by_hand", ingest_by_hand)
     return seen
 
 
@@ -52,7 +52,7 @@ async def test_pasted_text_reaches_the_intake_and_frees_the_slot(make_bot, reque
     """
     bot = wire(await make_bot(), FakeIngestion())
 
-    await bot.ui_ingest_pasted_text(TEXT)
+    await bot.ui_ingest_by_hand(TEXT)
 
     (kit, request), = requests_seen
     assert kit is not None and request == TEXT
@@ -71,7 +71,7 @@ async def test_a_link_is_sorted_once_by_the_bot(make_bot, requests_seen, url, ki
     агента не ждут и заводятся без него."""
     bot = wire(await make_bot(), FakeIngestion())
 
-    await bot.ui_ingest_pasted_text(HandRequest("link", url, None, True))
+    await bot.ui_ingest_by_hand(HandRequest("link", url, None, True))
 
     ((_, request),) = requests_seen
     assert request == HandRequest(kind, url, None, True)
@@ -82,15 +82,15 @@ async def test_a_page_without_claude_code_is_locked_before_the_slot(make_bot, re
     начинается. Пост и статья агента не ждут."""
     bot = wire(await make_bot(), FakeIngestion())
 
-    assert await bot.ui_ingest_pasted_text(HandRequest("link", "https://hh.ru/vacancy/1", None, False)) == "locked"
+    assert await bot.ui_ingest_by_hand(HandRequest("link", "https://hh.ru/vacancy/1", None, False)) == "locked"
     assert requests_seen == []
 
 
 async def test_a_page_with_the_agent_at_hand_goes_through(make_bot, requests_seen, monkeypatch):
-    monkeypatch.setattr(pasted_mod, "aggregators_available", lambda bot: None)
+    monkeypatch.setattr(bot_hand_made, "aggregators_available", lambda bot: None)
     bot = wire(await make_bot(), FakeIngestion())
 
-    await bot.ui_ingest_pasted_text(HandRequest("link", "https://hh.ru/vacancy/1", None, False))
+    await bot.ui_ingest_by_hand(HandRequest("link", "https://hh.ru/vacancy/1", None, False))
 
     ((_, request),) = requests_seen
     assert request.tab == "page"
@@ -103,9 +103,9 @@ async def test_a_job_that_never_told_the_window_answers_with_its_own_end(make_bo
     async def broke(kit, request):
         raise RuntimeError("база не отвечает")
 
-    monkeypatch.setattr(pasted_mod.hand_made, "ingest_by_hand", broke)
+    monkeypatch.setattr(bot_hand_made.flow_hand_made, "ingest_by_hand", broke)
 
-    assert await bot.ui_ingest_pasted_text(TEXT) == "error"
+    assert await bot.ui_ingest_by_hand(TEXT) == "error"
 
 
 async def test_a_job_that_ended_without_a_word_answers_with_trouble(make_bot, monkeypatch):
@@ -116,9 +116,9 @@ async def test_a_job_that_ended_without_a_word_answers_with_trouble(make_bot, mo
     async def silent(kit, request):
         return None
 
-    monkeypatch.setattr(pasted_mod.hand_made, "ingest_by_hand", silent)
+    monkeypatch.setattr(bot_hand_made.flow_hand_made, "ingest_by_hand", silent)
 
-    assert await bot.ui_ingest_pasted_text(TEXT) == "error"
+    assert await bot.ui_ingest_by_hand(TEXT) == "error"
 
 
 async def test_the_bot_forwards_the_end_of_an_intake_to_the_window(make_bot):
@@ -142,9 +142,9 @@ async def test_a_stop_after_the_window_was_told_sends_no_second_word(make_bot, m
         kit.pipeline.emit_hand_made(HandResult("ok", 7))
         raise RuntimeError("отклик сорвался")
 
-    monkeypatch.setattr(pasted_mod.hand_made, "ingest_by_hand", told_then_broke)
+    monkeypatch.setattr(bot_hand_made.flow_hand_made, "ingest_by_hand", told_then_broke)
 
-    assert await bot.ui_ingest_pasted_text(TEXT) == "told"
+    assert await bot.ui_ingest_by_hand(TEXT) == "told"
 
 
 async def test_a_paste_while_the_slot_is_busy_is_refused_without_calling_the_intake(
@@ -158,7 +158,7 @@ async def test_a_paste_while_the_slot_is_busy_is_refused_without_calling_the_int
     bot = wire(await make_bot(), FakeIngestion())
     busy_slot(bot)
 
-    assert await bot.ui_ingest_pasted_text(TEXT) == "busy"
+    assert await bot.ui_ingest_by_hand(TEXT) == "busy"
     assert requests_seen == []
 
 

@@ -214,7 +214,7 @@ TELEGRAM_REFUSALS = {
 ссылке его нет у закрытого канала, а одна беда двумя словами читалась бы как
 две разные."""
 
-PASTED_REFUSALS = {
+HAND_MADE_REFUSALS = {
     "busy": BUSY_CYCLE,
     **AGENT_STOPS,
     **TELEGRAM_REFUSALS,

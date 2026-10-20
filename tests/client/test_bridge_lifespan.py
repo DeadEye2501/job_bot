@@ -216,9 +216,9 @@ async def test_the_end_of_a_vacancy_made_by_hand_reaches_the_window_with_its_num
     news = await hub.events.take(after=0, timeout=0.01)
     assert [one["payload"] for one in news["events"]] == [
         {"message": "Такая вакансия уже существует", "danger": False,
-         "action": "create_from_text", "outcome": "duplicate", "vacancy_id": 5},
+         "action": "create_by_hand", "outcome": "duplicate", "vacancy_id": 5},
         {"message": "Вакансия заведена", "danger": False,
-         "action": "create_from_text", "outcome": "ok", "vacancy_id": 6},
+         "action": "create_by_hand", "outcome": "ok", "vacancy_id": 6},
     ]
 
 

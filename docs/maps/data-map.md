@@ -596,6 +596,11 @@
   - `launched_task: asyncio.Task | None`
   - `dialogs: list[DialogPeer] | None`
 
+### `backend/bot/hand_made.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `HandMadeOutcome` = `Literal[work.WorkOutcome, 'told', 'locked']`
+
 ### `backend/bot/loop.py`
 
 - `logger` = `logging.getLogger(__name__)`
@@ -610,11 +615,6 @@
 - `_PHOTO_TYPES` = `frozenset(PHOTO_SUFFIXES)`
 - `PHOTO_SIZE_LIMIT` = `10 * 1024 * 1024`
 - `DOCUMENT_SIZE_LIMIT` = `50 * 1024 * 1024`
-
-### `backend/bot/pasted.py`
-
-- `logger` = `logging.getLogger(__name__)`
-- `PastedOutcome` = `Literal[work.WorkOutcome, 'told', 'locked']`
 
 ### `backend/bot/rerun.py`
 
@@ -2235,7 +2235,7 @@
 - `POLL_REFUSALS` = `словарь из 5 и раскрытых`
 - `RERUN_REFUSALS` = `словарь из 6 и раскрытых`
 - `TELEGRAM_REFUSALS` = `словарь из 3`
-- `PASTED_REFUSALS` = `словарь из 11 и раскрытых`
+- `HAND_MADE_REFUSALS` = `словарь из 11 и раскрытых`
 - `CALM` = `frozenset({'duplicate'})`
 - `PARSE_CV_REFUSALS` = `словарь из 5`
 - `NO_AGGREGATOR` = `'Агрегатор не найден'`
@@ -2281,7 +2281,7 @@
 ### `client/bridge/vacancies.py`
 
 - `logger` = `logging.getLogger(__name__)`
-- `HAND_MADE_ACTION` = `'create_from_text'`
+- `HAND_MADE_ACTION` = `'create_by_hand'`
 - `FILED` = `'Вакансия заведена'`
 
 ### `client/bridge/vacancy_links.py`
