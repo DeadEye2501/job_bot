@@ -3,11 +3,53 @@
 import pytest
 
 from backend.domain.telegram_identity import (
+    ARTICLE_URL_RE,
     DialogPeer,
     hrs_to_catch_up,
     normalize_username,
     typed_username,
 )
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        pytest.param(
+            "вся вакансия https://telegra.ph/Senior-Manual-QA-08-21",
+            ["https://telegra.ph/Senior-Manual-QA-08-21"],
+            id="адрес словами",
+        ),
+        pytest.param(
+            "ПОСМОТРЕТЬ (https://telegra.ph/Senior-Manual-QA-08-21)",
+            ["https://telegra.ph/Senior-Manual-QA-08-21"],
+            id="адрес за подписью ссылки",
+        ),
+        pytest.param(
+            "вся вакансия https://telegra.ph/Senior-Manual-QA-08-21.",
+            ["https://telegra.ph/Senior-Manual-QA-08-21"],
+            id="точка в конце предложения",
+        ),
+        pytest.param(
+            "тут https://telegra.ph/QA-08-21, а ещё тут",
+            ["https://telegra.ph/QA-08-21"],
+            id="запятая после адреса",
+        ),
+        pytest.param(
+            "вся вакансия https://telegra.ph/QA-08-21#trebovaniya",
+            ["https://telegra.ph/QA-08-21#trebovaniya"],
+            id="якорь остаётся в адресе",
+        ),
+        pytest.param("наш сайт https://telegra.ph/", [], id="корень без статьи"),
+        pytest.param("https://habr.com/QA-08-21", [], id="чужой сайт"),
+    ],
+)
+def test_which_addresses_count_as_an_article(text, expected):
+    """Адрес статьи узнаётся в тексте объявления и не прихватывает лишнего.
+
+    Скобка отдельно: адрес спрятанной ссылки дописывают в текст именно в
+    скобках, и утащенная в адрес закрывающая скобка вела бы в никуда.
+    """
+    assert ARTICLE_URL_RE.findall(text) == expected
 
 
 @pytest.mark.parametrize(

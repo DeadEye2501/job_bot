@@ -222,3 +222,23 @@ async def test_a_page_of_a_blacklisted_site_is_skipped_without_costing_the_limit
 
     assert answer.startswith("пропущена") and "чёрном списке" in answer
     assert (await all_rows(session_factory, Vacancy), job.submitted, job.refused) == ([], 0, False)
+
+
+@pytest.mark.parametrize("url", [
+    "https://t.me/jobs_channel/15",
+    "https://www.telegram.me/jobs_channel/15",
+    "https://telegra.ph/Vacancy-10-18",
+])
+async def test_a_telegram_page_is_left_to_its_own_round(make_pipeline, session_factory, url):
+    """Каналы читает приём постов, их статьи он же дочитывает: «Поиску по сети»
+    туда не нужно, и это не чёрный список человека."""
+    job, _, tools = await _web_seeker(make_pipeline, session_factory)
+
+    known = await tool(tools, "is_known")(url=url)
+    answer = await tool(tools, "submit_vacancy")(
+        text="Текст вакансии", url=url, published="", contacts=[]
+    )
+
+    assert "свой обход" in known and "чёрном списке" not in known
+    assert answer.startswith("пропущена") and "свой обход" in answer
+    assert (await all_rows(session_factory, Vacancy), job.submitted) == ([], 0)

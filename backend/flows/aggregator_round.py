@@ -16,6 +16,7 @@ from backend.agent.stops import RUN_STOPPERS, LimitExhausted
 from backend.agent.tools_browser import browser_tools
 from backend.agent.tools_common import common_tools
 from backend.agent.tools_seeker import seeker_tools
+from backend.domain.telegram_identity import TELEGRAM_HOSTS
 from backend.flows.handover import hand_over
 from backend.flows.parse_queue import ParseQueue
 from backend.repository.aggregators import barred_hosts, list_aggregators, mark_run
@@ -77,7 +78,7 @@ async def _seek_plan(kit: AgentKit, job: SeekJob, queue: ParseQueue) -> SessionP
         task = seeker_task(source.host, bounds)
         return SessionPlan(system_prompt(SEEKER_PROMPT, tools), task, tools, web_search=False)
     async with kit.pipeline.session_factory() as session:
-        hosts = [a.host for a in await list_aggregators(session) if a.host]
+        hosts = [a.host for a in await list_aggregators(session) if a.host] + sorted(TELEGRAM_HOSTS)
         barred = sorted(await barred_hosts(session))
     task = web_seeker_task(hosts, barred, bounds)
     return SessionPlan(system_prompt(WEB_SEEKER_PROMPT, tools), task, tools, web_search=True)

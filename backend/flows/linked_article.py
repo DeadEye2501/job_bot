@@ -15,6 +15,7 @@ import httpx
 
 from adapters import telegraph
 from backend.domain.spellings import dedupe_first_wins
+from backend.domain.telegram_identity import ARTICLE_URL_RE
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,7 @@ def _article_urls(text: str) -> list[str]:
     чувствителен к регистру, и схлопни мы его — два разных адреса слились бы
     в один.
     """
-    return dedupe_first_wins(telegraph.ARTICLE_URL_RE.findall(text), key=lambda url: url)
+    return dedupe_first_wins(ARTICLE_URL_RE.findall(text), key=lambda url: url)
 
 
 def _blame_the_site(url: str, trouble: httpx.HTTPError) -> None:

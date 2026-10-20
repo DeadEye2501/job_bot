@@ -160,6 +160,16 @@ async def test_the_web_seeker_searches_the_web_and_avoids_the_persons_aggregator
     assert plan.web_search is True and "board.test" in plan.task
 
 
+async def test_the_web_seeker_is_told_to_keep_off_telegram(seek, parsed):
+    _, _, kit = await seek([finish_step()], name="Поиск по сети", host=None)
+
+    (plan,) = kit.run_session.plans
+    (avoided,) = [line for line in plan.task.splitlines() if "обходить стороной" in line]
+    (barred,) = [line for line in plan.task.splitlines() if "чёрном списке" in line]
+    hosts = ("t.me", "telegram.me", "telegra.ph")
+    assert all(host in avoided for host in hosts) and not any(host in barred for host in hosts)
+
+
 @pytest.mark.parametrize("host", ["site.test", None], ids=["агрегатор", "поиск по сети"])
 async def test_the_seeker_is_told_how_to_call_a_person(seek, parsed, host):
     step = finish_step()
