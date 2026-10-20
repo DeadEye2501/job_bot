@@ -349,7 +349,9 @@ async def _text_to_judge_by(pipeline, row) -> tuple[str, bool] | None:
     """Текст, по которому судить недоразобранную строку, и можно ли удалять.
 
     Ссылок на статью в тексте нет — ждать нечего и перечитывать незачем:
-    объявление собрано целиком, и непригодное можно убирать.
+    объявление собрано целиком, и непригодное можно убирать. Поста нет —
+    перечитывать неоткуда: вставленный текст дочитал статьи ещё до заведения,
+    а страница площадки — это и есть весь её текст.
 
     Иначе пост перечитывается: только так видно, собралась ли наконец статья,
     которой не хватило на приёме. Собралась — судим по свежему тексту, и
@@ -362,11 +364,10 @@ async def _text_to_judge_by(pipeline, row) -> tuple[str, bool] | None:
     Ждать не бесконечно: прождавшую дольше `LONGEST_WAIT` судят по
     сохранённому, но удалять по нему не дают — целым он так и не собрался.
     """
-    if not linked_article.article_urls(row.raw_text):
+    post = _post_of(row.username or "", row.source_msg_id, row.source_url)
+    if post is None or not linked_article.article_urls(row.raw_text):
         return row.raw_text, True
-    fresh = await _reread_and_store(
-        pipeline, row.id, row.raw_text, _post_of(row.username or "", row.source_msg_id, row.source_url)
-    )
+    fresh = await _reread_and_store(pipeline, row.id, row.raw_text, post)
     if fresh is not None:
         text, whole = fresh
         if whole:
@@ -407,7 +408,7 @@ async def recover_orphan_vacancies(pipeline) -> int:
     приговор был отложен до полного текста. Обе лечатся одинаково — пост
     перечитывается заново (`_text_to_judge_by`), и что из этого вышло, решает
     судьбу строки: дочитанную судят с правом убрать непригодную, ждущую
-    оставляют ждать.
+    оставляют ждать. Строку без поста перечитывать неоткуда — её судят сразу.
 
     Идёт на каждом полном обороте, до обхода каналов: статья возвращается
     посреди рабочего дня, а ждущей строки человек не видит вовсе. За оборот
