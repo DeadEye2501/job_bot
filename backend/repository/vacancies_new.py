@@ -12,6 +12,7 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.domain.hosts import typed_page
 from backend.domain.salary import salary_text
 from backend.domain.scoring import score_stack
 from backend.domain.stack import deduped_halves, joined_stack
@@ -76,10 +77,11 @@ async def create_vacancy(session: AsyncSession, fields: dict) -> tuple[int, bool
 
     Оборот открывает зовущий.
     """
-    if fields.get("source_url"):
-        existing = await vacancy_at_address(session, fields["source_url"])
+    page = typed_page(fields.get("source_url"))
+    if page is not None:
+        existing = await vacancy_at_address(session, page)
         if existing is not None:
-            logger.info("vacancy by hand: page %s is vacancy %d", fields["source_url"], existing)
+            logger.info("vacancy by hand: page %s is vacancy %d", page, existing)
             return existing, False
     # Свой набор: половины стека из него вынимаются, а объект чужой.
     fields = dict(fields)

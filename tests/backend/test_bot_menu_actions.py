@@ -105,6 +105,19 @@ async def test_a_job_that_never_told_the_window_answers_with_its_own_end(make_bo
     assert await bot.ui_ingest_pasted_text(TEXT) == "error"
 
 
+async def test_a_job_that_ended_without_a_word_answers_with_trouble(make_bot, monkeypatch):
+    """Работа кончилась, а итога окну так и не сказала — окно слышит беду, а не
+    молчит: другой вести не будет."""
+    bot = wire(await make_bot(), FakeIngestion())
+
+    async def silent(kit, request):
+        return None
+
+    monkeypatch.setattr(pasted_mod.hand_made, "ingest_by_hand", silent)
+
+    assert await bot.ui_ingest_pasted_text(TEXT) == "error"
+
+
 async def test_the_bot_forwards_the_end_of_an_intake_to_the_window(make_bot):
     """Итог заведения от конвейера доезжает до окна: второй вести по концу
     работы нет, и без этой пересылки окно ждало бы итога вечно."""

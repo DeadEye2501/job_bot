@@ -114,7 +114,9 @@ class PostAddress:
         return self.channel if self.channel is not None else int(f"-100{self.private_id}")
 
 
-_POST_PATH_RE = re.compile(r"(?:c/(?P<private>\d+)|(?P<nick>[^/]+))/(?P<msg>\d+)/?")
+# Номер темы форума стоит между каналом и номером поста и поста не меняет:
+# номер сообщения в канале один на все темы.
+_POST_PATH_RE = re.compile(r"(?:c/(?P<private>\d+)|(?P<nick>[^/]+))/(?:\d+/)?(?P<msg>\d+)/?")
 
 
 def post_address(url: str) -> PostAddress | None:

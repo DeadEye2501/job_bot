@@ -269,6 +269,32 @@ async def test_a_duplicate_of_an_unparsed_row_finishes_it(filing, session_factor
     assert filing.told == [HandResult("duplicate", existing.id)] and filing.applied == []
 
 
+async def test_fields_linking_a_post_of_another_vacancy_are_filed(filing, session_factory):
+    """В посте бывает несколько вакансий: ссылка на пост у набранной в «Полях» —
+    упоминание, а не её собственный адрес, и повтором не считается."""
+    await put(session_factory, vacancy_row(is_parsed=True, source_url="https://t.me/pyjobs/5"))
+
+    await ingest_by_hand(kit_for(filing), HandRequest("fields", _fields(source_url="https://t.me/pyjobs/5"), None, False))
+
+    assert len(await all_rows(session_factory, Vacancy)) == 2
+    assert filing.told[0].outcome == "ok"
+
+
+async def test_a_duplicate_waiting_for_its_article_is_not_judged_by_its_header(
+    filing, session_factory, parsed
+):
+    """Неразобранная ждёт статью: дочитывать её одной шапкой нельзя, её дочитает
+    подбор недоразобранного. Окну — что статья ещё не пришла."""
+    existing = vacancy_row(is_parsed=False, raw_text="QA https://telegra.ph/QA-08-21",
+                           source_url="https://hh.ru/vacancy/123")
+    await put(session_factory, existing)
+
+    await ingest_by_hand(kit_for(filing), HandRequest("page", "https://hh.ru/vacancy/123", None, True))
+
+    assert parsed == []
+    assert filing.told == [HandResult("article", existing.id)]
+
+
 async def test_a_duplicate_that_could_not_be_finished_is_not_a_jump(filing, session_factory, monkeypatch):
     """Дочитать неразобранную не вышло — окно не переходит на строку, которой в
     списке не видно, а говорит, что модель не ответила."""
