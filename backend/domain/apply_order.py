@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 
 from backend.domain.contact_keys import contact_key, is_address, is_link
-from backend.domain.hosts import owning_host
+from backend.domain.hosts import page_owner
 from backend.domain.spellings import dedupe_first_wins
 from backend.models import ApplicationVia
 
@@ -83,7 +83,7 @@ def _buttons(vacancy: VacancyFacts, world: World) -> list[Way]:
     """
     ways = []
     for link in _links(vacancy):
-        site = _owner(link, world.sites)
+        site = page_owner(link, world.sites)
         if (site is not None and site.logged_in and site.resume_chosen
                 and site.id not in world.closed_sites):
             ways.append(Way(VIA_AGGREGATOR, link, site.id))
@@ -99,7 +99,7 @@ def _forms(vacancy: VacancyFacts, world: World) -> list[Way]:
     """
     web_find = vacancy.source_site is not None and vacancy.source_site.host is None
     return [Way(VIA_FORM, link, None) for link in _links(vacancy)
-            if (web_find or link != vacancy.source_url) and _owner(link, world.sites) is None]
+            if (web_find or link != vacancy.source_url) and page_owner(link, world.sites) is None]
 
 
 def _links(vacancy: VacancyFacts) -> list[str]:
@@ -115,8 +115,3 @@ def _links(vacancy: VacancyFacts) -> list[str]:
 
 def _contact_links(vacancy: VacancyFacts) -> list[str]:
     return [c.strip() for c in vacancy.contacts if is_link(c)]
-
-
-def _owner(link: str, sites: list[KnownSite]) -> KnownSite | None:
-    host = owning_host(link, {s.host for s in sites if s.host})
-    return next((s for s in sites if host and s.host == host), None)

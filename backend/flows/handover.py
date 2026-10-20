@@ -46,6 +46,30 @@ class Intake:
         return HAND_MADE, {"via": kind, **payload}
 
 
+def hand_made_intake(hands_over: bool, channel: str | None = None) -> Intake:
+    """Как вести заведённое человеком из окна: окно ждёт итога, откликателю —
+    по переключателю."""
+    return Intake(channel=channel, hands_over=hands_over, tells_window=True, by_hand=True)
+
+
+async def tell_known(pipeline, vacancy_id: int) -> None:
+    """Окну — что вакансия уже заведена, с её номером.
+
+    Неразобранную дочитывают её собственным текстом — без сноса и без
+    откликателя: окно переходит на неё, а отдавать ли её, решали, когда её
+    заводили. Дочитать не вышло — окну не повтор, а молчание модели: строки
+    без разбора в списке не видно, и переходить было бы некуда.
+    """
+    async with pipeline.session_factory() as session:
+        row = await session.get(Vacancy, vacancy_id)
+        unparsed, text = not row.is_parsed, row.raw_text
+    done = True
+    if unparsed and text:
+        await pipeline.reload_resources()
+        done = await finish_orphan(pipeline, vacancy_id, text, Intake(allow_delete=False, hands_over=False))
+    tell(pipeline, "duplicate" if done else "llm", vacancy_id)
+
+
 async def orphan_intake(pipeline, vacancy_id: int, intake: Intake) -> Intake:
     """Как вести брошенную недоразобранной строку: заведённую человеком — без передачи.
 

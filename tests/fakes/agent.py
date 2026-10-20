@@ -66,6 +66,14 @@ def finish_step(result: str = "done", reason: str = ""):
     return step
 
 
+def submit_step(url: str, text: str = "Текст вакансии"):
+    """Шаг сценария искателя: передать вакансию с этой страницы и кончить сессию."""
+    async def step(tools):
+        await tools["submit_vacancy"](text=text, url=url, published="", contacts=[])
+        await tools["finish"](result="done")
+    return step
+
+
 def fail_step(reason: str):
     """Шаг сценария: способ отклика не сработал по этой причине."""
     async def step(tools):

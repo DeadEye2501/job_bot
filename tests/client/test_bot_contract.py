@@ -23,7 +23,7 @@ from backend.bot.pasted import PastedOutcome
 from backend.bot.rerun import RerunOutcome
 from backend.flows.hand_outcome import HandOutcome
 from client.bridge import lifespan
-from client.bridge.refusals import PASTED_REFUSALS, RERUN_REFUSALS
+from client.bridge.refusals import PASTED_REFUSALS, RERUN_REFUSALS, agent_refusals
 from tests.fakes.ui_bot import ANSWERS, UiBot
 
 
@@ -174,7 +174,7 @@ def test_every_pasted_outcome_has_a_phrase_for_the_human():
     требуют: первое значит, что исход уже ушёл вестью, второе — слово удачи.
     """
     said = _pasted_outcomes() | _hand_made_outcomes()
-    assert said - {"ok", "told"} == set(PASTED_REFUSALS)
+    assert said - {"ok", "told"} == set(agent_refusals(PASTED_REFUSALS, None))
 
 
 def test_the_fake_answers_the_pasted_intake_with_an_outcome_the_bot_can_return():

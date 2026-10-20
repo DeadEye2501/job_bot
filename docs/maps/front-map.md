@@ -62,7 +62,7 @@
 - —
 - принимает: ask, events, say
 
-### app/NewVacancy.svelte (193)
+### app/NewVacancy.svelte (203)
 - —
 - принимает: ask, say, lockedTip, newVacancy, onhandmade, onvacancy, onfiled
 
@@ -154,7 +154,7 @@
 - принимает: ask, say, onback, onnext
 - берёт: ./TelegramLogin.svelte
 
-## components — 112 файлов
+## components — 113 файлов
 
 ### components/ActionsMenu.svelte (30)
 - —
@@ -414,10 +414,10 @@
 - —
 - принимает: icon, label, active, onpick
 
-### components/NewCardDialog.svelte (94)
-- Ряд способов только у вакансии: её заводят двумя — набирают поля сами или отдают боту текст объявления. У человека и компании второго нет вовсе. Ряд тот же, что у грейда и формата: свой разошёлся бы с ними видом.
+### components/NewCardDialog.svelte (97)
+- Ряд способов только у вакансии: её заводят тремя — набирают поля сами или отдают боту текст объявления или ссылку на него. У человека и компании второго нет вовсе. Ряд тот же, что у грейда и формата: свой разошёлся бы с ними видом.
 - принимает: kind, draft, busy, ready, locked, options, toggle, ontoggle, oncompany, onhr, onconfirm, oncancel
-- берёт: ./AskDialog.svelte, ./ChoiceRow.svelte, ./NewCompanyFields.svelte, ./NewPersonFields.svelte, ./NewVacancyFields.svelte, ./PastedVacancyFields.svelte, ./RowToggle.svelte
+- берёт: ./AskDialog.svelte, ./ChoiceRow.svelte, ./NewCompanyFields.svelte, ./NewPersonFields.svelte, ./NewVacancyFields.svelte, ./PastedVacancyFields.svelte, ./RowToggle.svelte, ./SourceUrlField.svelte
 
 ### components/NewCompanyFields.svelte (35)
 - Написания набирают по одному, как в карточке компании: их сверяют поштучно, и набранные одной строкой они читались бы как одно длинное написание, под которым компания не приходит никогда.
@@ -429,10 +429,10 @@
 - принимает: draft
 - берёт: ./DraftNotes.svelte
 
-### components/NewVacancyFields.svelte (110)
+### components/NewVacancyFields.svelte (111)
 - Дата сразу под названием: она про само объявление, а не про то, чего от кандидата ждут, и место ей рядом с тем, чем объявление называется.
 - принимает: draft, options, oncompany, onhr
-- берёт: ./ChoiceRow.svelte, ./DraftChips.svelte, ./DraftNotes.svelte, ./PostedAtField.svelte, ./SuggestInput.svelte
+- берёт: ./ChoiceRow.svelte, ./DraftChips.svelte, ./DraftNotes.svelte, ./PostedAtField.svelte, ./SourceUrlField.svelte, ./SuggestInput.svelte
 
 ### components/NotesField.svelte (68)
 - —
@@ -561,6 +561,10 @@
 ### components/SourceStats.svelte (61)
 - Легенда под полосой: одиннадцать цветов без подписей не читаются, а подписать отрезки внутри полосы негде.
 - принимает: stats, empty
+
+### components/SourceUrlField.svelte (11)
+- —
+- принимает: draft
 
 ### components/StackField.svelte (16)
 - —
@@ -920,9 +924,9 @@
 - * Чем подписана запись без названия. Показывают её приглушённой * (`styles/unnamed.css`) — так видно, что это не название, а его отсутствие.
 - отдаёт: UNNAMED, titled
 
-### state/vacancies.js (340)
+### state/vacancies.js (350)
 - * Порядки списка в том виде, в каком их выбирают. Ключи уезжают на мост и * разбираются там `backend/repository/vacancies_list._order_for`; незнакомый * ему ключ сводится к «сначала новые». Первый здесь — тот, в котором список * открывается.
-- отдаёт: SORTS, VACANCY_MODES, ago, blankVacancy, emptyNote, gradeLabel, handsOverToggle, isText, pasteLock, remoteLabel, salaryLabel, scoreTone, settleHandMade, shortAgo, shownStack, sortKey, vacancyFields, vacancyLine, vacancyNamed, viaBot
+- отдаёт: SORTS, VACANCY_MODES, ago, blankVacancy, emptyNote, gradeLabel, handsOverToggle, isLink, isText, pasteLock, remoteLabel, salaryLabel, scoreTone, settleHandMade, shortAgo, shownStack, sortKey, vacancyFields, vacancyLine, vacancyNamed, viaBot
 
 ### state/vacancy_actions.js (98)
 - * Почему отклик и переразбор сейчас недоступны. * * Пустая фраза значит «доступно». Обе просьбы уходят боту, поэтому неживое * окружение запирает оба и объясняется теми же словами, что и кнопка обхода * внизу окна: две разные фразы об одной беде человек читает как две беды. * * Идущий обход запирает оба: прогон сам зовёт модель, а параллельной работы * модели не допускаем — даже отклика в Telegram, которому браузер не нужен. * Старшинство причин то же, что у источников и окна заведения (`sourceBlock`). * * Есть ли куда откликаться, здесь не решается: это знает только мост, и * ответ его разбирает `applyChoices`.
@@ -2054,7 +2058,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/vacancies.test.js (348)
 - * Черновик, ушедший боту, — каким его держит оболочка.
 
-### tests/vacancies_screen_new_live.test.js (497)
+### tests/vacancies_screen_new_live.test.js (558)
 - * Мост, отвечающий тем же, чем отвечает настоящий. * * Заведение чужой карточки отказывает: так ведёт себя настоящий, когда имя * занято или связь оборвалась, — и это единственный способ увидеть, что * остаётся в черновике после неудачи.
 
 ### tests/vacancy_actions.test.js (191)

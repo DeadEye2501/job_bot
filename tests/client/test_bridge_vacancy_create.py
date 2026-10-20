@@ -233,6 +233,36 @@ async def test_an_empty_paste_is_refused_with_words(api, ask, with_bot):
     assert answer["detail"] == "Вставьте текст объявления"
 
 
+async def test_a_link_goes_to_the_bot_as_it_was_pasted(api, ask, with_bot):
+    """Ссылку мост отдаёт боту как есть: что за ней — пост, статья, страница, —
+    решает бот один раз."""
+    bot = with_bot()
+
+    answer = await ask(api.vacancies.create_from_text, {"url": " https://t.me/pyjobs/5 ", "hands_over": True})
+
+    assert answer["ok"]["started"] is True
+    assert _requests(bot) == [HandRequest("link", "https://t.me/pyjobs/5", None, True)]
+
+
+async def test_an_empty_link_is_refused_with_words(api, ask, with_bot):
+    with_bot()
+
+    answer = await ask(api.vacancies.create_from_text, {"url": "   "})
+
+    assert answer["fail"] == "denied"
+    assert answer["detail"] == "Вставьте ссылку на объявление"
+
+
+async def test_a_page_without_claude_code_is_explained(api, ask, with_bot, heard):
+    """Отказ без Claude Code говорит, что нужно, а не «не удалось»."""
+    with_bot(pasted="locked")
+
+    await ask(api.vacancies.create_from_text, {"url": "https://hh.ru/vacancy/1"})
+
+    said = await heard()
+    assert said["danger"] is True and "Claude Code" in said["message"]
+
+
 async def test_pasting_before_the_bot_is_up_is_refused_by_name(api, ask):
     """До входа в Telegram вставку отбивают словами про бота.
 

@@ -3,16 +3,51 @@
 
 import pytest
 
+from types import SimpleNamespace
+
 from backend.domain.hosts import (
     AddressParts,
     address_parts,
     host_owns,
+    link_kind,
+    page_owner,
     site_label,
     source_key,
     vacancy_address_key,
 )
 
 _LEVER_UUID = "0f6a9c3e-1b2d-4e5f-8a7b-9c0d1e2f3a4b"
+
+
+@pytest.mark.parametrize(("url", "kind"), [
+    pytest.param("https://telegra.ph/QA-08-21", "article", id="статья"),
+    pytest.param("telegra.ph/QA-08-21", "article", id="статья без схемы"),
+    pytest.param("HTTPS://Telegra.ph/QA-08-21.", "article", id="статья заглавными и с точкой"),
+    pytest.param("https://t.me/+AbCdEf123", "channel", id="приглашение"),
+    pytest.param("https://t.me/joinchat/AbCdEf123", "channel", id="старое приглашение"),
+    pytest.param("https://t.me/pyjobs?start=1", "channel", id="канал с хвостом"),
+    pytest.param("https://t.me/pyjobs/15", "post", id="пост"),
+    pytest.param("https://t.me/s/pyjobs/15", "post", id="пост веб-просмотра"),
+    pytest.param("https://t.me/c/12345/15", "post", id="пост закрытого"),
+    pytest.param("https://t.me/pyjobs", "channel", id="канал"),
+    pytest.param("t.me/pyjobs/", "channel", id="канал без схемы"),
+    pytest.param("https://t.me/iv?url=https://site.test/a&rhash=1", "telegram", id="мгновенный просмотр"),
+    pytest.param("https://telegra.ph/", "telegram", id="корень Telegraph"),
+    pytest.param("https://hh.ru/vacancy/123", "page", id="площадка"),
+    pytest.param("https://company.test/careers/qa", "page", id="сайт компании"),
+])
+def test_a_link_is_sorted_by_where_it_leads(url, kind):
+    """Род ссылки решает одно правило по самому адресу: от него зависит, кто её
+    читает — склейка статей, Telegram или агент."""
+    assert link_kind(url) == kind
+
+
+def test_a_page_belongs_to_the_site_that_owns_its_host():
+    """Поддомен — та же площадка; «Поиск по сети» без хоста не владеет ничем."""
+    hh, web = SimpleNamespace(host="hh.ru"), SimpleNamespace(host=None)
+
+    assert page_owner("https://spb.hh.ru/vacancy/1", [web, hh]) is hh
+    assert page_owner("https://nothh.ru/vacancy/1", [web, hh]) is None
 
 
 @pytest.mark.parametrize(("url", "key"), [

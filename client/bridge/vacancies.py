@@ -33,6 +33,8 @@ from client.bridge.refusals import (
     NO_VACANCY,
     PASTED_REFUSALS,
     TEXT_REQUIRED,
+    URL_REQUIRED,
+    agent_refusals,
 )
 from client.bridge.page import read_page
 from client.bridge.vacancy_actions import VacancyActions
@@ -316,29 +318,35 @@ class Vacancies(VacancyActions, VacancyLinks, VacancyContacts):
         return reply(self._hub.runner, run())
 
     def create_from_text(self, payload: dict) -> dict:
-        """Завести вакансию по вставленному тексту объявления.
+        """Завести вакансию по вставленному тексту объявления или по ссылке на него.
 
-        Вторая вкладка того же окна: человек приносит текст, а поля из него
-        достаёт конвейер — тем же разбором, каким он читает пост канала, и с
-        тем же баллом, приговором и отпечатком. Набирать то же самое руками
-        значило бы делать работу, которую бот делает лучше.
+        Вторая и третья вкладки того же окна: человек приносит текст или
+        ссылку, а поля достаёт конвейер — тем же разбором, каким он читает пост
+        канала. Что за ссылкой — пост, статья, страница, — решает бот, один раз;
+        мост отдаёт её как есть. Набирать то же самое руками значило бы делать
+        работу, которую бот делает лучше.
 
         Ответ говорит только «пущено»: разбор — это несколько обращений к
         модели, и ждать их значит держать окно. Чем кончилось, человек узнаёт
         вестью. Положение переключателя приходит видимым, как его видит
-        человек: запертый показан выключенным и выключенным уходит.
+        человек: запертый показан выключенным и выключенным уходит. Страницу
+        читает агент, и отказ без него говорит, чего не хватает (`agent_refusals`).
         """
-        text = text_or_none(payload.get("raw_text"))
-        if not text:
-            return denied(TEXT_REQUIRED, action=HAND_MADE_ACTION)
-
-        request = HandRequest(
-            "text", text, moment_or_none(payload.get("posted_at")), bool(payload.get("hands_over")),
-        )
+        hands_over = bool(payload.get("hands_over"))
+        if "url" in payload:
+            url = text_or_none(payload.get("url"))
+            if not url:
+                return denied(URL_REQUIRED, action=HAND_MADE_ACTION)
+            request = HandRequest("link", url, None, hands_over)
+        else:
+            text = text_or_none(payload.get("raw_text"))
+            if not text:
+                return denied(TEXT_REQUIRED, action=HAND_MADE_ACTION)
+            request = HandRequest("text", text, moment_or_none(payload.get("posted_at")), hands_over)
         return launched_on_bot(
             self._hub,
             lambda bot: bot.ui_ingest_pasted_text(request),
-            PASTED_REFUSALS,
+            agent_refusals(PASTED_REFUSALS, self._hub.rs.chat),
             FILED,
             action=HAND_MADE_ACTION,
         )

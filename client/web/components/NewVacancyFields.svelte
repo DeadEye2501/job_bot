@@ -24,6 +24,7 @@
   import DraftChips from './DraftChips.svelte';
   import DraftNotes from './DraftNotes.svelte';
   import PostedAtField from './PostedAtField.svelte';
+  import SourceUrlField from './SourceUrlField.svelte';
   import SuggestInput from './SuggestInput.svelte';
 
   let { draft, options, oncompany, onhr } = $props();
@@ -56,7 +57,7 @@
   onsave={onhr}
 />
 
-<input class="input" placeholder="Ссылка на объявление" bind:value={draft.source_url} />
+<SourceUrlField {draft} />
 
 <ChoiceRow
   options={GRADES}

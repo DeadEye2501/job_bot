@@ -20,7 +20,7 @@ from collections.abc import Awaitable, Callable
 from datetime import datetime
 
 from backend.flows import embeddings, handover, intake, linked_article
-from backend.flows.hand_outcome import tell
+from backend.flows.hand_outcome import show_parsing, tell
 from backend.flows.handover import Intake
 from backend.models import Vacancy
 
@@ -54,17 +54,14 @@ async def ingest_pasted_text(
     брошенной не сливается — её доберёт подбор недоразобранного.
 
     Отдавать ли откликателю (`hands_over`), решал человек переключателем окна.
-
-    Нижняя полоса показывает разбор с нулями — «шкала неизвестна»: сколько
-    шагов займёт разбор одного объявления, заранее не знает никто.
     """
-    pipeline.emit_progress("pasted", "Разбор объявления", 0, 0)
+    show_parsing(pipeline)
     text, whole = await linked_article.with_linked_articles(text)
     if not whole:
         logger.info("%s: статья по ссылке не скачалась, не заведено", WHAT)
         tell(pipeline, "article")
         return
-    by_hand = Intake(hands_over=hands_over, tells_window=True, by_hand=True)
+    by_hand = handover.hand_made_intake(hands_over)
 
     async def save(embedding: list[float]) -> int:
         # Колонок источника у строки нет: канала за вставленным текстом не

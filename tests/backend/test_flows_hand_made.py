@@ -13,6 +13,7 @@ from backend.flows.hand_outcome import HandResult
 from backend.models import Vacancy, VacancyEvent
 from backend.repository.vacancies_new import HAND_MADE
 from backend.telegram_time import tg_moment
+from tests.backend.fixtures.parse_stub import parse_into
 from tests.dbio import all_rows, only_row, put
 from tests.factories import channel_row, vacancy_row
 from tests.fakes.agent import kit_for
@@ -197,3 +198,84 @@ async def test_a_link_to_a_channel_is_not_a_post(filing, session_factory):
     await ingest_by_hand(kit_for(filing), HandRequest("channel", "https://t.me/pyjobs", None, False))
 
     assert filing.told == [HandResult("channel_link")]
+
+
+async def test_another_telegram_link_has_no_vacancy_and_no_agent(filing, session_factory):
+    """Мгновенный просмотр постом не разбирается, а в Telegram агенту хода нет."""
+    sessions = []
+
+    async def agent(plan):
+        sessions.append(plan)
+
+    await ingest_by_hand(kit_for(filing, run_session=agent), HandRequest("telegram", "https://t.me/iv?url=x", None, False))
+
+    assert filing.told == [HandResult("no_vacancy")] and sessions == []
+
+
+async def test_a_page_goes_to_the_agent_as_made_by_hand(filing, monkeypatch):
+    """Страницу ведёт агент, и ведёт заведённой человеком — с переключателем окна."""
+    seen = []
+
+    async def ingest_page(kit, url, intake):
+        seen.append((url, intake))
+
+    monkeypatch.setattr("backend.flows.linked_page.ingest_page", ingest_page)
+
+    await ingest_by_hand(kit_for(filing), HandRequest("page", "https://company.test/qa", None, True))
+
+    ((url, intake),) = seen
+    assert url == "https://company.test/qa"
+    assert (intake.by_hand, intake.hands_over, intake.tells_window) == (True, True, True)
+
+
+@pytest.mark.usefixtures("one_vector")
+async def test_an_article_link_goes_the_way_of_pasted_text(filing, session_factory, monkeypatch, parsed):
+    """Статья по ссылке — тот же вставленный текст из одной ссылки: склейка
+    дочитывает статью, повтор не проверяется."""
+    serve_articles(monkeypatch)
+
+    await ingest_by_hand(kit_for(filing), HandRequest("article", "https://telegra.ph/QA-08-21", None, False))
+
+    saved = await only_row(session_factory, Vacancy)
+    assert "Требования" in saved.raw_text
+    assert filing.told == [HandResult("ok", saved.id)]
+
+
+@pytest.mark.parametrize("kind, url", [
+    ("post", "https://t.me/pyjobs/5"),
+    ("page", "https://hh.ru/vacancy/123"),
+], ids=["пост", "страница"])
+async def test_a_link_filed_before_is_a_duplicate_before_anything_else(filing, session_factory, kind, url):
+    """Однозначный повтор узнаётся первым: ни Telegram, ни агента, ни строки, ни
+    откликателя — окно переходит на существующую."""
+    existing = vacancy_row(is_parsed=True, source_url=url)
+    await put(session_factory, existing)
+
+    await ingest_by_hand(kit_for(filing), HandRequest(kind, url, None, True))
+
+    assert len(await all_rows(session_factory, Vacancy)) == 1
+    assert filing.told == [HandResult("duplicate", existing.id)] and filing.applied == []
+
+
+async def test_a_duplicate_of_an_unparsed_row_finishes_it(filing, session_factory, parsed):
+    """Повтор неразобранной строки: она дочитывается своим текстом — без
+    сноса и без откликателя, — а окно переходит на неё."""
+    existing = vacancy_row(is_parsed=False, raw_text="Ищем QA", source_url="https://hh.ru/vacancy/123")
+    await put(session_factory, existing)
+
+    await ingest_by_hand(kit_for(filing), HandRequest("page", "https://hh.ru/vacancy/123", None, True))
+
+    assert parsed == [(existing.id, "Ищем QA", None, False)]
+    assert filing.told == [HandResult("duplicate", existing.id)] and filing.applied == []
+
+
+async def test_a_duplicate_that_could_not_be_finished_is_not_a_jump(filing, session_factory, monkeypatch):
+    """Дочитать неразобранную не вышло — окно не переходит на строку, которой в
+    списке не видно, а говорит, что модель не ответила."""
+    parse_into(monkeypatch, [], done=False)
+    existing = vacancy_row(is_parsed=False, raw_text="Ищем QA", source_url="https://hh.ru/vacancy/123")
+    await put(session_factory, existing)
+
+    await ingest_by_hand(kit_for(filing), HandRequest("page", "https://hh.ru/vacancy/123", None, True))
+
+    assert filing.told == [HandResult("llm", existing.id)]
