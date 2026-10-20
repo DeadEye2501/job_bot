@@ -1,8 +1,8 @@
 """Следствия, которые наблюдает тест `backend/flows/linked_article.py`.
 
 Само хождение в сеть проверено у переходника (`test_adapters_telegraph`); здесь
-смотрят только на склейку: что дописано, в каком порядке и когда в сеть не
-ходят вовсе.
+смотрят на склейку — что дописано, в каком порядке и когда в сеть не ходят
+вовсе — и на чтение поста, которое её зовёт.
 """
 
 import logging
@@ -10,22 +10,16 @@ import logging
 import httpx
 import pytest
 
-from adapters import telegraph
 from backend.flows import linked_article
+from tests.fakes.telegram_objects import post
+from tests.fakes.telegraph import serve_articles
 
 
 @pytest.fixture
 def fetched(monkeypatch):
     """Подставная загрузка статьи: отдаёт заготовленное и помнит, о чём просили."""
-    asked: list[str] = []
     articles: dict[str, str | None] = {}
-
-    async def fetch_article(_client, url):
-        asked.append(url)
-        return articles.get(url)
-
-    monkeypatch.setattr(telegraph, "fetch_article", fetch_article)
-    return asked, articles
+    return serve_articles(monkeypatch, articles), articles
 
 
 async def test_the_article_is_written_after_the_post(fetched):
@@ -40,6 +34,22 @@ async def test_the_article_is_written_after_the_post(fetched):
     assert got == "Senior QA https://telegra.ph/QA-08-21\n\nТребования: Python"
     assert asked == ["https://telegra.ph/QA-08-21"]
     assert whole is True
+
+
+async def test_a_post_reads_out_with_its_articles(fetched):
+    """Текст поста — со статьями: одно чтение на приём и на прогон заново,
+    иначе разобранное кнопкой разошлось бы с разобранным обходом."""
+    _asked, articles = fetched
+    articles["https://telegra.ph/QA-08-21"] = "Требования: Python"
+
+    got = await linked_article.post_full_text(post(10, text="Senior QA https://telegra.ph/QA-08-21"))
+
+    assert got == ("Senior QA https://telegra.ph/QA-08-21\n\nТребования: Python", True)
+
+
+async def test_a_post_without_text_reads_out_as_nothing(fetched):
+    """Пост с одной картинкой текста не даёт — читать в нём нечего."""
+    assert await linked_article.post_full_text(post(10, text="")) is None
 
 
 async def test_a_post_without_articles_does_not_go_online(fetched):
@@ -102,19 +112,13 @@ async def test_an_address_without_an_article_leaves_the_text_whole(fetched):
     assert whole is True
 
 
-async def test_a_site_that_did_not_answer_makes_the_text_short(fetched, monkeypatch):
+async def test_a_site_that_did_not_answer_makes_the_text_short(monkeypatch):
     """Не отдавшаяся страница — недобор: к утру она вернётся.
 
     Признаётся ради прогона заново: у него на руках уже есть сохранённый
     текст со статьёй, и переписать его постом без неё — потерять требования.
     """
-    asked, _articles = fetched
-
-    async def fetch_article(_client, url):
-        asked.append(url)
-        raise httpx.ConnectError("сеть отвалилась")
-
-    monkeypatch.setattr(telegraph, "fetch_article", fetch_article)
+    serve_articles(monkeypatch, httpx.ConnectError("сеть отвалилась"))
 
     got, whole = await linked_article.with_linked_articles(
         "Senior QA https://telegra.ph/QA-08-21"
@@ -124,20 +128,14 @@ async def test_a_site_that_did_not_answer_makes_the_text_short(fetched, monkeypa
     assert whole is False
 
 
-async def test_the_log_names_what_the_site_answered_with(fetched, monkeypatch, caplog):
+async def test_the_log_names_what_the_site_answered_with(monkeypatch, caplog):
     """Запись о несостоявшейся статье называет породу беды, а не пустые скобки.
 
     От породы зависит судьба объявления: истёкший срок ожидания пройдёт, а
     закрытая дверь сайта — нет. У истёкшего срока `str` пуст, и запись «не
     отдал страницу ()» не отличает одно от другого ничем.
     """
-    asked, _articles = fetched
-
-    async def fetch_article(_client, url):
-        asked.append(url)
-        raise httpx.ReadTimeout("")
-
-    monkeypatch.setattr(telegraph, "fetch_article", fetch_article)
+    serve_articles(monkeypatch, httpx.ReadTimeout(""))
 
     with caplog.at_level(logging.WARNING):
         await linked_article.with_linked_articles("Senior QA https://telegra.ph/QA-08-21")

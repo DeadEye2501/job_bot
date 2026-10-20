@@ -15,7 +15,7 @@
 import httpx
 import pytest
 
-from adapters import telegraph
+from tests.fakes.telegraph import serve_articles
 from backend.flows import embeddings, ingest
 from tests.backend.fixtures.flows import similar_by_hand
 from tests.backend.fixtures.parse_stub import parse_into
@@ -136,10 +136,7 @@ async def test_a_linked_article_is_written_into_the_post(intake, monkeypatch):
     отклика вынесены в статью: без неё разбирать нечего, а сохранённый текст
     не годится для прогона заново.
     """
-    async def fetch_article(_client, url):
-        return "Требования: Python"
-
-    monkeypatch.setattr(telegraph, "fetch_article", fetch_article)
+    serve_articles(monkeypatch)
 
     await ingest.ingest_post(
         intake, 1, "jobs", post(10, text="Senior QA https://telegra.ph/QA-08-21")
@@ -159,10 +156,7 @@ async def test_the_fingerprint_is_taken_from_the_whole_text(intake, monkeypatch)
     объявил бы второе повтором первого и потерял бы его молча.
     """
 
-    async def fetch_article(_client, _url):
-        return "Требования: Python"
-
-    monkeypatch.setattr(telegraph, "fetch_article", fetch_article)
+    serve_articles(monkeypatch)
     text = "Senior QA, контакты в описании https://telegra.ph/QA-08-21"
 
     await ingest.ingest_post(
@@ -278,10 +272,7 @@ async def test_an_article_that_did_not_load_holds_the_verdict_back(
     судит о том, чего не видел. Строка заводится, чтобы объявление не пропало
     вместе с уехавшим курсором канала, и ждёт дочитывания.
     """
-    async def fetch_article(_client, _url):
-        raise httpx.ConnectError("сеть отвалилась")
-
-    monkeypatch.setattr(telegraph, "fetch_article", fetch_article)
+    serve_articles(monkeypatch, httpx.ConnectError("сеть отвалилась"))
 
     await ingest.ingest_post(
         intake, 1, "jobs", post(10, text="Senior QA https://telegra.ph/QA-08-21")
@@ -300,10 +291,7 @@ async def test_a_repost_that_lost_its_article_holds_the_verdict_back_too(
     статьи разбору видна одна шапка со ссылкой. Строка так и остаётся
     недоразобранной и ждёт дочитывания вместе с остальными.
     """
-    async def fetch_article(_client, _url):
-        raise httpx.ConnectError("сеть отвалилась")
-
-    monkeypatch.setattr(telegraph, "fetch_article", fetch_article)
+    serve_articles(monkeypatch, httpx.ConnectError("сеть отвалилась"))
     intake.similar_id = 3
     intake.unparsed = True
 

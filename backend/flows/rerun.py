@@ -15,9 +15,7 @@ from typing import Literal
 from sqlalchemy import select
 
 from backend.agent.stops import RUN_STOPPERS
-from backend.domain.telegram_identity import ARTICLE_URL_RE
 from backend.flows import embeddings, handover, linked_article
-from backend.message_text import extract_post_text
 from backend.models import TelegramChannel
 from backend.models import Vacancy, VacancyStatus
 from backend.repository.channels import list_named_channels
@@ -74,22 +72,17 @@ async def _vacancy_origin(pipeline, vacancy_id: int) -> _Origin | None:
 
 
 async def _post_text(msg, where: str, vacancy_id: int) -> tuple[str, bool] | None:
-    """Перечитанный пост двумя значениями; пусто — текста в посте нет.
-
-    Первый — со статьями и адресами ссылок: он идёт и в разбор, и в строку, и
-    в отпечаток. Второй — целиком ли собран текст, то есть не пропала ли
-    статья по причине, которая пройдёт.
+    """Перечитанный пост, как его читает приём; пусто — текста нет, и это в журнал.
 
     Что делать с недобравшим, здесь не решают: оба ответа принадлежат зовущему.
     """
-    candidate = extract_post_text(msg)
-    if not candidate:
+    fresh = await linked_article.post_full_text(msg)
+    if fresh is None:
         logger.info(
             "rerun: vacancy %d fetched msg %s but text is empty (media-only?), keeping cached raw_text",
             vacancy_id, where,
         )
-        return None
-    return await linked_article.with_linked_articles(candidate)
+    return fresh
 
 
 async def _fetch_fresh_text(
@@ -370,7 +363,7 @@ async def _text_to_judge_by(pipeline, row) -> tuple[str, bool] | None:
     Ждать не бесконечно: прождавшую дольше `LONGEST_WAIT` судят по
     сохранённому, но удалять по нему не дают — целым он так и не собрался.
     """
-    if not ARTICLE_URL_RE.search(row.raw_text):
+    if not linked_article.article_urls(row.raw_text):
         return row.raw_text, True
     fresh = await _reread_and_store(
         pipeline, row.id, row.raw_text, (row.username or "", row.source_msg_id)

@@ -10,7 +10,7 @@
 за строкой и только вместе с ней.
 """
 
-from adapters import telegraph
+from tests.fakes.telegraph import serve_articles
 from backend.flows import embeddings as embeddings_mod
 from backend.flows import parse as parse_mod
 from backend.models import Vacancy
@@ -48,10 +48,7 @@ async def test_the_fingerprint_is_taken_from_the_whole_text(monkeypatch, rerunni
     """
     _, vacancy, make_pipeline = rerunning
 
-    async def fetch_article(_client, _url):
-        return "Требования: Python"
-
-    monkeypatch.setattr(telegraph, "fetch_article", fetch_article)
+    serve_articles(monkeypatch)
     text = "Senior QA, контакты в описании https://telegra.ph/QA-08-21"
     fresh = post(
         42,
