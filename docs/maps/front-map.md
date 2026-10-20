@@ -518,9 +518,9 @@
 - принимает: blocked, count
 - берёт: ./BlacklistMark.svelte
 
-### components/RowToggle.svelte (47)
+### components/RowToggle.svelte (59)
 - Нажатие дальше не идёт: строка вокруг переключателя бывает нажимаемой сама, и тогда переключение открывало бы её заодно с собой.
-- принимает: checked, disabled, muted, title, look, ontoggle
+- принимает: checked, disabled, muted, title, icon, ontoggle
 
 ### components/RunButton.svelte (13)
 - —
@@ -928,7 +928,7 @@
 - * Почему отклик и переразбор сейчас недоступны. * * Пустая фраза значит «доступно». Обе просьбы уходят боту, поэтому неживое * окружение запирает оба и объясняется теми же словами, что и кнопка обхода * внизу окна: две разные фразы об одной беде человек читает как две беды. * * Идущий обход запирает оба: прогон сам зовёт модель, а параллельной работы * модели не допускаем — даже отклика в Telegram, которому браузер не нужен. * Старшинство причин то же, что у источников и окна заведения (`sourceBlock`). * * Есть ли куда откликаться, здесь не решается: это знает только мост, и * ответ его разбирает `applyChoices`.
 - отдаёт: NO_WAYS, actionBlocks, applyChoices, rawChips, sourcePill
 
-### state/vacancy_card.js (126)
+### state/vacancy_card.js (131)
 - * Своя запись правится, чужая читается: пояснение бота — след его работы, а не * заметка, и правка стирала бы то, по чему потом разбираются.
 - отдаёт: timelineRows
 
@@ -1068,10 +1068,10 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 - селекторы (7): .chips, .chip, .chip-x, .chip:hover .chip-x, .chip-add, .chip-input, .chip-input:focus
 - берёт: --accent, --bg-secondary, --border, --danger, --text-primary, --text-tertiary
 
-### styles/choice-line.css (44)
-- Ряд сегментов и квадратная галочка при нём, в одну строку. Галочка без подписи — пояснение у неё во всплывающей подсказке, — поэтому ростом и рамкой она та же, что сегменты рядом: квадрат высотой с ряд, а не пилюля из строки списка. Рамка — общая с полями формы (`input.css`).
-- селекторы (5): .choice-line, .tab-check, .tab-check:checked::after, .tab-check:checked, .tab-check:disabled
-- берёт: --accent
+### styles/choice-line.css (60)
+- Ряд сегментов и значок-переключатель при нём, в одну строку. Значок без подписи — пояснение у него во всплывающей подсказке, — квадрат высотой с ряд сегментов, в той же рамке, что поля формы (`input.css`). Выключенный — тёмно-серый, при наведении светлеет, включённый светится акцентом. Галочка под ним невидима, но нажимается вся: положение и запор держит она.
+- селекторы (8): .choice-line, .icon-check, .icon-check .material-symbols-outlined, .icon-check:hover, .icon-check.on, .icon-check-box, .icon-check.locked, .icon-check.locked:hover
+- берёт: --accent, --border, --text-primary, --text-tertiary
 
 ### styles/choice-row.css (99)
 - Ряд вариантов выбора: три вида одного ряда. Сегментами — когда вариантов три-четыре и они делят ширину поровну; чипами — когда их одиннадцать и в один ряд равной ширины они не помещаются; плитками — сегменты без растяжки, когда варианты в букву и тянуть их на всю ширину значило бы превратить две буквы в полосу.
@@ -1290,7 +1290,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 .cdd-btn,
 .choice-row[data-look='seg'],
 .choice-row[data-look='tile'],
-.tab-check,
+.icon-check,
 .pdf-row,
 .photo-frame, .input,
 .textarea, .input:hover:not(:disabled, :focus),
@@ -2063,7 +2063,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/vacancy_apply_live.test.js (151)
 - * Карточка, у которой мост отдаёт эти способы; `ways` может быть обещанием.
 
-### tests/vacancy_card.test.js (230)
+### tests/vacancy_card.test.js (240)
 - —
 
 ### tests/vacancy_card_live.test.js (102)

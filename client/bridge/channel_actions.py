@@ -11,6 +11,7 @@ from client.bridge.refusals import (
     NO_BOT,
     NO_CHANNEL,
     POLL_REFUSALS,
+    TELEGRAM_REFUSALS,
 )
 from client.bridge.source_switch import switch_all
 
@@ -138,17 +139,8 @@ class ChannelActions:
             if bot is None:
                 raise Denied(NO_BOT, action="create")
             channel_id, status = await bot.add_channel(username)
-            if status == "invalid":
-                raise Denied(
-                    f"Telegram не нашёл канал @{username}. Проверьте имя",
-                    action="create", status=status,
-                )
-            if status == "error":
-                raise Denied(
-                    f"Не вышло спросить Telegram о канале @{username}. "
-                    "Попробуйте ещё раз, причина в журнале",
-                    action="create", status=status,
-                )
+            if status in TELEGRAM_REFUSALS:
+                raise Denied(TELEGRAM_REFUSALS[status], action="create", status=status)
             return {
                 "channel_id": channel_id,
                 "username": username,

@@ -12,24 +12,38 @@ from backend.flows.parse import Judged
 from backend.models import Vacancy
 from backend.repository.hr_card import LAST_VACANCY_ORDER
 from backend.repository.vacancies_common import PARSED_ONLY
-from backend.repository.vacancies_new import made_by_hand
+from backend.repository.vacancies_new import HAND_MADE, made_by_hand
 
 
 @dataclass(frozen=True)
 class Intake:
-    """Как вести разобранную строку: из какого она канала, можно ли её снести
-    как мусор и отдавать ли откликателю.
+    """Как вести разобранную строку: из какого она канала, кто её завёл, можно
+    ли её снести как мусор и отдавать ли откликателю.
 
     Решает это зовущий, а не разбор и не передача: каждый знает, ручается ли он
     за текст и просили ли отклика. По умолчанию — без канала, сносить можно,
     отдавать; заведённую человеком разбор не сносит и так. `tells_window` —
     окно ждёт итога этого разбора: он уходит вестью между разбором и передачей.
+    `by_hand` — строку заводит человек, хоть и дорогой автоматики (пост по
+    ссылке): событие заведения у неё ручное.
     """
 
     channel: str | None = None
     allow_delete: bool = True
     hands_over: bool = True
     tells_window: bool = False
+    by_hand: bool = False
+
+    def event(self, kind: str, payload: dict) -> tuple[str, dict]:
+        """Род и нагрузка события заведения строки.
+
+        У заведённой человеком род один — «заведено вручную»: по нему разбор
+        узнаёт, что приговора не выносить. Откуда она пришла, остаётся в
+        нагрузке (`via`), и лента карточки называет источник.
+        """
+        if not self.by_hand:
+            return kind, payload
+        return HAND_MADE, {"via": kind, **payload}
 
 
 async def orphan_intake(pipeline, vacancy_id: int, intake: Intake) -> Intake:

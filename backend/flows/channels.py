@@ -4,7 +4,7 @@ import logging
 from typing import Literal
 
 from backend.agent.stops import RUN_STOPPERS
-from backend.telegram_lookup import read_channel_metadata
+from backend.telegram_lookup import ask_telegram, read_channel_metadata
 from backend.models import TelegramChannel
 from backend.repository.channels import (
     is_channel_blacklisted,
@@ -200,22 +200,14 @@ async def _collect_metadata(pipeline, channels) -> tuple[dict, dict]:
     `telegram_lookup.read_channel_metadata`; здесь остаётся своё: название
     попадает в сбор только изменившееся.
 
-    Канал, до которого не достучались, пропускается с записью в журнал: из-за
-    одного закрытого остальные обновиться должны. Канал, которого нет вовсе,
-    — одной строкой: обход его уже выключил, а сводка идёт и по выключенным.
+    Канал, до которого не достучались, пропускается с записью в журнал
+    (`ask_telegram`): из-за одного закрытого остальные обновиться должны.
     """
-    from pyrogram.errors import UsernameNotOccupied
-
     title_updates: dict[int, str] = {}
     avatar_updates: dict[int, bytes] = {}
     for ch in channels:
-        try:
-            chat = await pipeline.client.get_chat(ch.username)
-        except UsernameNotOccupied:
-            logger.info("[@%s] канала нет — название не обновить", ch.username)
-            continue
-        except Exception:
-            logger.exception("[@%s] get_chat failed", ch.username)
+        chat, trouble = await ask_telegram(f"[@{ch.username}] get_chat", lambda: pipeline.client.get_chat(ch.username))
+        if trouble is not None:
             continue
         new_title, blob = await read_channel_metadata(
             pipeline.client, chat, current_avatar=ch.avatar

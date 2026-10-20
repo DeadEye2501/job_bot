@@ -104,6 +104,15 @@ class PostAddress:
     private_id: int | None
     msg_id: int
 
+    @property
+    def chat_id(self) -> str | int:
+        """Чем спросить канал у Telegram: ником или номером закрытого канала.
+
+        Номер — числом и с приставкой `-100`, как Telegram называет каналы:
+        строкой Pyrogram принял бы его за телефон.
+        """
+        return self.channel if self.channel is not None else int(f"-100{self.private_id}")
+
 
 _POST_PATH_RE = re.compile(r"(?:c/(?P<private>\d+)|(?P<nick>[^/]+))/(?P<msg>\d+)/?")
 

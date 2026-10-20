@@ -11,6 +11,8 @@
 
 import logging
 
+from pyrogram.errors import ChannelPrivate
+
 from backend.models import TelegramChannel
 from tests.dbio import all_rows, only_row, put
 from tests.factories import channel_row
@@ -47,7 +49,7 @@ async def test_a_channel_unknown_to_telegram_is_not_written_down(
     """
     bot = await make_bot(FakeTelegramClient(chats={}))
 
-    assert await bot.add_channel("опечатка") == (None, "invalid")
+    assert await bot.add_channel("опечатка") == (None, "tg_invalid")
     assert await all_rows(session_factory, TelegramChannel) == []
 
 
@@ -62,7 +64,15 @@ async def test_a_telegram_failure_is_not_written_down_either(
     """
     bot = await make_bot(FakeTelegramClient(fails={"get_chat": OSError("сеть")}))
 
-    assert await bot.add_channel("jobs") == (None, "error")
+    assert await bot.add_channel("jobs") == (None, "tg_error")
+    assert await all_rows(session_factory, TelegramChannel) == []
+
+
+async def test_a_closed_channel_is_named_closed(make_bot, session_factory):
+    """Закрытый канал без подписки — не опечатка и не сбой: человеку нужна подписка."""
+    bot = await make_bot(FakeTelegramClient(fails={"get_chat": ChannelPrivate()}))
+
+    assert await bot.add_channel("jobs") == (None, "tg_private")
     assert await all_rows(session_factory, TelegramChannel) == []
 
 
