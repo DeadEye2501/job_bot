@@ -15,7 +15,10 @@ from pathlib import Path
 
 import pytest
 
-from adapters import app_tied_process
+if sys.platform == "win32":
+    from adapters.platforms.windows import processes as app_tied_process
+else:
+    from adapters import app_tied_process
 
 pytestmark = pytest.mark.skipif(sys.platform != "win32", reason="задания есть только в Windows")
 

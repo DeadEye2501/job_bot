@@ -18,11 +18,11 @@ import asyncio
 import json
 import logging
 import os
-import subprocess
 import tempfile
 from dataclasses import dataclass
 
 from adapters import app_tied_process
+from adapters.platforms.processes import cli_process_options
 from adapters.claude import EFFORT
 
 logger = logging.getLogger(__name__)
@@ -53,7 +53,6 @@ _NOT_SUBSCRIPTION = (
 
 # Окно процесса не показывается: приложение оконное, и процесс мигал бы
 # консолью поверх него.
-_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 # Строка потока — целый ответ модели одной строкой JSON; предел чтения по
 # умолчанию (64 КБ) длинный разбор вакансии переполнил бы.
@@ -131,7 +130,7 @@ async def spawn_cli(argv: list[str], env: dict):
         stderr=asyncio.subprocess.DEVNULL,
         env=env,
         cwd=tempfile.gettempdir(),
-        creationflags=_NO_WINDOW,
+        **cli_process_options(),
         limit=_LINE_LIMIT,
     )
     app_tied_process.tie_to_app(process.pid)

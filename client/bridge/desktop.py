@@ -16,10 +16,10 @@
 from __future__ import annotations
 
 import logging
-import os
-import subprocess
 
 import webview
+
+from adapters.platforms import desktop as platform_desktop
 
 from client.bridge.answer import denied
 from client.bridge.media import media_file
@@ -67,22 +67,10 @@ _OPENABLE_SUFFIXES = frozenset({
 
 
 def _show_in_folder(target) -> bool:
-    """Открыть проводник на этом файле, не запуская его самого.
-
-    Дорога для того, что открывать нельзя: перечень расширений отбивает
-    присланную программу, но файл-то человеку прислали, и добраться до него он
-    вправе. Проводник показывает его выделенным — дальше решает человек.
-
-    `startfile` так не умеет: он именно **запускает** названное, а нам нужен
-    отбор в чужом окне. Отсюда единственный в мосте запуск чужой программы, и
-    имя её здесь литералом.
-
-    Код возврата не смотрим: проводник отвечает единицей и на удаче. Признак
-    здесь один — зов состоялся, то есть программа нашлась и запустилась.
-    """
+    """Показать файл без исполнения; системная операция выбрана по ОС."""
     try:
-        subprocess.Popen(["explorer", f"/select,{target}"])
-    except OSError:
+        platform_desktop.show_in_folder(target)
+    except (OSError, NotImplementedError):
         logger.exception("не удалось показать в папке: %s", target)
         return False
     return True
@@ -98,22 +86,10 @@ def _scheme_of(url: str) -> str:
 
 
 def open_in_system(target: str) -> bool:
-    """Отдать путь или ссылку тому, чем система их открывает, и сказать, дошло ли.
-
-    Без Qt: переехавшим доменам он недоступен, а дело у этой просьбы то же
-    самое. `startfile` есть только на Windows — под неё приложение и
-    собирается; на чужой системе его нет вовсе, и это тот же исход «не
-    смогли», потому `AttributeError` ловится рядом с `OSError`. **Этой ветки не
-    исполняет ни один сторож** и не может: прогон идёт на Windows, где
-    `startfile` есть, а подменять его отсутствие значило бы сторожить
-    подмену, а не систему.
-
-    Ответ нужен зовущему: «открыли» и «не смогли» человек различает только по
-    нашему слову — окна-то он не увидит.
-    """
+    """Открыть проверенный адрес/путь и сообщить о результате системе UI."""
     try:
-        os.startfile(target)
-    except (AttributeError, OSError):
+        platform_desktop.open_target(target)
+    except (AttributeError, OSError, NotImplementedError):
         logger.exception("не удалось открыть системой: %s", target)
         return False
     return True

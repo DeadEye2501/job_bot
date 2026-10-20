@@ -213,6 +213,14 @@ def test_a_thread_that_ended_itself_is_not_called_a_crash(entry, caplog):
     assert caplog.text == ""
 
 
+# Child interpreters do not inherit the in-process config override from conftest.
+_ISOLATED_DATA = (
+    "import config, os\n"
+    "from pathlib import Path\n"
+    "config._user_data_dir = lambda: Path(os.environ['APPDATA']) / config.APP_NAME\n"
+)
+
+
 def test_the_running_application_writes_its_log_to_the_file(tmp_path):
     """Запущенное приложение пишет журнал в файл, и пишет его до конца.
 
@@ -229,7 +237,7 @@ def test_the_running_application_writes_its_log_to_the_file(tmp_path):
         [
             sys.executable,
             "-c",
-            "import main, logging\n"
+            _ISOLATED_DATA + "import main, logging\n"
             "from backend import bootstrap\n"
             "bootstrap.ensure_schema()\n"
             "logging.getLogger('httpx.child').warning("
@@ -260,7 +268,7 @@ def test_the_running_application_writes_down_a_thread_that_fell(tmp_path):
         [
             sys.executable,
             "-c",
-            "import main, threading\n"
+            _ISOLATED_DATA + "import main, threading\n"
             "def fall():\n"
             "    raise ValueError('поток не дожил')\n"
             "worker = threading.Thread(target=fall)\n"
@@ -292,7 +300,7 @@ def test_the_running_application_switches_its_output_to_utf8(tmp_path):
         k: v for k, v in os.environ.items() if k not in ("PYTHONIOENCODING", "APPDATA")
     }
     done = subprocess.run(
-        [sys.executable, "-c", "import main, sys; print(sys.stdout.encoding)"],
+        [sys.executable, "-c", _ISOLATED_DATA + "import main, sys; print(sys.stdout.encoding)"],
         cwd=str(ROOT),
         env={**env, "APPDATA": str(tmp_path)},
         capture_output=True,

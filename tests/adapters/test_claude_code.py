@@ -323,6 +323,8 @@ def test_the_real_exe_beside_the_npm_shim_is_preferred(monkeypatch, tmp_path):
     Через обёртку доводы шли бы сквозь разбор `cmd.exe`, а при снятии
     снимался бы `cmd.exe`, оставляя `claude.exe` под ним сиротой.
     """
+    from adapters.platforms.windows.cli import executable
+    monkeypatch.setattr(claude_code.platform_cli, "executable", executable)
     shim = tmp_path / "claude.cmd"
     shim.write_text("@echo off")
     exe = tmp_path / "node_modules" / "@anthropic-ai" / "claude-code" / "bin" / "claude.exe"
@@ -350,6 +352,7 @@ async def test_the_real_spawn_ties_the_process_to_the_app_and_reads_long_lines(m
     """
     tied: list[int] = []
     monkeypatch.setattr(claude_code_process.app_tied_process, "tie_to_app", tied.append)
+    monkeypatch.setattr(claude_code_process, "cli_process_options", lambda: {})
     long_line = 'print("x" * 100_000)'
     process = await real_spawn([sys.executable, "-c", long_line], dict(os.environ))
 

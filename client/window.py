@@ -8,12 +8,13 @@
 from __future__ import annotations
 
 import logging
-import sys
 from concurrent.futures import Future
 from pathlib import Path
 from typing import Any
 
 import webview
+
+from adapters.platforms import window as platform_window
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from adapters import claude_code_process, db
@@ -213,19 +214,7 @@ def _icon() -> str | None:
 
 
 def _own_the_taskbar_icon() -> None:
-    """Назвать себя системе до того, как поднимется окно.
-
-    Windows складывает окна в панели задач по этому имени. Без него приложение
-    садится под именем интерпретатора и делит значок с любым другим питоном.
-    """
-    if sys.platform != "win32":
-        return
-    import ctypes
-
-    try:
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("DeadEye.JobBot.UI")
-    except (AttributeError, OSError):
-        logger.warning("имя для панели задач не принято", exc_info=True)
+    platform_window.own_taskbar_icon()
 
 
 def _drop_stale_session_files(rs: RuntimeSettings) -> None:

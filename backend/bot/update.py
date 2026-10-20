@@ -24,6 +24,9 @@ async def download_update(bot) -> DownloadOutcome:
     """Скачать свежий релиз рядом с exe, заняв место прогона, и отдать его
     копии-подменщику. «Стоп» гасит и скачивание."""
 
+    if not updater.can_install_update():
+        return "no_update"
+
     def report(got: int, total: int) -> None:
         fire(bot.on_progress, "on_progress", "update", _LABEL, got, total)
 

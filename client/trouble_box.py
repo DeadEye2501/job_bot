@@ -14,14 +14,11 @@
 консоли, и человек его видит.
 """
 
-import ctypes
+from adapters.platforms import window as platform_window
 import logging
 
 
 logger = logging.getLogger(__name__)
-
-# Значок беды и одна кнопка «ОК» — `MB_ICONERROR`.
-_AS_TROUBLE = 0x10
 
 
 def show_trouble(text: str) -> None:
@@ -32,6 +29,6 @@ def show_trouble(text: str) -> None:
     выходит и перехватить нас не может.
     """
     try:
-        ctypes.windll.user32.MessageBoxW(None, text, "Job Bot", _AS_TROUBLE)
+        platform_window.show_trouble(text)
     except Exception:
         logger.exception("не вышло показать беду окном системы: %s", text)

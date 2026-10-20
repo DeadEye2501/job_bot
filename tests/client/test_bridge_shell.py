@@ -162,9 +162,11 @@ async def test_an_attachment_we_do_not_open_is_shown_in_the_folder(
     """
     (media / "1").mkdir()
     (media / "1" / "42.exe").write_bytes(b"MZ")
+    from adapters.platforms.windows import desktop as windows_desktop
+    monkeypatch.setattr("client.bridge.desktop.platform_desktop.show_in_folder", windows_desktop.show_in_folder)
     shown: list = []
     monkeypatch.setattr(
-        "client.bridge.desktop.subprocess.Popen", lambda args: shown.append(args)
+        "adapters.platforms.windows.desktop.subprocess.Popen", lambda args: shown.append(args)
     )
 
     answer = await ask(api.system.open_attachment, f"{MEDIA_PREFIX}1/42.exe")
@@ -248,9 +250,11 @@ def test_the_system_gets_the_target_and_says_it_went_through(monkeypatch):
     Окна человек в этот миг не видит — оно поднимается чужим приложением, — и
     «дошло» от «не дошло» он отличает только по нашему ответу.
     """
+    from adapters.platforms.windows import desktop as windows_desktop
+    monkeypatch.setattr("client.bridge.desktop.platform_desktop.open_target", windows_desktop.open_target)
     handed: list[str] = []
     monkeypatch.setattr(
-        "client.bridge.desktop.os.startfile", handed.append, raising=False
+        "adapters.platforms.windows.desktop.os.startfile", handed.append, raising=False
     )
 
     assert open_in_system("C:/резюме.pdf") is True
@@ -264,11 +268,14 @@ def test_a_refusal_from_the_system_is_named_and_written_down(monkeypatch, caplog
     ведёт в никуда. Человеку хватает «не удалось», а разбирать это потом
     придётся по трассировке — без неё в журнале осталось бы одно слово.
     """
+    from adapters.platforms.windows import desktop as windows_desktop
+    monkeypatch.setattr("client.bridge.desktop.platform_desktop.open_target", windows_desktop.open_target)
+
     def refuse(target: str) -> None:
         raise OSError("нет приложения для .pdf")
 
     monkeypatch.setattr(
-        "client.bridge.desktop.os.startfile", refuse, raising=False
+        "adapters.platforms.windows.desktop.os.startfile", refuse, raising=False
     )
 
     with caplog.at_level(logging.ERROR, logger="client.bridge.desktop"):

@@ -7,13 +7,13 @@
 from __future__ import annotations
 
 import logging
-import sys
 
 import httpx
 
+from backend.updater import can_install_update
 from backend.app_version import VERSION, newer_version
 from backend.update_download import newer_release
-from client.bridge.answer import launched_on_bot, reply
+from client.bridge.answer import denied, launched_on_bot, reply
 from client.bridge.refusals import UPDATE_REFUSALS
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ class AppUpdate:
         Может только собранный exe: из исходников подменять нечего, и решается
         это здесь, один раз, — окно получает уже решённое.
         """
-        return {"ok": {"version": VERSION, "updatable": bool(getattr(sys, "frozen", False))}}
+        return {"ok": {"version": VERSION, "updatable": can_install_update()}}
 
     def check_update(self) -> dict:
         """Есть ли на GitHub версия новее запущенной.
@@ -55,6 +55,8 @@ class AppUpdate:
     def update(self) -> dict:
         """Скачать новую версию и передать её подменщику. Ответ — «пущено», исход —
         вестью; ход — в полосе."""
+        if not can_install_update():
+            return denied("Обновление этой копии приложения не поддерживается")
         return launched_on_bot(
             self._hub,
             self._download_then_hand_over,

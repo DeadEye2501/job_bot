@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from adapters.browser import find_browser
+from adapters.platforms.windows.browser import find_browser
 
 
 def _install(root: Path, relative: str) -> Path:

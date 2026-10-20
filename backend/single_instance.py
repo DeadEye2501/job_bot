@@ -6,6 +6,8 @@ import os
 from contextlib import nullcontext
 from pathlib import Path
 
+from adapters.platforms.locking import lock_file
+
 logger = logging.getLogger(__name__)
 
 
@@ -35,7 +37,7 @@ def release_the_lock() -> None:
     _held = None
 
 
-_BUSY = frozenset({errno.EACCES, errno.EAGAIN, errno.EWOULDBLOCK, errno.EDEADLOCK})
+_BUSY = frozenset({errno.EACCES, errno.EAGAIN, errno.EWOULDBLOCK, getattr(errno, "EDEADLOCK", errno.EDEADLK)})
 """Номера бед, означающие «замок держит кто-то другой», а не осечку сторожа."""
 
 
@@ -57,18 +59,11 @@ def _take_the_lock(fd: int) -> bool | None:
     `flock` диапазонов не знает и запирает файл целиком. Наружу разница не
     выходит: файл этот больше ни для чего не нужен, в него ничего не пишется.
 
-    Оба вызова живут в модулях, которых на чужой системе не существует, —
-    поэтому ввозятся здесь, а не наверху.
+    Реализацию системного вызова выбирает adapters.platforms.locking;
+    WinAPI не загружается на чужой системе.
     """
     try:
-        if os.name == "nt":
-            import msvcrt
-
-            msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
-        else:
-            import fcntl
-
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        lock_file(fd)
     except OSError as e:
         if e.errno in _BUSY:
             return False
