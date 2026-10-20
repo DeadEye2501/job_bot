@@ -12,7 +12,7 @@
 - * Слушатель вестей поверх зова, который спрашивает мост «что нового после N». * * Зов приходит доводом, а не берётся отсюда: так цикл проверяется без окна и * без моста вовсе, а другого способа его проверить нет — он бесконечен по * устройству.
 - отдаёт: listener
 
-## app — 31 файлов
+## app — 32 файлов
 
 ### app/AggregatorCard.svelte (225)
 - —
@@ -62,6 +62,10 @@
 - —
 - принимает: ask, events, say
 
+### app/NewVacancy.svelte (193)
+- —
+- принимает: ask, say, lockedTip, newVacancy, onhandmade, onvacancy, onfiled
+
 ### app/PeopleList.svelte (50)
 - Негодный ник отбивает мост, и его отказ приезжает плашкой — потому здесь и не проверяется ничего сверх общего заслона.
 - принимает: ask, say, events, open, onopened, onchosen, oncompany, onvacancy
@@ -98,7 +102,7 @@
 - принимает: ask, say
 - берёт: ./TelegramLogin.svelte
 
-### app/Shell.svelte (274)
+### app/Shell.svelte (288)
 - —
 - берёт: ./BottomBar.svelte, ./ContactsScreen.svelte, ./LogsScreen.svelte, ./ProfileScreen.svelte, ./SettingsScreen.svelte, ./StatsScreen.svelte, ./VacanciesScreen.svelte, ./WizardScreen.svelte
 
@@ -114,10 +118,10 @@
 - Окно пересоздаётся на смене шага: код и облачный пароль — разные секреты, и набранный код не должен доехать до поля пароля.
 - принимает: say, creds, relogin, ondone, onclose
 
-### app/VacanciesScreen.svelte (456)
-- —
-- принимает: ask, say, lockedTip, events, oncontacts, open, onopened, onchosen, openFilter, onfiltered, view, onview
-- берёт: ./VacancyCard.svelte
+### app/VacanciesScreen.svelte (328)
+- Список перечитывается показанным числом строк, а не страницей: заведение не повод схлопывать пролистанное.
+- принимает: ask, say, lockedTip, events, oncontacts, open, onopened, onchosen, openFilter, onfiltered, view, onview, newVacancy, onhandmade, onvacancy
+- берёт: ./NewVacancy.svelte, ./VacancyCard.svelte
 
 ### app/VacancyCard.svelte (460)
 - Совпавшее с анкетой подсвечено: по нему видно, чем вакансия набрала свою оценку.
@@ -134,15 +138,15 @@
 
 ### app/WizardCv.svelte (185)
 - —
-- принимает: ask, busy, events, onback, onnext
+- принимает: ask, busy, onback, onnext
 
 ### app/WizardLlm.svelte (328)
 - —
 - принимает: ask, kind, onback, onnext
 
-### app/WizardScreen.svelte (162)
+### app/WizardScreen.svelte (161)
 - Приглушена только обложка: на финале четыре галочки горят в полную силу — это и есть то, ради чего мастер проходили.
-- принимает: ask, say, events, ondone, completed
+- принимает: ask, say, ondone, completed
 - берёт: ./WizardCv.svelte, ./WizardLlm.svelte, ./WizardTelegram.svelte
 
 ### app/WizardTelegram.svelte (112)
@@ -410,10 +414,10 @@
 - —
 - принимает: icon, label, active, onpick
 
-### components/NewCardDialog.svelte (79)
+### components/NewCardDialog.svelte (94)
 - Ряд способов только у вакансии: её заводят двумя — набирают поля сами или отдают боту текст объявления. У человека и компании второго нет вовсе. Ряд тот же, что у грейда и формата: свой разошёлся бы с ними видом.
-- принимает: kind, draft, busy, ready, locked, options, oncompany, onhr, onconfirm, oncancel
-- берёт: ./AskDialog.svelte, ./ChoiceRow.svelte, ./NewCompanyFields.svelte, ./NewPersonFields.svelte, ./NewVacancyFields.svelte, ./PastedVacancyFields.svelte
+- принимает: kind, draft, busy, ready, locked, options, toggle, ontoggle, oncompany, onhr, onconfirm, oncancel
+- берёт: ./AskDialog.svelte, ./ChoiceRow.svelte, ./NewCompanyFields.svelte, ./NewPersonFields.svelte, ./NewVacancyFields.svelte, ./PastedVacancyFields.svelte, ./RowToggle.svelte
 
 ### components/NewCompanyFields.svelte (35)
 - Написания набирают по одному, как в карточке компании: их сверяют поштучно, и набранные одной строкой они читались бы как одно длинное написание, под которым компания не приходит никогда.
@@ -514,9 +518,9 @@
 - принимает: blocked, count
 - берёт: ./BlacklistMark.svelte
 
-### components/RowToggle.svelte (43)
+### components/RowToggle.svelte (47)
 - Нажатие дальше не идёт: строка вокруг переключателя бывает нажимаемой сама, и тогда переключение открывало бы её заодно с собой.
-- принимает: checked, disabled, muted, title, ontoggle
+- принимает: checked, disabled, muted, title, look, ontoggle
 
 ### components/RunButton.svelte (13)
 - —
@@ -654,7 +658,7 @@
 - —
 - принимает: marks, dimmed
 
-## state — 71 файлов
+## state — 72 файлов
 
 ### state/aggregators.js (89)
 - * Где агрегатор ищет — подпись под именем. * * У «Поиска по сети» адреса нет — его место занимает то, где он ищет: пустое * место под именем читалось бы как недозаведённый агрегатор.
@@ -679,6 +683,10 @@
 ### state/avatar.js (19)
 - * Буквы имени на месте снимка. * * Снимок есть не у всех: у заведённых руками его нет вовсе, а пустой кружок * читается как недогрузившаяся картинка. Берутся первое слово и последнее — * имя и фамилия; отчество между ними ничего не различает.
 - отдаёт: initials
+
+### state/awaited.svelte.js (44)
+- * Кто чего ждёт.
+- отдаёт: awaited, hearAwaited
 
 ### state/blacklist.js (158)
 - * Роды строк отсева. Первый — общий: в нём экран открывается. * * Порядок несущий: слова стоят перед предметами, потому что ими отсев и * пользуются чаще всего — по одному слову отсеивается больше объявлений, чем по * всем каналам вместе.
@@ -736,8 +744,8 @@
 - * Чем подписать компанию в списке. * * Имя — сверху, сайт и алиасы — под ним: по имени компанию узнают, по * домену различают. Две «Ромашки» с разными сайтами — разные компании, и без * второй строки они неотличимы. * * Имени может не быть — оно приходит из объявления, — и тогда компания названа * номером: показать нечего, но строка должна остаться нажимаемой.
 - отдаёт: blankCompany, companyCandidate, companyLine, companyNamed, companyTitle
 
-### state/contact_adding.svelte.js (112)
-- * Заводит окно заведения. * * `list.again(answer)` — что сделать по удаче: перечитать список вкладки или * положить список, пришедший в ответе моста. * * `save` отправляет черновик; отказ — пустота (уже показан плашкой) или * брошенная ошибка (остаётся в окне, см. `trouble`). * * `form.done(draft, answer)` — слово по удаче; пустое значит, что об исходе * скажет весть.
+### state/contact_adding.svelte.js (129)
+- * Заводит окно заведения. * * `list.again(answer)` — что сделать по удаче: перечитать список вкладки или * положить список, пришедший в ответе моста. * * `save` отправляет черновик; отказ — пустота (уже показан плашкой) или * брошенная ошибка (остаётся в окне, см. `trouble`). * * `form.done(draft, answer)` — слово по удаче; пустое значит, что об исходе * скажет весть. * * `held` — где лежит черновик: у окон о человеке, компании, канале и контакте * он свой и умирает с экраном, у окна вакансии его держит оболочка — набранное * должно дожить до итога разбора. `keeps()` — ждут ли итога: тогда закрытое * окно черновик не стирает.
 - отдаёт: contactAdding
 
 ### state/contacts_watch.js (23)
@@ -856,7 +864,7 @@
 - * Что из списка остаётся видно под набранное. * * Пустое набранное оставляет список целым: поле поиска стоит над уже открытым * списком, и до первого знака резать нечего. Одни пробелы — то же самое: их * набирают между словами и стирают последними, и схлопнутый на них список * мигал бы под руками. * * Регистр не различается — человек набирает как придётся, а значения приходят * как записаны. Вхождением, а не началом строки: имена приходят с приставками * («qwen/qwen3-4b», «@ник · компания»), и отбор по началу прятал бы строку от * того, кто набирает её собственное имя. * * `text` называет, где искать: у строки списка полей несколько, и по какому из * них её вспоминают, знает не этот файл, а тот, кто её показывает.
 - отдаёт: matching
 
-### state/section_memory.svelte.js (76)
+### state/section_memory.svelte.js (106)
 - * Память свежего окна: первые вкладки, ни одной открытой карточки, пустой * отбор и первый порядок. * * Порядок хранится подписью, а не ключом: подписью его выбирают в меню и * подписью же показывают в подсказке кнопки.
 - отдаёт: heldMemory, sectionMemory, withCard, withTab, withView
 
@@ -888,8 +896,8 @@
 - * Заводит вакансии карточки; `alive` — признак жизни её экрана (`alive.js`). * * `read(page)` — обёртка над мостом: получает `{limit, offset}`, отдаёт * страницу `{vacancies, has_more}` или пустоту.
 - отдаёт: sourceVacancies
 
-### state/sources.js (99)
-- * Чем заперто ручное действие источника; пусто — не заперто. * * Отсев старше всего: обход кончится и лампа зажжётся сами, а запись в отсеве * сама не снимется. Дальше идущий обход — место прогона одно, и мост второй * прогон не пустит, — потом слова моста о том, чего не хватает, и погасшая * лампа. `barred` — слова отсева у этого рода, пусто — источник не в отсеве.
+### state/sources.js (102)
+- * Чем заперто ручное действие бота; пусто — не заперто. * * Одно правило на кнопки источников, карточки вакансии и окно заведения. * * Отсев старше всего: обход кончится и лампа зажжётся сами, а запись в отсеве * сама не снимется. Дальше идущий обход — место прогона одно, и мост второй * прогон не пустит, — потом слова моста о том, чего не хватает, и погасшая * лампа. `barred` — слова отсева у этого рода, пусто — источник не в отсеве.
 - отдаёт: BLOCKED_TITLE, MASTER_OFF_TITLE, masterToggle, share, sourceBlock, sourceStats, sourceToggle
 
 ### state/stats.js (295)
@@ -912,12 +920,12 @@
 - * Чем подписана запись без названия. Показывают её приглушённой * (`styles/unnamed.css`) — так видно, что это не название, а его отсутствие.
 - отдаёт: UNNAMED, titled
 
-### state/vacancies.js (301)
+### state/vacancies.js (340)
 - * Порядки списка в том виде, в каком их выбирают. Ключи уезжают на мост и * разбираются там `backend/repository/vacancies_list._order_for`; незнакомый * ему ключ сводится к «сначала новые». Первый здесь — тот, в котором список * открывается.
-- отдаёт: SORTS, VACANCY_MODES, ago, blankVacancy, emptyNote, gradeLabel, pasteLock, remoteLabel, salaryLabel, scoreTone, shortAgo, shownStack, sortKey, typed, vacancyFields, vacancyLine, vacancyNamed
+- отдаёт: SORTS, VACANCY_MODES, ago, blankVacancy, emptyNote, gradeLabel, handsOverToggle, isText, pasteLock, remoteLabel, salaryLabel, scoreTone, settleHandMade, shortAgo, shownStack, sortKey, vacancyFields, vacancyLine, vacancyNamed, viaBot
 
-### state/vacancy_actions.js (97)
-- * Почему отклик и переразбор сейчас недоступны. * * Пустая фраза значит «доступно». Обе просьбы уходят боту, поэтому неживое * окружение запирает оба и объясняется теми же словами, что и кнопка обхода * внизу окна: две разные фразы об одной беде человек читает как две беды. * * Идущий обход запирает оба: прогон сам зовёт модель, а параллельной работы * модели не допускаем — даже отклика в Telegram, которому браузер не нужен. * * Есть ли куда откликаться, здесь не решается: это знает только мост, и * ответ его разбирает `applyChoices`.
+### state/vacancy_actions.js (98)
+- * Почему отклик и переразбор сейчас недоступны. * * Пустая фраза значит «доступно». Обе просьбы уходят боту, поэтому неживое * окружение запирает оба и объясняется теми же словами, что и кнопка обхода * внизу окна: две разные фразы об одной беде человек читает как две беды. * * Идущий обход запирает оба: прогон сам зовёт модель, а параллельной работы * модели не допускаем — даже отклика в Telegram, которому браузер не нужен. * Старшинство причин то же, что у источников и окна заведения (`sourceBlock`). * * Есть ли куда откликаться, здесь не решается: это знает только мост, и * ответ его разбирает `applyChoices`.
 - отдаёт: NO_WAYS, actionBlocks, applyChoices, rawChips, sourcePill
 
 ### state/vacancy_card.js (126)
@@ -940,7 +948,7 @@
 - * Слово, согласованное с числом. * * «1 категории» человек читает как опечатку и перестаёт верить остальному на * экране. Числа 11–14 — исключение русского счёта и берут последнюю форму.
 - отдаёт: counted, plural, vacancyCount
 
-## styles — 123 файлов
+## styles — 124 файлов
 
 ### styles/accent-fill.css (20)
 - Залито акцентом — так помечено выбранное и главное: основная кнопка окна, зажатая пилюля срока или рода, выбранный день в календаре, текущий шаг мастера, уверенная оценка вакансии и счёт непрочитанного. Одним правилом на все места, а не своим в каждом: заливка здесь несёт один и тот же смысл «вот это», и разъедься её цвет или вес, соседние экраны стали бы помечать выбранное по-разному. Ввозится после оформления самих блоков: у их наведения та же весомость селектора, и выигрывает порядок.
@@ -1059,6 +1067,11 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 - Короткие подписи россыпью: синонимы навыка, стек места работы.
 - селекторы (7): .chips, .chip, .chip-x, .chip:hover .chip-x, .chip-add, .chip-input, .chip-input:focus
 - берёт: --accent, --bg-secondary, --border, --danger, --text-primary, --text-tertiary
+
+### styles/choice-line.css (44)
+- Ряд сегментов и квадратная галочка при нём, в одну строку. Галочка без подписи — пояснение у неё во всплывающей подсказке, — поэтому ростом и рамкой она та же, что сегменты рядом: квадрат высотой с ряд, а не пилюля из строки списка. Рамка — общая с полями формы (`input.css`).
+- селекторы (5): .choice-line, .tab-check, .tab-check:checked::after, .tab-check:checked, .tab-check:disabled
+- берёт: --accent
 
 ### styles/choice-row.css (99)
 - Ряд вариантов выбора: три вида одного ряда. Сегментами — когда вариантов три-четыре и они делят ширину поровну; чипами — когда их одиннадцать и в один ряд равной ширины они не помещаются; плитками — сегменты без растяжки, когда варианты в букву и тянуть их на всю ширину значило бы превратить две буквы в полосу.
@@ -1270,13 +1283,14 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 .lang-table:has(.input.missing):not(:focus-within), .input-pair, .input-pair .input, .input-pair .input + .input
 - берёт: --accent, --border, --danger-border, --text-secondary
 
-### styles/input.css (97)
+### styles/input.css (98)
 - Поле ввода, многострочное поле и поле для секрета рядом с глазом. Экран настроек уменьшает их своим правилом — там полей вдвое больше.
 - селекторы (11): .input,
 .textarea,
 .cdd-btn,
 .choice-row[data-look='seg'],
 .choice-row[data-look='tile'],
+.tab-check,
 .pdf-row,
 .photo-frame, .input,
 .textarea, .input:hover:not(:disabled, :focus),
@@ -1753,7 +1767,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 .wiz-body > .warning-card, .wiz-fields, .wiz-modes, .wiz-fields .help
 - берёт: --accent, --accent-chip-selected, --bg-secondary, --bg-tertiary, --border, --text-primary, --text-secondary, --text-tertiary
 
-## tests — 106 файлов
+## tests — 107 файлов
 
 ### tests/aggregator_card_live.test.js (223)
 - —
@@ -1781,6 +1795,9 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 
 ### tests/avatar.test.js (27)
 - —
+
+### tests/awaited.test.js (69)
+- * Слушатель вестей, которым тест сам доставляет вести.
 
 ### tests/blacklist.test.js (227)
 - —
@@ -1850,7 +1867,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/confirm_send_live.test.js (188)
 - * Полоса, ждущая подтверждения: прогон идёт, пришла весть с пунктами.
 
-### tests/contact_adding.test.js (130)
+### tests/contact_adding.test.js (151)
 - —
 
 ### tests/creds.js (7)
@@ -1869,7 +1886,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/flash.test.js (34)
 - —
 
-### tests/footer.test.js (183)
+### tests/footer.test.js (188)
 - * Нажатие мышью: место на дорожке шириной 300 точек.
 
 ### tests/fresh.test.js (65)
@@ -1895,7 +1912,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/new_card.test.js (36)
 - —
 
-### tests/new_vacancy_fields_live.test.js (84)
+### tests/new_vacancy_fields_live.test.js (86)
 - —
 
 ### tests/notes_field.test.js (66)
@@ -1975,7 +1992,7 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/search.test.js (49)
 - —
 
-### tests/section_memory.test.js (42)
+### tests/section_memory.test.js (67)
 - —
 
 ### tests/section_tabs_live.test.js (68)
@@ -2034,13 +2051,13 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/tg_login_dialog_live.test.js (52)
 - —
 
-### tests/vacancies.test.js (297)
-- —
+### tests/vacancies.test.js (348)
+- * Черновик, ушедший боту, — каким его держит оболочка.
 
-### tests/vacancies_screen_new_live.test.js (322)
+### tests/vacancies_screen_new_live.test.js (497)
 - * Мост, отвечающий тем же, чем отвечает настоящий. * * Заведение чужой карточки отказывает: так ведёт себя настоящий, когда имя * занято или связь оборвалась, — и это единственный способ увидеть, что * остаётся в черновике после неудачи.
 
-### tests/vacancy_actions.test.js (185)
+### tests/vacancy_actions.test.js (191)
 - —
 
 ### tests/vacancy_apply_live.test.js (151)
@@ -2078,8 +2095,8 @@ input[type='checkbox'], button, body, .material-symbols-outlined
 ### tests/wizard.test.js (218)
 - —
 
-### tests/wizard_cv_live.test.js (119)
-- * Шаг с подставным мостом: след зовов и способ доставить весть об исходе. * * `during` доставляет весть посреди самого зова разбора — так приходят * мгновенные отказы: файл пропал, формат не читается, текста в файле нет.
+### tests/wizard_cv_live.test.js (139)
+- * Шаг с подставным мостом: след зовов и способ доставить весть об исходе. * * Вести слушает учёт ожиданий, как в оболочке; весть доставляется с меткой * разбора резюме — чужие шаг не ловит. `during` доставляет весть посреди самого * зова разбора — так приходят мгновенные отказы: файл пропал, формат не * читается, текста в файле нет.
 
 ### tests/words.test.js (13)
 - —
