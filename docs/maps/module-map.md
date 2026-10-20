@@ -896,7 +896,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _checked_kind(src: Path, file_path: str) -> bool` (28)
 - `async def send_to_hr_media(bot, hr_id: int, file_path: str) -> Message` (38)
 
-### `backend/bot/client.py` — 420 строк ⚠ подошёл к 300
+### `backend/bot/client.py` — 418 строк ⚠ подошёл к 300
 
 Сборка бота: его состояние, соединения и поверхность, которой пользуется окно.
 
@@ -906,7 +906,7 @@ First-run bootstrap: ensure DB schema exists.
 - `def _open_connections(bot, runtime_settings: RuntimeSettings) -> None` (18)
 - `def _subscribe_to_updates(bot) -> None` (33)
 - `def _declare_loop_controls(bot) -> None` (23)
-- `def _declare_ui_hooks(bot) -> None` (43)
+- `def _declare_ui_hooks(bot) -> None` (41)
 - `def _forward_pipeline_hooks(bot) -> None` (20)
 - `class Bot` (213)
   - `def is_ready(self) -> bool` (7)
@@ -931,7 +931,7 @@ First-run bootstrap: ensure DB schema exists.
   - `async def current_mode(self) -> BotMode` (2)
   - `async def run(self, *, once=False) -> None` (2)
   - `async def ui_rerun_vacancy_pipeline(self, vacancy_id) -> rerun.RerunOutcome` (4)
-  - `async def ui_ingest_pasted_text(self, request) -> pasted.PastedOutcome` (2)
+  - `async def ui_ingest_by_hand(self, request) -> hand_made.HandMadeOutcome` (2)
   - `async def ui_forget_vacancy(self, vacancy_id) -> bool` (2)
   - `async def run_aggregator_now(self, aggregator_id) -> aggregators.AgentOutcome` (2)
   - `async def login_aggregator(self, aggregator_id) -> aggregators.AgentOutcome` (2)
@@ -944,6 +944,15 @@ First-run bootstrap: ensure DB schema exists.
   - `def human_done(self, answer=None) -> None` (2)
   - `def reveal_browser(self) -> None` (2)
   - `async def delete_aggregator(self, aggregator_id) -> str` (2)
+
+### `backend/bot/hand_made.py` — 53 строк
+
+Заведение вакансии из окна, которое ведёт бот: текст, ссылка и поля к отклику — в месте прогона.
+
+Зависит от: `backend.bot`, `backend.bot.aggregators`, `backend.domain.hosts`, `backend.flows`, `backend.flows.hand_made`
+
+- `async def ui_ingest_by_hand(bot, request: HandRequest) -> HandMadeOutcome` (29)
+  - `async def job(kit) -> str` (3)
 
 ### `backend/bot/loop.py` — 283 строк
 
@@ -982,15 +991,6 @@ First-run bootstrap: ensure DB schema exists.
 - `def store_profile_photo(blob: bytes, suffix: str) -> str` (10)
 - `def drop_stored_media(relative: str) -> None` (5)
 - `async def download_media(client, msg, hr_id: int) -> str | None` (25)
-
-### `backend/bot/pasted.py` — 52 строк
-
-Заведение вакансии из окна, которое ведёт бот: текст, ссылка и поля к отклику — в месте прогона.
-
-Зависит от: `backend.bot`, `backend.bot.aggregators`, `backend.domain.hosts`, `backend.flows`, `backend.flows.hand_made`
-
-- `async def ui_ingest_pasted_text(bot, request: HandRequest) -> PastedOutcome` (29)
-  - `async def job(kit) -> str` (3)
 
 ### `backend/bot/rerun.py` — 38 строк
 
@@ -3832,7 +3832,7 @@ Runtime settings layer.
     - `async def run() -> dict` (16)
   - `def create(self, payload: dict) -> dict` (39)
     - `async def run() -> dict` (8)
-  - `def create_from_text(self, payload: dict) -> dict` (27)
+  - `def create_from_ad(self, payload: dict) -> dict` (27)
   - `def _handed(self, request: HandRequest) -> dict` (9)
 - `def tell_hand_made(events, result) -> None` (9)
 
@@ -4031,7 +4031,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## tests — 348 модулей
+## tests — 349 модулей
 
 ### `tests/adapters/test_agent_mcp.py` — 80 строк
 
@@ -6849,7 +6849,7 @@ Runtime settings layer.
 
 Шов имён между мостом и ботом.
 
-Зависит от: `backend.bot`, `backend.bot.client`, `backend.bot.pasted`, `backend.bot.rerun`, `backend.flows.hand_outcome`, `client.bridge`, `client.bridge.refusals`, `tests.fakes.ui_bot`
+Зависит от: `backend.bot`, `backend.bot.client`, `backend.bot.hand_made`, `backend.bot.rerun`, `backend.flows.hand_outcome`, `client.bridge`, `client.bridge.refusals`, `tests.fakes.ui_bot`
 
 Тестов: 8
 
@@ -6859,8 +6859,8 @@ Runtime settings layer.
 - `def _hooks_set_in(what) -> set[str]` (13)
 - `def _hooks_the_bot_declares() -> set[str]` (3)
 - `def _rerun_outcomes() -> set[str]` (3)
-- `def _pasted_outcomes() -> set[str]` (3)
-- `def _hand_made_outcomes() -> set[str]` (3)
+- `def _work_outcomes() -> set[str]` (3)
+- `def _hand_outcomes() -> set[str]` (3)
 
 ### `tests/client/test_bridge_aggregators.py` — 431 строк ⚠ подошёл к 300
 
@@ -7175,6 +7175,16 @@ Runtime settings layer.
     - `async def broken(vacancy_id, way)` (2)
 - `def _by_mail(vacancy) -> dict` (2)
 
+### `tests/client/test_bridge_vacancy_by_bot.py` — 140 строк
+
+Заявки окна «Добавить вакансию», которые мост отдаёт боту.
+
+Зависит от: `backend.flows.hand_made`
+
+Тестов: 10
+
+- `def _requests(bot) -> list` (2)
+
 ### `tests/client/test_bridge_vacancy_contacts.py` — 77 строк
 
 Контакты вакансии в карточке: человек добавляет и удаляет их руками.
@@ -7184,17 +7194,16 @@ Runtime settings layer.
 Тестов: 6
 
 
-### `tests/client/test_bridge_vacancy_create.py` — 509 строк ⚠ за пределом 500
+### `tests/client/test_bridge_vacancy_create.py` — 377 строк ⚠ подошёл к 300
 
 Следствия заведения вакансии руками: что после него видно в списке и в карточке.
 
-Зависит от: `backend.flows.hand_made`, `backend.models`, `tests.dbio`, `tests.factories`
+Зависит от: `backend.models`, `tests.dbio`, `tests.factories`
 
-Тестов: 33
+Тестов: 23
 
 - `async def created(ask, api, **fields) -> int` (9)
 - `async def profile_knowing(session_factory, name: str, level: int) -> None` (10)
-- `def _requests(bot) -> list` (2)
 
 ### `tests/client/test_bridge_vacancy_links.py` — 228 строк
 
@@ -7757,7 +7766,7 @@ Runtime settings layer.
 
 Бот, каким его видит окно: обращения, которые делает мост.
 
-Зависит от: `backend.bot.pasted`, `backend.bot.rerun`
+Зависит от: `backend.bot.hand_made`, `backend.bot.rerun`
 
 - `class Sent` (4)
 - `class UiBot` (123)
@@ -7768,7 +7777,7 @@ Runtime settings layer.
   - `def kick(self) -> None` (2)
   - `async def run(self, *, once: bool=False) -> None` (7)
   - `async def ui_rerun_vacancy_pipeline(self, vacancy_id: int) -> RerunOutcome` (3)
-  - `async def ui_ingest_pasted_text(self, request) -> PastedOutcome` (3)
+  - `async def ui_ingest_by_hand(self, request) -> HandMadeOutcome` (3)
   - `async def ui_forget_vacancy(self, vacancy_id: int) -> bool` (3)
   - `async def mark_hr_chat_read(self, hr_id: int) -> int` (3)
   - `async def send_to_hr_chat(self, hr_id: int, text: str) -> Sent` (4)

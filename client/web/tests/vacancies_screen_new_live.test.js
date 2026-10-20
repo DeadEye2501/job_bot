@@ -48,23 +48,23 @@ async function bridge(method, payload) {
   }
   if (method === 'vacancies.create' && payload.hands_over) {
     SENT.push(payload);
-    return { started: true, action: 'create_from_text' };
+    return { started: true, action: 'create_by_hand' };
   }
   if (method === 'vacancies.create') {
     SENT.push(payload);
     return { created_id: 77, created: true, message: 'Вакансия заведена' };
   }
-  if (method === 'vacancies.create_from_text' && payload.raw_text === 'Отказ') {
+  if (method === 'vacancies.create_from_ad' && payload.raw_text === 'Отказ') {
     PASTED.push(payload);
     return null;
   }
-  if (method === 'vacancies.create_from_text' && payload.raw_text === 'Занято') {
+  if (method === 'vacancies.create_from_ad' && payload.raw_text === 'Занято') {
     // Место прогона занято: отказ приходит вестью раньше ответа на сам зов.
     PASTED.push(payload);
-    NEWS?.({ action: 'create_from_text', message: 'Идёт другой прогон', danger: true });
+    NEWS?.({ action: 'create_by_hand', message: 'Идёт другой прогон', danger: true });
     return { started: true };
   }
-  if (method === 'vacancies.create_from_text') {
+  if (method === 'vacancies.create_from_ad') {
     PASTED.push(payload);
     return { started: true };
   }
@@ -490,7 +490,7 @@ describe('живой экран вакансий', () => {
     page.querySelector('button[title="Добавить вакансию"]').click();
     await settled();
 
-    NEWS({ action: 'create_from_text', outcome: 'error', message: 'Модель не ответила', danger: true });
+    NEWS({ action: 'create_by_hand', outcome: 'error', message: 'Модель не ответила', danger: true });
     await settled();
     press('Отмена', { exact: true });
     await settled();

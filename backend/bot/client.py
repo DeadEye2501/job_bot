@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from adapters import lm_studio, telegram
 from backend.applying import run
-from backend.bot import pasted
+from backend.bot import hand_made
 from backend.bot import rerun
 from backend.bot import loop
 from backend.bot import updates
@@ -155,10 +155,8 @@ def _declare_ui_hooks(bot) -> None:
     # Signature: on_new_message(hr_id: int). The bridge puts it in the queue
     # the Contacts/HR pane reads.
     bot.on_new_message = None
-    # Real-time HR-read-receipt push. Signature:
-    # on_hr_read(hr_id: int, max_tg_id: int). Cheaper than on_new_message
-    # because the UI only needs to flip ✓ → ✓✓ on already-rendered rows
-    # rather than refetch the whole chat.
+    # on_hr_read(hr_id: int, max_tg_id: int): cheaper than on_new_message — the UI
+    # only flips ✓ → ✓✓ on rendered rows instead of refetching the whole chat.
     bot.on_hr_read = None
     # Real-time push for the Contacts/Channels pane: fires once per poll
     # cycle, right after the title sweep writes any new titles into the
@@ -380,8 +378,8 @@ class Bot:
     ) -> rerun.RerunOutcome:
         return await rerun.ui_rerun_vacancy_pipeline(self, vacancy_id)
 
-    async def ui_ingest_pasted_text(self, request) -> pasted.PastedOutcome:
-        return await pasted.ui_ingest_pasted_text(self, request)
+    async def ui_ingest_by_hand(self, request) -> hand_made.HandMadeOutcome:
+        return await hand_made.ui_ingest_by_hand(self, request)
 
     async def ui_forget_vacancy(self, vacancy_id) -> bool:
         return await self.ingestion.forget_vacancy(vacancy_id)

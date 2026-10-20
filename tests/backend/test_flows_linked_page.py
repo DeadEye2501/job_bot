@@ -233,4 +233,4 @@ async def test_the_bar_shows_the_parse_of_an_ad(page, parsed):
 
     await page(COMPANY_PAGE, [_submitting(COMPANY_PAGE)], on_kit=watch)
 
-    assert steps and all(step[:2] == ("pasted", "Разбор объявления") for step in steps)
+    assert steps and all(step[:2] == ("hand_made", "Разбор объявления") for step in steps)

@@ -210,7 +210,7 @@ async def test_the_bottom_bar_names_the_parse(intake):
 
     await _pasted(intake, "Ищем повара")
 
-    assert steps[0] == ("pasted", "Разбор объявления", 0, 0)
+    assert steps[0] == ("hand_made", "Разбор объявления", 0, 0)
 
 
 async def test_the_profile_and_the_blacklist_are_reloaded_before_the_parse(intake):

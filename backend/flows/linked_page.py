@@ -24,7 +24,7 @@ async def ingest_page(kit: AgentKit, url: str, intake: Intake) -> None:
 
     Агент ничего не передал и кончил сессию сам — на странице нет вакансии.
     Сорвался — капча, вход, срок — это беда, а не пустая страница: окну её
-    скажет бот по концу работы, где итога не прозвучало (`bot/pasted`).
+    скажет бот по концу работы, где итога не прозвучало (`bot/hand_made`).
     """
     show_parsing(kit.pipeline)
     job = SeekJob(await _source(kit, url), 1, page=url, intake=intake)

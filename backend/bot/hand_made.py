@@ -7,21 +7,22 @@ from typing import Literal
 from backend.bot import work
 from backend.bot.aggregators import aggregators_available
 from backend.domain.hosts import link_kind
-from backend.flows import hand_made
+from backend.flows import hand_made as flow_hand_made
 from backend.flows.hand_made import HandRequest
 
 logger = logging.getLogger(__name__)
 
-PastedOutcome = Literal[work.WorkOutcome, "told", "locked"]
+HandMadeOutcome = Literal[work.WorkOutcome, "told", "locked"]
 """Чем кончилась работа заведения, как это видит окно.
 
 «Сказано» значит, что второй вести не нужно. «Заперто» — страницу по ссылке
 читает агент, а его сейчас нет. Остальное — отказы места прогона, до итога
-заведения не дошедшего.
+заведения не дошедшего. Сам итог заведения (`flows.hand_outcome.HandOutcome`)
+сюда не входит: он уходит окну вестью по ходу работы.
 """
 
 
-async def ui_ingest_pasted_text(bot, request: HandRequest) -> PastedOutcome:
+async def ui_ingest_by_hand(bot, request: HandRequest) -> HandMadeOutcome:
     """Повести заявку окна в общем месте прогона.
 
     Там же, где обход каналов и повторный разбор: у приёма те же обращения к
@@ -45,7 +46,7 @@ async def ui_ingest_pasted_text(bot, request: HandRequest) -> PastedOutcome:
     # отвечает бедой, и её перекрывает сказанный итог — без него кончившаяся
     # молча работа осталась бы окну неслышной.
     async def job(kit) -> str:
-        await hand_made.ingest_by_hand(kit, request)
+        await flow_hand_made.ingest_by_hand(kit, request)
         return "error"
 
     outcome = await work.in_slot(bot, job, "ingest by hand")

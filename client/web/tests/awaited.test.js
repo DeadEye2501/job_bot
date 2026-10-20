@@ -43,11 +43,11 @@ describe('ожидание своей вести', () => {
 
   it('отказанный до пуска зов снимает ожидание', () => {
     news();
-    awaited.start('create_from_text', () => {});
+    awaited.start('create_by_hand', () => {});
 
-    awaited.cancel('create_from_text');
+    awaited.cancel('create_by_hand');
 
-    expect(awaited.pending('create_from_text')).toBe(false);
+    expect(awaited.pending('create_by_hand')).toBe(false);
   });
 
   it('свежая подписка начинает без ожиданий: прошлое окно своих вестей не дождётся', () => {

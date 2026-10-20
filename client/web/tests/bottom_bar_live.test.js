@@ -37,7 +37,7 @@ describe('живая нижняя полоса', () => {
     // её место занято переключателем режима.
     handlers.ingestion_started();
     handlers.progress_update({
-      stage: 'pasted',
+      stage: 'hand_made',
       label: 'Разбор вставленного объявления…',
       current: 0,
       total: 0,

@@ -19,11 +19,11 @@ import pytest
 
 from backend.bot import client as client_mod
 from backend.bot.client import Bot
-from backend.bot.pasted import PastedOutcome
+from backend.bot.hand_made import HandMadeOutcome
 from backend.bot.rerun import RerunOutcome
 from backend.flows.hand_outcome import HandOutcome
 from client.bridge import lifespan
-from client.bridge.refusals import PASTED_REFUSALS, RERUN_REFUSALS, agent_refusals
+from client.bridge.refusals import HAND_MADE_REFUSALS, RERUN_REFUSALS, agent_refusals
 from tests.fakes.ui_bot import ANSWERS, UiBot
 
 
@@ -154,17 +154,17 @@ def test_the_fake_answers_the_rerun_with_an_outcome_the_bot_can_return():
     assert ANSWERS["rerun"] in _rerun_outcomes()
 
 
-def _pasted_outcomes() -> set[str]:
+def _work_outcomes() -> set[str]:
     """Чем работа заведения может кончиться по объявлению бота."""
-    return set(get_args(PastedOutcome))
+    return set(get_args(HandMadeOutcome))
 
 
-def _hand_made_outcomes() -> set[str]:
+def _hand_outcomes() -> set[str]:
     """Чем кончается само ручное заведение — это окно слышит вестью по ходу."""
     return set(get_args(HandOutcome))
 
 
-def test_every_pasted_outcome_has_a_phrase_for_the_human():
+def test_every_hand_made_outcome_has_a_phrase_for_the_human():
     """У каждого исхода ручного заведения есть своя фраза человеку.
 
     Тот же шов, что и у повторного разбора, и та же беда без него: исход
@@ -173,10 +173,10 @@ def test_every_pasted_outcome_has_a_phrase_for_the_human():
     статья не скачалась, молчит модель отпечатков. «Сказано» и удача фразы не
     требуют: первое значит, что исход уже ушёл вестью, второе — слово удачи.
     """
-    said = _pasted_outcomes() | _hand_made_outcomes()
-    assert said - {"ok", "told"} == set(agent_refusals(PASTED_REFUSALS, None))
+    said = _work_outcomes() | _hand_outcomes()
+    assert said - {"ok", "told"} == set(agent_refusals(HAND_MADE_REFUSALS, None))
 
 
-def test_the_fake_answers_the_pasted_intake_with_an_outcome_the_bot_can_return():
+def test_the_fake_answers_the_hand_made_intake_with_an_outcome_the_bot_can_return():
     """Заготовленный ответ подделки — из тех же исходов, что и у бота."""
-    assert ANSWERS["pasted"] in _pasted_outcomes()
+    assert ANSWERS["hand_made"] in _work_outcomes()

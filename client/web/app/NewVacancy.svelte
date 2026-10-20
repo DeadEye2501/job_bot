@@ -26,7 +26,7 @@
   let { ask, say, lockedTip, newVacancy, onhandmade, onvacancy, onfiled } = $props();
 
   // Метка вестей ручного заведения: одна на все вкладки, её же ставит мост.
-  const HAND_MADE_ACTION = 'create_from_text';
+  const HAND_MADE_ACTION = 'create_by_hand';
 
   const handsOver = $derived(handsOverToggle(newVacancy.handsOver, lockedTip));
 
@@ -79,14 +79,14 @@
    *  адресом — что за ней, решает бот. */
   function sent(draft) {
     if (isText(draft)) {
-      return ask('vacancies.create_from_text', {
+      return ask('vacancies.create_from_ad', {
         raw_text: draft.raw_text,
         posted_at: draft.posted_at,
         hands_over: handsOver.checked,
       });
     }
     if (isLink(draft)) {
-      return ask('vacancies.create_from_text', { url: draft.source_url, hands_over: handsOver.checked });
+      return ask('vacancies.create_from_ad', { url: draft.source_url, hands_over: handsOver.checked });
     }
     return ask('vacancies.create', { ...vacancyFields(draft), hands_over: handsOver.checked });
   }
