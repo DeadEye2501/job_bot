@@ -37,6 +37,8 @@ def test_finder_path_finds_local_bin(monkeypatch, tmp_path):
     claude.parent.mkdir(parents=True)
     claude.touch(mode=0o755)
 
-    path = install_places_macos.with_install_places("/usr/bin:/bin")
+    monkeypatch.setenv("PATH", "/usr/bin:/bin")
 
-    assert shutil.which("claude", path=path) == str(claude)
+    install_places_macos.widen_path()
+
+    assert shutil.which("claude") == str(claude)

@@ -158,15 +158,25 @@ def _started_or_told_why() -> int:
         return 2
 
 
+def _served_mac_watcher() -> bool:
+    """Отработать сторожем привязанных процессов мака, если позвали им.
+
+    Сторож — эта же программа с флагом: в замороженной сборке другого
+    исполняемого нет. Ему не нужны ни замок, ни окно. Мак-модуль грузится
+    строкой, чтобы не попасть в Windows-сборку.
+    """
+    if sys.platform != "darwin":
+        return False
+    tie_watch = importlib.import_module("adapters.tie_watch_macos")
+    if sys.argv[1:2] != [tie_watch.TIE_WATCH_FLAG]:
+        return False
+    tie_watch.watch(sys.stdin)
+    return True
+
+
 def main() -> int:
-    # Сторож привязанных процессов мака — эта же программа с флагом: в
-    # замороженной сборке другого исполняемого нет. Ему не нужны ни замок, ни
-    # окно. Грузится строкой, чтобы мак-модуль не попал в Windows-сборку.
-    if sys.platform == "darwin":
-        tie_watch = importlib.import_module("adapters.tie_watch_macos")
-        if sys.argv[1:2] == [tie_watch.TIE_WATCH_FLAG]:
-            tie_watch.watch(sys.stdin)
-            return 0
+    if _served_mac_watcher():
+        return 0
 
     from backend import updater
     from backend.single_instance import hold_the_only_copy
@@ -196,6 +206,8 @@ def main() -> int:
         return 3
     with the_only_copy:
         updater.clear_leftovers()
+        if sys.platform == "darwin":
+            importlib.import_module("adapters.install_places_macos").widen_path()
         return _started_or_told_why()
 
 
