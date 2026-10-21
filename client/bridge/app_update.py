@@ -30,7 +30,9 @@ class AppUpdate:
         Может только собранный exe: из исходников подменять нечего, и решается
         это здесь, один раз, — окно получает уже решённое.
         """
-        return {"ok": {"version": VERSION, "updatable": bool(getattr(sys, "frozen", False))}}
+        # Самообновление умеет подменять только Windows-exe; мак-сборка его не делает.
+        updatable = bool(getattr(sys, "frozen", False)) and sys.platform != "darwin"
+        return {"ok": {"version": VERSION, "updatable": updatable}}
 
     def check_update(self) -> dict:
         """Есть ли на GitHub версия новее запущенной.
