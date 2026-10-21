@@ -2151,6 +2151,10 @@
 - `_LINK_SCHEMES` = `frozenset({'http', 'https', 'tg', 'mailto', 'tel…`
 - `_OPENABLE_SUFFIXES` = `frozenset({'.bmp', '.gif', '.jpeg', '.jpg', '.pn…`
 
+### `client/bridge/desktop_macos.py`
+
+- `logger` = `logging.getLogger(__name__)`
+
 ### `client/bridge/events.py`
 
 - `logger` = `logging.getLogger(__name__)`
@@ -2384,6 +2388,10 @@
 
 - `pytestmark` = `pytest.mark.skipif(sys.platform != 'darwin', rea…`
 - `_ROOT` = `Path(__file__).resolve().parents[2]`
+
+### `macos/tests/test_window_size_macos.py`
+
+- `pytestmark` = `pytest.mark.skipif(sys.platform != 'darwin', rea…`
 
 ## tests
 
