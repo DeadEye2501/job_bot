@@ -58,6 +58,7 @@ hiddenimports = [
     'client.bridge.desktop_macos',
     'client.window_size_macos',
     'client.trouble_macos',
+    'backend.updater_macos',
 ]
 
 
