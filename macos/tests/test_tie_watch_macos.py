@@ -4,13 +4,12 @@ import subprocess
 import sys
 import textwrap
 import time
-from pathlib import Path
 
 import pytest
 
-pytestmark = pytest.mark.skipif(sys.platform != "darwin", reason="только macOS")
+from tests.paths import ROOT
 
-_ROOT = Path(__file__).resolve().parents[2]
+pytestmark = pytest.mark.skipif(sys.platform != "darwin", reason="только macOS")
 
 
 def _watched(monkeypatch, tables: list[list[tuple[int, int, str]]]) -> list[int]:
@@ -89,7 +88,7 @@ def test_watcher_kills_tree_when_parent_dies():
             print(child.pid, flush=True)
             time.sleep(60)
         """)],
-        cwd=_ROOT, stdout=subprocess.PIPE, text=True,
+        cwd=ROOT, stdout=subprocess.PIPE, text=True,
     )
     shell = int(parent.stdout.readline())
     time.sleep(1)

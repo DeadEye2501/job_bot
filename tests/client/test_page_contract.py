@@ -24,8 +24,10 @@ from pathlib import Path
 
 import pytest
 
+from tests.paths import ROOT
 
-WEB = Path(__file__).resolve().parents[2] / "client" / "web"
+
+WEB = ROOT / "client" / "web"
 
 # Имя моста пишется на странице внутри зова обёртки: `call('домен.метод')` или
 # `ask('домен.метод')`. Обёрток две, и вторая — не мелочь: через неё идёт

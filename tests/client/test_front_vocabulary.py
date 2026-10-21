@@ -16,7 +16,6 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 from backend.domain.taxonomy import GRADES, LANGUAGE_LEVELS, WORK_FORMATS
 from backend.domain.verdict import (
@@ -30,8 +29,9 @@ from backend.domain.verdict import (
 )
 from backend.models.enums import BotMode, VacancyStatus
 from backend.models.settings import BLACKLIST_KINDS
+from tests.paths import ROOT
 
-STATE = Path(__file__).resolve().parents[2] / "client" / "web" / "state"
+STATE = ROOT / "client" / "web" / "state"
 
 
 def _array(module: str, name: str) -> str:

@@ -100,9 +100,9 @@ def test_app_routes_to_mac_updater(monkeypatch, tmp_path):
     assert update_download.new_exe_path() == updater_macos.download_path()
 
 
-def _app_marked(where: Path, mark: str) -> Path:
-    app = where / "JobBot.app"
-    (app / "Contents").mkdir(parents=True)
+def _mark(app: Path, mark: str) -> Path:
+    """Метка версии внутри бандла: по ней видно, какой из двух стоит на месте."""
+    (app / "Contents").mkdir(parents=True, exist_ok=True)
     (app / "Contents" / "mark").write_text(mark)
     return app
 
@@ -111,10 +111,8 @@ def _swap_bench(monkeypatch, tmp_path, fresh_name: str) -> tuple[Path, Path, sub
     """Установленный бандл с меткой «old», скачанный zip с бандлом `fresh_name` и
     меткой «new», подменённый `open` и «приложение» — `sleep 2`, выхода которого
     ждёт подменщик. Ответ — бандл, файл с аргументом `open`, процесс приложения."""
-    installed = tmp_path / "Applications"
-    old = _app_marked(installed, "old")
-    monkeypatch.setattr(sys, "executable", str(old / "Contents" / "MacOS" / "JobBot"))
-    fresh = _app_marked(tmp_path / "fresh", "new").rename(tmp_path / "fresh" / fresh_name)
+    old = _mark(_bundle(monkeypatch, tmp_path / "Applications"), "old")
+    fresh = _mark(tmp_path / "fresh" / fresh_name, "new")
     subprocess.run(["ditto", "-c", "-k", "--keepParent", str(fresh), str(updater_macos.download_path())],
                    check=True)
     fake_bin = tmp_path / "bin"

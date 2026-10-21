@@ -4200,7 +4200,7 @@ Runtime settings layer.
 Тестов: 5
 
 
-### `macos/tests/test_install_places_macos.py` — 45 строк
+### `macos/tests/test_install_places_macos.py` — 46 строк
 
 
 
@@ -4208,15 +4208,18 @@ Runtime settings layer.
 
 Тестов: 3
 
+- `def _home_with_local_bin(monkeypatch, home: Path) -> Path` (6)
 
-### `macos/tests/test_mac_start.py` — 56 строк
+### `macos/tests/test_mac_start.py` — 48 строк
 
 
 
-Зависит от: `adapters`, `adapters.browser`, `backend.single_instance`
+Зависит от: `adapters`, `adapters.browser`, `adapters.tie_watch_macos`, `tests.paths`
 
-Тестов: 4
+Тестов: 3
 
+- `def _watcher_run(home, stdin: bytes) -> subprocess.CompletedProcess` (9)
+- `def _data_files(home) -> list` (2)
 
 ### `macos/tests/test_process_macos.py` — 43 строк
 
@@ -4238,11 +4241,11 @@ Runtime settings layer.
 Тестов: 1
 
 
-### `macos/tests/test_tie_watch_macos.py` — 108 строк
+### `macos/tests/test_tie_watch_macos.py` — 107 строк
 
 
 
-Зависит от: `adapters`, `adapters.tie_watch_macos`
+Зависит от: `adapters`, `adapters.tie_watch_macos`, `tests.paths`
 
 Тестов: 4
 
@@ -4259,7 +4262,7 @@ Runtime settings layer.
 Тестов: 3
 
 
-### `macos/tests/test_updater_macos.py` — 161 строк
+### `macos/tests/test_updater_macos.py` — 159 строк
 
 
 
@@ -4268,8 +4271,8 @@ Runtime settings layer.
 Тестов: 9
 
 - `def _bundle(monkeypatch, root: Path) -> Path` (6)
-- `def _app_marked(where: Path, mark: str) -> Path` (5)
-- `def _swap_bench(monkeypatch, tmp_path, fresh_name: str) -> tuple[Path, Path, subprocess.Popen]` (19)
+- `def _mark(app: Path, mark: str) -> Path` (5)
+- `def _swap_bench(monkeypatch, tmp_path, fresh_name: str) -> tuple[Path, Path, subprocess.Popen]` (17)
 - `def _swapped(app: subprocess.Popen) -> None` (3)
 
 ### `macos/tests/test_window_size_macos.py` — 42 строк
@@ -4283,7 +4286,7 @@ Runtime settings layer.
 - `def _wizard_window()` (14)
 - `def _pump() -> None` (4)
 
-## tests — 353 модулей
+## tests — 354 модулей
 
 ### `tests/adapters/test_agent_mcp.py` — 80 строк
 
@@ -4295,11 +4298,11 @@ Runtime settings layer.
 
 - `async def _echo(text: str) -> str` (3)
 
-### `tests/adapters/test_app_tied_process.py` — 100 строк
+### `tests/adapters/test_app_tied_process.py` — 98 строк
 
 Привязка к приложению: кого Windows снимет вместе с ним и кого не тронет.
 
-Зависит от: `adapters`
+Зависит от: `adapters`, `tests.paths`
 
 Тестов: 4
 
@@ -4959,11 +4962,11 @@ Runtime settings layer.
 
 - `async def _facts(session_factory, **vacancy)` (5)
 
-### `tests/backend/test_bootstrap_schema.py` — 160 строк
+### `tests/backend/test_bootstrap_schema.py` — 159 строк
 
 Следствия подготовки схемы базы при запуске.
 
-Зависит от: `alembic`, `backend.bootstrap`, `tests.conftest`, `tests.dbio`
+Зависит от: `alembic`, `backend.bootstrap`, `tests.conftest`, `tests.dbio`, `tests.paths`
 
 Тестов: 3
 
@@ -5412,11 +5415,11 @@ Runtime settings layer.
 
 - `def shown(monkeypatch)` (7)
 
-### `tests/backend/test_entry_point_log.py` — 303 строк ⚠ подошёл к 300
+### `tests/backend/test_entry_point_log.py` — 302 строк ⚠ подошёл к 300
 
 Следствия журнала приложения: файл, поворот, кодировка и падения.
 
-Зависит от: `config`
+Зависит от: `config`, `tests.paths`
 
 Тестов: 11
 
@@ -6970,11 +6973,11 @@ Runtime settings layer.
 Тестов: 1
 
 
-### `tests/backend/test_single_instance.py` — 153 строк
+### `tests/backend/test_single_instance.py` — 154 строк
 
 Следствия сторожа единственности приложения.
 
-Зависит от: `backend.single_instance`
+Зависит от: `backend.single_instance`, `tests.paths`
 
 Тестов: 6
 
@@ -7115,7 +7118,7 @@ Runtime settings layer.
 
 Шов имён между мостом и ботом.
 
-Зависит от: `backend.bot`, `backend.bot.client`, `backend.bot.hand_made`, `backend.bot.rerun`, `backend.flows.hand_outcome`, `client.bridge`, `client.bridge.refusals`, `tests.fakes.ui_bot`
+Зависит от: `backend.bot`, `backend.bot.client`, `backend.bot.hand_made`, `backend.bot.rerun`, `backend.flows.hand_outcome`, `client.bridge`, `client.bridge.refusals`, `tests.fakes.ui_bot`, `tests.paths`
 
 Тестов: 8
 
@@ -7522,7 +7525,7 @@ Runtime settings layer.
 
 Согласие перечней окна с перечнями бэкенда.
 
-Зависит от: `backend.domain.taxonomy`, `backend.domain.verdict`, `backend.models.enums`, `backend.models.settings`
+Зависит от: `backend.domain.taxonomy`, `backend.domain.verdict`, `backend.models.enums`, `backend.models.settings`, `tests.paths`
 
 Тестов: 8
 
@@ -7544,11 +7547,11 @@ Runtime settings layer.
 - `def _launch_texts() -> list[str]` (8)
 - `def _tail(arg) -> str | None` (5)
 
-### `tests/client/test_page_contract.py` — 158 строк
+### `tests/client/test_page_contract.py` — 160 строк
 
 Шов имён: сходятся ли имена, которыми страница зовёт мост, с самим мостом.
 
-Зависит от: —
+Зависит от: `tests.paths`
 
 Тестов: 6
 
@@ -8110,6 +8113,13 @@ Playwright под `BrowserHost`: запуск профиля и события �
 Зависит от: —
 
 - `async def call_tool(url: str, name: str, arguments: dict) -> None` (6)
+
+### `tests/paths.py` — 5 строк
+
+Корень репозитория в тестах: от него тесты находят исходники и запускают приложение.
+
+Зависит от: —
+
 
 ### `tests/test_config.py` — 66 строк
 

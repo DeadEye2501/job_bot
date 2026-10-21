@@ -22,13 +22,13 @@
 """
 
 import re
-from pathlib import Path
 
 from alembic import command
 
 from backend.bootstrap import alembic_config, ensure_schema
 from tests.conftest import INIT_REVISION
 from tests.dbio import sqlite_rows, sqlite_tables
+from tests.paths import ROOT
 
 _ENV_PY = '''
 from alembic import context
@@ -147,14 +147,13 @@ def test_the_build_carries_every_revision_the_sources_can_reach():
     на свежем клоне её в `versions/` нет вовсе. Забытая в сборке новая ревизия
     краснеет всё так же — она была бы слева и не нашлась бы справа.
     """
-    root = Path(__file__).resolve().parents[2]
-    spec = (root / "JobBot.spec").read_text(encoding="utf-8")
+    spec = (ROOT / "JobBot.spec").read_text(encoding="utf-8")
     bundled = [
-        root / name
+        ROOT / name
         for name in re.findall(r"'(alembic/[^']+[.]py)'", spec)
         if "env.py" not in name
     ]
 
-    assert _revisions_in((root / "alembic" / "versions").glob("*.py")) <= (
+    assert _revisions_in((ROOT / "alembic" / "versions").glob("*.py")) <= (
         _revisions_in(bundled)
     )

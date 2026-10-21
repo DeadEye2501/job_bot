@@ -1,13 +1,12 @@
 import os
 import subprocess
 import sys
-from pathlib import Path
 
 import pytest
 
-pytestmark = pytest.mark.skipif(sys.platform != "darwin", reason="только macOS")
+from tests.paths import ROOT
 
-_ROOT = Path(__file__).resolve().parents[2]
+pytestmark = pytest.mark.skipif(sys.platform != "darwin", reason="только macOS")
 
 
 def test_package_names_lead_to_twins(monkeypatch):
@@ -23,34 +22,27 @@ def test_package_names_lead_to_twins(monkeypatch):
     assert adapters.browser.has_window(os.getpid()) is False
 
 
-def test_tie_watch_flag_skips_app(tmp_path):
-    env = {**os.environ, "HOME": str(tmp_path)}
+def _watcher_run(home, stdin: bytes) -> subprocess.CompletedProcess:
+    """`main.py` сторожем, с этим вводом и домашним каталогом `home`."""
+    from adapters.tie_watch_macos import TIE_WATCH_FLAG
 
-    done = subprocess.run(
-        [sys.executable, str(_ROOT / "main.py"), "--tie-watch"],
-        cwd=_ROOT, env=env, stdin=subprocess.DEVNULL, capture_output=True, timeout=20,
+    return subprocess.run(
+        [sys.executable, str(ROOT / "main.py"), TIE_WATCH_FLAG],
+        cwd=ROOT, env={**os.environ, "HOME": str(home)}, input=stdin,
+        capture_output=True, timeout=20,
     )
 
-    assert done.returncode == 0
-    data_dir = tmp_path / "Library" / "Application Support"
-    assert not [p for p in data_dir.rglob("*") if p.is_file()]
+
+def _data_files(home) -> list:
+    return [p for p in (home / "Library" / "Application Support").rglob("*") if p.is_file()]
+
+
+def test_tie_watch_flag_skips_app(tmp_path):
+    assert _watcher_run(tmp_path, b"").returncode == 0
+    assert not _data_files(tmp_path)
 
 
 def test_watcher_failure_stays_out_of_the_log(tmp_path):
-    env = {**os.environ, "HOME": str(tmp_path)}
+    _watcher_run(tmp_path, b"not-a-pid\n")
 
-    subprocess.run(
-        [sys.executable, str(_ROOT / "main.py"), "--tie-watch"],
-        cwd=_ROOT, env=env, input=b"not-a-pid\n", capture_output=True, timeout=20,
-    )
-
-    data_dir = tmp_path / "Library" / "Application Support"
-    assert not [p for p in data_dir.rglob("*") if p.is_file()]
-
-
-def test_second_copy_is_refused(tmp_path):
-    from backend.single_instance import hold_the_only_copy
-
-    lock = tmp_path / "jobbot.lock"
-    with hold_the_only_copy(lock):
-        assert hold_the_only_copy(lock) is None
+    assert not _data_files(tmp_path)

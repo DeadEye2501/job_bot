@@ -12,7 +12,6 @@
 
 import ast
 import inspect
-from pathlib import Path
 from typing import get_args
 
 import pytest
@@ -25,9 +24,10 @@ from backend.flows.hand_outcome import HandOutcome
 from client.bridge import lifespan
 from client.bridge.refusals import HAND_MADE_REFUSALS, RERUN_REFUSALS, agent_refusals
 from tests.fakes.ui_bot import ANSWERS, UiBot
+from tests.paths import ROOT
 
 
-BRIDGE = Path(__file__).resolve().parents[2] / "client" / "bridge"
+BRIDGE = ROOT / "client" / "bridge"
 
 
 def _is_the_bot(node: ast.expr) -> bool:

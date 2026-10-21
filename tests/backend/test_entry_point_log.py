@@ -13,9 +13,8 @@ import os
 import subprocess
 import sys
 import threading
-from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
+from tests.paths import ROOT
 
 
 def _write_through(module, text: str) -> str:
