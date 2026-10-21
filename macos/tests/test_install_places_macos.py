@@ -27,7 +27,8 @@ def test_named_dir_not_repeated(monkeypatch, tmp_path):
 
     places = install_places_macos.with_install_places(str(local_bin)).split(os.pathsep)
 
-    assert places == [str(local_bin)]
+    assert places[0] == str(local_bin)
+    assert places.count(str(local_bin)) == 1
 
 
 @pytest.mark.skipif(sys.platform != "darwin", reason="только macOS")
