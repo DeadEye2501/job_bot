@@ -4,6 +4,7 @@
 знают форму ответа API релизов. Клиент берётся у него же.
 """
 
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -13,6 +14,9 @@ from adapters.web_page import page_client
 
 LATEST = "https://api.github.com/repos/DeadEye2501/job_bot/releases/latest"
 ASSET = "JobBot.exe"
+# Релиз один на обе системы, файлов в нём два: каждая сборка ищет свой.
+if sys.platform == "darwin":
+    ASSET = "JobBot-macos-arm64.zip"
 _TIMEOUT_SEC = 20.0
 _USER_AGENT = "JobBot-updater"
 

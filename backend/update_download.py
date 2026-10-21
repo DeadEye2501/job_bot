@@ -6,6 +6,7 @@
 """
 
 import hashlib
+import importlib
 import logging
 import sys
 from collections.abc import Callable
@@ -27,6 +28,9 @@ _MB = 1024 * 1024
 def new_exe_path() -> Path:
     """Куда ложится скачанное: рядом с exe, под его именем с `.new`. Рядом, а не
     во временной папке: подмена — переименование, а оно не ходит между дисками."""
+    # Мак-двойник грузится строкой, чтобы не попасть в Windows-сборку.
+    if sys.platform == "darwin":
+        return importlib.import_module("backend.updater_macos").download_path()
     exe = Path(sys.executable)
     return exe.with_name(exe.name + ".new")
 

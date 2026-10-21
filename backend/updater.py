@@ -9,6 +9,7 @@ exe Windows подменить не даёт, поэтому подменяет 
 """
 
 import ctypes
+import importlib
 import logging
 import os
 import shutil
@@ -47,6 +48,10 @@ def launch_updater(new: Path) -> None:
     а питон живёт его дочерним процессом; загрузчик держит `JobBot.exe` дольше и
     выходит последним, подчистив распаковку.
     """
+    # Мак-двойник грузится строкой, чтобы не попасть в Windows-сборку.
+    if sys.platform == "darwin":
+        importlib.import_module("backend.updater_macos").launch_updater(new)
+        return
     exe = Path(sys.executable)
     shutil.copy2(exe, updater_copy())
     _start([str(updater_copy()), UPDATE_FLAG, str(os.getppid()), str(exe), str(new)])
@@ -77,6 +82,9 @@ def run(args: list[str]) -> int:
 def clear_leftovers() -> None:
     """При обычном запуске убрать оставшееся от обновления: скачанный файл и
     копию-подменщик."""
+    if sys.platform == "darwin":
+        importlib.import_module("backend.updater_macos").clear_leftovers()
+        return
     for leftover in (new_exe_path(), updater_copy()):
         remove_leftover(leftover)
 
