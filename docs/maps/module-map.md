@@ -3284,7 +3284,7 @@ Runtime settings layer.
 - `def _remove_the_data() -> list[str]` (27)
 - `async def wipe_all(engine) -> list[str]` (28)
 
-## client — 52 модулей
+## client — 54 модулей
 
 ### `client/bridge/__init__.py` — 23 строк
 
@@ -3504,21 +3504,31 @@ Runtime settings layer.
 
 - `def _stat_cv(cv_path: str) -> dict | None` (9)
 
-### `client/bridge/desktop.py` — 210 строк
+### `client/bridge/desktop.py` — 218 строк
 
 Просьбы окна к рабочему столу: открыть названное системой, выбрать файл диалогом.
 
 Зависит от: `client.bridge.answer`, `client.bridge.media`, `client.bridge.refusals`
 
-- `def _show_in_folder(target) -> bool` (20)
+- `def _show_in_folder(target) -> bool` (23)
 - `def _scheme_of(url: str) -> str` (7)
-- `def open_in_system(target: str) -> bool` (20)
+- `def open_in_system(target: str) -> bool` (23)
 - `class Desktop` (67)
   - `def open_url(self, url: str) -> dict` (28)
   - `def open_attachment(self, url: str) -> dict` (25)
 - `def closed_dialog() -> dict` (3)
 - `def file_filter(label: str, suffixes) -> str` (3)
 - `def chosen_path(window, *file_types: str) -> str | None` (10)
+
+### `client/bridge/desktop_macos.py` — 32 строк
+
+Просьбы окна к рабочему столу на маке — двойники `open_in_system` и `_show_in_folder`.
+
+Зависит от: —
+
+- `def open_in_system(target: str) -> bool` (3)
+- `def show_in_folder(target) -> bool` (3)
+- `def _opened(args: list[str], target) -> bool` (7)
 
 ### `client/bridge/events.py` — 155 строк
 
@@ -4095,17 +4105,26 @@ Runtime settings layer.
 - `def _own_the_taskbar_icon() -> None` (14)
 - `def _drop_stale_session_files(rs: RuntimeSettings) -> None` (24)
 
-### `client/window_size.py` — 74 строк
+### `client/window_size.py` — 80 строк
 
 Размеры окна: каким оно открывается и в какой миг вырастает.
 
 Зависит от: —
 
 - `def grow_to_main(window) -> None` (18)
-- `def _unlock_frame(form) -> None` (27)
+- `def _unlock_frame(form) -> None` (31)
   - `def apply() -> None` (6)
 
-## macos — 8 модулей
+### `client/window_size_macos.py` — 24 строк
+
+Рамка окна на маке — двойник `window_size._unlock_frame`.
+
+Зависит от: `client.window_size`
+
+- `def unlock_frame(window) -> None` (10)
+  - `def apply() -> None` (3)
+
+## macos — 11 модулей
 
 ### `macos/tests/conftest.py` — 15 строк
 
@@ -4113,6 +4132,15 @@ Runtime settings layer.
 
 Зависит от: —
 
+
+### `macos/tests/fake_run.py` — 23 строк
+
+Подмена `subprocess.run` в мак-тестах: записывает зовы, отвечает как настоящий.
+
+Зависит от: —
+
+- `def recorded_runs(monkeypatch, stdout: str='', fails: bool=False) -> list[list[str]]` (13)
+  - `def run(args, check=False, **_kwargs)` (6)
 
 ### `macos/tests/test_app_tied_macos.py` — 17 строк
 
@@ -4132,6 +4160,15 @@ Runtime settings layer.
 Тестов: 5
 
 - `def _bases(monkeypatch, tmp_path) -> tuple[Path, Path]` (6)
+
+### `macos/tests/test_desktop_macos.py` — 43 строк
+
+
+
+Зависит от: `client.bridge`, `macos.tests.fake_run`
+
+Тестов: 5
+
 
 ### `macos/tests/test_install_places_macos.py` — 45 строк
 
@@ -4162,11 +4199,11 @@ Runtime settings layer.
 - `def _quartz(monkeypatch, windows: list[dict]) -> list[int]` (15)
   - `def window_list(option, _relative_to)` (3)
 
-### `macos/tests/test_process_table_macos.py` — 26 строк
+### `macos/tests/test_process_table_macos.py` — 19 строк
 
 
 
-Зависит от: `adapters`
+Зависит от: `adapters`, `macos.tests.fake_run`
 
 Тестов: 1
 
@@ -4182,6 +4219,17 @@ Runtime settings layer.
 - `def _watched(monkeypatch, tables: list[list[tuple[int, int, str]]]) -> list[int]` (14)
   - `def kill(pid, sig)` (3)
 - `def _alive(pid: int) -> bool` (6)
+
+### `macos/tests/test_window_size_macos.py` — 42 строк
+
+
+
+Зависит от: `client.window_size`
+
+Тестов: 1
+
+- `def _wizard_window()` (14)
+- `def _pump() -> None` (4)
 
 ## tests — 353 модулей
 

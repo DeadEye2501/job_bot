@@ -28,7 +28,7 @@ def _pump() -> None:
 
 
 def test_window_becomes_resizable():
-    from AppKit import NSWindowStyleMaskResizable
+    from AppKit import NSWindowStyleMaskResizable, NSWindowStyleMaskTitled
 
     from client.window_size import MAIN, _unlock_frame
 
@@ -38,4 +38,5 @@ def test_window_becomes_resizable():
     _pump()
 
     assert window.styleMask() & NSWindowStyleMaskResizable
+    assert window.styleMask() & NSWindowStyleMaskTitled
     assert (window.minSize().width, window.minSize().height) == MAIN
