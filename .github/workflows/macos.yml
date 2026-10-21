@@ -1,8 +1,8 @@
 name: macOS
 
 on:
-  push:
-    branches: [macos-build]
+  # Ручной запуск — собрать мак-бандл артефактом без нового релиза.
+  workflow_dispatch:
   release:
     types: [published]
 
@@ -86,16 +86,16 @@ jobs:
           [ "$status" -eq 137 ]
 
       - name: Архив
-        run: ditto -c -k --keepParent dist/JobBot.app JobBot-macos-arm64.zip
+        run: ditto -c -k --keepParent dist/JobBot.app JobBot-macos.zip
 
       - uses: actions/upload-artifact@v4
         with:
-          name: JobBot-macos-arm64
-          path: JobBot-macos-arm64.zip
+          name: JobBot-macos
+          path: JobBot-macos.zip
 
       - name: В релиз
         if: github.event_name == 'release'
         env:
           GH_TOKEN: ${{ github.token }}
         # Повторный прогон того же релиза заменяет файл, а не падает на нём.
-        run: gh release upload "${{ github.event.release.tag_name }}" JobBot-macos-arm64.zip --clobber
+        run: gh release upload "${{ github.event.release.tag_name }}" JobBot-macos.zip --clobber

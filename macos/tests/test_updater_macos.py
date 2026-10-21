@@ -13,7 +13,7 @@ from tests.fakes.github_release import download_url, serve_latest
 
 darwin = pytest.mark.skipif(sys.platform != "darwin", reason="только macOS")
 
-_MAC_FILE = "JobBot-macos-arm64.zip"
+_MAC_FILE = "JobBot-macos.zip"
 
 
 def _bundle(monkeypatch, root: Path) -> Path:

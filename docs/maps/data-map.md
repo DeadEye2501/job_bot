@@ -156,7 +156,7 @@
 
 - `LATEST` = `'https://api.github.com/repos/DeadEye2501/job_bo…`
 - `ASSET` = `'JobBot.exe'`
-- `ASSET` = `'JobBot-macos-arm64.zip'`
+- `ASSET` = `'JobBot-macos.zip'`
 - `_TIMEOUT_SEC` = `20.0`
 - `_USER_AGENT` = `'JobBot-updater'`
 - `class Release`
@@ -2402,7 +2402,7 @@
 ### `macos/tests/test_updater_macos.py`
 
 - `darwin` = `pytest.mark.skipif(sys.platform != 'darwin', rea…`
-- `_MAC_FILE` = `'JobBot-macos-arm64.zip'`
+- `_MAC_FILE` = `'JobBot-macos.zip'`
 
 ### `macos/tests/test_window_size_macos.py`
 
