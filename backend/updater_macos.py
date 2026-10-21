@@ -36,6 +36,11 @@ open "$2"
 """
 
 
+_swapper: subprocess.Popen | None = None
+"""Запущенный подменщик. Держится до выхода приложения: брошенный `Popen`
+предупреждает, что процесс ещё жив, а этот так и задуман — он ждёт нашего выхода."""
+
+
 def bundle() -> Path:
     """Запущенный `JobBot.app`: программа лежит в его `Contents/MacOS`."""
     return Path(sys.executable).parents[2]
@@ -53,10 +58,11 @@ def _unpacked() -> Path:
 
 def launch_updater(new: Path) -> None:
     """Распаковать скачанное рядом с бандлом и запустить подменщика."""
+    global _swapper
     subprocess.run(["ditto", "-x", "-k", str(new), str(_unpacked())], check=True)
     log = Path(tempfile.gettempdir()) / "JobBot-update.log"
     with log.open("a", encoding="utf-8") as out:
-        subprocess.Popen(
+        _swapper = subprocess.Popen(
             ["/bin/sh", "-c", _SWAP, "jobbot-update", str(os.getpid()), str(bundle()),
              str(_unpacked() / "JobBot.app"), str(_unpacked()), str(new)],
             stdout=out, stderr=out, start_new_session=True,
