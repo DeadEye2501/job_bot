@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 # при любом исходе, как у Windows-подменщика: человек ждёт приложения.
 _SWAP = """
 while kill -0 "$1" 2>/dev/null; do sleep 0.5; done
+rm -rf "$2.old"
 if mv "$2" "$2.old"; then
   if mv "$3" "$2"; then rm -rf "$2.old"; else mv "$2.old" "$2"; fi
 fi
@@ -57,9 +58,18 @@ def _unpacked() -> Path:
 
 
 def launch_updater(new: Path) -> None:
-    """Распаковать скачанное рядом с бандлом и запустить подменщика."""
+    """Распаковать скачанное рядом с бандлом и запустить подменщика.
+
+    Сбой распаковки уходит наверх как `OSError`: файл скачан и сверен, не
+    вышла только передача, и зовущий говорит человеку именно это.
+    """
     global _swapper
-    subprocess.run(["ditto", "-x", "-k", str(new), str(_unpacked())], check=True)
+    # Распаковка поверх прежней оставила бы в бандле файлы старой версии.
+    shutil.rmtree(_unpacked(), onexc=_report)
+    try:
+        subprocess.run(["ditto", "-x", "-k", str(new), str(_unpacked())], check=True)
+    except subprocess.CalledProcessError as error:
+        raise OSError(f"обновление не распаковалось: {new}") from error
     log = Path(tempfile.gettempdir()) / "JobBot-update.log"
     with log.open("a", encoding="utf-8") as out:
         _swapper = subprocess.Popen(
@@ -77,6 +87,6 @@ def clear_leftovers() -> None:
         shutil.rmtree(folder, onexc=_report)
 
 
-def _report(_function, path, _error) -> None:
+def _report(_function, path, error) -> None:
     if os.path.exists(path):
-        logger.warning("не удалось убрать остаток обновления %s", path, exc_info=True)
+        logger.warning("не удалось убрать остаток обновления %s", path, exc_info=error)
