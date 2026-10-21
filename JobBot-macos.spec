@@ -5,8 +5,8 @@
 #     bash macos/make_icns.sh
 #     PIPENV_PIPFILE=macos/Pipfile pipenv run python -m PyInstaller JobBot-macos.spec --clean --noconfirm
 #
-# От `JobBot.spec` отличается тремя местами, остальное повторяет его: общий
-# источник у двух spec потребовал бы правки Windows-сборки.
+# Списки повторяют `JobBot.spec`: общий источник у двух spec потребовал бы
+# правки Windows-сборки. Отличия:
 #   - onedir + BUNDLE вместо onefile: onefile с окном PyInstaller на маке не
 #     поддерживает, а `.app` — это и есть папка.
 #   - keyring-бэкенд мака вместо Windows.
@@ -19,8 +19,8 @@ import sys
 
 from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs, collect_submodules
 
-# Номер версии бандла берётся у приложения, а путь к его модулям ставится
-# строкой выше: spec исполняется не из корня репозитория.
+# Номер версии бандла берётся у приложения. Корня репозитория в путях
+# сборщика может не быть, поэтому он ставится строкой ниже.
 sys.path.insert(0, os.path.abspath(SPECPATH))
 from backend.app_version import VERSION
 
