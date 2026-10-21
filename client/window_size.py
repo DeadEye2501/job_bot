@@ -8,6 +8,8 @@
 
 from __future__ import annotations
 
+import importlib
+import sys
 
 WIZARD = (640, 620)
 """Окно мастера.
@@ -59,6 +61,10 @@ def _unlock_frame(form) -> None:
     Множитель `_scale` — доля экрана: размеры формы система считает в точках
     самого экрана, а наши названы в тех, в которых нарисована разметка.
     """
+    # Мак-двойник грузится строкой, чтобы не попасть в Windows-сборку.
+    if sys.platform == "darwin":
+        importlib.import_module("client.window_size_macos").unlock_frame(form)
+        return
     from webview.platforms.winforms import Func, Size, Type, WinForms
 
     def apply() -> None:
