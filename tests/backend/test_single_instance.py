@@ -18,6 +18,7 @@ import time
 from pathlib import Path
 
 from backend.single_instance import hold_the_only_copy
+from tests.paths import ROOT
 
 
 def _lock_once_it_is_free(lock_path: Path, seconds: float = 5.0):
@@ -133,7 +134,7 @@ def test_a_killed_copy_does_not_keep_the_lock(tmp_path: Path):
             " held = hold_the_only_copy(sys.argv[2]);"
             " print('taken' if held else 'refused', flush=True);"
             " time.sleep(30)",
-            str(Path(__file__).resolve().parents[2]),
+            str(ROOT),
             str(lock),
         ],
         stdout=subprocess.PIPE,

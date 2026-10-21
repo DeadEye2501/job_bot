@@ -2385,7 +2385,6 @@
 ### `macos/tests/test_mac_start.py`
 
 - `pytestmark` = `pytest.mark.skipif(sys.platform != 'darwin', rea…`
-- `_ROOT` = `Path(__file__).resolve().parents[2]`
 
 ### `macos/tests/test_process_macos.py`
 
@@ -2399,7 +2398,6 @@
 ### `macos/tests/test_tie_watch_macos.py`
 
 - `pytestmark` = `pytest.mark.skipif(sys.platform != 'darwin', rea…`
-- `_ROOT` = `Path(__file__).resolve().parents[2]`
 
 ### `macos/tests/test_updater_macos.py`
 
@@ -2415,7 +2413,6 @@
 ### `tests/adapters/test_app_tied_process.py`
 
 - `pytestmark` = `pytest.mark.skipif(sys.platform != 'win32', reas…`
-- `ROOT` = `Path(__file__).resolve().parents[2]`
 - `_APP` = `'\nimport os, subprocess, sys\nfrom adapters imp…`
 - `_PARENT` = `'\nimport subprocess, sys, time\ngrandchild = su…`
 
@@ -2527,10 +2524,6 @@
 - `TERMINAL` = `набор из 4`
 - `LIVE` = `[status for status in VacancyStatus if status no…`
 
-### `tests/backend/test_entry_point_log.py`
-
-- `ROOT` = `Path(__file__).resolve().parents[2]`
-
 ### `tests/backend/test_flows_aggregator_name.py`
 
 - `CHAT_MODEL` = `LlmProviderConfig(base_url='http://provider.test…`
@@ -2633,7 +2626,7 @@
 
 ### `tests/client/test_bot_contract.py`
 
-- `BRIDGE` = `Path(__file__).resolve().parents[2] / 'client' /…`
+- `BRIDGE` = `ROOT / 'client' / 'bridge'`
 
 ### `tests/client/test_bridge_login.py`
 
@@ -2654,7 +2647,7 @@
 
 ### `tests/client/test_front_vocabulary.py`
 
-- `STATE` = `Path(__file__).resolve().parents[2] / 'client' /…`
+- `STATE` = `ROOT / 'client' / 'web' / 'state'`
 
 ### `tests/client/test_messages_without_dot.py`
 
@@ -2663,7 +2656,7 @@
 
 ### `tests/client/test_page_contract.py`
 
-- `WEB` = `Path(__file__).resolve().parents[2] / 'client' /…`
+- `WEB` = `ROOT / 'client' / 'web'`
 - `CALLING` = `re.compile('\\b(?:call|ask)\\(\\s*[\'"]([a-z_]+)…`
 - `HANDED_OVER` = `re.compile('\\bmethod:\\s*[\'"]([a-z_]+)\\.([a-z…`
 - `SOURCES` = `набор из 2`
@@ -2762,3 +2755,7 @@
 - `ANSWERS` = `словарь из 18`
 - `class UiBot`
   - `is_running_round` = `False`
+
+### `tests/paths.py`
+
+- `ROOT` = `Path(__file__).resolve().parents[1]`

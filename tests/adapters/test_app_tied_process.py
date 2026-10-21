@@ -11,15 +11,13 @@
 import os
 import subprocess
 import sys
-from pathlib import Path
 
 import pytest
 
 from adapters import app_tied_process
+from tests.paths import ROOT
 
 pytestmark = pytest.mark.skipif(sys.platform != "win32", reason="задания есть только в Windows")
-
-ROOT = Path(__file__).resolve().parents[2]
 
 _APP = """
 import os, subprocess, sys

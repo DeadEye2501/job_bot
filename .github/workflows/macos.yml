@@ -38,7 +38,12 @@ jobs:
       - name: Тесты двойников
         # Красная фаза видна целиком: тест, чей модуль ещё не написан, не
         # заслоняет остальные.
-        run: pipenv run python -m pytest macos/tests -q -p no:cacheprovider --continue-on-collection-errors
+        # Замок единственной копии сторожит общий тест, а не мак-копия его: он
+        # зависит только от `tmp_path` и идёт без общего стенда `tests/`, чей
+        # сторож каталога данных на маке падает.
+        run: |
+          pipenv run python -m pytest macos/tests -q -p no:cacheprovider --continue-on-collection-errors
+          pipenv run python -m pytest "tests/backend/test_single_instance.py::test_a_second_copy_is_refused" -q -p no:cacheprovider --noconftest
 
       - uses: actions/setup-node@v4
         with:
