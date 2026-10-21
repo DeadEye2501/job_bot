@@ -365,16 +365,16 @@ Claude через установленный Claude Code по подписке: 
 - `def _article_text(html: str) -> str | None` (28)
 - `async def fetch_article(client: httpx.AsyncClient, url: str) -> str | None` (24)
 
-### `adapters/tie_watch_macos.py` — 62 строк
+### `adapters/tie_watch_macos.py` — 67 строк
 
 Сторож привязанных процессов на маке: гасит их, когда приложение кончилось.
 
 Зависит от: `adapters.process_table_macos`
 
 - `def self_command() -> list[str]` (5)
-- `def watch(lines: Iterable[str]) -> None` (10)
+- `def watch(lines: Iterable[str]) -> None` (13)
 - `def _started_of(table: list[tuple[int, int, str]]) -> dict[int, str]` (2)
-- `def _doomed(tied: dict[int, str | None], table: list[tuple[int, int, str]]) -> list[int]` (10)
+- `def _doomed(tied: dict[int, str], table: list[tuple[int, int, str]]) -> list[int]` (10)
 
 ### `adapters/web_page.py` — 17 строк
 
@@ -3150,7 +3150,7 @@ Runtime settings layer.
   - `async def mark_wizard_completed(self) -> None` (3)
 - `def _from_llm_row(row: LlmConfig) -> LlmProviderConfig | None` (13)
 
-### `backend/single_instance.py` — 132 строк
+### `backend/single_instance.py` — 130 строк
 
 Замок, которым запущенная копия приложения не пускает вторую.
 
@@ -4104,13 +4104,13 @@ Runtime settings layer.
 Тестов: 1
 
 
-### `macos/tests/test_mac_start.py` — 44 строк
+### `macos/tests/test_mac_start.py` — 56 строк
 
 
 
-Зависит от: `adapters.app_tied_process`, `adapters.process_windows`, `backend.single_instance`
+Зависит от: `adapters`, `adapters.browser`, `backend.single_instance`
 
-Тестов: 3
+Тестов: 4
 
 
 ### `macos/tests/test_process_macos.py` — 43 строк
@@ -4133,7 +4133,7 @@ Runtime settings layer.
 Тестов: 1
 
 
-### `macos/tests/test_tie_watch_macos.py` — 103 строк
+### `macos/tests/test_tie_watch_macos.py` — 108 строк
 
 
 
