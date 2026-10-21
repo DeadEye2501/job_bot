@@ -1,0 +1,35 @@
+name: macOS
+
+on:
+  push:
+    branches: [macos-build]
+
+jobs:
+  build:
+    runs-on: macos-14
+    env:
+      PIPENV_PIPFILE: macos/Pipfile
+      CMAKE_ARGS: -DGGML_METAL=on
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          architecture: arm64
+
+      - name: Зависимости
+        run: |
+          pip install pipenv
+          [ -f macos/Pipfile.lock ] || pipenv lock
+          pipenv install --dev --deploy
+
+      # Замок мака собирается здесь, а не на Windows: так он попадает в руки
+      # и коммитится, а версии pyobjc закрепляются по нему.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Pipfile.lock
+          path: macos/Pipfile.lock
+
+      - name: Тесты двойников
+        run: pipenv run python -m pytest macos/tests -q -p no:cacheprovider
