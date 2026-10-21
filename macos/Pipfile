@@ -30,8 +30,8 @@ llama-cpp-python = "==0.3.19"
 playwright = "==1.63.0"
 mcp = "==1.30.0"
 uvicorn = "==0.54.0"
-pyobjc-framework-Quartz = "*"
-pyobjc-framework-Cocoa = "*"
+pyobjc-framework-Quartz = "==12.2.2"
+pyobjc-framework-Cocoa = "==12.2.2"
 
 [dev-packages]
 pytest = "*"
