@@ -137,6 +137,23 @@ pipenv run python -m PyInstaller JobBot.spec --clean --noconfirm
 
 После сборки готовый файл лежит в `dist/JobBot.exe`. Холодный старт — несколько секунд: онешот распаковывает себя во временный `_MEIPASS`-каталог. БД и логи живут в `%APPDATA%\JobBot`, рядом с .exe постоянно ничего не хранится — распространять можно как один файл. Временно рядом появляется только `JobBot.exe.new` — скачанное обновление до подмены.
 
+### Сборка `.app` (macOS)
+
+Мак-сборка живёт рядом с Windows-сборкой и её не трогает: свой `JobBot-macos.spec` и свои зависимости в `macos/Pipfile` (llama-cpp-python там собирается из исходников с Metal, добавлены Quartz и Cocoa из pyobjc). Там, где Windows-код завязан на WinAPI, на маке работает двойник рядом с ним (`*_macos.py`); выбирает его ветка `sys.platform == "darwin"`, а грузится он по имени строкой, чтобы в Windows-exe не попадал. Поддерживаются только Apple Silicon (arm64).
+
+Собирается на GitHub Actions (`.github/workflows/macos.yml`, раннер `macos-14`): тесты двойников из `macos/tests`, фронт, бандл, проверка запуска собранного, архив `JobBot-macos-arm64.zip` артефактом. Локально, на маке:
+
+```bash
+cd client/web && npm run build && cd ../..
+export PIPENV_PIPFILE=macos/Pipfile CMAKE_ARGS="-DGGML_METAL=on"
+pipenv install --dev
+pipenv run python -m pytest macos/tests -q
+bash macos/make_icns.sh
+pipenv run python -m PyInstaller JobBot-macos.spec --clean --noconfirm
+```
+
+Готовое — `dist/JobBot.app`. Подписи Apple у него нет, поэтому скачанное macOS при первом запуске не пускает: открыть правым кликом → «Открыть» (на новых macOS — «Системные настройки → Конфиденциальность и безопасность → Всё равно открыть») или снять карантин `xattr -cr JobBot.app`.
+
 ### Обновление
 
 Собранный exe при запуске спрашивает последний релиз репозитория `DeadEye2501/job_bot` на GitHub (`backend/update_download.py`, `adapters/github_release.py`). Релиз без файла `JobBot.exe` или без его контрольной суммы обновлением не считается. Значок круглых стрелок в нижней полосе серый — проверить вручную, акцентный — найдена версия новее. По нажатию акцентного:
@@ -149,6 +166,8 @@ pipenv run python -m PyInstaller JobBot.spec --clean --noconfirm
 
 Пока идёт прогон, значок заперт. При запуске из исходников (`python main.py`) проверить можно, а обновиться — нет: подменять нечего. Номер версии — в боковом меню.
 
+На маке самообновления нет: проверить новую версию можно, а ставится она скачиванием `JobBot-macos-arm64.zip` из релиза.
+
 ### Выпуск версии
 
 1. Поднять номер в `backend/app_version.py` (`VERSION`).
@@ -160,6 +179,8 @@ pipenv run python -m PyInstaller JobBot.spec --clean --noconfirm
    ```
 
 GitHub CLI ставится `winget install GitHub.cli`, вход — `gh auth login`.
+
+Мак-сборку к релизу добавлять руками не нужно: опубликованный релиз запускает `macos.yml`, и тот кладёт `JobBot-macos-arm64.zip` в файлы того же релиза.
 
 Что вшито в бандл (см. `JobBot.spec`): собранный фронт `client/web/dist`, `alembic.ini` + `alembic/env.py` + `alembic/script.py.mako` + init-миграция, `client/icon.ico`, драйвер Playwright (`collect_data_files('playwright')`), библиотеки движка `llama_cpp` (`collect_dynamic_libs`). Hidden imports: `aiosqlite`, `keyring.backends.Windows`, `keyring.backends.fail`, `logging.config`, `logging.handlers`, `llama_cpp`, `playwright.async_api` и подмодули `anthropic`, `mcp` (без `mcp.cli`) и `uvicorn`.
 
@@ -275,6 +296,8 @@ pyproject.toml        # настройки pytest и ruff
 - Node.js — только для сборки фронта (Svelte, Vite, тесты на vitest)
 - Claude Code — для поставщика «Claude Code» и для агента, ставится отдельно
 - Браузер на Chromium (Chrome, Opera, Brave, Vivaldi, Яндекс.Браузер или Edge) — для агента
+
+На маке список тот же, но свой — `macos/Pipfile`: llama-cpp-python ставится из исходников с Metal (нужны Xcode Command Line Tools), `pywebview` рисует системным WebKit, сверху `pyobjc-framework-Quartz` и `pyobjc-framework-Cocoa`, PyInstaller — в dev-зависимостях.
 
 Версии боевых пакетов закреплены точно (см. `Pipfile`): их обновление — отдельный осознанный шаг, а не побочный эффект установки dev-зависимости. Dev-зависимости: `pytest`, `pytest-asyncio`, `ruff`.
 
