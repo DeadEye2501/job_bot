@@ -39,7 +39,9 @@ def watch(lines: Iterable[str]) -> None:
     tied = {}
     for line in lines:
         pid = int(line)
-        tied[pid] = _started_of(process_table(_STARTED)).get(pid)
+        started = _started_of(process_table(_STARTED))
+        if pid in started:
+            tied[pid] = started[pid]
     for pid in _doomed(tied, process_table(_STARTED)):
         # Вышедший сам — уже то, чего сторож добивается.
         with contextlib.suppress(ProcessLookupError):
@@ -50,13 +52,13 @@ def _started_of(table: list[tuple[int, int, str]]) -> dict[int, str]:
     return {pid: started for pid, _parent, started in table}
 
 
-def _doomed(tied: dict[int, str | None], table: list[tuple[int, int, str]]) -> list[int]:
+def _doomed(tied: dict[int, str], table: list[tuple[int, int, str]]) -> list[int]:
     """Привязанные, всё ещё те же самые, и все их потомки."""
     started = _started_of(table)
     children: dict[int, list[int]] = {}
     for pid, parent, _started in table:
         children.setdefault(parent, []).append(pid)
-    doomed = [pid for pid, then in tied.items() if then is not None and started.get(pid) == then]
+    doomed = [pid for pid, then in tied.items() if started.get(pid) == then]
     for pid in doomed:
         doomed.extend(child for child in children.get(pid, []) if child not in doomed)
     return doomed

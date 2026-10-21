@@ -52,18 +52,23 @@ def test_reused_pid_is_spared(monkeypatch):
     assert killed == []
 
 
-def test_gone_process_is_not_an_error(monkeypatch):
+def test_gone_process_does_not_stop_the_rest(monkeypatch):
     from adapters import tie_watch_macos
 
-    table = [(11, 1, "t11")]
+    table = [(11, 1, "t11"), (12, 1, "t12")]
     monkeypatch.setattr(tie_watch_macos, "process_table", lambda _column: table)
+    killed = []
 
-    def kill(_pid, _sig):
-        raise ProcessLookupError
+    def kill(pid, _sig):
+        if pid == 11:
+            raise ProcessLookupError
+        killed.append(pid)
 
     monkeypatch.setattr(os, "kill", kill)
 
-    tie_watch_macos.watch(["11\n"])
+    tie_watch_macos.watch(["11\n", "12\n"])
+
+    assert killed == [12]
 
 
 def _alive(pid: int) -> bool:

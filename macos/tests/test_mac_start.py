@@ -11,16 +11,16 @@ _ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_package_names_lead_to_twins(monkeypatch):
+    import adapters.browser
+    from adapters import claude_code_process
+
     calls = []
-    monkeypatch.setattr("adapters.app_tied_process.tie_children_named", calls.append)
+    monkeypatch.setattr("adapters.app_tied_process.tie_to_app", calls.append)
 
-    from adapters.app_tied_process import tie_children_named
-    from adapters.process_windows import has_window
+    claude_code_process.app_tied_process.tie_to_app(5)
 
-    tie_children_named("node.exe")
-
-    assert calls == ["node.exe"]
-    assert has_window(os.getpid()) is False
+    assert calls == [5]
+    assert adapters.browser.has_window(os.getpid()) is False
 
 
 def test_tie_watch_flag_skips_app(tmp_path):
