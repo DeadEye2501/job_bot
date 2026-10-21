@@ -178,6 +178,13 @@ pipenv run python -m PyInstaller JobBot-macos.spec --clean --noconfirm
    gh release create v1.2.0 dist/JobBot.exe --title "1.2.0"
    ```
 
+4. Дождаться мак-сборки этого релиза и положить её в корень рядом с exe, с перезаписью:
+
+   ```powershell
+   gh run watch $(gh run list --workflow macos.yml --event release -L 1 --json databaseId -q '.[0].databaseId')
+   gh release download v1.2.0 -p JobBot-macos.zip --clobber
+   ```
+
 GitHub CLI ставится `winget install GitHub.cli`, вход — `gh auth login`.
 
 Мак-сборку к релизу добавлять руками не нужно: опубликованный релиз запускает `macos.yml`, и тот кладёт `JobBot-macos.zip` в файлы того же релиза.
