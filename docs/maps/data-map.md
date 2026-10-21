@@ -2349,6 +2349,11 @@
 - `logger` = `logging.getLogger(__name__)`
 - `_AS_TROUBLE` = `16`
 
+### `client/trouble_macos.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `_ALERT` = `набор из 6`
+
 ### `client/window.py`
 
 - `logger` = `logging.getLogger(__name__)`

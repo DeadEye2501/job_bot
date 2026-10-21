@@ -3284,7 +3284,7 @@ Runtime settings layer.
 - `def _remove_the_data() -> list[str]` (27)
 - `async def wipe_all(engine) -> list[str]` (28)
 
-## client — 54 модулей
+## client — 55 модулей
 
 ### `client/bridge/__init__.py` — 23 строк
 
@@ -3353,14 +3353,14 @@ Runtime settings layer.
 
 - `class Api` (15)
 
-### `client/bridge/app_update.py` — 72 строк
+### `client/bridge/app_update.py` — 74 строк
 
 Обновление приложения из релизов GitHub: какая версия запущена и есть ли новее.
 
 Зависит от: `backend.app_version`, `backend.update_download`, `client.bridge.answer`, `client.bridge.refusals`
 
-- `class AppUpdate` (49)
-  - `def version(self) -> dict` (7)
+- `class AppUpdate` (51)
+  - `def version(self) -> dict` (9)
   - `def check_update(self) -> dict` (19)
     - `async def run() -> dict` (9)
   - `def update(self) -> dict` (10)
@@ -4079,9 +4079,17 @@ Runtime settings layer.
 - `def _or_index(path: str) -> str` (10)
 - `def _content_type(target: Path) -> str` (17)
 
-### `client/trouble_box.py` — 37 строк
+### `client/trouble_box.py` — 43 строк
 
 Сказать человеку о беде, когда своего окна ещё нет.
+
+Зависит от: —
+
+- `def show_trouble(text: str) -> None` (15)
+
+### `client/trouble_macos.py` — 30 строк
+
+Окно о беде на маке — двойник `trouble_box.show_trouble`.
 
 Зависит от: —
 
@@ -4124,7 +4132,7 @@ Runtime settings layer.
 - `def unlock_frame(window) -> None` (10)
   - `def apply() -> None` (3)
 
-## macos — 11 модулей
+## macos — 13 модулей
 
 ### `macos/tests/conftest.py` — 15 строк
 
@@ -4147,6 +4155,15 @@ Runtime settings layer.
 
 
 Зависит от: `adapters`
+
+Тестов: 1
+
+
+### `macos/tests/test_app_update_macos.py` — 10 строк
+
+
+
+Зависит от: `client.bridge.app_update`
 
 Тестов: 1
 
@@ -4219,6 +4236,15 @@ Runtime settings layer.
 - `def _watched(monkeypatch, tables: list[list[tuple[int, int, str]]]) -> list[int]` (14)
   - `def kill(pid, sig)` (3)
 - `def _alive(pid: int) -> bool` (6)
+
+### `macos/tests/test_trouble_macos.py` — 36 строк
+
+
+
+Зависит от: `client`, `client.trouble_box`, `macos.tests.fake_run`
+
+Тестов: 3
+
 
 ### `macos/tests/test_window_size_macos.py` — 42 строк
 

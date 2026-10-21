@@ -12,8 +12,11 @@ def test_trouble_text_goes_as_argument(monkeypatch):
 
     trouble_macos.show_trouble(text)
 
-    assert calls[0][0] == "osascript"
-    assert calls[0][-1] == text
+    *script, last = calls[0]
+    assert script[0] == "osascript"
+    assert last == text
+    assert not any('"ключа"' in part for part in script)
+    assert any("item 1 of argv" in part for part in script)
 
 
 def test_failed_alert_does_not_raise(monkeypatch):
