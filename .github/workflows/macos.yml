@@ -68,6 +68,18 @@ jobs:
           grep -q "окно открывается" "$log"
           ! grep -q Traceback "$log"
 
+      # Тесты гоняют сторожа из исходников, а в бандле он запускается иначе —
+      # той же программой с флагом. Ошибку в нём не увидел бы никто: журнала
+      # сторож не пишет.
+      - name: Сторож в бандле
+        run: |
+          sleep 60 &
+          victim=$!
+          echo "$victim" | dist/JobBot.app/Contents/MacOS/JobBot --tie-watch
+          status=0
+          wait "$victim" || status=$?
+          [ "$status" -eq 137 ]
+
       - name: Архив
         run: ditto -c -k --keepParent dist/JobBot.app JobBot-macos-arm64.zip
 
