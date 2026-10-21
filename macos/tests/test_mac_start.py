@@ -36,6 +36,18 @@ def test_tie_watch_flag_skips_app(tmp_path):
     assert not [p for p in data_dir.rglob("*") if p.is_file()]
 
 
+def test_watcher_failure_stays_out_of_the_log(tmp_path):
+    env = {**os.environ, "HOME": str(tmp_path)}
+
+    subprocess.run(
+        [sys.executable, str(_ROOT / "main.py"), "--tie-watch"],
+        cwd=_ROOT, env=env, input=b"not-a-pid\n", capture_output=True, timeout=20,
+    )
+
+    data_dir = tmp_path / "Library" / "Application Support"
+    assert not [p for p in data_dir.rglob("*") if p.is_file()]
+
+
 def test_second_copy_is_refused(tmp_path):
     from backend.single_instance import hold_the_only_copy
 
