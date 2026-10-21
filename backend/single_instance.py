@@ -35,8 +35,13 @@ def release_the_lock() -> None:
     _held = None
 
 
-_BUSY = frozenset({errno.EACCES, errno.EAGAIN, errno.EWOULDBLOCK, errno.EDEADLOCK})
-"""Номера бед, означающие «замок держит кто-то другой», а не осечку сторожа."""
+_BUSY = frozenset(
+    {errno.EACCES, errno.EAGAIN, errno.EWOULDBLOCK, getattr(errno, "EDEADLOCK", errno.EDEADLK)}
+)
+"""Номера бед, означающие «замок держит кто-то другой», а не осечку сторожа.
+
+`EDEADLOCK` есть не везде: на маке у того же номера только имя `EDEADLK`.
+"""
 
 
 def _take_the_lock(fd: int) -> bool | None:
