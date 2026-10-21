@@ -15,7 +15,9 @@
 """
 
 import ctypes
+import importlib
 import logging
+import sys
 
 
 logger = logging.getLogger(__name__)
@@ -31,6 +33,10 @@ def show_trouble(text: str) -> None:
     на ней значит не сказать ему вовсе ничего — а зовущий в этот миг уже
     выходит и перехватить нас не может.
     """
+    # Мак-двойник грузится строкой, чтобы не попасть в Windows-сборку.
+    if sys.platform == "darwin":
+        importlib.import_module("client.trouble_macos").show_trouble(text)
+        return
     try:
         ctypes.windll.user32.MessageBoxW(None, text, "Job Bot", _AS_TROUBLE)
     except Exception:
