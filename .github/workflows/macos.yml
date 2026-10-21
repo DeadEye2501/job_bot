@@ -3,10 +3,14 @@ name: macOS
 on:
   push:
     branches: [macos-build]
+  release:
+    types: [published]
 
 jobs:
   build:
     runs-on: macos-14
+    permissions:
+      contents: write
     env:
       PIPENV_PIPFILE: macos/Pipfile
       CMAKE_ARGS: -DGGML_METAL=on
@@ -35,3 +39,42 @@ jobs:
         # Красная фаза видна целиком: тест, чей модуль ещё не написан, не
         # заслоняет остальные.
         run: pipenv run python -m pytest macos/tests -q -p no:cacheprovider --continue-on-collection-errors
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Фронт
+        run: cd client/web && npm ci && npm run build
+
+      - name: Сборка JobBot.app
+        run: |
+          bash macos/make_icns.sh
+          pipenv run python -m PyInstaller JobBot-macos.spec --clean --noconfirm
+
+      # Ловит то, чего тесты двойников не видят: пропущенный hiddenimport,
+      # бэкенд ключницы, падение Cocoa на старте собранного бандла.
+      - name: Проверка запуска
+        run: |
+          log="$HOME/Library/Application Support/JobBot/jobbot.log"
+          dist/JobBot.app/Contents/MacOS/JobBot &
+          app=$!
+          sleep 30
+          cat "$log" || true
+          kill -0 "$app"
+          kill "$app"
+          ! grep -q Traceback "$log"
+
+      - name: Архив
+        run: ditto -c -k --keepParent dist/JobBot.app JobBot-macos-arm64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: JobBot-macos-arm64
+          path: JobBot-macos-arm64.zip
+
+      - name: В релиз
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" JobBot-macos-arm64.zip
