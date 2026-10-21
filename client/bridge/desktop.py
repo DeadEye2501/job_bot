@@ -15,9 +15,11 @@
 
 from __future__ import annotations
 
+import importlib
 import logging
 import os
 import subprocess
+import sys
 
 import webview
 
@@ -74,12 +76,14 @@ def _show_in_folder(target) -> bool:
     вправе. Проводник показывает его выделенным — дальше решает человек.
 
     `startfile` так не умеет: он именно **запускает** названное, а нам нужен
-    отбор в чужом окне. Отсюда единственный в мосте запуск чужой программы, и
-    имя её здесь литералом.
+    отбор в чужом окне. Отсюда запуск чужой программы, и имя её здесь
+    литералом. На маке дорога своя — `desktop_macos`.
 
     Код возврата не смотрим: проводник отвечает единицей и на удаче. Признак
     здесь один — зов состоялся, то есть программа нашлась и запустилась.
     """
+    if sys.platform == "darwin":
+        return importlib.import_module("client.bridge.desktop_macos").show_in_folder(target)
     try:
         subprocess.Popen(["explorer", f"/select,{target}"])
     except OSError:
@@ -101,16 +105,19 @@ def open_in_system(target: str) -> bool:
     """Отдать путь или ссылку тому, чем система их открывает, и сказать, дошло ли.
 
     Без Qt: переехавшим доменам он недоступен, а дело у этой просьбы то же
-    самое. `startfile` есть только на Windows — под неё приложение и
-    собирается; на чужой системе его нет вовсе, и это тот же исход «не
-    смогли», потому `AttributeError` ловится рядом с `OSError`. **Этой ветки не
-    исполняет ни один сторож** и не может: прогон идёт на Windows, где
-    `startfile` есть, а подменять его отсутствие значило бы сторожить
-    подмену, а не систему.
+    самое. `startfile` есть только на Windows; на маке просьба уходит
+    двойнику `desktop_macos`, а на прочих системах `startfile` нет вовсе, и
+    это тот же исход «не смогли», потому `AttributeError` ловится рядом с
+    `OSError`. **Этой ветки не исполняет ни один сторож** и не может: прогон
+    идёт на Windows, где `startfile` есть, а подменять его отсутствие значило
+    бы сторожить подмену, а не систему.
 
     Ответ нужен зовущему: «открыли» и «не смогли» человек различает только по
     нашему слову — окна-то он не увидит.
     """
+    # Мак-двойник грузится строкой, чтобы не попасть в Windows-сборку.
+    if sys.platform == "darwin":
+        return importlib.import_module("client.bridge.desktop_macos").open_in_system(target)
     try:
         os.startfile(target)
     except (AttributeError, OSError):
