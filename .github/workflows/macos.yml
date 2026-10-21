@@ -53,16 +53,19 @@ jobs:
           pipenv run python -m PyInstaller JobBot-macos.spec --clean --noconfirm
 
       # Ловит то, чего тесты двойников не видят: пропущенный hiddenimport,
-      # бэкенд ключницы, падение Cocoa на старте собранного бандла.
+      # бэкенд ключницы, падение Cocoa на старте собранного бандла. Домашний
+      # каталог настоящий: ключница мака живёт в нём, и с подменённым
+      # бэкенд не нашёл бы её.
       - name: Проверка запуска
         run: |
           log="$HOME/Library/Application Support/JobBot/jobbot.log"
           dist/JobBot.app/Contents/MacOS/JobBot &
           app=$!
           sleep 30
-          cat "$log" || true
+          cat "$log"
           kill -0 "$app"
           kill "$app"
+          grep -q "окно открывается" "$log"
           ! grep -q Traceback "$log"
 
       - name: Архив
@@ -77,4 +80,5 @@ jobs:
         if: github.event_name == 'release'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.event.release.tag_name }}" JobBot-macos-arm64.zip
+        # Повторный прогон того же релиза заменяет файл, а не падает на нём.
+        run: gh release upload "${{ github.event.release.tag_name }}" JobBot-macos-arm64.zip --clobber
