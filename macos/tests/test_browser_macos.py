@@ -5,6 +5,7 @@ import pytest
 
 from adapters import browser_macos
 from adapters.browser import BRAVE, CHROME, InstalledBrowser
+from tests.files import empty_file as _install
 
 
 def _bases(monkeypatch, tmp_path) -> tuple[Path, Path]:
@@ -13,13 +14,6 @@ def _bases(monkeypatch, tmp_path) -> tuple[Path, Path]:
     monkeypatch.setattr(browser_macos, "_SYSTEM_APPS", system)
     monkeypatch.setattr(Path, "home", lambda: home)
     return system, home / "Applications"
-
-
-def _install(base: Path, inside: str) -> Path:
-    path = base / inside
-    path.parent.mkdir(parents=True)
-    path.touch()
-    return path
 
 
 def test_first_installed_wins(monkeypatch, tmp_path):

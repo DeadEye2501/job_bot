@@ -21,7 +21,7 @@ Bootstrap config.
 - `def data_dirs() -> list[Path]` (18)
 - `def get_log_path() -> Path` (7)
 
-### `main.py` — 203 строк
+### `main.py` — 216 строк
 
 Job Bot — single CLI entry point.
 
@@ -32,9 +32,10 @@ Job Bot — single CLI entry point.
 - `def _log_uncaught(exc_type, exc, tb) -> None` (13)
 - `def _log_uncaught_in_thread(args) -> None` (10)
 - `def _started_or_told_why() -> int` (36)
-- `def main() -> int` (39)
+- `def _served_mac_watcher() -> bool` (14)
+- `def main() -> int` (36)
 
-## adapters — 26 модулей
+## adapters — 28 модулей
 
 ### `adapters/__init__.py` — 20 строк
 
@@ -83,7 +84,7 @@ MCP-сервер инструментов одной сессии агента: 
 - `def _children() -> list[tuple[int, str]]` (13)
 - `def _snapshot() -> list[tuple[int, int, str]]` (16)
 
-### `adapters/browser.py` — 352 строк ⚠ подошёл к 300
+### `adapters/browser.py` — 357 строк ⚠ подошёл к 300
 
 Браузер на профилях агрегаторов: агент водит его через Playwright, человек
 
@@ -91,7 +92,7 @@ MCP-сервер инструментов одной сессии агента: 
 
 - `class BrowserClosed(RuntimeError)` (3)
 - `class InstalledBrowser` (4)
-- `def find_browser() -> InstalledBrowser | None` (18)
+- `def find_browser() -> InstalledBrowser | None` (21)
 - `def _candidates(relative: str) -> list[Path]` (2)
 - `def _first(relative: str) -> Path | None` (2)
 - `def _installed(name: str, relative: str, channel: str | None=None) -> InstalledBrowser | None` (3)
@@ -115,6 +116,14 @@ MCP-сервер инструментов одной сессии агента: 
 - `async def hold_sending(route) -> None` (13)
 - `def _is_captcha(url: str) -> bool` (8)
 - `def _accept_dialogs(page) -> None` (4)
+
+### `adapters/browser_macos.py` — 36 строк
+
+Поиск установленного браузера на маке — двойник `browser.find_browser`.
+
+Зависит от: `adapters.browser`
+
+- `def find_browser() -> InstalledBrowser | None` (13)
 
 ### `adapters/claude.py` — 145 строк
 
@@ -239,6 +248,16 @@ Claude через установленный Claude Code по подписке: 
 - `def make_client() -> httpx.AsyncClient` (2)
 - `async def latest_release() -> Release | None` (25)
 - `async def download(url: str, write: Callable[[bytes], None]) -> None` (11)
+
+### `adapters/install_places_macos.py` — 28 строк
+
+Где на маке лежат программы, которые приложение зовёт по имени.
+
+Зависит от: —
+
+- `def _places() -> list[Path]` (4)
+- `def with_install_places(path: str) -> str` (5)
+- `def widen_path() -> None` (3)
 
 ### `adapters/lm_chat.py` — 239 строк
 
@@ -4086,7 +4105,7 @@ Runtime settings layer.
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
 
-## macos — 6 модулей
+## macos — 8 модулей
 
 ### `macos/tests/conftest.py` — 15 строк
 
@@ -4102,6 +4121,25 @@ Runtime settings layer.
 Зависит от: `adapters`
 
 Тестов: 1
+
+
+### `macos/tests/test_browser_macos.py` — 54 строк
+
+
+
+Зависит от: `adapters`, `adapters.browser`, `tests.files`
+
+Тестов: 5
+
+- `def _bases(monkeypatch, tmp_path) -> tuple[Path, Path]` (6)
+
+### `macos/tests/test_install_places_macos.py` — 45 строк
+
+
+
+Зависит от: `adapters`
+
+Тестов: 3
 
 
 ### `macos/tests/test_mac_start.py` — 56 строк
@@ -4145,7 +4183,7 @@ Runtime settings layer.
   - `def kill(pid, sig)` (3)
 - `def _alive(pid: int) -> bool` (6)
 
-## tests — 352 модулей
+## tests — 353 модулей
 
 ### `tests/adapters/test_agent_mcp.py` — 80 строк
 
@@ -4168,15 +4206,14 @@ Runtime settings layer.
 - `def _alive(pid: int) -> bool` (5)
 - `def _orphan(mode: str) -> int` (7)
 
-### `tests/adapters/test_browser_choice.py` — 45 строк
+### `tests/adapters/test_browser_choice.py` — 37 строк
 
 Какой браузер водит агент: первый найденный из перечня.
 
-Зависит от: `adapters.browser`
+Зависит от: `adapters.browser`, `tests.files`
 
 Тестов: 4
 
-- `def _install(root: Path, relative: str) -> Path` (5)
 - `def _roots(monkeypatch, tmp_path)` (4)
 
 ### `tests/adapters/test_browser_closed.py` — 52 строк
@@ -7957,6 +7994,14 @@ Playwright под `BrowserHost`: запуск профиля и события �
   - `async def confirm_code(self, code: str) -> LoginStep` (3)
   - `async def confirm_password(self, password: str) -> LoginStep` (3)
   - `async def forget(self) -> None` (3)
+
+### `tests/files.py` — 11 строк
+
+Файлы-пустышки в тестах: «установленная программа» — это просто файл на своём месте.
+
+Зависит от: —
+
+- `def empty_file(root: Path, relative: str) -> Path` (6)
 
 ### `tests/mcp_call.py` — 12 строк
 

@@ -206,6 +206,7 @@ def main() -> int:
         return 3
     with the_only_copy:
         updater.clear_leftovers()
+        # Мак-модуль грузится строкой, чтобы не попасть в Windows-сборку.
         if sys.platform == "darwin":
             importlib.import_module("adapters.install_places_macos").widen_path()
         return _started_or_told_why()

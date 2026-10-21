@@ -78,6 +78,11 @@
 - `_GOOGLE_CAPTCHA_PATH` = `'/recaptcha/'`
 - `_CLOUDFLARE_CHECK_PATH` = `'/cdn-cgi/challenge-platform/'`
 
+### `adapters/browser_macos.py`
+
+- `_SYSTEM_APPS` = `Path('/Applications')`
+- `_INSIDE` = `набор из 6`
+
 ### `adapters/claude.py`
 
 - `_log` = `logging.getLogger(__name__)`
