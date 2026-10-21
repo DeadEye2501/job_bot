@@ -32,4 +32,6 @@ jobs:
           path: macos/Pipfile.lock
 
       - name: Тесты двойников
-        run: pipenv run python -m pytest macos/tests -q -p no:cacheprovider
+        # Красная фаза видна целиком: тест, чей модуль ещё не написан, не
+        # заслоняет остальные.
+        run: pipenv run python -m pytest macos/tests -q -p no:cacheprovider --continue-on-collection-errors
