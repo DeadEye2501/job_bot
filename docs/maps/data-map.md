@@ -31,6 +31,11 @@
   - `_server: uvicorn.Server`
   - `_task: asyncio.Task`
 
+### `adapters/app_tied_macos.py`
+
+- `_log` = `logging.getLogger(__name__)`
+- `_watcher: subprocess.Popen | None` = `None`
+
 ### `adapters/app_tied_process.py`
 
 - `_log` = `logging.getLogger(__name__)`
@@ -185,6 +190,10 @@
 - `LLM_REQUEST_TIMEOUT_SEC` = `180.0`
 - `LmClient` = `httpx.AsyncClient | claude.ClaudeClient | claude…`
 
+### `adapters/process_macos.py`
+
+- `_NORMAL_LAYER` = `0`
+
 ### `adapters/process_windows.py`
 
 - `_EnumProc` = `ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND,…`
@@ -234,6 +243,11 @@
 - `FETCH_TIMEOUT_SEC` = `20.0`
 - `_USER_AGENT` = `'Mozilla/5.0 (compatible; JobBot/1.0)'`
 - `_GONE_FOR_GOOD` = `frozenset({404, 410, 451})`
+
+### `adapters/tie_watch_macos.py`
+
+- `TIE_WATCH_FLAG` = `'--tie-watch'`
+- `_STARTED` = `'lstart'`
 
 ## alembic
 
@@ -2340,6 +2354,31 @@
 
 - `WIZARD` = `набор из 2`
 - `MAIN` = `набор из 2`
+
+## macos
+
+### `macos/tests/conftest.py`
+
+- `_ROOT` = `tempfile.mkdtemp(prefix='jobbot-mac-tests-')`
+
+### `macos/tests/test_mac_start.py`
+
+- `pytestmark` = `pytest.mark.skipif(sys.platform != 'darwin', rea…`
+- `_ROOT` = `Path(__file__).resolve().parents[2]`
+
+### `macos/tests/test_process_macos.py`
+
+- `_ALL` = `набор из 2`
+- `_ON_SCREEN` = `набор из 2`
+
+### `macos/tests/test_process_table_macos.py`
+
+- `_PS` = `'    1     0 /sbin/launchd\n  512     1 /Applica…`
+
+### `macos/tests/test_tie_watch_macos.py`
+
+- `pytestmark` = `pytest.mark.skipif(sys.platform != 'darwin', rea…`
+- `_ROOT` = `Path(__file__).resolve().parents[2]`
 
 ## tests
 

@@ -21,7 +21,7 @@ Bootstrap config.
 - `def data_dirs() -> list[Path]` (18)
 - `def get_log_path() -> Path` (7)
 
-### `main.py` — 193 строк
+### `main.py` — 203 строк
 
 Job Bot — single CLI entry point.
 
@@ -32,9 +32,16 @@ Job Bot — single CLI entry point.
 - `def _log_uncaught(exc_type, exc, tb) -> None` (13)
 - `def _log_uncaught_in_thread(args) -> None` (10)
 - `def _started_or_told_why() -> int` (36)
-- `def main() -> int` (30)
+- `def main() -> int` (39)
 
-## adapters — 21 модулей
+## adapters — 26 модулей
+
+### `adapters/__init__.py` — 20 строк
+
+Адаптеры к внешнему миру.
+
+Зависит от: —
+
 
 ### `adapters/agent_mcp.py` — 97 строк
 
@@ -47,6 +54,16 @@ MCP-сервер инструментов одной сессии агента: 
 - `def tool_host(tools: list[Callable], **settings) -> FastMCP` (7)
 - `async def serve_tools(tools: list[Callable]) -> ToolServer` (28)
 - `async def _started(server: uvicorn.Server, task: asyncio.Task) -> None` (10)
+
+### `adapters/app_tied_macos.py` — 65 строк
+
+Дочерние процессы, которые гасятся вместе с приложением, — двойник `app_tied_process`.
+
+Зависит от: `adapters.process_table_macos`, `adapters.tie_watch_macos`
+
+- `def tie_to_app(pid: int) -> None` (17)
+- `def tie_children_named(name: str) -> int` (13)
+- `def _children() -> list[tuple[int, str]]` (12)
 
 ### `adapters/app_tied_process.py` — 188 строк
 
@@ -272,6 +289,22 @@ Claude через установленный Claude Code по подписке: 
 
 - `def make_client(config: LlmProviderConfig) -> 'LmClient'` (20)
 
+### `adapters/process_macos.py` — 20 строк
+
+Окна процесса на маке — двойник `process_windows`.
+
+Зависит от: —
+
+- `def has_window(pid: int) -> bool` (9)
+
+### `adapters/process_table_macos.py` — 19 строк
+
+Таблица процессов мака по `ps`: номер, номер родителя и один столбец.
+
+Зависит от: —
+
+- `def process_table(column: str) -> list[tuple[int, int, str]]` (14)
+
 ### `adapters/process_windows.py` — 28 строк
 
 Видимые окна процесса Windows.
@@ -331,6 +364,17 @@ Claude через установленный Claude Code по подписке: 
 - `def make_client() -> httpx.AsyncClient` (3)
 - `def _article_text(html: str) -> str | None` (28)
 - `async def fetch_article(client: httpx.AsyncClient, url: str) -> str | None` (24)
+
+### `adapters/tie_watch_macos.py` — 62 строк
+
+Сторож привязанных процессов на маке: гасит их, когда приложение кончилось.
+
+Зависит от: `adapters.process_table_macos`
+
+- `def self_command() -> list[str]` (5)
+- `def watch(lines: Iterable[str]) -> None` (10)
+- `def _started_of(table: list[tuple[int, int, str]]) -> dict[int, str]` (2)
+- `def _doomed(tied: dict[int, str | None], table: list[tuple[int, int, str]]) -> list[int]` (10)
 
 ### `adapters/web_page.py` — 17 строк
 
@@ -3106,7 +3150,7 @@ Runtime settings layer.
   - `async def mark_wizard_completed(self) -> None` (3)
 - `def _from_llm_row(row: LlmConfig) -> LlmProviderConfig | None` (13)
 
-### `backend/single_instance.py` — 127 строк
+### `backend/single_instance.py` — 132 строк
 
 Замок, которым запущенная копия приложения не пускает вторую.
 
@@ -4041,6 +4085,65 @@ Runtime settings layer.
 - `def grow_to_main(window) -> None` (18)
 - `def _unlock_frame(form) -> None` (27)
   - `def apply() -> None` (6)
+
+## macos — 6 модулей
+
+### `macos/tests/conftest.py` — 15 строк
+
+Стенд тестов мак-двойников: каталог данных — свежий временный.
+
+Зависит от: —
+
+
+### `macos/tests/test_app_tied_macos.py` — 17 строк
+
+
+
+Зависит от: `adapters`
+
+Тестов: 1
+
+
+### `macos/tests/test_mac_start.py` — 44 строк
+
+
+
+Зависит от: `adapters.app_tied_process`, `adapters.process_windows`, `backend.single_instance`
+
+Тестов: 3
+
+
+### `macos/tests/test_process_macos.py` — 43 строк
+
+
+
+Зависит от: `adapters`
+
+Тестов: 3
+
+- `def _quartz(monkeypatch, windows: list[dict]) -> list[int]` (15)
+  - `def window_list(option, _relative_to)` (3)
+
+### `macos/tests/test_process_table_macos.py` — 26 строк
+
+
+
+Зависит от: `adapters`
+
+Тестов: 1
+
+
+### `macos/tests/test_tie_watch_macos.py` — 103 строк
+
+
+
+Зависит от: `adapters`, `adapters.tie_watch_macos`
+
+Тестов: 4
+
+- `def _watched(monkeypatch, tables: list[list[tuple[int, int, str]]]) -> list[int]` (14)
+  - `def kill(pid, sig)` (3)
+- `def _alive(pid: int) -> bool` (6)
 
 ## tests — 352 модулей
 

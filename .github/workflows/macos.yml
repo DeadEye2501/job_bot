@@ -24,8 +24,8 @@ jobs:
           [ -f macos/Pipfile.lock ] || pipenv lock
           pipenv install --dev --deploy
 
-      # Замок мака собирается здесь, а не на Windows: так он попадает в руки
-      # и коммитится, а версии pyobjc закрепляются по нему.
+      # Lock-файл мака собирается здесь, а не на Windows: так он попадает в
+      # руки и коммитится, а версии pyobjc закрепляются по нему.
       - uses: actions/upload-artifact@v4
         with:
           name: Pipfile.lock
