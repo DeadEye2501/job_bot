@@ -3,9 +3,11 @@
 
 import asyncio
 import contextlib
+import importlib
 import logging
 import os
 import shutil
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -56,6 +58,9 @@ def find_browser() -> InstalledBrowser | None:
     исполняемому файлу. Путь известен у всех: человеку для входа браузер
     запускается им самим, без Playwright (`BrowserHost.let_person_in`).
     """
+    # Двойник грузится строкой, чтобы мак-модуль не попал в Windows-сборку.
+    if sys.platform == "darwin":
+        return importlib.import_module("adapters.browser_macos").find_browser()
     for found in (
         _installed(CHROME, "Google/Chrome/Application/chrome.exe", "chrome"),
         _opera(),
