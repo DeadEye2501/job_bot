@@ -1,15 +1,7 @@
 """Какой браузер водит агент: первый найденный из перечня."""
 
-from pathlib import Path
-
 from adapters.browser import find_browser
-
-
-def _install(root: Path, relative: str) -> Path:
-    exe = root / relative
-    exe.parent.mkdir(parents=True, exist_ok=True)
-    exe.write_bytes(b"")
-    return exe
+from tests.files import empty_file as _install
 
 
 def _roots(monkeypatch, tmp_path):
