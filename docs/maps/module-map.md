@@ -238,7 +238,7 @@ Claude через установленный Claude Code по подписке: 
   - `async def aclose(self) -> None` (3)
   - `def _release(self) -> None` (5)
 
-### `adapters/github_release.py` — 69 строк
+### `adapters/github_release.py` — 73 строк
 
 Последний релиз приложения на GitHub.
 
@@ -425,7 +425,7 @@ init
 - `def upgrade() -> None` (331)
 - `def downgrade() -> None` (44)
 
-## backend — 215 модулей
+## backend — 216 модулей
 
 ### `backend/agent/__init__.py` — 1 строк
 
@@ -3247,32 +3247,45 @@ Runtime settings layer.
 - `def from_tg_row(row: TgAccount) -> TgAccountConfig | None` (24)
 - `def fill_tg_row(row: TgAccount, creds: TgAccountConfig) -> None` (15)
 
-### `backend/update_download.py` — 97 строк
+### `backend/update_download.py` — 101 строк
 
 Скачивание обновления: файл остаётся на диске, только если сошёлся с релизом.
 
 Зависит от: `adapters`, `adapters.github_release`, `backend.app_version`
 
-- `def new_exe_path() -> Path` (5)
+- `def new_exe_path() -> Path` (8)
 - `async def newer_release() -> Release | None` (6)
 - `async def download_update(target: Path, report: Callable[[int, int], None]) -> UpdateOutcome` (21)
 - `async def _fetch(release: Release, target: Path, report: Callable[[int, int], None]) -> str` (23)
 - `def remove_leftover(path: Path) -> None` (8)
 
-### `backend/updater.py` — 124 строк
+### `backend/updater.py` — 132 строк
 
 Подмена exe скачанным обновлением — копией приложения в режиме `--update`.
 
 Зависит от: `backend.update_download`
 
 - `def updater_copy() -> Path` (4)
-- `def launch_updater(new: Path) -> None` (10)
+- `def launch_updater(new: Path) -> None` (14)
 - `def run(args: list[str]) -> int` (20)
-- `def clear_leftovers() -> None` (5)
+- `def clear_leftovers() -> None` (8)
 - `def _start(args: list[str]) -> None` (6)
 - `def _log_to_own_file() -> None` (6)
 - `def _wait_for_exit(pid: int) -> None` (9)
 - `def _replace(new: Path, exe: Path) -> bool` (14)
+
+### `backend/updater_macos.py` — 92 строк
+
+Подмена бандла скачанным обновлением на маке — двойник `updater`.
+
+Зависит от: `backend.update_download`
+
+- `def bundle() -> Path` (3)
+- `def download_path() -> Path` (4)
+- `def _unpacked() -> Path` (2)
+- `def launch_updater(new: Path) -> None` (20)
+- `def clear_leftovers() -> None` (6)
+- `def _report(_function, path, error) -> None` (3)
 
 ### `backend/wipe.py` — 103 строк
 
@@ -3353,14 +3366,14 @@ Runtime settings layer.
 
 - `class Api` (15)
 
-### `client/bridge/app_update.py` — 74 строк
+### `client/bridge/app_update.py` — 72 строк
 
 Обновление приложения из релизов GitHub: какая версия запущена и есть ли новее.
 
 Зависит от: `backend.app_version`, `backend.update_download`, `client.bridge.answer`, `client.bridge.refusals`
 
-- `class AppUpdate` (51)
-  - `def version(self) -> dict` (9)
+- `class AppUpdate` (49)
+  - `def version(self) -> dict` (7)
   - `def check_update(self) -> dict` (19)
     - `async def run() -> dict` (9)
   - `def update(self) -> dict` (10)
@@ -4132,7 +4145,7 @@ Runtime settings layer.
 - `def unlock_frame(window) -> None` (10)
   - `def apply() -> None` (3)
 
-## macos — 13 модулей
+## macos — 14 модулей
 
 ### `macos/tests/conftest.py` — 15 строк
 
@@ -4245,6 +4258,19 @@ Runtime settings layer.
 
 Тестов: 3
 
+
+### `macos/tests/test_updater_macos.py` — 161 строк
+
+
+
+Зависит от: `adapters.github_release`, `backend`, `macos.tests.fake_run`, `tests.fakes.github_release`
+
+Тестов: 9
+
+- `def _bundle(monkeypatch, root: Path) -> Path` (6)
+- `def _app_marked(where: Path, mark: str) -> Path` (5)
+- `def _swap_bench(monkeypatch, tmp_path, fresh_name: str) -> tuple[Path, Path, subprocess.Popen]` (19)
+- `def _swapped(app: subprocess.Popen) -> None` (3)
 
 ### `macos/tests/test_window_size_macos.py` — 42 строк
 

@@ -8,6 +8,7 @@ import httpx
 import pytest
 
 from backend import updater_macos
+from macos.tests.fake_run import recorded_runs
 from tests.fakes.github_release import download_url, serve_latest
 
 darwin = pytest.mark.skipif(sys.platform != "darwin", reason="только macOS")
@@ -39,6 +40,38 @@ def test_leftovers_cleared(monkeypatch, tmp_path):
 
     assert sorted(p.name for p in tmp_path.iterdir()) == ["JobBot.app"]
     assert app.is_dir()
+
+
+def test_clean_start_has_nothing_to_clear(monkeypatch, tmp_path):
+    app = _bundle(monkeypatch, tmp_path)
+
+    updater_macos.clear_leftovers()
+
+    assert app.is_dir()
+
+
+def test_broken_unpack_is_a_handoff_failure(monkeypatch, tmp_path):
+    """Скачанное сверено, не вышла только распаковка: это «не передано», а не
+    «не скачалось» — зовущий различает их по `OSError`."""
+    _bundle(monkeypatch, tmp_path)
+    recorded_runs(monkeypatch, fails=True)
+
+    with pytest.raises(OSError):
+        updater_macos.launch_updater(updater_macos.download_path())
+
+
+@darwin
+def test_app_updater_routes_to_mac(monkeypatch, tmp_path):
+    from backend import updater
+
+    handed = []
+    monkeypatch.setattr(updater_macos, "launch_updater", handed.append)
+    monkeypatch.setattr(updater_macos, "clear_leftovers", lambda: handed.append("cleared"))
+
+    updater.launch_updater(tmp_path / "JobBot-update.zip")
+    updater.clear_leftovers()
+
+    assert handed == [tmp_path / "JobBot-update.zip", "cleared"]
 
 
 @darwin
@@ -74,30 +107,55 @@ def _app_marked(where: Path, mark: str) -> Path:
     return app
 
 
-@darwin
-def test_swap_replaces_bundle(monkeypatch, tmp_path):
+def _swap_bench(monkeypatch, tmp_path, fresh_name: str) -> tuple[Path, Path, subprocess.Popen]:
+    """Установленный бандл с меткой «old», скачанный zip с бандлом `fresh_name` и
+    меткой «new», подменённый `open` и «приложение» — `sleep 2`, выхода которого
+    ждёт подменщик. Ответ — бандл, файл с аргументом `open`, процесс приложения."""
     installed = tmp_path / "Applications"
     old = _app_marked(installed, "old")
     monkeypatch.setattr(sys, "executable", str(old / "Contents" / "MacOS" / "JobBot"))
-    fresh = _app_marked(tmp_path / "fresh", "new")
+    fresh = _app_marked(tmp_path / "fresh", "new").rename(tmp_path / "fresh" / fresh_name)
     subprocess.run(["ditto", "-c", "-k", "--keepParent", str(fresh), str(updater_macos.download_path())],
                    check=True)
-
     fake_bin = tmp_path / "bin"
     fake_bin.mkdir()
     opened = tmp_path / "opened"
     (fake_bin / "open").write_text(f'#!/bin/sh\necho "$1" > "{opened}"\n')
     (fake_bin / "open").chmod(0o755)
     monkeypatch.setenv("PATH", f"{fake_bin}:{os.environ['PATH']}")
-    app = subprocess.Popen(["sleep", "1"])
+    app = subprocess.Popen(["sleep", "2"])
     monkeypatch.setattr(os, "getpid", lambda: app.pid)
+    return old, opened, app
+
+
+def _swapped(app: subprocess.Popen) -> None:
+    app.wait()
+    updater_macos._swapper.wait(timeout=10)
+
+
+@darwin
+def test_swap_waits_then_replaces_bundle(monkeypatch, tmp_path):
+    old, opened, app = _swap_bench(monkeypatch, tmp_path, "JobBot.app")
 
     updater_macos.launch_updater(updater_macos.download_path())
-    app.wait()
-    deadline = time.monotonic() + 10
-    while not opened.exists() and time.monotonic() < deadline:
-        time.sleep(0.1)
+    time.sleep(0.5)
+
+    assert (old / "Contents" / "mark").read_text() == "old"
+    assert not opened.exists()
+
+    _swapped(app)
 
     assert (old / "Contents" / "mark").read_text() == "new"
     assert opened.read_text().strip() == str(old)
-    assert sorted(p.name for p in installed.iterdir()) == ["JobBot.app"]
+    assert sorted(p.name for p in old.parent.iterdir()) == ["JobBot.app"]
+
+
+@darwin
+def test_failed_swap_keeps_old_bundle(monkeypatch, tmp_path):
+    old, opened, app = _swap_bench(monkeypatch, tmp_path, "Other.app")
+
+    updater_macos.launch_updater(updater_macos.download_path())
+    _swapped(app)
+
+    assert (old / "Contents" / "mark").read_text() == "old"
+    assert opened.read_text().strip() == str(old)

@@ -156,6 +156,7 @@
 
 - `LATEST` = `'https://api.github.com/repos/DeadEye2501/job_bo…`
 - `ASSET` = `'JobBot.exe'`
+- `ASSET` = `'JobBot-macos-arm64.zip'`
 - `_TIMEOUT_SEC` = `20.0`
 - `_USER_AGENT` = `'JobBot-updater'`
 - `class Release`
@@ -2091,6 +2092,12 @@
 - `_SYNCHRONIZE` = `1048576`
 - `_DETACHED` = `8 | 512`
 
+### `backend/updater_macos.py`
+
+- `logger` = `logging.getLogger(__name__)`
+- `_SWAP` = `'\nwhile kill -0 "$1" 2>/dev/null; do sleep 0.5;…`
+- `_swapper: subprocess.Popen | None` = `None`
+
 ### `backend/wipe.py`
 
 - `logger` = `logging.getLogger(__name__)`
@@ -2393,6 +2400,11 @@
 
 - `pytestmark` = `pytest.mark.skipif(sys.platform != 'darwin', rea…`
 - `_ROOT` = `Path(__file__).resolve().parents[2]`
+
+### `macos/tests/test_updater_macos.py`
+
+- `darwin` = `pytest.mark.skipif(sys.platform != 'darwin', rea…`
+- `_MAC_FILE` = `'JobBot-macos-arm64.zip'`
 
 ### `macos/tests/test_window_size_macos.py`
 
