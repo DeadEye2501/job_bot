@@ -16,7 +16,7 @@ LATEST = "https://api.github.com/repos/DeadEye2501/job_bot/releases/latest"
 ASSET = "JobBot.exe"
 # Релиз один на обе системы, файлов в нём два: каждая сборка ищет свой.
 if sys.platform == "darwin":
-    ASSET = "JobBot-macos-arm64.zip"
+    ASSET = "JobBot-macos.zip"
 _TIMEOUT_SEC = 20.0
 _USER_AGENT = "JobBot-updater"
 

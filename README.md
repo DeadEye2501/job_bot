@@ -141,7 +141,7 @@ pipenv run python -m PyInstaller JobBot.spec --clean --noconfirm
 
 Мак-сборка живёт рядом с Windows-сборкой и её не трогает: свой `JobBot-macos.spec` и свои зависимости в `macos/Pipfile` (llama-cpp-python там собирается из исходников с Metal, добавлены Quartz и Cocoa из pyobjc). Там, где Windows-код завязан на WinAPI, на маке работает двойник рядом с ним (`*_macos.py`); выбирает его ветка `sys.platform == "darwin"`, а грузится он по имени строкой, чтобы в Windows-exe не попадал. Поддерживаются только Apple Silicon (arm64).
 
-Собирается на GitHub Actions (`.github/workflows/macos.yml`, раннер `macos-14`): тесты двойников из `macos/tests`, фронт, бандл, проверка запуска собранного, архив `JobBot-macos-arm64.zip` артефактом. Локально, на маке:
+Собирается на GitHub Actions (`.github/workflows/macos.yml`, раннер `macos-14`): тесты двойников из `macos/tests`, фронт, бандл, проверка запуска собранного, архив `JobBot-macos.zip` артефактом. Локально, на маке:
 
 ```bash
 cd client/web && npm run build && cd ../..
@@ -166,7 +166,7 @@ pipenv run python -m PyInstaller JobBot-macos.spec --clean --noconfirm
 
 Пока идёт прогон, значок заперт. При запуске из исходников (`python main.py`) проверить можно, а обновиться — нет: подменять нечего. Номер версии — в боковом меню.
 
-На маке ход тот же, а файл свой: номер версии и релиз общие на обе системы, в релизе лежат `JobBot.exe` и `JobBot-macos-arm64.zip`, и каждая сборка ищет только свой (`backend/updater_macos.py`). Мак-сборка качает zip рядом с `JobBot.app` как `JobBot-update.zip`, сверяет сумму, распаковывает и отдаёт подмену процессу `sh`: тот ждёт выхода приложения, ставит новый `JobBot.app` на место старого (не вышло — возвращает старый) и открывает его. Свой журнал подменщик пишет во временную папку, в `JobBot-update.log`. Остатки — zip, папку распаковки, отведённый старый бандл — убирает следующий запуск.
+На маке ход тот же, а файл свой: номер версии и релиз общие на обе системы, в релизе лежат `JobBot.exe` и `JobBot-macos.zip`, и каждая сборка ищет только свой (`backend/updater_macos.py`). Мак-сборка качает zip рядом с `JobBot.app` как `JobBot-update.zip`, сверяет сумму, распаковывает и отдаёт подмену процессу `sh`: тот ждёт выхода приложения, ставит новый `JobBot.app` на место старого (не вышло — возвращает старый) и открывает его. Свой журнал подменщик пишет во временную папку, в `JobBot-update.log`. Остатки — zip, папку распаковки, отведённый старый бандл — убирает следующий запуск.
 
 ### Выпуск версии
 
@@ -180,7 +180,7 @@ pipenv run python -m PyInstaller JobBot-macos.spec --clean --noconfirm
 
 GitHub CLI ставится `winget install GitHub.cli`, вход — `gh auth login`.
 
-Мак-сборку к релизу добавлять руками не нужно: опубликованный релиз запускает `macos.yml`, и тот кладёт `JobBot-macos-arm64.zip` в файлы того же релиза.
+Мак-сборку к релизу добавлять руками не нужно: опубликованный релиз запускает `macos.yml`, и тот кладёт `JobBot-macos.zip` в файлы того же релиза.
 
 Что вшито в бандл (см. `JobBot.spec`): собранный фронт `client/web/dist`, `alembic.ini` + `alembic/env.py` + `alembic/script.py.mako` + init-миграция, `client/icon.ico`, драйвер Playwright (`collect_data_files('playwright')`), библиотеки движка `llama_cpp` (`collect_dynamic_libs`). Hidden imports: `aiosqlite`, `keyring.backends.Windows`, `keyring.backends.fail`, `logging.config`, `logging.handlers`, `llama_cpp`, `playwright.async_api` и подмодули `anthropic`, `mcp` (без `mcp.cli`) и `uvicorn`.
 

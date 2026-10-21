@@ -60,6 +60,7 @@ env/
 build/
 dist/
 JobBot.exe
+JobBot-macos.zip
 
 # Тестовый прогон
 mutants/
