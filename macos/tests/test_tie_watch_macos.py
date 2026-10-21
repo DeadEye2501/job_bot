@@ -94,6 +94,7 @@ def test_watcher_kills_tree_when_parent_dies():
 
     parent.send_signal(signal.SIGKILL)
     parent.wait()
+    parent.stdout.close()
     deadline = time.monotonic() + 5
     while (_alive(shell) or _alive(sleeper)) and time.monotonic() < deadline:
         time.sleep(0.1)
