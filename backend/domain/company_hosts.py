@@ -12,7 +12,7 @@
 """
 
 from backend.domain.hosts import VACANCY_PAGES, host_owns
-from backend.domain.telegram_identity import TELEGRAM_LINK_HOSTS, TELEGRAPH_HOSTS
+from backend.domain.telegram_identity import TELEGRAM_LINK_HOSTS, ARTICLE_HOSTS
 
 AGGREGATOR_HOSTS = frozenset({
     # Агрегаторы вакансий, соцсети, мессенджеры, блог-платформы: ссылка на
@@ -53,7 +53,7 @@ AGGREGATOR_HOSTS = frozenset({
     "docs.google.com",
     "forms.gle",
     "typeform.com",
-    *TELEGRAPH_HOSTS,
+    *ARTICLE_HOSTS,
     "notion.so",
     "taplink.cc",
     "bit.ly",

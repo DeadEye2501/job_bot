@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 import httpx
 import pytest
 
-from tests.fakes.telegraph import serve_articles
+from tests.fakes.article_page import serve_articles
 from backend.flows import ingest, rerun
 from backend.flows import intake as intake_flow
 from backend.flows import embeddings

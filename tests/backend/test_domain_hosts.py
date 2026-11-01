@@ -23,6 +23,7 @@ _LEVER_UUID = "0f6a9c3e-1b2d-4e5f-8a7b-9c0d1e2f3a4b"
     pytest.param("https://telegra.ph/QA-08-21", "article", id="статья"),
     pytest.param("telegra.ph/QA-08-21", "article", id="статья без схемы"),
     pytest.param("HTTPS://Telegra.ph/QA-08-21.", "article", id="статья заглавными и с точкой"),
+    pytest.param("https://teletype.in/@remoteit/vM9ut7b5nLq", "article", id="статья Teletype"),
     pytest.param("https://t.me/+AbCdEf123", "channel", id="приглашение"),
     pytest.param("https://t.me/joinchat/AbCdEf123", "channel", id="старое приглашение"),
     pytest.param("https://t.me/pyjobs?start=1", "channel", id="канал с хвостом"),

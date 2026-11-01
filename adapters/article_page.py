@@ -1,12 +1,12 @@
-"""Статья Telegraph: сходить по адресу и достать из страницы её текст.
+"""Статья Telegraph или Teletype: сходить по адресу и достать из страницы её текст.
 
 Объявления в каналах сплошь и рядом умещают в пост одну шапку, а всё
 остальное выносят в статью — «ПОСМОТРЕТЬ», ссылка, и там уже требования,
 условия и способ отклика. Разбирать в таком объявлении без статьи нечего.
 
-Страница разбирается по тегу `article`, а не поиском по строке: Telegraph
-кладёт в него статью целиком, вместе с заголовком, и это переживает
-перевёрстку, от которой поиск по именам стилей рассыпается.
+Страница разбирается по тегу `article`, а не поиском по строке: оба сайта
+кладут в него тело статьи, и это переживает перевёрстку, от которой поиск по
+именам стилей рассыпается.
 """
 
 import logging
@@ -15,6 +15,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from adapters.web_page import page_client
+from backend.domain.contact_keys import contact_key
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ _USER_AGENT = "Mozilla/5.0 (compatible; JobBot/1.0)"
 
 
 def make_client() -> httpx.AsyncClient:
-    """Клиент к Telegraph. Переходы разрешены: короткие адреса ведут через них."""
+    """Клиент к сайту статей. Переходы разрешены: короткие адреса ведут через них."""
     return page_client(FETCH_TIMEOUT_SEC, _USER_AGENT)
 
 
@@ -45,20 +46,44 @@ def _article_text(html: str) -> str | None:
     Подпись автора с датой в счёт тела не идёт: Telegraph отдаёт её пустым
     тегом и наполняет уже в браузере. Начни он присылать её со страницей — и
     статья из одного заголовка перестала бы читаться как пустая.
+
+    Заголовок ищется сперва в статье, затем на странице. Telegraph ставит `h1`
+    и в статью, и над ней, в шапку, — возьми он верхний, внутренний остался бы
+    в теле повтором. Teletype ставит его только над статьёй.
     """
     soup = BeautifulSoup(html, "html.parser")
     article = soup.find("article")
     if article is None:
         return None
-    headline = article.find("h1")
+    headline = article.find("h1") or soup.find("h1")
     head_text = ""
     if headline is not None:
         head_text = headline.get_text(" ", strip=True)
         headline.extract()
+    _show_link_addresses(article)
     body_text = article.get_text("\n", strip=True)
     if not body_text:
         return None
     return f"{head_text}\n\n{body_text}" if head_text else body_text
+
+
+def _show_link_addresses(article) -> None:
+    """Дописать за подписью каждой ссылки статьи её адрес в скобках.
+
+    То же, что `extract_post_text` делает со ссылками поста, и по той же
+    причине: отклик прячут под словом — «APPLY», — и без адреса разбору
+    откликаться некуда.
+
+    Ссылка заменяется строкой целиком, а не дополняется: текст тела
+    собирается с переносом между кусками, и дописанный адрес уехал бы от
+    подписи на свою строку. Подпись, которая и есть адрес, его не получает —
+    иначе адрес встал бы в текст дважды.
+    """
+    for link in article.find_all("a", href=True):
+        words = link.get_text(" ", strip=True)
+        href = link["href"]
+        shown = words if contact_key(words) == contact_key(href) else f"{words} ({href})"
+        link.replace_with(shown)
 
 
 # Отказы, после которых страница не появится: её нет (404), она удалена
@@ -90,11 +115,11 @@ async def fetch_article(client: httpx.AsyncClient, url: str) -> str | None:
     response = await client.get(url)
     if response.status_code in _GONE_FOR_GOOD:
         logger.info(
-            "telegraph: страница %s не вернётся (%d)", url, response.status_code
+            "article_page: страница %s не вернётся (%d)", url, response.status_code
         )
         return None
     response.raise_for_status()
     text = _article_text(response.text)
     if text is None:
-        logger.info("telegraph: на странице %s статьи не нашлось", url)
+        logger.info("article_page: на странице %s статьи не нашлось", url)
     return text

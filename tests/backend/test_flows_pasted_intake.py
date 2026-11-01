@@ -23,7 +23,7 @@ from backend.models import Vacancy, VacancyEvent
 from tests.backend.fixtures.flows import similar_by_hand, told_then_applied
 from tests.dbio import all_rows, only_row, put
 from tests.factories import vacancy_row
-from tests.fakes.telegraph import serve_articles
+from tests.fakes.article_page import serve_articles
 
 
 @pytest.fixture

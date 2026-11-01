@@ -1,6 +1,6 @@
 """Следствия, которые наблюдает тест `backend/flows/linked_article.py`.
 
-Само хождение в сеть проверено у переходника (`test_adapters_telegraph`); здесь
+Само хождение в сеть проверено у переходника (`test_adapters_article_page`); здесь
 смотрят на склейку — что дописано, в каком порядке и когда в сеть не ходят
 вовсе — и на чтение поста, которое её зовёт.
 """
@@ -12,7 +12,7 @@ import pytest
 
 from backend.flows import linked_article
 from tests.fakes.telegram_objects import post
-from tests.fakes.telegraph import serve_articles
+from tests.fakes.article_page import serve_articles
 
 
 @pytest.fixture

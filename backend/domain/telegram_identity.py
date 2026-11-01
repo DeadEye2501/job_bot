@@ -20,14 +20,16 @@ from backend.domain.address_start import without_scheme
 TELEGRAM_LINK_HOSTS = frozenset({"t.me", "telegram.me"})
 """Хосты ссылок на канал, пост и собеседника."""
 
-TELEGRAPH_HOSTS = frozenset({"telegra.ph"})
+ARTICLE_HOSTS = frozenset({"telegra.ph", "teletype.in"})
 """Хосты статей, в которые каналы выносят текст объявления."""
 
-TELEGRAM_HOSTS = TELEGRAM_LINK_HOSTS | TELEGRAPH_HOSTS
+TELEGRAM_HOSTS = TELEGRAM_LINK_HOSTS | ARTICLE_HOSTS
 """Всё, что читает приём постов, а не «Поиск по сети»."""
 
-# Адрес статьи: «https://telegra.ph/ключ». Ключ обязателен: без него это
-# корень сайта, статьи за ним нет никогда.
+# Адрес статьи: «https://telegra.ph/ключ», «https://teletype.in/@автор/ключ».
+# Ключ обязателен: без него это корень сайта, статьи за ним нет никогда.
+# Страница автора на Teletype («teletype.in/@автор») под правило попадает, но
+# тега статьи на ней нет, и она отдаёт пустоту.
 #
 # Хвост адреса кончается не на чём попало. Закрывающая скобка в него не
 # входит — за подписью ссылки адрес дописывают именно в скобках
@@ -40,7 +42,7 @@ TELEGRAM_HOSTS = TELEGRAM_LINK_HOSTS | TELEGRAPH_HOSTS
 # адрес честно отдаёт пустоту, ничего не портя. Ловить их отдельным правилом
 # значило бы завести ветку под случай, которого в постах ещё не встречалось.
 ARTICLE_URL_RE = re.compile(
-    r"https?://(?:" + "|".join(map(re.escape, sorted(TELEGRAPH_HOSTS)))
+    r"https?://(?:" + "|".join(map(re.escape, sorted(ARTICLE_HOSTS)))
     + r")/[^\s)\]]*[^\s)\].,;:!?…»\"']"
 )
 

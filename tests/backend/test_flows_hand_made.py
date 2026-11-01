@@ -20,7 +20,7 @@ from tests.factories_aggregators import web_search_row
 from tests.fakes.agent import kit_for, scripted_kit, submit_step
 from tests.fakes.telegram import WithMessages
 from tests.fakes.telegram_objects import TG_EPOCH, chat, post
-from tests.fakes.telegraph import serve_articles
+from tests.fakes.article_page import serve_articles
 
 
 def _fields(**overrides) -> dict:
