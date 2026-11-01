@@ -1,6 +1,6 @@
-"""Подставной Telegraph: что отдаёт статья по адресу и о каких адресах спросили."""
+"""Подставной сайт статей: что отдаёт статья по адресу и о каких адресах спросили."""
 
-from adapters import telegraph
+from adapters import article_page
 
 ARTICLE = "Требования: Python"
 
@@ -19,5 +19,5 @@ def serve_articles(monkeypatch, answer=ARTICLE) -> list[str]:
             raise answer
         return answer.get(url) if isinstance(answer, dict) else answer
 
-    monkeypatch.setattr(telegraph, "fetch_article", fetch_article)
+    monkeypatch.setattr(article_page, "fetch_article", fetch_article)
     return asked

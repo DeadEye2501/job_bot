@@ -16,7 +16,7 @@ import httpx
 import pytest
 from pyrogram.errors import FloodWait
 
-from tests.fakes.telegraph import serve_articles
+from tests.fakes.article_page import serve_articles
 from backend.flows import parse as parse_mod
 from backend.models import (
     StatusHistorySource,

@@ -6,7 +6,7 @@ from urllib.parse import parse_qsl, urlsplit
 
 from backend.domain.address_start import without_scheme
 from backend.domain.telegram_identity import (
-    ARTICLE_URL_RE, TELEGRAM_HOSTS, TELEGRAM_LINK_HOSTS, TELEGRAPH_HOSTS, post_address,
+    ARTICLE_URL_RE, TELEGRAM_HOSTS, TELEGRAM_LINK_HOSTS, ARTICLE_HOSTS, post_address,
 )
 
 
@@ -153,14 +153,14 @@ def on_telegram(url: str) -> bool:
 
 
 def link_kind(url: str) -> LinkKind:
-    """Род ссылки — одно правило по самому адресу: статья Telegraph, пост
+    """Род ссылки — одно правило по самому адресу: статья Telegraph или Teletype, пост
     Telegram, иная ссылка Telegram на канал или приглашение, прочий Telegram —
     мгновенный просмотр, корень статей, — или любая другая страница.
 
     Прочий Telegram отдельным родом, а не страницей: агенту туда хода нет.
     """
     parts = address_parts(url.strip())
-    if owning_host(url, set(TELEGRAPH_HOSTS)):
+    if owning_host(url, set(ARTICLE_HOSTS)):
         # Распознаёт статью то же правило, что склейка в тексте поста: с начала
         # адреса, без хвостовой точки конца предложения.
         return "article" if ARTICLE_URL_RE.match(article_address(url)) else "telegram"

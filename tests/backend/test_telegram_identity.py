@@ -62,6 +62,11 @@ def test_a_link_that_is_not_a_post_has_no_post_address(url):
             ["https://telegra.ph/QA-08-21#trebovaniya"],
             id="якорь остаётся в адресе",
         ),
+        pytest.param(
+            "C# DEVELOPER #backend https://teletype.in/@remoteit/vM9ut7b5nLq",
+            ["https://teletype.in/@remoteit/vM9ut7b5nLq"],
+            id="статья Teletype",
+        ),
         pytest.param("наш сайт https://telegra.ph/", [], id="корень без статьи"),
         pytest.param("https://habr.com/QA-08-21", [], id="чужой сайт"),
     ],

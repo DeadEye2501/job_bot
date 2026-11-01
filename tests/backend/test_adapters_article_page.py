@@ -1,21 +1,26 @@
-"""Следствия, которые наблюдают тесты `adapters/telegraph.py`.
+"""Следствия, которые наблюдают тесты `adapters/article_page.py`.
 
 Страница собирается здесь короткой, но с той же разметкой, что у настоящей:
 Telegraph кладёт статью целиком — вместе с заголовком — в тег `article`, и
 держится разбор именно за него. Собери страницу без этого тега — и проверки
 зеленели бы на поиске по именам стилей, которого в боевом коде нет.
+
+Заголовок у Telegraph стоит ещё и в шапке над статьёй. Убери его оттуда — и
+проверки не заметили бы разбора, который берёт заголовок из шапки и
+оставляет его повтор в теле статьи.
 """
 
 import httpx
 import pytest
 
-from adapters import telegraph
+from adapters import article_page
 
 
 def _page(*, headline: str = "Senior Manual QA", body: str = "<p>Ищем QA</p>") -> str:
     """Страница статьи в той разметке, в какой её отдаёт Telegraph."""
     return (
         "<html><body>"
+        f'<header class="tl_article_header"><h1>{headline}</h1><address></address></header>'
         '<article id="_tl_editor" class="tl_article_content">'
         f"<h1>{headline}</h1><address></address>{body}"
         "</article>"
@@ -31,7 +36,7 @@ def _client(handler) -> httpx.AsyncClient:
 async def test_the_article_comes_back_with_its_headline():
     """Из страницы достаются и заголовок, и тело статьи."""
     async with _client(lambda _r: httpx.Response(200, text=_page())) as client:
-        got = await telegraph.fetch_article(client, "https://telegra.ph/Senior-QA-08-21")
+        got = await article_page.fetch_article(client, "https://telegra.ph/Senior-QA-08-21")
 
     assert got == "Senior Manual QA\n\nИщем QA"
 
@@ -44,7 +49,7 @@ async def test_the_article_body_keeps_its_lines():
     """
     body = "<ul><li>Python</li><li>SQL</li></ul>"
     async with _client(lambda _r: httpx.Response(200, text=_page(body=body))) as client:
-        got = await telegraph.fetch_article(client, "https://telegra.ph/Senior-QA-08-21")
+        got = await article_page.fetch_article(client, "https://telegra.ph/Senior-QA-08-21")
 
     assert got == "Senior Manual QA\n\nPython\nSQL"
 
@@ -61,7 +66,7 @@ async def test_an_article_without_a_headline_comes_back_without_it():
         "</body></html>"
     )
     async with _client(lambda _r: httpx.Response(200, text=page)) as client:
-        got = await telegraph.fetch_article(client, "https://telegra.ph/Senior-QA-08-21")
+        got = await article_page.fetch_article(client, "https://telegra.ph/Senior-QA-08-21")
 
     assert got == "Ищем QA"
 
@@ -75,9 +80,62 @@ async def test_only_the_first_headline_leaves_the_body():
     """
     body = "<h1>Про компанию</h1><p>Ищем QA</p>"
     async with _client(lambda _r: httpx.Response(200, text=_page(body=body))) as client:
-        got = await telegraph.fetch_article(client, "https://telegra.ph/Senior-QA-08-21")
+        got = await article_page.fetch_article(client, "https://telegra.ph/Senior-QA-08-21")
 
     assert got == "Senior Manual QA\n\nПро компанию\nИщем QA"
+
+
+async def test_a_headline_outside_the_article_still_heads_it():
+    """Заголовок над статьёй, а не в ней, всё равно идёт заголовком.
+
+    Так верстает Teletype: в `article` у него одно тело, а `h1` стоит выше, в
+    шапке страницы рядом с автором и датой. Без заголовка разбор лишился бы
+    полного названия должности — в посте его часто сокращают.
+    """
+    page = (
+        "<html><body>"
+        '<header class="article__header"><div>October 27</div>'
+        '<h1 class="article__header_title">Senior C# Developer</h1></header>'
+        '<article class="article__content text"><p>Стек: C#, .NET</p></article>'
+        "</body></html>"
+    )
+    async with _client(lambda _r: httpx.Response(200, text=page)) as client:
+        got = await article_page.fetch_article(client, "https://teletype.in/@remoteit/vM9ut7b5nLq")
+
+    assert got == "Senior C# Developer\n\nСтек: C#, .NET"
+
+
+async def test_a_link_hidden_under_words_keeps_its_address():
+    """За подписью ссылки в статье стоит её адрес.
+
+    Отклик в статьях прячут под словом — «APPLY», — и без адреса разбору
+    откликаться некуда: в посте его тоже нет.
+    """
+    body = '<p><a href="https://hh.ru/vacancy/137869492">APPLY</a></p>'
+    async with _client(lambda _r: httpx.Response(200, text=_page(body=body))) as client:
+        got = await article_page.fetch_article(client, "https://telegra.ph/Senior-QA-08-21")
+
+    assert got == "Senior Manual QA\n\nAPPLY (https://hh.ru/vacancy/137869492)"
+
+
+@pytest.mark.parametrize(
+    ("link", "shown"),
+    [
+        pytest.param(
+            '<a href="mailto:hr@acme.io">hr@acme.io</a>', "hr@acme.io", id="почта"
+        ),
+        pytest.param(
+            '<a href="https://acme.io/jobs/">acme.io/jobs</a>', "acme.io/jobs", id="ссылка"
+        ),
+    ],
+)
+async def test_a_link_showing_its_address_is_not_repeated(link, shown):
+    """Ссылка, у которой подпись и есть адрес, второй раз его не получает."""
+    body = f"<p>{link}</p>"
+    async with _client(lambda _r: httpx.Response(200, text=_page(body=body))) as client:
+        got = await article_page.fetch_article(client, "https://telegra.ph/Senior-QA-08-21")
+
+    assert got == f"Senior Manual QA\n\n{shown}"
 
 
 async def test_an_article_of_one_headline_gives_nothing():
@@ -88,7 +146,7 @@ async def test_an_article_of_one_headline_gives_nothing():
     """
     async with _client(lambda _r: httpx.Response(200, text=_page(body=""))) as client:
         assert (
-            await telegraph.fetch_article(client, "https://telegra.ph/Senior-QA-08-21")
+            await article_page.fetch_article(client, "https://telegra.ph/Senior-QA-08-21")
             is None
         )
 
@@ -102,7 +160,7 @@ async def test_a_page_without_an_article_gives_nothing():
     page = "<html><body><h1>Статья не найдена</h1></body></html>"
     async with _client(lambda _r: httpx.Response(200, text=page)) as client:
         assert (
-            await telegraph.fetch_article(client, "https://telegra.ph/Senior-QA-08-21")
+            await article_page.fetch_article(client, "https://telegra.ph/Senior-QA-08-21")
             is None
         )
 
@@ -132,7 +190,7 @@ async def test_a_site_that_did_not_answer_says_so(trouble):
 
     async with _client(handle) as client:
         with pytest.raises(httpx.HTTPError):
-            await telegraph.fetch_article(client, "https://telegra.ph/Senior-QA-08-21")
+            await article_page.fetch_article(client, "https://telegra.ph/Senior-QA-08-21")
 
 
 @pytest.mark.parametrize(
@@ -159,6 +217,6 @@ async def test_a_page_that_will_never_come_back_gives_nothing(code):
     """
     async with _client(lambda _r: httpx.Response(code, text=_page())) as client:
         assert (
-            await telegraph.fetch_article(client, "https://telegra.ph/Senior-QA-08-21")
+            await article_page.fetch_article(client, "https://telegra.ph/Senior-QA-08-21")
             is None
         )

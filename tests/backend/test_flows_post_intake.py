@@ -15,7 +15,7 @@
 import httpx
 import pytest
 
-from tests.fakes.telegraph import serve_articles
+from tests.fakes.article_page import serve_articles
 from backend.flows import embeddings, ingest
 from backend.models import VacancyStatus
 from backend.repository.vacancies_life import add_vacancy_event

@@ -14,7 +14,7 @@ import logging
 
 import httpx
 
-from adapters import telegraph
+from adapters import article_page
 from backend.domain.spellings import dedupe_first_wins
 from backend.domain.telegram_identity import ARTICLE_URL_RE
 from backend.message_text import extract_post_text
@@ -34,9 +34,9 @@ def article_urls(text: str) -> list[str]:
     Один и тот же адрес попадается в посте дважды: словами и подписью кнопки.
     Скачивать его дважды незачем, а дописывать дважды — тем более.
 
-    Сравниваются адреса как есть, без приведения: у Telegraph ключ статьи
-    чувствителен к регистру, и схлопни мы его — два разных адреса слились бы
-    в один.
+    Сравниваются адреса как есть, без приведения: у Telegraph и Teletype ключ
+    статьи чувствителен к регистру, и схлопни мы его — два разных адреса
+    слились бы в один.
     """
     return dedupe_first_wins(ARTICLE_URL_RE.findall(text), key=lambda url: url)
 
@@ -51,10 +51,10 @@ def _blame_the_site(url: str, trouble: httpx.HTTPError) -> None:
     Читает эту разницу человек, а не код: приговор её не разбирает, и всякая
     беда откладывает объявление одинаково. Отличить по одному отказу «сайт
     лежит до утра» от «сайт закрылся навсегда» всё равно нельзя, а вот понять,
-    почему Telegraph перестал отдавать статьи, — можно только отсюда.
+    почему сайт статей перестал их отдавать, — можно только отсюда.
     """
     logger.warning(
-        "telegraph: %s не отдал страницу (%s: %s)",
+        "article_page: %s не отдал страницу (%s: %s)",
         url, type(trouble).__name__, trouble,
     )
 
@@ -82,10 +82,10 @@ async def with_linked_articles(text: str) -> tuple[str, bool]:
         return text, True
     parts = [text]
     whole = True
-    async with telegraph.make_client() as client:
+    async with article_page.make_client() as client:
         for url in urls[:_MAX_ARTICLES]:
             try:
-                article = await telegraph.fetch_article(client, url)
+                article = await article_page.fetch_article(client, url)
             except httpx.HTTPError as e:
                 _blame_the_site(url, e)
                 whole = False
@@ -93,7 +93,7 @@ async def with_linked_articles(text: str) -> tuple[str, bool]:
             if article:
                 parts.append(article)
     logger.info(
-        "telegraph: статей у объявления %d, дописано %d", len(urls), len(parts) - 1
+        "article_page: статей у объявления %d, дописано %d", len(urls), len(parts) - 1
     )
     return "\n\n".join(parts), whole
 

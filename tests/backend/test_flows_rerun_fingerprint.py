@@ -10,7 +10,7 @@
 за строкой и только вместе с ней.
 """
 
-from tests.fakes.telegraph import serve_articles
+from tests.fakes.article_page import serve_articles
 from backend.flows import embeddings as embeddings_mod
 from backend.flows import parse as parse_mod
 from backend.models import Vacancy
