@@ -5,7 +5,7 @@ from datetime import date
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.salary import salary_text
-from backend.domain.tenure import full_years, place_period, skill_years, years_in_it, years_text
+from backend.domain.tenure import full_years, place_period, worked_years, years_text
 from backend.llm.candidate import GENDER_WORDS, candidate_languages, format_languages
 from backend.models import SalaryPeriod
 from backend.repository.profile import get_profile
@@ -33,7 +33,7 @@ async def build_agent_profile(session: AsyncSession, today: date, photo: bool) -
     return "\n".join([
         *_person_lines(profile, languages, today),
         f"Фото: {'есть' if photo else 'нет'}",
-        f"Общий стаж: {years_text(years_in_it(places, today)) if places else 'нет мест работы'}",
+        f"Общий стаж: {years_text(worked_years(places, today)) if places else 'нет мест работы'}",
         "Навыки:", *_skill_lines(skills, places, projects, today),
         "Опыт работы:", *_place_lines(places),
         "Проекты:", *_project_lines(projects),
@@ -98,7 +98,7 @@ def _skill_term(skill, places, projects, today: date) -> str:
     не даёт."""
     named = [p for p in places if skill in p.skills]
     if named:
-        return f"стаж {years_text(skill_years(named, today))}"
+        return f"стаж {years_text(worked_years(named, today))}"
     if any(skill in p.skills for p in projects):
         return "опыт есть в проектах, стаж не считается"
     return "стаж не привязан к местам работы"
