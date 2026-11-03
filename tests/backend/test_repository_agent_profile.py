@@ -136,15 +136,14 @@ async def test_a_skill_gets_the_tenure_of_the_places_that_name_it(
     await put(session_factory, tool, loose, first, second)
     await session.execute(profile_experience_skills.insert().values([
         {"experience_id": first.id, "skill_id": tool.id},
-        {"experience_id": second.id, "skill_id": tool.id},
     ]))
     await session.commit()
 
     text = await build_agent_profile(session, TODAY, photo=False)
 
-    assert "Инструмент-А — уровень 3 из 5, стаж 4+ г." in text
+    assert "Инструмент-А — уровень 3 из 5, стаж 2+ г." in text
     assert "Инструмент-Б — уровень 3 из 5, стаж не привязан к местам работы" in text
-    assert "Общий стаж: 7+ г." in text
+    assert "Общий стаж: 3+ г." in text
 
 
 async def test_a_place_and_a_project_name_their_own_skills(session, session_factory):

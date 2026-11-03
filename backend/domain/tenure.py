@@ -19,27 +19,33 @@ def years_text(years: int) -> str:
 
 
 def full_years(start: date, end: date) -> int:
-    """Полных лет между датами. Отрицательным не бывает: место, начатое
-    «завтра», — опечатка, а не отрицательный стаж."""
+    """Полных лет между датами. Отрицательным не бывает: дата рождения
+    «завтра» — опечатка, а не отрицательный возраст."""
     years = end.year - start.year - ((end.month, end.day) < (start.month, start.day))
     return max(years, 0)
 
 
-def years_in_it(experiences, today: date) -> int:
-    """Сколько лет опыта — от самого раннего места работы до сегодня.
+def _month_number(day: date) -> int:
+    return day.year * 12 + day.month
 
-    Считается по началу, а не по сумме сроков: перерывы между местами опытом
-    быть не перестают, а вычесть их значило бы спорить с тем, как этот срок
-    называют в резюме.
+
+def worked_years(experiences, today: date) -> int:
+    """Полных лет в сумме месяцев, отработанных на данных местах.
+
+    Месяцы считаются целиком с обоих концов: импорт резюме пишет конец места
+    первым числом месяца, окно — любым днём, и «01.2020 — 12.2020» в обоих
+    случаях — год. Перерывы не считаются, пересекающиеся места — один раз.
+    Срок не идёт дальше сегодняшнего месяца: будущее стажем ещё не стало.
+    Место, кончающееся раньше начала, — опечатка ввода — ничего не даёт.
     """
-    return full_years(min(e.start_date for e in experiences), today)
-
-
-def skill_years(experiences, today: date) -> int:
-    """Стаж по навыку — от первого места, где он назван, до конца последнего.
-
-    Правило то же, что у общего стажа, кроме конца: навык с прошлой работы
-    не растёт до сегодня.
-    """
-    end = max(e.end_date or today for e in experiences)
-    return full_years(min(e.start_date for e in experiences), end)
+    spans = sorted(
+        (_month_number(e.start_date), _month_number(min(e.end_date or today, today)))
+        for e in experiences
+    )
+    months, counted_to = 0, 0
+    for start, end in spans:
+        start = max(start, counted_to + 1)
+        if end >= start:
+            months += end - start + 1
+            counted_to = end
+    return months // 12
