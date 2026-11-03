@@ -249,28 +249,41 @@ async def refresh_channel_metadata(pipeline, channels) -> None:
 
 
 async def _unseen_posts(pipeline, channel_username: str, last_id: int | None):
-    """Посты канала, которых мы ещё не видели, — старые первыми, не больше
-    предела за обход.
+    """Не больше предела самых свежих постов, новее отметки, — старые первыми.
 
-    С отметкой канал читается свежими вперёд до первого уже виденного, и
-    берутся старейшие непрочитанные: отметка сдвигается только по прочитанному,
-    а остальное возьмут следующие обходы. Возьми свежие — и после простоя,
-    когда новых больше предела, середина между отметкой и ними пропала бы.
+    Вышло новых меньше предела — берутся только они: чтение обрывается на
+    первом уже виденном. Больше — посты между отметкой и самым старым взятым
+    пропускаются: дочитывать их по пределу за обход значит отставать на
+    активном канале всё сильнее, разбирая закрытые вакансии, а чтение истории
+    до отметки без предела упирается в FloodWait.
 
-    Без отметки — первый обход — берётся предел самых свежих: это глубина
-    первого захода, читать «до виденного» нечего.
+    Спрашивается на пост больше предела: лишний, если он новее отметки, и
+    говорит, что пропуск был, — иначе ровно предел новых не отличить от
+    пропуска.
     """
     limit = pipeline.rs.backfill_limit
-    client = pipeline.client
-    if last_id is None:
-        newest = [msg async for msg in client.get_chat_history(channel_username, limit=limit)]
-        return list(reversed(newest))
     unseen = []
-    async for msg in client.get_chat_history(channel_username):
-        if msg.id <= last_id:
+    async for msg in pipeline.client.get_chat_history(channel_username, limit=limit + 1):
+        if last_id is not None and msg.id <= last_id:
             break
         unseen.append(msg)
-    return list(reversed(unseen))[:limit]
+    fresh = unseen[:limit]
+    if last_id is not None and len(unseen) > limit:
+        _log_skipped(channel_username, last_id, fresh[-1].id)
+    return list(reversed(fresh))
+
+
+def _log_skipped(channel_username: str, last_id: int, oldest_taken: int) -> None:
+    """Записать, сколько постов между отметкой и самым старым взятым пропущено.
+
+    Число — по номерам, без чтения пропущенного: читать его ради счёта и есть
+    то, от чего уходит предел. Удалённые посты тоже занимают номер, поэтому
+    это верхняя граница.
+    """
+    logger.info(
+        "[@%s] пропущено до %d постов между отметкой %d и %d: новых больше предела",
+        channel_username, oldest_taken - last_id - 1, last_id, oldest_taken,
+    )
 
 
 async def _take_post(pipeline, channel_id: int, channel_username: str, msg) -> bool:

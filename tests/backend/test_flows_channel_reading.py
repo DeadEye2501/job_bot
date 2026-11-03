@@ -294,26 +294,66 @@ async def test_the_window_is_told_where_inside_the_channel_it_is(reading):
     ]
 
 
-async def test_a_channel_that_outran_the_limit_loses_nothing(reading, session_factory):
-    """Канал, выложивший больше предела за простой, не теряет середину.
+async def test_a_channel_that_outran_the_limit_takes_the_freshest(
+    reading, session_factory
+):
+    """Канал, выложивший за простой больше предела, отдаёт предел самых свежих.
 
-    За обход берётся предел старейших непрочитанных, и отметка встаёт на
-    последнем из них: остальное заберут следующие обходы. Отметка, уехавшая на
-    самый свежий, оставила бы между ней и прежней посты, которых не увидит уже
-    никто.
+    На активном канале новых за круг приходит больше предела, и дочитывание
+    старейших отставало бы всё сильнее. Отметка встаёт на самый свежий, а
+    у Telegram спрашивается предел и один пост сверх него — не вся история.
     """
     pipeline, client, channel = reading
     await pipeline.rs.set_app("backfill_limit", "3")
     client.history = [post(msg_id) for msg_id in range(20, 0, -1)]
 
     await channels.poll_channel(pipeline, channel.id, "jobs", 5)
-    first = list(pipeline.taken)
-    await channels.poll_channel(pipeline, channel.id, "jobs", 8)
 
-    assert first == [6, 7, 8]
-    assert pipeline.taken == [6, 7, 8, 9, 10, 11]
+    assert pipeline.taken == [18, 19, 20]
+    assert client.history_calls == [("jobs", 4)]
     saved = await only_row(session_factory, TelegramChannel)
-    assert saved.last_processed_msg_id == 11
+    assert saved.last_processed_msg_id == 20
+
+
+async def test_skipped_posts_are_counted_in_the_log(reading, caplog):
+    """Пропущенное между отметкой и самым старым взятым пишется в журнал числом.
+
+    Число — по номерам постов, без чтения пропущенного: удалённые посты тоже
+    занимают номер, поэтому это верхняя граница.
+    """
+    pipeline, client, channel = reading
+    await pipeline.rs.set_app("backfill_limit", "3")
+    client.history = [post(msg_id) for msg_id in range(20, 0, -1)]
+
+    with caplog.at_level("INFO"):
+        await channels.poll_channel(pipeline, channel.id, "jobs", 5)
+
+    assert "[@jobs] пропущено до 12 постов между отметкой 5 и 18" in caplog.text
+
+
+async def test_exactly_the_limit_of_new_posts_skips_nothing(reading, caplog):
+    """Новых ровно предел — ничего не пропущено, и журнал об этом молчит."""
+    pipeline, client, channel = reading
+    await pipeline.rs.set_app("backfill_limit", "3")
+    client.history = [post(msg_id) for msg_id in range(8, 0, -1)]
+
+    with caplog.at_level("INFO"):
+        await channels.poll_channel(pipeline, channel.id, "jobs", 5)
+
+    assert pipeline.taken == [6, 7, 8]
+    assert "пропущено" not in caplog.text
+
+
+async def test_the_first_walk_is_not_called_a_skip(reading, caplog):
+    """Первый обход без отметки ничего не пропускает: предел — его глубина."""
+    pipeline, client, channel = reading
+    await pipeline.rs.set_app("backfill_limit", "3")
+    client.history = [post(msg_id) for msg_id in range(20, 0, -1)]
+
+    with caplog.at_level("INFO"):
+        await channels.poll_channel(pipeline, channel.id, "jobs", None)
+
+    assert "пропущено" not in caplog.text
 
 
 async def test_the_first_walk_of_a_channel_takes_the_freshest(reading):
