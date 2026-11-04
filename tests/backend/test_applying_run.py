@@ -6,11 +6,12 @@ import pytest
 
 from backend.agent.stops import ResumeMissing
 from backend.applying import run
-from backend.applying.result import Dropped, Missed, TelegramClosed, Unfit
+from backend.applying.result import Dropped, Missed, TelegramClosed, Unfit, WindowClosed
 from backend.models import Vacancy, VacancyStatus
 from tests.backend.fixtures.applying import MAIL
 from tests.dbio import put
 from tests.factories import channel_row
+from tests.factories_aggregators import vacancy_contact_row
 
 
 @pytest.fixture
@@ -87,6 +88,25 @@ async def test_a_telegram_ban_closes_telegram_for_the_rest_of_the_run(
     answers[(first, "telegram")] = Missed("FloodWait", TelegramClosed(until=time.time() + 600))
     await run.apply_vacancies(kit, [first, second])
     assert calls == [(first, "telegram"), (first, "email"), (second, "email")]
+
+
+async def test_a_site_whose_window_was_closed_stays_shut_for_the_rest_of_the_work(
+        executors, two_vacancies, kit, session_factory, monkeypatch):
+    """Не только до конца этого прогона: поллинг зовёт откликателя на каждую
+    пачку находок, а набор агента у них один."""
+    monkeypatch.setattr("backend.applying.world.current_refusal", lambda chat: None)
+    calls, answers = executors
+    first, second = (v.id for v in two_vacancies)
+    for vacancy_id in (first, second):
+        await put(session_factory, vacancy_contact_row(vacancy_id, "https://company.test/apply"))
+        answers[(vacancy_id, "telegram")] = Missed("нет адресата")
+    answers[(first, "form")] = Missed("человек закрыл окно браузера", WindowClosed("company.test"))
+
+    await run.apply_vacancies(kit, [first])
+    await run.apply_vacancies(kit, [second])
+
+    assert calls == [(first, "telegram"), (first, "form"), (first, "email"),
+                     (second, "telegram"), (second, "email")]
 
 
 async def test_a_crashed_way_hands_over_to_the_next(executors, two_vacancies, kit, monkeypatch):

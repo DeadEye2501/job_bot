@@ -31,6 +31,30 @@ async def test_a_window_closed_by_the_person_is_not_opened_again(monkeypatch):
     assert stops == [1] and len(playwright.contexts) == 1
 
 
+async def test_a_closed_window_is_noticed_without_asking_for_a_page(monkeypatch):
+    """Сессия может кончиться, ни разу не спросив вкладку после закрытия окна."""
+    stops = []
+    host, playwright = driven_host(monkeypatch, lambda: stops.append(1))
+    await host.open_profile(1)
+    playwright.contexts[0].pages.clear()
+
+    await host.notice_closed()
+
+    assert stops == [1]
+    with pytest.raises(BrowserClosed):
+        await host.page()
+
+
+async def test_an_open_window_is_not_taken_for_a_closed_one(monkeypatch):
+    stops = []
+    host, _ = driven_host(monkeypatch, lambda: stops.append(1))
+    await host.open_profile(1)
+
+    await host.notice_closed()
+
+    assert stops == [] and await host.page()
+
+
 async def test_the_next_work_opens_the_profile_again(monkeypatch):
     host, playwright = driven_host(monkeypatch)
     await host.open_profile(1)

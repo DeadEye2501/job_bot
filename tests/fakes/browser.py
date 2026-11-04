@@ -135,9 +135,17 @@ class FakeBrowser:
         self.calls: list[str] = []
         self.closes = True
         self.sending: bool | None = None
+        # Окно, закрытое человеком без события браузера: `notice_closed` зовёт
+        # это раз, как хозяин браузера зовёт `on_closed`.
+        self.unnoticed_close = None
 
     async def page(self):
         return self._page
+
+    async def notice_closed(self):
+        if self.unnoticed_close is not None:
+            close, self.unnoticed_close = self.unnoticed_close, None
+            close()
 
     async def show(self):
         self.calls.append("show")

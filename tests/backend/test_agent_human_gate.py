@@ -284,3 +284,30 @@ async def test_a_click_after_the_wait_expired_does_not_raise_a_browser():
     await asyncio.sleep(0)
 
     assert browser.calls == ["show"]
+
+
+async def test_a_forgotten_wait_hides_the_plate_and_the_next_call_calls_the_person_anew():
+    """Ожидание брошено вместе с сессией, что его вела: плашка гаснет, а тот же
+    зов следующей сессии снова выводит браузер и зовёт человека — со своим сроком."""
+    gate, told = _gate()
+    browser = FakeBrowser()
+    first = asyncio.create_task(gate.wait("login", "site.test", browser))
+    await asyncio.sleep(0)
+    first.cancel()
+    await asyncio.gather(first, return_exceptions=True)
+
+    gate.forget()
+    assert told[-1] == "resolved"
+
+    waiting = asyncio.create_task(gate.wait("login", "site.test", browser))
+    await asyncio.sleep(0)
+    assert told[-1] == ("login", "site.test", None)
+    assert browser.calls == ["show", "show"]
+    gate.resolve()
+    assert await waiting == "готово"
+
+
+async def test_forgetting_when_nobody_waits_tells_the_window_nothing():
+    gate, told = _gate()
+    gate.forget()
+    assert told == []

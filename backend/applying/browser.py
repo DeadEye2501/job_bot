@@ -1,18 +1,21 @@
 """Браузерный способ: сессия агента на кнопку агрегатора или форму работодателя."""
 
+import asyncio
+
 from backend.agent.confirm import confirming
 from backend.agent.jobs import Applied, ApplyJob, Failed, Finished
 from backend.agent.kit import AgentKit, SessionPlan
 from backend.agent.prompts.applier import APPLIER_PROMPT, applier_task
 from backend.agent.prompts.frame import system_prompt
-from backend.agent.sessions import run_to_limit
+from backend.agent.sessions import WINDOW_CLOSED, run_to_limit
 from backend.agent.stops import ResumeMissing
 from backend.agent.tools_applier import applier_tools
 from backend.agent.tools_browser import browser_tools
 from backend.agent.tools_common import common_tools
 from backend.agent.tools_letter import letter_tools
-from backend.applying.result import GONE, Dropped, Missed, Outcome, SiteClosed, Unfit
+from backend.applying.result import GONE, Dropped, Missed, Outcome, SiteClosed, Unfit, WindowClosed
 from backend.domain.apply_order import Way
+from backend.domain.hosts import normalize_host
 from backend.models import Aggregator
 from backend.payloads import SeenResume
 from backend.repository.aggregator_resumes import chosen_resume, drop_resume
@@ -31,6 +34,11 @@ async def via_browser(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome:
     Выбранного резюме сайт не предложил — его больше нет на сайте: оно
     удаляется из базы (база — зеркало сайта), другое не отмечается, и прогон
     снимается целиком — следующий отклик на этом сайте ушёл бы не тем резюме.
+
+    Окно браузера, закрытое человеком посреди сессии, гасит только её
+    (`AgentKit.window_closed`): брошенное ожидание человека прибирается, а сайт
+    до конца работы больше не предлагается — у кнопки агрегатора весь агрегатор,
+    а не хост ссылки: ссылка бывает на его поддомен.
     """
     rs = kit.pipeline.rs
     async with kit.pipeline.session_factory() as session:
@@ -45,13 +53,26 @@ async def via_browser(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome:
     job = ApplyJob(vacancy_id, way, profile, simulated=rs.send_locked, letter_writer=rs.letter_writer,
                    language=language, resume=SeenResume(resume.title, resume.url) if resume else None,
                    confirming=confirming(kit))
-    plan = _apply_plan(kit, job, vacancy_text, profile_text)
-    await kit.browser.open_profile(job.profile_id, sending=not job.simulated)
-    await run_to_limit(kit, plan)
-    if isinstance(job.outcome, Finished) and job.outcome.result == "resume_missing":
+    closed = asyncio.Event()
+    plan = _apply_plan(kit, job, vacancy_text, profile_text, closed)
+    kit.window_closed = closed
+    try:
+        await kit.browser.open_profile(job.profile_id, sending=not job.simulated)
+        await run_to_limit(kit, plan)
+        # Сессия могла кончиться, так и не заметив закрытого окна: отказ действия
+        # агент получает текстом, а событие браузера приходит позже или никогда.
+        await kit.browser.notice_closed()
+    finally:
+        kit.window_closed = None
+    shut = (site.host if site else normalize_host(way.target)) if closed.is_set() else None
+    if shut is not None:
+        kit.gate.forget()
+    # «Резюме нет» агент тоже мог сказать, ослепнув без браузера, а цена ошибки
+    # здесь — удалённое резюме и снятая работа.
+    if shut is None and isinstance(job.outcome, Finished) and job.outcome.result == "resume_missing":
         await kit.written(lambda session: drop_resume(session, site.id, job.resume.url))
         raise ResumeMissing(site.host)
-    outcome = _settle(job, way)
+    outcome = _settle(job, way, shut)
     if isinstance(outcome, Unfit):
         await _mark_unfit(kit, vacancy_id, outcome.reason)
     return outcome
@@ -64,7 +85,8 @@ async def _mark_unfit(kit: AgentKit, vacancy_id: int, reason: str) -> None:
     kit.pipeline.fire_vacancies_changed()
 
 
-def _apply_plan(kit: AgentKit, job: ApplyJob, vacancy_text: str, profile_text: str) -> SessionPlan:
+def _apply_plan(kit: AgentKit, job: ApplyJob, vacancy_text: str, profile_text: str,
+                closed: asyncio.Event) -> SessionPlan:
     """План откликателя.
 
     Поиск в сети — для курса валют в анкете и вакансии.
@@ -73,16 +95,21 @@ def _apply_plan(kit: AgentKit, job: ApplyJob, vacancy_text: str, profile_text: s
              *browser_tools(kit, kit.pipeline.cv_file(), kit.pipeline.photo_file(),
                             job if job.confirming else None)]
     task = applier_task(job, vacancy_text, profile_text, kit.today)
-    return SessionPlan(system_prompt(APPLIER_PROMPT, tools), task, tools, web_search=True)
+    return SessionPlan(system_prompt(APPLIER_PROMPT, tools), task, tools, web_search=True, cut=closed)
 
 
-def _settle(job: ApplyJob, way: Way) -> Outcome:
-    """Исход способа; закрытая площадка — урок, её кнопка до конца прогона не предлагается."""
+def _settle(job: ApplyJob, way: Way, shut: str | None) -> Outcome:
+    """Исход способа; закрытая площадка — урок, её кнопка до конца прогона не
+    предлагается. `shut` — хост сайта, чьё окно закрыл человек; пусто — окно
+    не закрывали. Закрытое окно уступает только ушедшему отклику и «Закончить»:
+    прочий итог агент мог поставить, уже ослепнув без браузера."""
     outcome = job.outcome
     if isinstance(outcome, Applied):
         return "applied"
     if isinstance(outcome, Dropped):
         return outcome
+    if shut is not None:
+        return Missed(WINDOW_CLOSED, WindowClosed(shut))
     if isinstance(outcome, Finished) and outcome.result == "vacancy_closed":
         return Missed("вакансия закрыта на сайте")
     if isinstance(outcome, Finished) and outcome.result == "not_fit":

@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 
 from backend.domain.contact_keys import contact_key, is_address, is_link
-from backend.domain.hosts import on_telegram, page_owner
+from backend.domain.hosts import on_telegram, owning_host, page_owner
 from backend.domain.spellings import dedupe_first_wins
 from backend.models import ApplicationVia
 
@@ -46,13 +46,18 @@ class VacancyFacts:
 
 @dataclass
 class World:
-    """Что сейчас доступно. Живёт прогон откликателя: исполнитель доучивает его."""
+    """Что сейчас доступно. Живёт прогон откликателя: исполнитель доучивает его.
+
+    `shut_hosts` — сайты, чьё окно человек закрыл посреди отклика: ни кнопкой,
+    ни формой они не предлагаются, с поддоменами.
+    """
 
     telegram_open: bool
     mail_ready: bool
     agent_ready: bool
     sites: list[KnownSite]
     closed_sites: set[int]
+    shut_hosts: set[str]
 
 
 def apply_ways(vacancy: VacancyFacts, world: World) -> list[Way]:
@@ -85,7 +90,7 @@ def _buttons(vacancy: VacancyFacts, world: World) -> list[Way]:
     for link in _links(vacancy):
         site = page_owner(link, world.sites)
         if (site is not None and site.logged_in and site.resume_chosen
-                and site.id not in world.closed_sites):
+                and site.id not in world.closed_sites and not _shut(link, world)):
             ways.append(Way(VIA_AGGREGATOR, link, site.id))
     return ways
 
@@ -99,7 +104,12 @@ def _forms(vacancy: VacancyFacts, world: World) -> list[Way]:
     """
     web_find = vacancy.source_site is not None and vacancy.source_site.host is None
     return [Way(VIA_FORM, link, None) for link in _links(vacancy)
-            if (web_find or link != vacancy.source_url) and page_owner(link, world.sites) is None]
+            if (web_find or link != vacancy.source_url) and page_owner(link, world.sites) is None
+            and not _shut(link, world)]
+
+
+def _shut(link: str, world: World) -> bool:
+    return owning_host(link, world.shut_hosts) is not None
 
 
 def _links(vacancy: VacancyFacts) -> list[str]:

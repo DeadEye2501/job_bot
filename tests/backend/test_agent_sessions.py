@@ -153,3 +153,23 @@ async def test_the_frame_names_the_language_of_the_person(make_pipeline, session
     await run_guarded(kit_for(await make_pipeline(), gate=silent_gate(), run_session=session), plan)
 
     assert "на языке пользователя — Қазақша" in seen[0]
+
+
+async def test_a_cut_session_is_put_out_and_ends_without_success(make_pipeline):
+    """Человек закрыл окно браузера посреди отклика: сессия гаснет до возврата."""
+    cut, stopped = asyncio.Event(), asyncio.Event()
+
+    async def session(plan):
+        cut.set()
+        try:
+            await asyncio.sleep(3600)
+        finally:
+            stopped.set()
+
+    # С потолком: не погаси гонка сессию, тест упал бы через три часа срока сессии.
+    end = await asyncio.wait_for(run_guarded(
+        kit_for(await make_pipeline(), gate=silent_gate(), run_session=session),
+        dataclasses.replace(PLAN, cut=cut)), 5)
+
+    assert end == AgentEnd(False, "человек закрыл окно браузера", False)
+    assert stopped.is_set()

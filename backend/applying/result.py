@@ -24,7 +24,15 @@ class SiteClosed:
     site_id: int
 
 
-Lesson = TelegramClosed | SiteClosed
+@dataclass(frozen=True)
+class WindowClosed:
+    """Человек закрыл окно браузера посреди отклика на этом сайте; `host` — хост
+    адреса способа."""
+
+    host: str
+
+
+Lesson = TelegramClosed | SiteClosed | WindowClosed
 
 
 @dataclass(frozen=True)

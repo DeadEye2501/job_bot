@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.agent.availability import current_refusal
-from backend.applying.result import Lesson, TelegramClosed
+from backend.applying.result import Lesson, SiteClosed, TelegramClosed
 from backend.domain.apply_order import KnownSite, VacancyFacts, Way, World, apply_ways
 from backend.models import HR, Aggregator, Vacancy, VacancyStatus
 from backend.repository.aggregator_resumes import chosen_resume
@@ -28,6 +28,7 @@ async def read_world(rs, session_factory) -> World:
         agent_ready=current_refusal(rs.chat) is None,
         sites=sites,
         closed_sites=set(),
+        shut_hosts=set(),
     )
 
 
@@ -86,5 +87,7 @@ def learn(world: World, lesson: Lesson) -> None:
     """Доучить мир тем, что узнал исполнитель."""
     if isinstance(lesson, TelegramClosed):
         world.telegram_open = False
-    else:
+    elif isinstance(lesson, SiteClosed):
         world.closed_sites.add(lesson.site_id)
+    else:
+        world.shut_hosts.add(lesson.host)

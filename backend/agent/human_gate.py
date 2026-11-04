@@ -153,6 +153,17 @@ class HumanGate:
             self._answer = _STOPPED
             self._done.set()
 
+    def forget(self) -> None:
+        """Ожидание брошено вместе с сессией, что его вела: человек закрыл окно
+        браузера посреди отклика. Плашка гаснет, а срок не достаётся следующей
+        сессии — её тот же зов иначе не позвал бы человека и не вывел бы браузер.
+
+        Ждущих не будит: их вызовы гасит конец сессии.
+        """
+        if self._deadline is not None:
+            self._deadline = None
+            self._on_resolved()
+
     def reset(self) -> None:
         """К новой работе агента: прежние срок и остановка касались прошлой."""
         self._deadline, self._answer = None, None
