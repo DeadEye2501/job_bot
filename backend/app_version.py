@@ -3,7 +3,7 @@
 Тег релиза на GitHub повторяет этот номер с приставкой `v`, а не наоборот.
 """
 
-VERSION = "1.2.2"
+VERSION = "1.2.3"
 
 
 def _parse(text: str) -> tuple[int, int, int] | None:
