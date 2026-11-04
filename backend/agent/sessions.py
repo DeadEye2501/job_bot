@@ -29,6 +29,8 @@ _TICK_SEC = 1.0
 # и верхней границы у их суммы нет. Выход из зависшего — «Стоп».
 SEEKER_TOOL_TIMEOUT_MS = 2**31 - 1
 
+WINDOW_CLOSED = "человек закрыл окно браузера"
+
 
 async def run_guarded(kit: AgentKit, plan: SessionPlan) -> AgentEnd:
     """Сессия наперегонки со сроками. Отмена снаружи гасит сессию и ждёт её конца:
@@ -44,14 +46,17 @@ async def run_guarded(kit: AgentKit, plan: SessionPlan) -> AgentEnd:
     language = await kit.read(read_user_language)
     plan = replace(plan, system_prompt=in_user_language(plan.system_prompt, language))
     session = asyncio.create_task(kit.run_session(plan))
-    expiry = asyncio.create_task(kit.gate.expired.wait())
+    stops = {asyncio.create_task(kit.gate.expired.wait())}
+    if plan.cut is not None:
+        stops.add(asyncio.create_task(plan.cut.wait()))
     try:
-        done = await _raced(session, expiry, plan.paused)
+        done = await _raced(session, stops, plan.paused)
     except asyncio.CancelledError:
         await _shielded_put_out(session)
         raise
     finally:
-        expiry.cancel()
+        for stop in stops:
+            stop.cancel()
     if session not in done:
         # Под щитом и здесь: истёкший срок человека гасит и сессию искателя, и
         # вложенную в его вызов — гашение сверху застало бы нас посреди этого.
@@ -62,6 +67,8 @@ async def run_guarded(kit: AgentKit, plan: SessionPlan) -> AgentEnd:
         raise HumanTimeout
     if session in done:
         return session.result()
+    if plan.cut is not None and plan.cut.is_set():
+        return AgentEnd(False, WINDOW_CLOSED, False)
     return AgentEnd(False, "сессия агента превысила срок", False)
 
 
@@ -70,8 +77,9 @@ async def _shielded_put_out(session: asyncio.Task) -> None:
         await put_out(session)
 
 
-async def _raced(session: asyncio.Task, expiry: asyncio.Task, paused) -> set:
-    """Дождаться сессии или истёкшего ожидания человека; пусто — срок вышел.
+async def _raced(session: asyncio.Task, stops: set[asyncio.Task], paused) -> set:
+    """Дождаться сессии или того, что её гасит, — истёкшего ожидания человека
+    или события плана (`SessionPlan.cut`); пусто — срок вышел.
 
     Срок отсчитывается шагами и тратится только на шаги, когда сессия не
     стоит: стоящую ждут, сколько бы она ни стояла.
@@ -81,7 +89,7 @@ async def _raced(session: asyncio.Task, expiry: asyncio.Task, paused) -> set:
     while left > 0:
         began = loop.time()
         done, _ = await asyncio.wait(
-            {session, expiry}, timeout=min(_TICK_SEC, left), return_when=asyncio.FIRST_COMPLETED
+            {session, *stops}, timeout=min(_TICK_SEC, left), return_when=asyncio.FIRST_COMPLETED
         )
         if done:
             return done

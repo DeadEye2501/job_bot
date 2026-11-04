@@ -71,11 +71,21 @@ async def in_slot(bot, job: Callable[[AgentKit], Awaitable[str]], label: str,
     return await slot.answer_in_slot(bot, lambda: agent_work(bot, job), label, progress)
 
 
+def window_closed(bot, kit: AgentKit) -> None:
+    """Человек закрыл окно браузера агента. Посреди отклика — бросил этот отклик:
+    гаснет он один, а работа идёт дальше. В прочее время — остановил работу."""
+    if kit.window_closed is not None:
+        kit.window_closed.set()
+    else:
+        slot.cancel_current_poll(bot)
+
+
 def _kit(bot) -> AgentKit:
-    return AgentKit(
+    kit = AgentKit(
         pipeline=bot.ingestion,
-        browser=BrowserHost(find_browser(), bot.rs.show_browser, lambda: slot.cancel_current_poll(bot)),
+        browser=BrowserHost(find_browser(), bot.rs.show_browser, lambda: window_closed(bot, kit)),
         gate=bot.human_gate,
         run_session=live_session(bot.rs.chat.model),
         today=date.today(),
     )
+    return kit

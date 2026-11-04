@@ -71,6 +71,6 @@ def mail_account_row() -> MailAccount:
 def world_of(**overrides) -> World:
     """Мир откликателя, где открыто всё, а сайтов человека нет; иное задаёт тест."""
     fields = {"telegram_open": True, "mail_ready": True, "agent_ready": True,
-              "sites": [], "closed_sites": set()}
+              "sites": [], "closed_sites": set(), "shut_hosts": set()}
     fields.update(overrides)
     return World(**fields)

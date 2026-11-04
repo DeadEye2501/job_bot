@@ -3,7 +3,7 @@
 import asyncio
 
 from backend.applying import run
-from backend.applying.result import Unfit
+from backend.applying.result import Missed, Unfit, WindowClosed
 from backend.bot.apply import apply_all_new, apply_chosen_way
 from backend.models import BotMode, Vacancy, VacancyStatus
 from tests.backend.fixtures.applying import MAIL, TG, telegram_vacancy
@@ -74,6 +74,17 @@ async def test_a_way_that_found_the_vacancy_unfit_says_so(manual_case, monkeypat
 
     monkeypatch.setitem(run.EXECUTORS, "email", unfit)
     assert await apply_chosen_way(bot, vacancy.id, MAIL) == "unfit"
+
+
+async def test_a_way_whose_window_the_person_closed_is_cancelled_not_failed(manual_case, monkeypatch):
+    """Человек закрыл окно сам: окну это отмена отклика, а не провал."""
+    bot, vacancy = await manual_case()
+
+    async def closed(kit, vacancy_id, way):
+        return Missed("человек закрыл окно браузера", WindowClosed("company.test"))
+
+    monkeypatch.setitem(run.EXECUTORS, "email", closed)
+    assert await apply_chosen_way(bot, vacancy.id, MAIL) == "cancelled"
 
 
 async def test_apply_all_new_goes_through_every_new_vacancy(manual_case, session_factory):

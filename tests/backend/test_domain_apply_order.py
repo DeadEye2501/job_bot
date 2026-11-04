@@ -51,6 +51,13 @@ def test_a_closed_site_drops_its_button():
     assert ways == []
 
 
+def test_a_shut_host_drops_its_buttons_and_forms_with_their_subdomains():
+    ways = apply_ways(_vacancy(source_url="https://site.test/vacancy/1", source_site=SITE, contacts=[
+        "https://jobs.company.test/apply", "https://other.test/apply", "hr@company.test"]),
+        _world(shut_hosts={"site.test", "company.test"}))
+    assert ways == [Way("form", "https://other.test/apply", None), Way("email", "hr@company.test", None)]
+
+
 def test_a_vacancy_from_an_aggregator_goes_through_its_button_first():
     ways = apply_ways(_vacancy(source_url="https://site.test/vacancy/1", source_site=SITE,
                                contacts=["hr@company.test"]), _world())

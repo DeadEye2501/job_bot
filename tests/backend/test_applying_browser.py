@@ -1,10 +1,13 @@
 """Браузерный способ: одна сессия агента на кнопку агрегатора или форму работодателя."""
 
+import dataclasses
+
 import pytest
 
+from backend.agent.human_gate import HumanGate
 from backend.agent.stops import LimitExhausted, ResumeMissing
 from backend.applying.browser import via_browser
-from backend.applying.result import Dropped, Missed, SiteClosed, Unfit
+from backend.applying.result import Dropped, Missed, SiteClosed, Unfit, WindowClosed
 from backend.domain.apply_order import Way
 from backend.models import (
     AggregatorResume, Vacancy, VacancyStatus, VacancyStatusHistory,
@@ -15,6 +18,7 @@ from tests.factories_aggregators import aggregator_resume_row, web_search_row
 from tests.fakes.agent import (
     LimitHit,
     edited,
+    fail_step,
     finish_step,
     finished,
     page_item,
@@ -126,6 +130,70 @@ async def test_an_exhausted_subscription_stops_the_run_not_just_the_way(board, k
     kit = await kit_with([limit])
     with pytest.raises(LimitExhausted):
         await via_browser(kit, vacancy.id, Way("aggregator", PAGE, site.id))
+
+
+async def test_a_window_closed_mid_application_misses_the_way_and_shuts_the_site(board, kit_with):
+    """Окно закрыто, пока агент ждёт входа: гаснет отклик этим способом, плашка
+    убирается, а сайт до конца работы больше не предлагается."""
+    site, vacancy = await board()
+    told = []
+
+    async def step(tools):
+        kit.window_closed.set()
+        await tools["need_human"](kind="login")
+
+    kit = await kit_with([step])
+    kit = dataclasses.replace(kit, gate=HumanGate(lambda *need: told.append("needed"),
+                                                  lambda: told.append("resolved")))
+
+    outcome = await via_browser(kit, vacancy.id, Way("aggregator", PAGE, site.id))
+
+    assert outcome == Missed("человек закрыл окно браузера", WindowClosed("site.test"))
+    assert told == ["needed", "resolved"]
+    assert kit.window_closed is None
+
+
+async def test_a_close_the_session_never_noticed_still_shuts_the_whole_aggregator(board, kit_with):
+    """Агент получил отказ действия текстом и кончил сессию сам, а браузер о
+    закрытии ещё не сообщил: окно замечается после сессии. Ссылка была на
+    поддомен — закрывается агрегатор, а не хост ссылки."""
+    site, vacancy = await board()
+    kit = await kit_with([fail_step("страница не отвечает")])
+    kit.browser.unnoticed_close = lambda: kit.window_closed.set()
+
+    outcome = await via_browser(kit, vacancy.id, Way("aggregator", "https://spb.site.test/vacancy/1", site.id))
+
+    assert outcome == Missed("человек закрыл окно браузера", WindowClosed("site.test"))
+
+
+async def test_a_missing_resume_said_after_the_window_closed_drops_nothing(
+        board, kit_with, session_factory):
+    """Без браузера агент резюме не видит: его «нет» — не повод удалять резюме и снимать работу."""
+    site, vacancy = await board()
+    await put(session_factory, aggregator_resume_row(
+        site.id, title="Повар", url="https://site.test/resume/1", is_chosen=True))
+
+    async def step(tools):
+        kit.window_closed.set()
+        await tools["finish"](result="resume_missing")
+
+    kit = await kit_with([step])
+
+    outcome = await via_browser(kit, vacancy.id, Way("aggregator", PAGE, site.id))
+
+    assert outcome == Missed("человек закрыл окно браузера", WindowClosed("site.test"))
+    assert (await only_row(session_factory, AggregatorResume)).is_chosen is True
+
+
+async def test_a_window_closed_after_the_application_went_out_keeps_it_applied(board, kit_with):
+    site, vacancy = await board()
+
+    async def step(tools):
+        await tools["record_application"](via="aggregator", target=PAGE)
+        kit.window_closed.set()
+
+    kit = await kit_with([step])
+    assert await via_browser(kit, vacancy.id, Way("aggregator", PAGE, site.id)) == "applied"
 
 
 async def test_the_applier_is_told_how_to_call_a_person(board, kit_with):

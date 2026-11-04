@@ -1,7 +1,8 @@
 """Набор, с которым работает сессия агента."""
 
+import asyncio
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from typing import TypeVar
 
@@ -24,7 +25,9 @@ class SessionPlan:
 
     `paused()` — стоит ли сейчас работа самой сессии: тогда её срок не течёт.
     `tool_timeout_ms` — срок одного вызова инструмента; пусто — общий срок
-    процесса агента (`claude_code_agent`).
+    процесса агента (`claude_code_agent`). `cut` — событие, которое гасит
+    сессию снаружи: у отклика в браузере — окно, закрытое человеком; пусто —
+    гасить снаружи нечему.
     """
 
     system_prompt: str
@@ -33,6 +36,7 @@ class SessionPlan:
     web_search: bool
     paused: Callable[[], bool] = _never
     tool_timeout_ms: int | None = None
+    cut: asyncio.Event | None = None
 
 
 RunSession = Callable[[SessionPlan], Awaitable[AgentEnd]]
@@ -43,13 +47,21 @@ T = TypeVar("T")
 @dataclass
 class AgentKit:
     """Всё, что нужно инструментам и обходу. Сессию обход получает функцией,
-    а не водителем: так он не знает, кто ведёт агента."""
+    а не водителем: так он не знает, кто ведёт агента.
+
+    `window_closed` — событие идущего отклика в браузере: закрытое человеком
+    окно гасит этот отклик, а не всю работу (`bot/work.window_closed`); пусто —
+    отклика в браузере нет. `shut_hosts` — сайты, чьё окно человек закрыл
+    посреди отклика: до конца работы с набором способом не предлагаются.
+    """
 
     pipeline: IngestionPipeline
     browser: BrowserHost
     gate: HumanGate
     run_session: RunSession
     today: date
+    window_closed: asyncio.Event | None = None
+    shut_hosts: set[str] = field(default_factory=set)
 
     async def written(self, write: Callable[[AsyncSession], Awaitable[T]]) -> T:
         """Записать одной транзакцией и отдать ответ записи.

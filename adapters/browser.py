@@ -33,8 +33,8 @@ _OWN_EXIT_SEC = 30
 
 
 class BrowserClosed(RuntimeError):
-    """Окно браузера агента закрыл человек: работа остановлена, и открывать его
-    снова нельзя до следующей работы."""
+    """Окно браузера агента закрыл человек: открывать его снова нельзя до
+    следующего `open_profile`."""
 
 _PROGRAMS = ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA")
 
@@ -113,8 +113,9 @@ class BrowserHost:
     """Один браузер приложения: профиль за профилем, развёрнутый или свёрнутый."""
 
     def __init__(self, browser: InstalledBrowser, always_visible: bool, on_closed: Callable[[], None]) -> None:
-        """`on_closed` — человек закрыл окно браузера агента: он остановил работу,
-        и открывать окно снова нельзя — закрытое раз за разом возвращалось бы."""
+        """`on_closed` — человек закрыл окно браузера агента; что он этим
+        остановил, решает зовущий. Окно до следующего `open_profile` не
+        открывается: закрытое раз за разом возвращалось бы."""
         self._browser = browser
         self._always_visible = always_visible
         self._on_closed = on_closed
@@ -178,14 +179,10 @@ class BrowserHost:
     async def page(self):
         """Последняя вкладка; профиль, ещё не открытый, открывается там, где был.
 
-        Браузер без вкладок, которого приложение не закрывало, закрыл человек:
-        Playwright сообщает о закрытии браузера позже, чем убирает вкладки, а
-        оставшийся в фоне не сообщает вовсе. Закрытое человеком не поднимается
-        до следующей работы (`BrowserClosed`).
+        Закрытое человеком не поднимается до следующего `open_profile`
+        (`BrowserClosed`).
         """
-        if self._context is not None and not self._context.pages:
-            await self._close_context()
-            self._closed_by_person()
+        await self.notice_closed()
         if self._stopped:
             raise BrowserClosed
         if self._context is None:
@@ -193,6 +190,17 @@ class BrowserHost:
         current = self._context.pages[-1]
         self._last_url = current.url
         return current
+
+    async def notice_closed(self) -> None:
+        """Заметить окно, закрытое человеком, не дожидаясь события браузера.
+
+        Браузер без вкладок, которого приложение не закрывало, закрыл человек:
+        Playwright сообщает о закрытии браузера позже, чем убирает вкладки, а
+        оставшийся в фоне не сообщает вовсе.
+        """
+        if self._context is not None and not self._context.pages:
+            await self._close_context()
+            self._closed_by_person()
 
     async def show(self) -> None:
         await self._place(on_screen=True)
@@ -263,14 +271,14 @@ class BrowserHost:
     def _forget_context(self, closed) -> None:
         """Закрылся нынешний контекст — его закрыл человек: своё приложение забывает
         контекст до закрытия (`_close_context`), и запоздалое событие прежнего
-        сюда не доходит. Человек этим остановил работу (`on_closed`)."""
+        сюда не доходит."""
         if closed is self._context:
             self._context = None
             self._closed_by_person()
 
     def _closed_by_person(self) -> None:
-        """Человек закрыл окно: работа остановлена — один раз, сколько бы
-        признаков закрытия ни пришло."""
+        """Человек закрыл окно: `on_closed` — один раз, сколько бы признаков
+        закрытия ни пришло."""
         if not self._stopped:
             self._stopped = True
             self._on_closed()

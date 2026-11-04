@@ -29,6 +29,9 @@ EXECUTORS: dict[str, Executor] = {
 async def apply_vacancies(kit: AgentKit, vacancy_ids: list[int]) -> None:
     """Откликнуться на каждую по очереди. Мир читается раз и доучивается по ходу."""
     world = await read_world(kit.pipeline.rs, kit.pipeline.session_factory)
+    # Набор, а не свежий: поллинг зовёт откликателя на каждую пачку находок, и
+    # сайт, чьё окно человек закрыл, иначе всплывал бы снова со следующей пачкой.
+    world.shut_hosts = kit.shut_hosts
     total = len(vacancy_ids)
     # Счёт с нуля, как у каналов: окно само называет место в очереди с единицы.
     for number, vacancy_id in enumerate(vacancy_ids):

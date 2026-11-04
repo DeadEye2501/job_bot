@@ -9,7 +9,7 @@ from typing import Literal
 
 from backend.agent.kit import AgentKit
 from backend.applying import run
-from backend.applying.result import Dropped, Unfit
+from backend.applying.result import Dropped, Missed, Unfit, WindowClosed
 from backend.bot import work
 from backend.domain.apply_order import Way
 from backend.flows.handover import new_to_apply
@@ -33,6 +33,10 @@ async def apply_chosen_way(bot, vacancy_id: int, way: Way) -> ApplyOutcome:
             return "ok"
         if isinstance(outcome, Dropped):
             return "dropped"
+        # Закрытое окно — решение человека, а не провал способа: окно говорит
+        # то же, что и об отклике, остановленном «Стопом».
+        if isinstance(outcome, Missed) and isinstance(outcome.lesson, WindowClosed):
+            return "cancelled"
         return "unfit" if isinstance(outcome, Unfit) else "failed"
 
     return await work.in_slot(bot, apply, f"apply {way.method} {vacancy_id}")
