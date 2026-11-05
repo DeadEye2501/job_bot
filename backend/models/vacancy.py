@@ -13,12 +13,14 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy.orm import Mapped, column_property, mapped_column, relationship
 from sqlalchemy.sql import expression
 
 from backend.models.base import Base, CreatedAtMixin, IdMixin, enum_column
 from backend.models.contacts import HR, Aggregator, Company, TelegramChannel
 from backend.models.enums import ContactAddedBy, StatusHistorySource, VacancyStatus
+from backend.models.workspace import ACTIVE_WORKSPACE_ID
 
 
 class Vacancy(IdMixin, CreatedAtMixin, Base):
@@ -28,15 +30,24 @@ class Vacancy(IdMixin, CreatedAtMixin, Base):
     # Составных хватает: поиск по одному только `hr_id` идёт левым началом
     # (hr_id, is_parsed), а по каналу — левым началом уникальности источника.
     # Отдельные индексы на те же колонки нового пути не давали.
+    # Источник уникален внутри профиля: один пост в двух профилях — две
+    # вакансии. Профиль в уникальности последним, чтобы левое начало осталось.
     __table_args__ = (
         UniqueConstraint(
             "source_channel_id",
             "source_msg_id",
+            "workspace_id",
             name="uq_vacancy_source",
         ),
         Index("ix_vacancy_hr_id_is_parsed", "hr_id", "is_parsed"),
         Index("ix_vacancy_company_id_is_parsed", "company_id", "is_parsed"),
-        Index("uq_vacancy_aggregator_key", "source_aggregator_id", "source_key", unique=True),
+        Index(
+            "uq_vacancy_aggregator_key",
+            "source_aggregator_id",
+            "source_key",
+            "workspace_id",
+            unique=True,
+        ),
     )
 
     hr_id: Mapped[int | None] = mapped_column(ForeignKey("hr.id"))
@@ -89,10 +100,21 @@ class Vacancy(IdMixin, CreatedAtMixin, Base):
     is_parsed: Mapped[bool] = mapped_column(server_default=expression.false())
     notes: Mapped[str | None]
     posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspace.id"))
     hr: Mapped[HR | None] = relationship()
     company: Mapped[Company | None] = relationship()
     channel: Mapped[TelegramChannel | None] = relationship()
     aggregator: Mapped[Aggregator | None] = relationship()
+
+    # Загружаемое поле, а не простой гибрид: у экземпляра простой гибрид дал
+    # бы выражение, а `bool()` выражения — ложь, и все вакансии стали бы чужими.
+    @hybrid_property
+    def in_active_workspace(self) -> bool:
+        """Вакансия активного профиля; только для чтения."""
+        return self._in_active_workspace
+
+
+Vacancy._in_active_workspace = column_property(Vacancy.workspace_id == ACTIVE_WORKSPACE_ID)
 
 
 class VacancyEvent(IdMixin, CreatedAtMixin, Base):
@@ -155,6 +177,7 @@ class TrashEvent(IdMixin, CreatedAtMixin, Base):
     )
     source_key: Mapped[str | None]
     reason: Mapped[str | None]
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspace.id"))
 
 
 class VacancyContact(IdMixin, Base):

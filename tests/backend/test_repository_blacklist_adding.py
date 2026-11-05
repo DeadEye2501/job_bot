@@ -11,7 +11,7 @@ from sqlalchemy import select
 from backend.models import Blacklist
 from backend.repository.blacklist import BlacklistUpdateError, create_blacklist
 from tests.dbio import put
-from tests.factories import blacklist_row
+from tests.factories import blacklist_row, blacklist_switch_row
 
 
 async def test_a_new_row_reaches_the_table_switched_on_and_numbered(session):
@@ -102,8 +102,9 @@ async def test_adding_a_switched_off_pair_switches_it_back_on(
     session, session_factory
 ):
     """Повторное добавление погашенной пары включает её обратно."""
-    existing = blacklist_row("hr", "@maria", active=False)
+    existing = blacklist_row("hr", "@maria")
     await put(session_factory, existing)
+    await put(session_factory, blacklist_switch_row(existing.id, active=False))
 
     row, _ = await create_blacklist(session, kind="hr", value="@maria")
 
@@ -119,10 +120,13 @@ async def test_switching_a_pair_back_on_is_told_apart_from_an_already_on_one(
     чёрный список» против «уже в чёрном списке», — и различить их нечем,
     если исход у обеих один.
     """
+    switched_off = blacklist_row("hr", "@maria")
+    switched_on = blacklist_row("hr", "@olga")
+    await put(session_factory, switched_off, switched_on)
     await put(
         session_factory,
-        blacklist_row("hr", "@maria", active=False),
-        blacklist_row("hr", "@olga", active=True),
+        blacklist_switch_row(switched_off.id, active=False),
+        blacklist_switch_row(switched_on.id, active=True),
     )
 
     _, switched_back_on = await create_blacklist(session, kind="hr", value="@maria")

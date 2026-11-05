@@ -14,6 +14,8 @@ from backend.repository.search import matches_search
 from backend.repository.source_stats import source_stats
 from backend.repository.vacancies_common import with_vacancy_counts
 from backend.repository.vacancies_life import repoint_vacancies
+from backend.repository.workspace_switches import put_switch
+from backend.repository.workspaces import active_workspace_id
 
 logger = logging.getLogger(__name__)
 
@@ -157,23 +159,20 @@ async def create_channel(
     колонка смотрит — иначе «PyJobs» и «pyjobs» лягут двумя каналами, и
     поиск по нику найдёт то один, то другой.
 
-    Транзакцию закрывает зовущий.
+    Включён канал только в активном профиле: в остальных своё новое
+    появляется выключенным. Транзакцию закрывает зовущий.
     """
-    channel = TelegramChannel(
-        username=username.lower(),
-        title=title,
-        is_active=True,
-        avatar=avatar,
-    )
+    channel = TelegramChannel(username=username.lower(), title=title, avatar=avatar)
     session.add(channel)
     await session.flush()
+    await put_switch(session, channel, await active_workspace_id(session), is_active=True)
     return channel.id
 
 
 async def set_channel_active(
     session: AsyncSession, channel_id: int, is_active: bool
 ) -> str:
-    """Включить или выключить канал: «ok», «missing» или «blacklisted».
+    """Включить или выключить канал в активном профиле: «ok», «missing» или «blacklisted».
 
     Запрет отсева стоит здесь, как у агрегатора, а не в окне и не в мосте:
     пройди включение — отметка была бы отменена нажатием, которое про неё
@@ -185,7 +184,7 @@ async def set_channel_active(
     if is_active and await CHANNEL_BLACKLIST.value(session, ch) is not None:
         return "blacklisted"
     prev = ch.is_active
-    ch.is_active = bool(is_active)
+    await put_switch(session, ch, await active_workspace_id(session), is_active=bool(is_active))
     if prev != ch.is_active:
         logger.info(
             "Channel %d (@%s) is_active %s -> %s",
@@ -198,7 +197,8 @@ async def set_channel_active(
 
 
 async def deactivate_blacklisted_channels(session: AsyncSession) -> int:
-    """Выключить каналы под действующей отметкой; сколько выключено — для журнала.
+    """Выключить каналы под отметкой в каждом профиле, где она включена; сколько
+    выключено — для журнала.
 
     Правило общее с агрегаторами (`BlacklistMark.switch_off`); своё здесь —
     только запись в журнал. Caller wraps в ``session.begin()``.
@@ -225,13 +225,13 @@ async def is_channel_blacklisted(
 
 
 async def reset_channel_cursor(session: AsyncSession, channel_id: int) -> bool:
-    """Clear ``last_processed_msg_id`` so the next poll re-pulls recent
-    history. Returns False if the row is missing.
+    """Clear ``last_processed_msg_id`` in the active workspace so the next
+    poll re-pulls recent history. Returns False if the row is missing.
     """
     ch = await session.get(TelegramChannel, channel_id)
     if ch is None:
         return False
-    ch.last_processed_msg_id = None
+    await put_switch(session, ch, await active_workspace_id(session), last_processed_msg_id=None)
     return True
 
 

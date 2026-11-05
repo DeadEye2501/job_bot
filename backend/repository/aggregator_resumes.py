@@ -7,11 +7,13 @@
 угаданное резюме может оказаться резюме другой профессии.
 """
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Aggregator, AggregatorResume
 from backend.payloads import SeenResume
+from backend.repository.workspace_switches import put_switch
+from backend.repository.workspaces import active_workspace_id
 
 
 async def resumes_of(session: AsyncSession, aggregator_id: int) -> list[AggregatorResume]:
@@ -56,18 +58,14 @@ async def forbid_more_resumes(session: AsyncSession, aggregator_id: int) -> None
 
 
 async def choose_resume(session: AsyncSession, aggregator_id: int, resume_id: int) -> None:
-    """Отметить резюме «откликаться этим», сняв отметку с прежнего.
+    """Отметить резюме «откликаться этим» в активном профиле, сняв отметку с прежнего.
 
-    Снятие идёт первым запросом: два отмеченных разом база не примет.
+    Выбранное одно на сайт в профиле: номер лежит в строке профиля, и новый
+    заменяет прежний.
     """
-    await session.execute(
-        update(AggregatorResume).where(AggregatorResume.aggregator_id == aggregator_id)
-        .values(is_chosen=False)
-    )
-    await session.execute(
-        update(AggregatorResume)
-        .where(AggregatorResume.id == resume_id)
-        .values(is_chosen=True)
+    aggregator = await session.get(Aggregator, aggregator_id)
+    await put_switch(
+        session, aggregator, await active_workspace_id(session), chosen_resume_id=resume_id
     )
 
 

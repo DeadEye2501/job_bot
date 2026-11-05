@@ -18,6 +18,7 @@ from backend.domain.stack import deduped_halves, joined_stack
 from backend.models import Vacancy, VacancyEvent
 from backend.repository.profile_skills import list_skills
 from backend.repository.vacancies_life import add_vacancy_event
+from backend.repository.workspaces import active_workspace_id
 
 logger = logging.getLogger(__name__)
 
@@ -49,8 +50,10 @@ async def add_with_event(
     """Записать строку вместе с событием её заведения; номер ложится в строку.
 
     Одно место на всех, кто заводит: событие и строка ложатся одной сделкой, и
-    строка без события выглядела бы взявшейся ниоткуда. Оборот — зовущего.
+    строка без события выглядела бы взявшейся ниоткуда. Вакансия ложится в
+    активный профиль — тот, что активен в миг записи. Оборот — зовущего.
     """
+    vacancy.workspace_id = await active_workspace_id(session)
     session.add(vacancy)
     await session.flush()
     await add_vacancy_event(session, vacancy.id, kind, payload)

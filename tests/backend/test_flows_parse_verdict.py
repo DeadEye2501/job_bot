@@ -24,7 +24,7 @@ from backend.models import TrashEvent, Vacancy, VacancyStatus
 from backend.payloads import FitValidation, PostGenre
 from backend.repository.blacklist_marks import load_active_blacklist_patterns
 from tests.dbio import all_rows, only_row, put
-from tests.factories import blacklist_row
+from tests.factories import blacklist_row, blacklist_switch_row
 from tests.factories_aggregators import vacancy_contact_row
 
 
@@ -376,7 +376,9 @@ async def test_the_score_judges_only_what_the_validator_called_a_vacancy(
 
 async def _barred(session_factory, vacancy_id: int, source_url: str | None) -> None:
     """Сайт `barred.test` в отсеве; у вакансии — данный адрес страницы."""
-    await put(session_factory, blacklist_row("aggregator", "barred.test"))
+    mark = blacklist_row("aggregator", "barred.test")
+    await put(session_factory, mark)
+    await put(session_factory, blacklist_switch_row(mark.id, active=True))
     async with session_factory() as session:
         (await session.get(Vacancy, vacancy_id)).source_url = source_url
         await session.commit()

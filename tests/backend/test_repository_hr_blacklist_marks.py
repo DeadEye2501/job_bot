@@ -16,7 +16,7 @@ from backend.repository.hr_card import (
 )
 from backend.repository.hr_identify import refresh_hr_from_telegram
 from tests.dbio import put
-from tests.factories import blacklist_row, hr_row
+from tests.factories import blacklist_row, blacklist_switch_row, hr_row
 from tests.fakes.telegram import user as tg_user
 
 
@@ -65,7 +65,9 @@ async def test_a_mark_survives_a_renamed_account(session, session_factory):
     """
     hr = hr_row(name="Анна", telegram_username="Recruiter_Anna", telegram_user_id=777)
     await put(session_factory, hr)
-    await put(session_factory, blacklist_row("hr", "user_id:777"))
+    mark = blacklist_row("hr", "user_id:777")
+    await put(session_factory, mark)
+    await put(session_factory, blacklist_switch_row(mark.id, active=True))
 
     async with session_factory() as telegram_said:
         row = await telegram_said.get(HR, hr.id)
@@ -88,10 +90,10 @@ async def test_the_card_shows_the_mark_written_under_either_spelling(
     by_username = hr_row(name="по нику", telegram_username="maria", telegram_user_id=111)
     by_id = hr_row(name="по номеру", telegram_username="olga", telegram_user_id=222)
     await put(session_factory, by_username, by_id)
+    marks = [blacklist_row("hr", "@maria"), blacklist_row("hr", "user_id:222")]
+    await put(session_factory, *marks)
     await put(
-        session_factory,
-        blacklist_row("hr", "@maria"),
-        blacklist_row("hr", "user_id:222"),
+        session_factory, *(blacklist_switch_row(m.id, active=True) for m in marks)
     )
 
     assert (await get_hr_detail(session, by_username.id)).blacklist_value == "@maria"
@@ -106,7 +108,9 @@ async def test_a_switched_off_mark_does_not_show(session, session_factory):
     """
     hr = hr_row(telegram_username="maria", telegram_user_id=111)
     await put(session_factory, hr)
-    await put(session_factory, blacklist_row("hr", "@maria", active=False))
+    mark = blacklist_row("hr", "@maria")
+    await put(session_factory, mark)
+    await put(session_factory, blacklist_switch_row(mark.id, active=False))
 
     assert (await get_hr_detail(session, hr.id)).blacklist_value is None
 
@@ -119,7 +123,9 @@ async def test_a_mark_of_another_kind_does_not_show(session, session_factory):
     """
     hr = hr_row(telegram_username="maria", telegram_user_id=111)
     await put(session_factory, hr)
-    await put(session_factory, blacklist_row("channel", "@maria"))
+    mark = blacklist_row("channel", "@maria")
+    await put(session_factory, mark)
+    await put(session_factory, blacklist_switch_row(mark.id, active=True))
 
     assert (await get_hr_detail(session, hr.id)).blacklist_value is None
 
@@ -137,10 +143,10 @@ async def test_when_both_spellings_are_listed_the_older_row_wins(
     """
     hr = hr_row(telegram_username="maria", telegram_user_id=111)
     await put(session_factory, hr)
+    marks = [blacklist_row("hr", "user_id:111"), blacklist_row("hr", "@maria")]
+    await put(session_factory, *marks)
     await put(
-        session_factory,
-        blacklist_row("hr", "user_id:111"),
-        blacklist_row("hr", "@maria"),
+        session_factory, *(blacklist_switch_row(m.id, active=True) for m in marks)
     )
 
     assert (await get_hr_detail(session, hr.id)).blacklist_value == "user_id:111"
@@ -156,7 +162,9 @@ async def test_a_mark_moves_onto_the_survivor_of_a_merge(session, session_factor
     absorbed = hr_row(name="дубль", telegram_username="olga", telegram_user_id=222)
     survivor = hr_row(name="основной", telegram_username="maria", telegram_user_id=111)
     await put(session_factory, absorbed, survivor)
-    await put(session_factory, blacklist_row("hr", "user_id:222"))
+    mark = blacklist_row("hr", "user_id:222")
+    await put(session_factory, mark)
+    await put(session_factory, blacklist_switch_row(mark.id, active=True))
 
     await merge_hr(session, absorbed_id=absorbed.id, survivor_id=survivor.id)
 
@@ -175,7 +183,9 @@ async def test_a_mark_keeps_working_when_the_account_moves_to_the_survivor(
     absorbed = hr_row(name="дубль", telegram_username="olga", telegram_user_id=222)
     survivor = hr_row(name="основной", telegram_username=None, telegram_user_id=None)
     await put(session_factory, absorbed, survivor)
-    await put(session_factory, blacklist_row("hr", "user_id:222"))
+    mark = blacklist_row("hr", "user_id:222")
+    await put(session_factory, mark)
+    await put(session_factory, blacklist_switch_row(mark.id, active=True))
 
     await merge_hr(session, absorbed_id=absorbed.id, survivor_id=survivor.id)
 
@@ -195,7 +205,9 @@ async def test_the_survivors_own_mark_follows_a_replaced_nickname(
     absorbed = hr_row(name="дубль", telegram_username="olga", telegram_user_id=222)
     survivor = hr_row(name="основной", telegram_username="anna", telegram_user_id=None)
     await put(session_factory, absorbed, survivor)
-    await put(session_factory, blacklist_row("hr", "@anna"))
+    mark = blacklist_row("hr", "@anna")
+    await put(session_factory, mark)
+    await put(session_factory, blacklist_switch_row(mark.id, active=True))
 
     await merge_hr(session, absorbed_id=absorbed.id, survivor_id=survivor.id)
 
@@ -212,7 +224,9 @@ async def test_a_mark_follows_a_nickname_changed_by_hand(session, session_factor
     """
     hr = hr_row(name="Мария", telegram_username="ivanov", telegram_user_id=None)
     await put(session_factory, hr)
-    await put(session_factory, blacklist_row("hr", "@ivanov"))
+    mark = blacklist_row("hr", "@ivanov")
+    await put(session_factory, mark)
+    await put(session_factory, blacklist_switch_row(mark.id, active=True))
 
     await update_hr_fields(session, hr.id, telegram_username="@ivanov_hr")
     await session.commit()
@@ -229,7 +243,9 @@ async def test_a_mark_follows_a_nickname_telegram_replaced(session, session_fact
     """
     hr = hr_row(name="Мария", telegram_username="ivanov", telegram_user_id=None)
     await put(session_factory, hr)
-    await put(session_factory, blacklist_row("hr", "@ivanov"))
+    mark = blacklist_row("hr", "@ivanov")
+    await put(session_factory, mark)
+    await put(session_factory, blacklist_switch_row(mark.id, active=True))
     stored = await session.get(HR, hr.id)
 
     await refresh_hr_from_telegram(
@@ -251,10 +267,10 @@ async def test_two_marked_records_leave_one_standing_mark(session, session_facto
     absorbed = hr_row(name="дубль", telegram_username="olga", telegram_user_id=222)
     survivor = hr_row(name="основной", telegram_username="maria", telegram_user_id=111)
     await put(session_factory, absorbed, survivor)
+    marks = [blacklist_row("hr", "user_id:222"), blacklist_row("hr", "user_id:111")]
+    await put(session_factory, *marks)
     await put(
-        session_factory,
-        blacklist_row("hr", "user_id:222"),
-        blacklist_row("hr", "user_id:111"),
+        session_factory, *(blacklist_switch_row(m.id, active=True) for m in marks)
     )
 
     await merge_hr(session, absorbed_id=absorbed.id, survivor_id=survivor.id)

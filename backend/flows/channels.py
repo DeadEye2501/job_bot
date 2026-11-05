@@ -11,6 +11,8 @@ from backend.repository.channels import (
     list_named_channels,
     set_channel_active,
 )
+from backend.repository.workspace_switches import put_switch
+from backend.repository.workspaces import active_workspace_id
 
 from backend.flows import embeddings, ingest
 from backend.notify import fire
@@ -377,7 +379,9 @@ async def advance_cursor(pipeline, channel_id: int, msg_id: int) -> None:
         ch = await session.get(TelegramChannel, channel_id)
         if ch is None:
             return
-        ch.last_processed_msg_id = msg_id
+        await put_switch(
+            session, ch, await active_workspace_id(session), last_processed_msg_id=msg_id
+        )
         await session.commit()
     logger.debug(
         "advance_cursor: channel=%d -> msg_id=%d", channel_id, msg_id,

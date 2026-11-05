@@ -7,8 +7,8 @@ import pytest
 from backend.agent.jobs import Source
 from backend.flows.resume_fill import fill
 from backend.models import Aggregator, ProfileLanguage
-from tests.dbio import only_row, put, resume_marks
-from tests.factories import profile_row
+from tests.dbio import only_row, put, reread, resume_marks
+from tests.factories import aggregator_switch_row, profile_row
 from tests.factories_aggregators import aggregator_resume_row, aggregator_row
 from tests.fakes.agent import finish_step, resumes_step, scripted_kit
 
@@ -22,9 +22,10 @@ async def _site(session_factory):
     site = aggregator_row(is_logged_in=True, can_add_resume=True)
     await put(session_factory, site)
     first = aggregator_resume_row(site.id, title="Швея", url=FIRST)
-    await put(session_factory, first,
-              aggregator_resume_row(site.id, title="Повар", url=SECOND, position=1, is_chosen=True))
-    return site, first
+    chosen = aggregator_resume_row(site.id, title="Повар", url=SECOND, position=1)
+    await put(session_factory, first, chosen)
+    await put(session_factory, aggregator_switch_row(site.id, chosen_resume_id=chosen.id))
+    return await reread(session_factory, site), first
 
 
 async def _marks(session_factory, aggregator_id):

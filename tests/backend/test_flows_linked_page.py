@@ -11,7 +11,7 @@ from backend.flows.linked_page import ingest_page
 from backend.models import Vacancy, VacancyEvent, VacancyStatus
 from backend.repository.vacancies_new import HAND_MADE
 from tests.dbio import all_rows, only_row, put
-from tests.factories import blacklist_row, vacancy_row
+from tests.factories import blacklist_row, blacklist_switch_row, vacancy_row
 from tests.factories_aggregators import aggregator_row, web_search_row
 from tests.backend.fixtures.flows import told_then_applied
 from tests.backend.fixtures.parse_stub import parse_into
@@ -26,7 +26,7 @@ COMPANY_PAGE = "https://company.test/careers/qa"
 @pytest.fixture
 async def page(make_pipeline, session_factory, parsed):
     """Завести страницу по ссылке сценарием агента; ответ — набор и вести окну."""
-    web, hh = web_search_row(), aggregator_row(host="hh.ru", is_active=False)
+    web, hh = web_search_row(), aggregator_row(host="hh.ru")
     await put(session_factory, web, hh)
 
     async def run(url, steps, hands_over=False, on_kit=None):
@@ -172,7 +172,9 @@ async def test_a_vacancy_of_another_site_is_not_this_page(page, session_factory)
 
 async def test_a_blacklisted_site_is_filed_by_hand(page, session_factory, parsed):
     """Чёрный список — подсказка автоматике: человек завёл — значит, хочет."""
-    await put(session_factory, blacklist_row("aggregator", "company.test"))
+    mark = blacklist_row("aggregator", "company.test")
+    await put(session_factory, mark)
+    await put(session_factory, blacklist_switch_row(mark.id, active=True))
 
     await page(COMPANY_PAGE, [_submitting(COMPANY_PAGE)])
 

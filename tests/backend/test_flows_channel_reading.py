@@ -20,7 +20,7 @@ from backend.flows import embeddings
 from backend.flows import ingest as ingest_mod
 from backend.models import TelegramChannel
 from tests.dbio import only_row, put
-from tests.factories import channel_row
+from tests.factories import channel_row, channel_switch_row
 from tests.fakes.telegram import FakeTelegramClient
 from tests.fakes.telegram_objects import post
 
@@ -28,7 +28,7 @@ from tests.fakes.telegram_objects import post
 @pytest.fixture
 async def reading(monkeypatch, make_pipeline, session_factory):
     """Канал, конвейер с подставным приёмом поста и отметкой на месте."""
-    await put(session_factory, channel_row(username="jobs", last_processed_msg_id=None))
+    await put(session_factory, channel_row(username="jobs"))
     channel = await only_row(session_factory, TelegramChannel)
     client = FakeTelegramClient()
     pipeline = await make_pipeline(client)
@@ -211,10 +211,7 @@ async def test_nothing_new_leaves_the_mark_alone(monkeypatch, reading, session_f
     """Когда нового нет, отметка не трогается и записи не идёт."""
     pipeline, client, channel = reading
     await put(session_factory, channel_row(username="other"))
-    async with session_factory() as session:
-        row = await session.get(TelegramChannel, channel.id)
-        row.last_processed_msg_id = 12
-        await session.commit()
+    await put(session_factory, channel_switch_row(channel.id, last_processed_msg_id=12))
     client.history = [post(12)]
     saves: list[int] = []
     monkeypatch.setattr(

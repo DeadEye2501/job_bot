@@ -8,7 +8,7 @@ import logging
 
 from backend.models import TelegramChannel
 from tests.dbio import all_rows, put
-from tests.factories import channel_row, vacancy_row
+from tests.factories import channel_row, channel_switch_row, vacancy_row
 
 
 async def test_the_list_counts_vacancies_and_shows_whether_it_is_on(
@@ -21,6 +21,7 @@ async def test_the_list_counts_vacancies_and_shows_whether_it_is_on(
     """
     channel = channel_row(username="pyjobs")
     await put(session_factory, channel)
+    await put(session_factory, channel_switch_row(channel.id, is_active=True))
     await put(session_factory, vacancy_row(source_channel_id=channel.id))
 
     answer = await ask(api.channels.list, {})
@@ -73,6 +74,7 @@ async def test_turning_a_channel_off_reaches_the_list(api, ask, session_factory)
     """
     channel = channel_row(username="pyjobs")
     await put(session_factory, channel)
+    await put(session_factory, channel_switch_row(channel.id, is_active=True))
 
     switched = await ask(
         api.channels.set_active, {"channel_id": channel.id, "is_active": False}
@@ -119,6 +121,9 @@ async def test_blacklisting_sweeps_the_namesake_channel_too(
     clicked = channel_row(username="pyjobs", title="Питон-вакансии")
     namesake = channel_row(username="pyjobs", title="Он же, заведённый заново")
     await put(session_factory, clicked, namesake)
+    await put(session_factory,
+              channel_switch_row(clicked.id, is_active=True),
+              channel_switch_row(namesake.id, is_active=True))
 
     assert "ok" in await ask(api.channels.block, clicked.id)
 
@@ -136,6 +141,7 @@ async def test_blacklisting_turns_the_channel_off_at_once(api, ask, session_fact
     """
     channel = channel_row(username="pyjobs")
     await put(session_factory, channel)
+    await put(session_factory, channel_switch_row(channel.id, is_active=True))
 
     answer = await ask(api.channels.block, channel.id)
     assert answer["ok"]["value"] == "@pyjobs"
@@ -164,9 +170,11 @@ async def test_the_switch_over_all_leaves_each_row_as_it_was(api, ask, session_f
 
     Включённый снова, он возвращает в обход ровно те каналы, что были включены.
     """
+    on, off = channel_row(username="on"), channel_row(username="off")
+    await put(session_factory, on, off)
     await put(session_factory,
-              channel_row(username="on", is_active=True),
-              channel_row(username="off", is_active=False))
+              channel_switch_row(on.id, is_active=True),
+              channel_switch_row(off.id, is_active=False))
 
     turned = (await ask(api.channels.set_all_active, {"is_active": False}))["ok"]
     listed = (await ask(api.channels.list, {}))["ok"]

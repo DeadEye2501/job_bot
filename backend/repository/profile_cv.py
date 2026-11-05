@@ -6,7 +6,6 @@ from dataclasses import asdict
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.repository.app_settings import CV_PATH_KEY, put_app_setting
 from backend.models import (
     Profile,
     ProfileExperience,
@@ -21,6 +20,7 @@ from backend.repository.profile_languages import replace_profile_languages
 from backend.repository.profile_projects import wipe_projects
 from backend.repository.profile_records import link_stack
 from backend.repository.profile_skills import index_skill_keys
+from backend.repository.workspaces import active_workspace, active_workspace_id
 
 logger = logging.getLogger(__name__)
 
@@ -116,13 +116,14 @@ def _answers(p, kept: dict) -> dict:
     return answers
 
 
-def _new_profile(p, kept: dict) -> Profile:
-    """Строка анкеты из разобранного резюме.
+def _new_profile(p, kept: dict, workspace_id: int) -> Profile:
+    """Строка анкеты профиля из разобранного резюме.
 
     Списки копируются, а не берутся ссылкой: разобранное резюме живёт своей
     жизнью, и правка анкеты в окне не должна доставать до него.
     """
     return Profile(
+        workspace_id=workspace_id,
         first_name=p.first_name,
         last_name=p.last_name,
         title=p.title,
@@ -151,7 +152,7 @@ async def save_parsed_cv(
     kept = await _answers_to_keep(session)
     await _wipe_profile(session)
 
-    profile = _new_profile(parsed.profile, kept)
+    profile = _new_profile(parsed.profile, kept, await active_workspace_id(session))
     session.add(profile)
     await session.flush()
 
@@ -170,7 +171,7 @@ async def save_parsed_cv(
     ])
     await session.flush()
     if cv_path is not None:
-        await put_app_setting(session, CV_PATH_KEY, cv_path)
+        (await active_workspace(session)).cv_path = cv_path
         await session.flush()
 
     logger.info(

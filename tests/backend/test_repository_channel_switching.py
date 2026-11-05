@@ -9,9 +9,12 @@ from backend.repository.channels import deactivate_blacklisted_channels, is_chan
 from tests.dbio import put
 from tests.factories import (
     blacklist_row,
+    blacklist_switch_row,
     channel_marks,
     channel_row,
+    channel_switch_row,
     marked_channels,
+    switches_of_marks,
 )
 
 
@@ -21,10 +24,17 @@ async def _listed_and_clean(session_factory, *, is_active: bool):
     Чистый канал стоит парой нарочно: видно, что проход разбирает каналы по
     отметке, а не по счёту, — без пары он зеленел бы и на «трогаем всех подряд».
     """
-    listed = channel_row(username="listed", is_active=is_active)
-    clean = channel_row(username="clean", is_active=is_active)
+    listed = channel_row(username="listed")
+    clean = channel_row(username="clean")
     await put(session_factory, listed, clean)
-    await put(session_factory, blacklist_row("channel", "@listed"))
+    await put(
+        session_factory,
+        channel_switch_row(listed.id, is_active=is_active),
+        channel_switch_row(clean.id, is_active=is_active),
+    )
+    mark = blacklist_row("channel", "@listed")
+    await put(session_factory, mark)
+    await put(session_factory, blacklist_switch_row(mark.id, active=True))
     return listed, clean
 
 
@@ -35,8 +45,9 @@ async def test_switching_a_missing_channel_reports_failure(session):
 
 async def test_a_channel_switches_both_ways(session, session_factory):
     """Канал включается и выключается по одному."""
-    channel = channel_row(username="pyjobs", is_active=True)
+    channel = channel_row(username="pyjobs")
     await put(session_factory, channel)
+    await put(session_factory, channel_switch_row(channel.id, is_active=True))
 
     assert await set_channel_active(session, channel.id, False) == "ok"
     assert (await session.get(TelegramChannel, channel.id)).is_active is False
@@ -62,7 +73,9 @@ async def test_a_blacklisted_channel_is_recognised_as_such(session, session_fact
     listed, switched_off, other_kind = marked_channels()
     nameless = channel_row(username=None)
     await put(session_factory, listed, switched_off, other_kind, nameless)
-    await put(session_factory, *channel_marks())
+    marks = channel_marks()
+    await put(session_factory, *marks)
+    await put(session_factory, *switches_of_marks(marks))
 
     assert await is_channel_blacklisted(session, listed.id) is True
     assert await is_channel_blacklisted(session, switched_off.id) is False
@@ -89,17 +102,21 @@ async def test_an_already_off_channel_is_not_counted_twice(session, session_fact
     Проход зовут при каждом изменении списка, и счётчик идёт в уведомление:
     «выключен 1 канал» после второго нажатия было бы неправдой.
     """
-    listed = channel_row(username="listed", is_active=False)
+    listed = channel_row(username="listed")
     await put(session_factory, listed)
-    await put(session_factory, blacklist_row("channel", "@listed"))
+    await put(session_factory, channel_switch_row(listed.id, is_active=False))
+    mark = blacklist_row("channel", "@listed")
+    await put(session_factory, mark)
+    await put(session_factory, blacklist_switch_row(mark.id, active=True))
 
     assert await deactivate_blacklisted_channels(session) == 0
 
 
 async def test_an_empty_blacklist_switches_nothing_off(session, session_factory):
     """При пустом чёрном списке проход не трогает ничего."""
-    channel = channel_row(username="clean", is_active=True)
+    channel = channel_row(username="clean")
     await put(session_factory, channel)
+    await put(session_factory, channel_switch_row(channel.id, is_active=True))
 
     assert await deactivate_blacklisted_channels(session) == 0
     assert (await session.get(TelegramChannel, channel.id)).is_active is True

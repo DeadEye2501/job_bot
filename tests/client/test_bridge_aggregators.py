@@ -8,7 +8,7 @@ from backend.bot.work import HUMAN_TIMEOUT_NOTE
 from backend.models import Aggregator, VacancyStatus
 from backend.repository.aggregators import WEB_SEARCH_NAME
 from tests.dbio import all_rows, put
-from tests.factories import vacancy_row
+from tests.factories import aggregator_switch_row, vacancy_row
 from tests.factories_aggregators import (
     aggregator_resume_row, aggregator_row, application_row, web_search_row,
 )
@@ -247,9 +247,12 @@ async def test_a_page_without_the_aggregator_is_bad_fields(api, ask):
 
 async def test_the_switch_over_all_leaves_each_row_as_it_was(api, ask, session_factory):
     """Общий выключатель — отдельный признак: тумблеры строк он не переписывает."""
+    site = aggregator_row(host="site.test", is_logged_in=True)
+    other = aggregator_row(host="other.test")
+    await put(session_factory, site, other)
     await put(session_factory,
-              aggregator_row(host="site.test", is_logged_in=True, is_active=True),
-              aggregator_row(host="other.test", is_active=False))
+              aggregator_switch_row(site.id, is_active=True),
+              aggregator_switch_row(other.id, is_active=False))
 
     turned = (await ask(api.aggregators.set_all_active, {"is_active": False}))["ok"]
     listed = (await ask(api.aggregators.list, {}))["ok"]
@@ -273,8 +276,9 @@ async def test_turning_all_without_the_flag_is_bad_fields(api, ask):
 
 
 async def test_blacklisting_switches_the_aggregator_off_and_marks_it(api, ask, session_factory):
-    site = aggregator_row(host="site.test", is_logged_in=True, is_active=True)
+    site = aggregator_row(host="site.test", is_logged_in=True)
     await put(session_factory, site)
+    await put(session_factory, aggregator_switch_row(site.id, is_active=True))
 
     blocked = (await ask(api.aggregators.block, site.id))["ok"]
     listed = (await ask(api.aggregators.list, {}))["ok"]["aggregators"]
@@ -333,10 +337,11 @@ async def test_the_card_lists_the_resumes_in_site_order_with_the_chosen_one(
 ):
     site = aggregator_row(can_add_resume=True)
     await put(session_factory, site)
+    chosen = aggregator_resume_row(site.id, title="Второе", url="https://hh.ru/r/2", position=1)
     await put(session_factory,
-              aggregator_resume_row(site.id, title="Второе", url="https://hh.ru/r/2", position=1,
-                                    is_chosen=True),
+              chosen,
               aggregator_resume_row(site.id, title="Первое", url="https://hh.ru/r/1"))
+    await put(session_factory, aggregator_switch_row(site.id, chosen_resume_id=chosen.id))
 
     card = (await ask(api.aggregators.detail, site.id))["ok"]
 
@@ -349,9 +354,10 @@ async def test_the_card_lists_the_resumes_in_site_order_with_the_chosen_one(
 async def test_choosing_a_resume_moves_the_mark(api, ask, session_factory):
     site = aggregator_row()
     await put(session_factory, site)
-    first = aggregator_resume_row(site.id, url="https://hh.ru/r/1", is_chosen=True)
+    first = aggregator_resume_row(site.id, url="https://hh.ru/r/1")
     second = aggregator_resume_row(site.id, title="Другое", url="https://hh.ru/r/2", position=1)
     await put(session_factory, first, second)
+    await put(session_factory, aggregator_switch_row(site.id, chosen_resume_id=first.id))
 
     answer = await ask(api.aggregators.choose_resume,
                        {"aggregator_id": site.id, "resume_id": second.id})

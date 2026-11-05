@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from backend.crypto import decrypt_or_none, encrypt_str
 from backend.incoming import normalize_enum
 from backend.provider_config import LlmProviderConfig, provider_complete
-from backend.repository.app_settings import CV_PATH_KEY, PHOTO_PATH_KEY, put_app_setting
+from backend.repository.workspaces import active_workspace
 from backend.models import (
     AppSetting,
     LlmConfig,
@@ -50,8 +50,6 @@ _APP_DEFAULTS: dict[str, str] = {
     "poll_interval_sec": "1800",
     "backfill_limit": "15",
     "dm_backfill_limit": "50",
-    CV_PATH_KEY: "",
-    PHOTO_PATH_KEY: "",
     "wizard_completed": "false",
     # send_locked: симуляция отправки — всё, кроме самого вызова Telegram.
     # По умолчанию выключена: включённая молча, она показывает «отклик
@@ -93,6 +91,15 @@ LETTER_WRITERS = ("app", "agent")
 Набор объявлен один раз: всё, что различает автора письма, берёт значения отсюда."""
 
 
+async def _put_app_setting(session: AsyncSession, key: str, value: str) -> None:
+    """Записать значение по ключу; сделку открывает и закрывает зовущий."""
+    row = await session.get(AppSetting, key)
+    if row is None:
+        session.add(AppSetting(key=key, value=value))
+    else:
+        row.value = value
+
+
 async def _llm_row(session: AsyncSession, kind: LlmConfigKind) -> LlmConfig | None:
     """Строка настроек поставщика моделей своего рода, если она заведена."""
     return (
@@ -111,6 +118,8 @@ class RuntimeSettings:
         self._chat: LlmProviderConfig | None = None
         self._embed: LlmProviderConfig | None = None
         self._app: dict[str, str] = {}
+        self._cv_path = ""
+        self._photo_path = ""
 
     @classmethod
     async def load(
@@ -135,6 +144,9 @@ class RuntimeSettings:
                 s.key: (s.value or "")
                 for s in (await session.scalars(select(AppSetting))).all()
             }
+
+            workspace = await active_workspace(session)
+            self._cv_path, self._photo_path = workspace.cv_path, workspace.photo_path
         logger.debug(
             "Runtime settings reloaded: tg=%s chat=%s embed=%s app_keys=%d",
             self._tg is not None,
@@ -229,11 +241,16 @@ class RuntimeSettings:
 
     @property
     def cv_path(self) -> str:
-        return self._app_value(CV_PATH_KEY)
+        """Путь к файлу резюме активного профиля; пусто — файла нет."""
+        return self._cv_path
 
     @property
     def photo_path(self) -> str:
-        return self._app_value(PHOTO_PATH_KEY)
+        """Путь к копии фото активного профиля внутри каталога медиа; пусто — фото нет.
+
+        Копия, а не исходный файл: исходный человек волен перенести или удалить.
+        """
+        return self._photo_path
 
     @property
     def wizard_completed(self) -> bool:
@@ -420,7 +437,7 @@ class RuntimeSettings:
         value = ("true" if value else "false") if isinstance(value, bool) else str(value)
         async with self._session_factory() as session:
             async with session.begin():
-                await put_app_setting(session, key, value)
+                await _put_app_setting(session, key, value)
         self._app[key] = value
         if key == "send_locked":
             # Заслон на горячем пути сверяется своей копией — читать настройки
@@ -434,6 +451,20 @@ class RuntimeSettings:
         # момент сюда могут пойти токены/секреты будущими callers'ами;
         # пишем только key + длину.
         logger.debug("app setting %s set (%d chars)", key, len(value or ""))
+
+    async def set_cv_path(self, value: str) -> None:
+        """Записать путь к файлу резюме в активный профиль; пусто — файла нет."""
+        async with self._session_factory() as session:
+            async with session.begin():
+                (await active_workspace(session)).cv_path = value
+        self._cv_path = value
+
+    async def set_photo_path(self, value: str) -> None:
+        """Записать путь к копии фото в активный профиль; пусто — фото нет."""
+        async with self._session_factory() as session:
+            async with session.begin():
+                (await active_workspace(session)).photo_path = value
+        self._photo_path = value
 
     async def mark_wizard_completed(self) -> None:
         await self.set_app("wizard_completed", True)

@@ -9,12 +9,18 @@
 """
 
 from backend.domain.verdict import EMPTY_SKIP_REASON
-from backend.models import TrashEvent, VacancyStatus
+from backend.models import VacancyStatus
 from backend.repository.aggregators import WEB_SEARCH_NAME
 from backend.repository.stats_pipeline import get_stats_channels_pipeline
 from tests.backend.fixtures.stats import rows_by_channel
 from tests.dbio import put
-from tests.factories import channel_row, days_ago, status_history_row, vacancy_row
+from tests.factories import (
+    channel_row,
+    days_ago,
+    status_history_row,
+    trash_event_row,
+    vacancy_row,
+)
 from tests.factories_aggregators import aggregator_row, web_search_row
 
 
@@ -89,8 +95,8 @@ async def test_the_deleted_junk_counts_towards_what_the_channel_sent(
     await put(
         session_factory,
         vacancy_row(source_channel_id=channel.id),
-        TrashEvent(source_channel_id=channel.id, source_msg_id=1, reason="реклама"),
-        TrashEvent(source_channel_id=channel.id, source_msg_id=2, reason="реклама"),
+        trash_event_row(source_channel_id=channel.id, source_msg_id=1, reason="реклама"),
+        trash_event_row(source_channel_id=channel.id, source_msg_id=2, reason="реклама"),
     )
 
     row = (await rows_by_channel(session, period="all"))[channel.id]
@@ -186,7 +192,7 @@ async def test_the_leftover_is_zero_when_everything_was_junk(
             status=VacancyStatus.NOT_FIT,
             skip_reason="trash: реклама",
         ),
-        TrashEvent(source_channel_id=channel.id, source_msg_id=1, reason="реклама"),
+        trash_event_row(source_channel_id=channel.id, source_msg_id=1, reason="реклама"),
     )
 
     row = (await rows_by_channel(session, period="all"))[channel.id]
@@ -243,7 +249,7 @@ async def test_a_channel_known_only_by_its_junk_still_appears(
     await put(session_factory, channel)
     await put(
         session_factory,
-        TrashEvent(source_channel_id=channel.id, source_msg_id=1, reason="реклама"),
+        trash_event_row(source_channel_id=channel.id, source_msg_id=1, reason="реклама"),
     )
 
     row = (await rows_by_channel(session, period="all"))[channel.id]
@@ -271,7 +277,7 @@ async def test_vacancies_without_a_channel_gather_in_their_own_row(
         vacancy_row(source_channel_id=channel.id),
         vacancy_row(),
         vacancy_row(status=VacancyStatus.NOT_FIT, skip_reason="язык не тот"),
-        TrashEvent(source_channel_id=None, source_msg_id=None, reason="реклама"),
+        trash_event_row(source_channel_id=None, source_msg_id=None, reason="реклама"),
     )
 
     rows = await rows_by_channel(session, period="all")
@@ -331,7 +337,7 @@ async def test_an_aggregator_gets_its_own_row_with_its_junk(session, session_fac
         session_factory,
         vacancy_row(source_aggregator_id=site.id, source_key="v/1"),
         vacancy_row(),
-        TrashEvent(source_aggregator_id=site.id, source_key="v/2", reason="реклама"),
+        trash_event_row(source_aggregator_id=site.id, source_key="v/2", reason="реклама"),
     )
 
     rows = await _rows_by_source(session)

@@ -238,14 +238,11 @@ def test_a_scoring_threshold_below_zero_is_taken_as_given(raw):
     assert settings(scoring_threshold=raw).scoring_threshold == int(raw)
 
 
-def test_the_path_to_the_resume_is_empty_until_set():
-    """Путь к резюме пуст, пока его не задали."""
-    assert settings().cv_path == ""
+async def test_a_stored_resume_path_is_used(session_factory):
+    """Заданный путь к резюме берётся из настроек — он лежит в активном профиле."""
+    await (await RuntimeSettings.load(session_factory)).set_cv_path("/tmp/cv.pdf")
 
-
-def test_a_stored_resume_path_is_used():
-    """Заданный путь к резюме берётся из настроек."""
-    assert settings(cv_path="/tmp/cv.pdf").cv_path == "/tmp/cv.pdf"
+    assert (await RuntimeSettings.load(session_factory)).cv_path == "/tmp/cv.pdf"
 
 
 def test_the_aggregator_settings_have_their_defaults():

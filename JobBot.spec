@@ -37,6 +37,7 @@ datas = [
     ('alembic/env.py', 'alembic'),
     ('alembic/script.py.mako', 'alembic'),
     ('alembic/versions/032b8b1c9f8a_init.py', 'alembic/versions'),
+    ('alembic/versions/5d2e7a9c4b13_workspaces.py', 'alembic/versions'),
     # Драйвер Playwright — node и его пакет: без них браузер агента не стартует.
     *collect_data_files('playwright'),
 ]

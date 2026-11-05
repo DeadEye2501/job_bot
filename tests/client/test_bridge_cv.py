@@ -91,7 +91,7 @@ async def test_a_chosen_resume_goes_to_the_system_by_its_full_path(
     """
     (tmp_path / "резюме.pdf").write_bytes(b"%PDF-1.4")
     monkeypatch.chdir(tmp_path)
-    await runtime_settings.set_app("cv_path", "резюме.pdf")
+    await runtime_settings.set_cv_path("резюме.pdf")
     handed: list[str] = []
     monkeypatch.setattr(
         "client.bridge.cv.open_in_system", lambda path: handed.append(path) or True
@@ -112,7 +112,7 @@ async def test_a_resume_the_system_would_not_open_is_not_called_opened(
     «открыли», человек читал бы на одном экране два противоположных
     утверждения.
     """
-    await runtime_settings.set_app("cv_path", "C:/нет/такого.pdf")
+    await runtime_settings.set_cv_path("C:/нет/такого.pdf")
     monkeypatch.setattr("client.bridge.cv.open_in_system", lambda path: False)
 
     answer = await ask(api.profile.open)

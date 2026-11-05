@@ -14,7 +14,6 @@ from backend.bot.media import (
     store_profile_photo,
 )
 from backend.domain.image_types import image_type
-from backend.repository.app_settings import PHOTO_PATH_KEY
 
 from client.bridge.answer import denied, reply
 from client.bridge.desktop import chosen_path, closed_dialog, file_filter
@@ -57,7 +56,7 @@ class Photo:
         async def run() -> dict:
             previous = self._hub.rs.photo_path
             relative = store_profile_photo(blob, suffix)
-            await self._hub.rs.set_app(PHOTO_PATH_KEY, relative)
+            await self._hub.rs.set_photo_path(relative)
             if previous != relative:
                 drop_stored_media(previous)
             return {"photo_path": relative}
@@ -69,7 +68,7 @@ class Photo:
 
         async def run() -> dict:
             drop_stored_media(self._hub.rs.photo_path)
-            await self._hub.rs.set_app(PHOTO_PATH_KEY, "")
+            await self._hub.rs.set_photo_path("")
             return {}
 
         return reply(self._hub.runner, run())

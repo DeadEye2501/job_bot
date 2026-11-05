@@ -11,9 +11,9 @@ from backend.bot import work
 from backend.domain.apply_order import Way
 from backend.llm.agent_letter import Letter
 from backend.models import VacancyStatus
-from backend.repository.app_settings import CV_PATH_KEY
-from tests.dbio import put
+from tests.dbio import put, reread
 from tests.factories import (
+    aggregator_switch_row,
     days_ago,
     hr_row,
     message_row,
@@ -43,8 +43,10 @@ def board(session_factory):
     """Залогиненный агрегатор и вакансия с него: кнопка агрегатора, затем форма из контактов."""
 
     async def make(**vacancy):
-        site = aggregator_row(host="site.test", is_logged_in=True, is_active=True)
+        site = aggregator_row(host="site.test", is_logged_in=True)
         await put(session_factory, site)
+        await put(session_factory, aggregator_switch_row(site.id, is_active=True))
+        site = await reread(session_factory, site)
         row = vacancy_row(**{"status": VacancyStatus.NEW, "source_aggregator_id": site.id,
                              "source_key": "vacancy/1", "source_url": PAGE, **vacancy})
         await put(session_factory, row)
@@ -59,7 +61,7 @@ async def _pipeline(make_pipeline, *, simulated: bool, resume=None):
     pipeline = await make_pipeline()
     await pipeline.rs.set_app("send_locked", "true" if simulated else "false")
     if resume is not None:
-        await pipeline.rs.set_app(CV_PATH_KEY, str(resume))
+        await pipeline.rs.set_cv_path(str(resume))
     return pipeline
 
 
@@ -135,7 +137,7 @@ def manual_case(make_bot, session_factory, tmp_path, monkeypatch):
         vacancy = await telegram_vacancy(session_factory, status=status)
         await put(session_factory, profile_row())
         bot = await make_bot()
-        await bot.rs.set_app(CV_PATH_KEY, str(resume_file(tmp_path)))
+        await bot.rs.set_cv_path(str(resume_file(tmp_path)))
         _model_writes_the_letter(monkeypatch)
         monkeypatch.setattr(work, "_kit", work_kit)
         bot.hanging = asyncio.Event()

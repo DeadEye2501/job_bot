@@ -13,13 +13,13 @@ from sqlalchemy import select
 
 from backend.payloads import ParsedCvLanguage
 from backend.models import (
-    AppSetting,
     Gender,
     Profile,
     ProfileExperience,
     ProfileLanguage,
     ProfileSkill,
     SalaryPeriod,
+    Workspace,
     profile_experience_skills,
     profile_project_skills,
 )
@@ -29,7 +29,13 @@ from backend.repository.profile_experience import list_experience
 from backend.repository.profile_projects import list_projects
 from backend.repository.profile_skills import list_skills
 from tests.dbio import put
-from tests.factories import experience_row, profile_row, profile_skill_row, project_row
+from tests.factories import (
+    TEST_WORKSPACE_ID,
+    experience_row,
+    profile_row,
+    profile_skill_row,
+    project_row,
+)
 from tests.factories_cv import (
     parsed_cv,
     parsed_cv_place,
@@ -270,28 +276,28 @@ async def test_a_place_keeps_all_it_was_given(session):
 
 
 async def test_the_path_to_the_file_is_recorded_alongside(session):
-    """Путь к файлу резюме записывается той же записью."""
+    """Путь к файлу резюме записывается той же записью — в активный профиль."""
     await save_parsed_cv(session, parsed_cv(), cv_path="cv/ivan.pdf")
 
-    saved = await session.get(AppSetting, "cv_path")
-    assert saved.value == "cv/ivan.pdf"
+    assert (await session.get(Workspace, TEST_WORKSPACE_ID)).cv_path == "cv/ivan.pdf"
 
 
 async def test_a_recorded_path_is_replaced_not_doubled(session):
-    """Повторная запись заменяет прежний путь, а не заводит вторую настройку."""
+    """Повторная запись заменяет прежний путь."""
     await save_parsed_cv(session, parsed_cv(), cv_path="cv/старое.pdf")
 
     await save_parsed_cv(session, parsed_cv(), cv_path="cv/новое.pdf")
 
-    rows = (await session.scalars(select(AppSetting))).all()
-    assert [(r.key, r.value) for r in rows] == [("cv_path", "cv/новое.pdf")]
+    assert (await session.get(Workspace, TEST_WORKSPACE_ID)).cv_path == "cv/новое.pdf"
 
 
 async def test_without_a_path_nothing_is_recorded(session):
-    """Без пути к файлу настройка не заводится."""
+    """Без пути к файлу прежний путь профиля не трогается."""
+    (await session.get(Workspace, TEST_WORKSPACE_ID)).cv_path = "cv/прежнее.pdf"
+
     await save_parsed_cv(session, parsed_cv())
 
-    assert (await session.scalars(select(AppSetting))).all() == []
+    assert (await session.get(Workspace, TEST_WORKSPACE_ID)).cv_path == "cv/прежнее.pdf"
 
 
 async def test_a_new_resume_keeps_the_answers_it_did_not_give(session, session_factory):

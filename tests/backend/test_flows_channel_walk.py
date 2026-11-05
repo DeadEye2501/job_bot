@@ -15,7 +15,7 @@ import pytest
 
 from backend.models import TelegramChannel
 from tests.dbio import all_rows, put
-from tests.factories import blacklist_row, channel_row
+from tests.factories import blacklist_row, blacklist_switch_row, channel_row, channel_switch_row
 from tests.fakes.telegram import FakeTelegramClient
 from tests.fakes.telegram_objects import chat
 
@@ -54,7 +54,9 @@ async def test_a_broken_metadata_sweep_does_not_cancel_the_walk(
     картинки. Уронив обход броском, она стоит человеку всех объявлений этого
     цикла, а следующий цикл идёт через полтора часа.
     """
-    await put(session_factory, channel_row(username="on", is_active=True))
+    channel = channel_row(username="on")
+    await put(session_factory, channel)
+    await put(session_factory, channel_switch_row(channel.id, is_active=True))
 
     async def broken(pipeline, rows):
         raise OSError("канал закрыт")
@@ -74,10 +76,12 @@ async def test_only_the_switched_on_channels_are_read(
     Выключить канал и значит «не собирай отсюда»; название у него всё
     равно обновится — он виден в окне.
     """
+    first, second = channel_row(username="on"), channel_row(username="off")
+    await put(session_factory, first, second)
     await put(
         session_factory,
-        channel_row(username="on", is_active=True),
-        channel_row(username="off", is_active=False),
+        channel_switch_row(first.id, is_active=True),
+        channel_switch_row(second.id, is_active=False),
     )
 
     await walking.poll_active_channels()
@@ -87,8 +91,9 @@ async def test_only_the_switched_on_channels_are_read(
 
 async def test_the_switch_over_all_channels_stops_the_walk(walking, session_factory):
     """Общий выключатель каналов гасит обход целиком, не трогая тумблеров строк."""
-    channel = channel_row(username="on", is_active=True)
+    channel = channel_row(username="on")
     await put(session_factory, channel)
+    await put(session_factory, channel_switch_row(channel.id, is_active=True))
     await walking.rs.set_app("channels_enabled", "false")
 
     await walking.poll_active_channels()
@@ -99,10 +104,12 @@ async def test_the_switch_over_all_channels_stops_the_walk(walking, session_fact
 
 async def test_a_channel_without_a_name_is_not_walked(walking, session_factory):
     """Канал без имени не обходят: спросить у Telegram его нечем."""
+    first, second = channel_row(username=None), channel_row(username="on")
+    await put(session_factory, first, second)
     await put(
         session_factory,
-        channel_row(username=None, is_active=True),
-        channel_row(username="on", is_active=True),
+        channel_switch_row(first.id, is_active=True),
+        channel_switch_row(second.id, is_active=True),
     )
 
     await walking.poll_active_channels()
@@ -118,10 +125,12 @@ async def test_a_channel_with_an_empty_name_is_not_walked(walking, session_facto
     отсутствие. Спрошенное у Telegram проверяется рядом — иначе канал
     выпадал бы из обхода, но обращение всё равно уходило.
     """
+    first, second = channel_row(username=""), channel_row(username="on")
+    await put(session_factory, first, second)
     await put(
         session_factory,
-        channel_row(username="", is_active=True),
-        channel_row(username="on", is_active=True),
+        channel_switch_row(first.id, is_active=True),
+        channel_switch_row(second.id, is_active=True),
     )
 
     await walking.poll_active_channels()
@@ -136,7 +145,9 @@ async def test_the_settings_are_reloaded_before_the_walk(walking, session_factor
     Пользователь мог поправить навыки или чёрный список между циклами, и
     обход должен идти уже по новым правилам.
     """
-    await put(session_factory, channel_row(username="on", is_active=True))
+    channel = channel_row(username="on")
+    await put(session_factory, channel)
+    await put(session_factory, channel_switch_row(channel.id, is_active=True))
 
     await walking.poll_active_channels()
 
@@ -149,10 +160,12 @@ async def test_a_broken_channel_does_not_stop_the_walk(monkeypatch, walking, ses
     Каналов полтора десятка, цикл идёт полтора часа; уронив его на
     первом же недоступном, бот терял бы всю работу.
     """
+    first, second = channel_row(username="broken"), channel_row(username="good")
+    await put(session_factory, first, second)
     await put(
         session_factory,
-        channel_row(username="broken", is_active=True),
-        channel_row(username="good", is_active=True),
+        channel_switch_row(first.id, is_active=True),
+        channel_switch_row(second.id, is_active=True),
     )
     walked: list[str] = []
 
@@ -179,10 +192,12 @@ async def test_a_channel_that_no_longer_exists_is_switched_off(
     """
     from pyrogram.errors import UsernameNotOccupied
 
+    first, second = channel_row(username="gone"), channel_row(username="good")
+    await put(session_factory, first, second)
     await put(
         session_factory,
-        channel_row(username="gone", is_active=True),
-        channel_row(username="good", is_active=True),
+        channel_switch_row(first.id, is_active=True),
+        channel_switch_row(second.id, is_active=True),
     )
     walked: list[str] = []
 
@@ -208,10 +223,12 @@ async def test_a_channel_that_no_longer_exists_is_switched_off(
 async def test_a_captcha_nobody_solved_stops_the_whole_walk(monkeypatch, walking, session_factory):
     """Капча, которую человек не прошёл, — беда всей работы, а не одного канала:
     следующий канал упёрся бы в то же ожидание."""
+    first, second = channel_row(username="first"), channel_row(username="second")
+    await put(session_factory, first, second)
     await put(
         session_factory,
-        channel_row(username="first", is_active=True),
-        channel_row(username="second", is_active=True),
+        channel_switch_row(first.id, is_active=True),
+        channel_switch_row(second.id, is_active=True),
     )
     walked: list[str] = []
 
@@ -232,10 +249,12 @@ async def test_the_window_is_told_where_the_walk_is(walking, session_factory):
     Полтора часа без единого признака жизни пользователь читает как
     зависшее приложение.
     """
+    first, second = channel_row(username="first"), channel_row(username="second")
+    await put(session_factory, first, second)
     await put(
         session_factory,
-        channel_row(username="first", is_active=True),
-        channel_row(username="second", is_active=True),
+        channel_switch_row(first.id, is_active=True),
+        channel_switch_row(second.id, is_active=True),
     )
     heard: list[tuple] = []
     walking.on_progress = lambda *args: heard.append(args)
@@ -251,7 +270,9 @@ async def test_both_bars_are_cleared_when_the_walk_ends(walking, session_factory
     Иначе нижняя застывает на счётчике последнего канала и до следующего
     цикла выглядит как незаконченная работа.
     """
-    await put(session_factory, channel_row(username="only", is_active=True))
+    channel = channel_row(username="only")
+    await put(session_factory, channel)
+    await put(session_factory, channel_switch_row(channel.id, is_active=True))
     heard: list[tuple] = []
     walking.on_progress = lambda *args: heard.append(args)
 
@@ -268,7 +289,9 @@ async def test_names_are_refreshed_even_for_switched_off_channels(
     Они показаны в том же списке, и застывшее название там выглядит
     ошибкой приложения, а не следствием выключенности.
     """
-    await put(session_factory, channel_row(username="off", title="Было", is_active=False))
+    channel = channel_row(username="off", title="Было")
+    await put(session_factory, channel)
+    await put(session_factory, channel_switch_row(channel.id, is_active=False))
     client = FakeTelegramClient(chats={"off": chat(title="Стало")})
     pipeline = await make_pipeline(client)
 
@@ -285,10 +308,12 @@ async def test_names_are_refreshed_even_for_switched_off_channels(
 
 async def test_one_channel_on_demand_is_read(walking, session_factory):
     """Прогон одного канала читает именно его."""
+    first, second = channel_row(username="wanted"), channel_row(username="other")
+    await put(session_factory, first, second)
     await put(
         session_factory,
-        channel_row(username="wanted", is_active=True),
-        channel_row(username="other", is_active=True),
+        channel_switch_row(first.id, is_active=True),
+        channel_switch_row(second.id, is_active=True),
     )
     rows = await all_rows(session_factory, TelegramChannel)
     wanted = next(c for c in rows if c.username == "wanted")
@@ -305,7 +330,9 @@ async def test_a_switched_off_channel_is_still_read_on_demand(
     Кнопку нажал пользователь, глядя именно на этот канал: отказать ему
     из-за выключенности значило бы проигнорировать прямую просьбу.
     """
-    await put(session_factory, channel_row(username="off", is_active=False))
+    channel = channel_row(username="off")
+    await put(session_factory, channel)
+    await put(session_factory, channel_switch_row(channel.id, is_active=False))
     rows = await all_rows(session_factory, TelegramChannel)
 
     assert await walking.poll_one_channel(rows[0].id) == "ok"
@@ -321,7 +348,9 @@ async def test_a_blacklisted_channel_is_not_read_even_on_demand(
     `@ник`, которого в теле поста обычно нет.
     """
     await put(session_factory, channel_row(username="listed"))
-    await put(session_factory, blacklist_row("channel", "@listed"))
+    mark = blacklist_row("channel", "@listed")
+    await put(session_factory, mark)
+    await put(session_factory, blacklist_switch_row(mark.id, active=True))
     rows = await all_rows(session_factory, TelegramChannel)
 
     assert await walking.poll_one_channel(rows[0].id) == "blacklisted"
@@ -366,7 +395,9 @@ async def test_a_broken_read_on_demand_reports_failure(monkeypatch, walking, ses
     настоящую причину — закрытый канал, просьбу подождать, молчание модели —
     оставляет только в журнале.
     """
-    await put(session_factory, channel_row(username="broken", is_active=True))
+    channel = channel_row(username="broken")
+    await put(session_factory, channel)
+    await put(session_factory, channel_switch_row(channel.id, is_active=True))
     rows = await all_rows(session_factory, TelegramChannel)
 
     async def poll(pipeline, channel_id, username, last_id):

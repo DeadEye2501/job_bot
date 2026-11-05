@@ -9,7 +9,6 @@ from adapters import lm_studio
 from adapters.cv_text import READABLE_SUFFIXES, read_cv_text
 from backend.provider_config import LlmProviderConfig
 from backend.llm import cv as llm_cv
-from backend.repository.app_settings import CV_PATH_KEY
 from backend.repository.profile_cv import save_parsed_cv
 
 from client.bridge.answer import denied, launched, reply
@@ -73,7 +72,7 @@ class Cv:
             return denied("Путь пустой")
 
         async def run() -> dict:
-            await self._hub.rs.set_app(CV_PATH_KEY, path)
+            await self._hub.rs.set_cv_path(path)
             return {"path": path, **(_stat_cv(path) or {})}
 
         return reply(self._hub.runner, run())

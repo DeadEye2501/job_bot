@@ -12,6 +12,7 @@ from backend.domain.apply_order import Way
 from backend.models import (
     AggregatorResume, Vacancy, VacancyStatus, VacancyStatusHistory,
 )
+from backend.repository.aggregator_resumes import choose_resume
 from tests.backend.fixtures.applying import FORM, PAGE
 from tests.dbio import all_rows, only_row, put
 from tests.factories_aggregators import aggregator_resume_row, web_search_row
@@ -25,6 +26,12 @@ from tests.fakes.agent import (
     record_step,
     under_confirmation,
 )
+
+
+async def _choose(session_factory, site_id: int, resume_id: int) -> None:
+    """Отметить резюме «откликаться этим»: строку профиля сайта уже положил `board`."""
+    async with session_factory() as session, session.begin():
+        await choose_resume(session, site_id, resume_id)
 
 
 async def test_a_recorded_application_is_applied(board, kit_with):
@@ -170,8 +177,9 @@ async def test_a_missing_resume_said_after_the_window_closed_drops_nothing(
         board, kit_with, session_factory):
     """Без браузера агент резюме не видит: его «нет» — не повод удалять резюме и снимать работу."""
     site, vacancy = await board()
-    await put(session_factory, aggregator_resume_row(
-        site.id, title="Повар", url="https://site.test/resume/1", is_chosen=True))
+    resume = aggregator_resume_row(site.id, title="Повар", url="https://site.test/resume/1")
+    await put(session_factory, resume)
+    await _choose(session_factory, site.id, resume.id)
 
     async def step(tools):
         kit.window_closed.set()
@@ -243,8 +251,9 @@ async def test_a_form_opens_in_the_web_search_profile(board, kit_with, session_f
 
 async def test_the_applier_is_told_which_resume_to_choose(board, kit_with, session_factory):
     site, vacancy = await board()
-    await put(session_factory, aggregator_resume_row(
-        site.id, title="Повар-кондитер", url="https://site.test/resume/7", is_chosen=True))
+    resume = aggregator_resume_row(site.id, title="Повар-кондитер", url="https://site.test/resume/7")
+    await put(session_factory, resume)
+    await _choose(session_factory, site.id, resume.id)
     kit = await kit_with([record_step(PAGE, via="aggregator")])
 
     await via_browser(kit, vacancy.id, Way("aggregator", PAGE, site.id))
@@ -257,11 +266,12 @@ async def test_a_chosen_resume_missing_on_the_site_stops_the_run_and_leaves_none
     board, kit_with, session_factory
 ):
     site, vacancy = await board()
+    gone = aggregator_resume_row(site.id, title="Пропало", url="https://site.test/resume/1")
     await put(session_factory,
-              aggregator_resume_row(site.id, title="Пропало", url="https://site.test/resume/1",
-                                    is_chosen=True),
+              gone,
               aggregator_resume_row(site.id, title="Осталось", url="https://site.test/resume/2",
                                     position=1))
+    await _choose(session_factory, site.id, gone.id)
     kit = await kit_with([finish_step("resume_missing")])
 
     # Вакансия на поддомене: весть называет сайт агрегатора, а не адрес вакансии.

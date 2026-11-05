@@ -7,7 +7,7 @@
 
 from backend.repository.blacklist import list_blacklist, set_blacklist_active
 from tests.dbio import put
-from tests.factories import blacklist_row
+from tests.factories import blacklist_row, blacklist_switch_row
 
 
 async def test_the_list_keeps_the_order_rows_were_added(session, session_factory):
@@ -16,10 +16,16 @@ async def test_the_list_keeps_the_order_rows_were_added(session, session_factory
     Раньше сортировали по включённости, и строка прыгала между верхом и
     низом при каждом нажатии — устойчивый порядок оказался важнее.
     """
-    first = blacklist_row("hr", "@первый", active=True)
-    second = blacklist_row("channel", "@второй", active=False)
-    third = blacklist_row("company", "Третья", active=True)
+    first = blacklist_row("hr", "@первый")
+    second = blacklist_row("channel", "@второй")
+    third = blacklist_row("company", "Третья")
     await put(session_factory, first, second, third)
+    await put(
+        session_factory,
+        blacklist_switch_row(first.id, active=True),
+        blacklist_switch_row(second.id, active=False),
+        blacklist_switch_row(third.id, active=True),
+    )
 
     await set_blacklist_active(session, first.id, False)
     await set_blacklist_active(session, second.id, True)

@@ -14,6 +14,8 @@ from backend.repository.search import matches_search
 from backend.repository.source_stats import source_stats
 from backend.repository.vacancies_common import counted_vacancies
 from backend.repository.vacancies_life import repoint_vacancies
+from backend.repository.workspace_switches import load_switches, put_switch
+from backend.repository.workspaces import active_workspace_id
 
 WEB_SEARCH_NAME = "Поиск по сети"
 
@@ -33,16 +35,20 @@ async def find_aggregator(session: AsyncSession, host: str) -> Aggregator | None
 async def create_aggregator(
     session: AsyncSession, address: str, name: str, avatar: bytes | None
 ) -> tuple[Aggregator | None, str]:
-    """Завести агрегатор по адресу, набранному как угодно. Новый выключен и без входа."""
+    """Завести агрегатор по адресу, набранному как угодно. Новый выключен и без входа.
+
+    Строки профиля не пишет: без неё агрегатор выключен во всех профилях.
+    """
     host = normalize_host(address)
     if not host:
         return None, "invalid"
     known = await find_aggregator(session, host)
     if known is not None:
         return known, "exists"
-    row = Aggregator(name=name, host=host, avatar=avatar, is_active=False, is_logged_in=False)
+    row = Aggregator(name=name, host=host, avatar=avatar, is_logged_in=False)
     session.add(row)
     await session.flush()
+    await load_switches(session, row)
     return row, "created"
 
 
@@ -83,7 +89,8 @@ aggregator_blacklist_value = AGGREGATOR_BLACKLIST.value
 
 
 async def deactivate_blacklisted_aggregators(session: AsyncSession) -> int:
-    """Выключить агрегаторы под действующей отметкой; сколько выключено.
+    """Выключить агрегаторы под отметкой в каждом профиле, где она включена;
+    сколько выключено.
 
     «Поиск по сети» под неё не попадает: написаний у него нет.
     """
@@ -140,7 +147,8 @@ async def get_aggregator_detail(
 
 
 async def set_aggregator_active(session: AsyncSession, aggregator_id: int, active: bool) -> str:
-    """Включить или выключить агрегатор. Без входа и в отсеве включить нельзя.
+    """Включить или выключить агрегатор в активном профиле. Без входа и в отсеве
+    включить нельзя.
 
     Запрет отсева стоит здесь, а не в окне: пройди включение — отметка была бы
     отменена нажатием, которое про неё ничего не знает.
@@ -152,7 +160,7 @@ async def set_aggregator_active(session: AsyncSession, aggregator_id: int, activ
         return "not_logged_in"
     if active and await aggregator_blacklist_value(session, row) is not None:
         return "blacklisted"
-    row.is_active = active
+    await put_switch(session, row, await active_workspace_id(session), is_active=active)
     return "ok"
 
 
@@ -172,7 +180,7 @@ async def is_logged_in(session: AsyncSession, aggregator_id: int) -> bool:
 async def mark_run(session: AsyncSession, aggregator_id: int, started_at: datetime) -> None:
     row = await session.get(Aggregator, aggregator_id)
     if row is not None:
-        row.last_run_at = started_at
+        await put_switch(session, row, await active_workspace_id(session), last_run_at=started_at)
 
 
 async def applications_of(session: AsyncSession, aggregator_id: int) -> int:

@@ -10,7 +10,7 @@ import pytest
 from backend.models import TelegramChannel, Vacancy
 from client.bridge.refusals import TELEGRAM_REFUSALS
 from tests.dbio import only_row, put
-from tests.factories import channel_row, vacancy_row
+from tests.factories import channel_row, channel_switch_row, vacancy_row
 
 
 async def test_a_name_that_is_not_a_channel_never_reaches_telegram(
@@ -170,8 +170,9 @@ async def test_a_reset_cursor_clears_the_mark_without_the_bot(
     Это одна правка строки в базе, и бот ей не нужен вовсе: запри её на
     поднятого бота — кнопка отказывала бы там, где работа ей по силам.
     """
-    channel = channel_row(username="pyjobs", last_processed_msg_id=500)
+    channel = channel_row(username="pyjobs")
     await put(session_factory, channel)
+    await put(session_factory, channel_switch_row(channel.id, last_processed_msg_id=500))
 
     assert "ok" in await ask(api.channels.reset_cursor, channel.id)
 

@@ -11,7 +11,13 @@
 
 from backend.models import Profile, ProfileLanguage
 from tests.dbio import only_row, put
-from tests.factories import blacklist_row, profile_row, profile_skill_row, resume_file
+from tests.factories import (
+    blacklist_row,
+    blacklist_switch_row,
+    profile_row,
+    profile_skill_row,
+    resume_file,
+)
 
 
 async def test_the_skills_are_lifted_into_memory(make_pipeline, session_factory):
@@ -36,11 +42,9 @@ async def test_the_skills_are_lifted_into_memory(make_pipeline, session_factory)
 
 async def test_the_blacklist_is_lifted_into_memory(make_pipeline, session_factory):
     """Образцы чёрного списка поднимаются в память."""
-    await put(
-        session_factory,
-        blacklist_row("keyword", "казино"),
-        blacklist_row("keyword", "ставки"),
-    )
+    marks = [blacklist_row("keyword", "казино"), blacklist_row("keyword", "ставки")]
+    await put(session_factory, *marks)
+    await put(session_factory, *(blacklist_switch_row(m.id, active=True) for m in marks))
     pipeline = await make_pipeline()
 
     await pipeline.reload_resources()
@@ -56,10 +60,12 @@ async def test_a_switched_off_blacklist_entry_is_not_lifted(
     Гашение и значит «пока не отсеивай»; иначе кнопка в окне ничего бы
     не меняла.
     """
+    off, on = blacklist_row("keyword", "казино"), blacklist_row("keyword", "ставки")
+    await put(session_factory, off, on)
     await put(
         session_factory,
-        blacklist_row("keyword", "казино", active=False),
-        blacklist_row("keyword", "ставки"),
+        blacklist_switch_row(off.id, active=False),
+        blacklist_switch_row(on.id, active=True),
     )
     pipeline = await make_pipeline()
 
@@ -114,7 +120,9 @@ async def test_the_second_reload_sees_the_edits(make_pipeline, session_factory):
     pipeline = await make_pipeline()
     await pipeline.reload_resources()
 
-    await put(session_factory, blacklist_row("keyword", "казино"))
+    mark = blacklist_row("keyword", "казино")
+    await put(session_factory, mark)
+    await put(session_factory, blacklist_switch_row(mark.id, active=True))
     await pipeline.reload_resources()
 
     assert pipeline.blacklist_patterns == ["казино"]
@@ -134,6 +142,6 @@ async def test_a_set_cv_path_is_handed_over_as_a_path(make_pipeline, tmp_path):
     """Заданный путь к резюме отдаётся как путь, а не строкой."""
     resume = resume_file(tmp_path)
     pipeline = await make_pipeline()
-    await pipeline.rs.set_app("cv_path", str(resume))
+    await pipeline.rs.set_cv_path(str(resume))
 
     assert pipeline.cv_path() == resume

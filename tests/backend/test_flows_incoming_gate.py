@@ -15,7 +15,7 @@ import pytest
 from backend.bot.media import MEDIA_DIR
 from backend.models import HR, Message
 from tests.dbio import all_rows, only_row, put
-from tests.factories import EPOCH, blacklist_row, hr_row, message_row
+from tests.factories import EPOCH, blacklist_row, blacklist_switch_row, hr_row, message_row
 from tests.fakes.telegram import FakeTelegramClient
 from tests.fakes.telegram_objects import incoming, message, photo, user
 
@@ -96,11 +96,13 @@ async def test_a_letter_from_a_blacklisted_hr_is_dropped(session_factory, delive
     Переписка с ним глохнет в обе стороны: исходящее уже заперто, и
     входящее тоже не должно ни попадать в ленту, ни двигать статусы.
     """
+    mark = blacklist_row("hr", "@maria")
     await put(
         session_factory,
         hr_row(telegram_user_id=777, telegram_username="maria"),
-        blacklist_row("hr", "@maria"),
+        mark,
     )
+    await put(session_factory, blacklist_switch_row(mark.id, active=True))
 
     await deliver(incoming())
 
