@@ -28,8 +28,8 @@ logger = logging.getLogger(__name__)
 # среди них меньшинство. Оборвавшийся ответ переспрашивается с запасом — см.
 # `answers.wants_more_room`, — и если не хватило и его, разбор сдаётся, а
 # зовущий записывает строку с названной причиной вместо вечного перебора.
-MAX_PARSE_TOKENS = 1200
-ROOMIER_PARSE_TOKENS = 2400
+MAX_PARSE_TOKENS = 2400
+ROOMIER_PARSE_TOKENS = 4800
 
 
 # Sanitiser для company_name: иногда LLM прилепляет URL прямо в название
