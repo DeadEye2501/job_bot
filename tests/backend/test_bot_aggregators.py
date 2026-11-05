@@ -10,8 +10,8 @@ from backend.bot.turn import launch_turn
 from backend.models import Aggregator, BotMode
 from backend.repository.aggregator_resumes import resumes_of
 from tests.backend.fixtures.bot import slot_freed, switch_to
-from tests.dbio import all_rows, put
-from tests.factories import blacklist_row
+from tests.dbio import all_rows, put, reread
+from tests.factories import aggregator_switch_row, blacklist_row, blacklist_switch_row
 from tests.factories_aggregators import aggregator_resume_row, aggregator_row, web_search_row
 from tests.fakes.agent import (
     captcha_step,
@@ -45,9 +45,10 @@ def agent(monkeypatch):
 @pytest.fixture
 async def sites(session_factory):
     """Один включённый агрегатор со входом и выключенный «Поиск по сети»."""
-    site = aggregator_row(host="site.test", is_active=True, is_logged_in=True)
+    site = aggregator_row(host="site.test", is_logged_in=True)
     await put(session_factory, site, web_search_row())
-    return site
+    await put(session_factory, aggregator_switch_row(site.id, is_active=True))
+    return await reread(session_factory, site)
 
 
 def _hold(release):
@@ -403,7 +404,9 @@ async def test_a_blacklisted_site_is_neither_run_nor_logged_into(
     """Ручной обход и вход тоже не трогают сайт из отсева: отметку снимают, а не обходят."""
     bot = await make_bot()
     kit = agent(bot, [finish_step(), finish_step()])
-    await put(session_factory, blacklist_row("aggregator", "site.test"))
+    mark = blacklist_row("aggregator", "site.test")
+    await put(session_factory, mark)
+    await put(session_factory, blacklist_switch_row(mark.id, active=True))
 
     assert await aggregators.run_aggregator_now(bot, sites.id) == "blacklisted"
     assert await aggregators.login_aggregator(bot, sites.id) == "blacklisted"

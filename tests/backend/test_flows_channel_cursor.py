@@ -14,7 +14,7 @@ from backend.flows import parse
 from backend.flows import channels
 from backend.models import TelegramChannel, VacancyStatus
 from tests.dbio import only_row, put
-from tests.factories import channel_row, vacancy_row
+from tests.factories import channel_row, channel_switch_row, vacancy_row
 
 
 async def test_the_cursor_moves_to_the_message_just_handled(
@@ -25,8 +25,9 @@ async def test_the_cursor_moves_to_the_message_just_handled(
     Со следующего обхода канал читается с этого места; без переезда
     каждый обход перечитывал бы его с начала.
     """
-    await put(session_factory, channel_row(last_processed_msg_id=100))
+    await put(session_factory, channel_row())
     channel = await only_row(session_factory, TelegramChannel)
+    await put(session_factory, channel_switch_row(channel.id, last_processed_msg_id=100))
     pipeline = await make_pipeline()
 
     await channels.advance_cursor(pipeline, channel.id, 250)
@@ -38,8 +39,9 @@ async def test_the_first_pass_sets_the_cursor_from_scratch(
     make_pipeline, session_factory
 ):
     """У канала без отметки она заводится с первого же разбора."""
-    await put(session_factory, channel_row(last_processed_msg_id=None))
+    await put(session_factory, channel_row())
     channel = await only_row(session_factory, TelegramChannel)
+    await put(session_factory, channel_switch_row(channel.id, last_processed_msg_id=None))
     pipeline = await make_pipeline()
 
     await channels.advance_cursor(pipeline, channel.id, 250)

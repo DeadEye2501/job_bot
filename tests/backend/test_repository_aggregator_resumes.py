@@ -7,6 +7,7 @@ from backend.repository.aggregator_resumes import (
 )
 from backend.repository.aggregators import delete_aggregator
 from tests.dbio import all_rows, only_row, put, resume_marks
+from tests.factories import aggregator_switch_row
 from tests.factories_aggregators import aggregator_resume_row, aggregator_row
 
 
@@ -29,8 +30,9 @@ async def test_a_resume_with_the_same_link_stays_the_same_record_with_its_mark(
     session, session_factory
 ):
     site = await _site(session_factory)
-    kept = aggregator_resume_row(site, title="Старое", url="https://hh.ru/r/1", is_chosen=True)
+    kept = aggregator_resume_row(site, title="Старое", url="https://hh.ru/r/1")
     await put(session_factory, kept)
+    await put(session_factory, aggregator_switch_row(site, chosen_resume_id=kept.id))
     async with session.begin():
         await sync_resumes(session, site, [SeenResume("Новое имя", "https://hh.ru/r/1")],
                            can_add=False)
@@ -43,9 +45,11 @@ async def test_a_vanished_resume_takes_its_mark_and_another_is_not_chosen(
     session, session_factory
 ):
     site = await _site(session_factory)
+    gone = aggregator_resume_row(site, title="Ушло", url="https://hh.ru/r/1")
     await put(session_factory,
-              aggregator_resume_row(site, title="Ушло", url="https://hh.ru/r/1", is_chosen=True),
+              gone,
               aggregator_resume_row(site, title="Осталось", url="https://hh.ru/r/2", position=1))
+    await put(session_factory, aggregator_switch_row(site, chosen_resume_id=gone.id))
     async with session.begin():
         await sync_resumes(session, site, [SeenResume("Осталось", "https://hh.ru/r/2"),
                                            SeenResume("Пришло", "https://hh.ru/r/3")],
@@ -89,9 +93,10 @@ async def test_a_scan_touches_only_its_own_site(session, session_factory):
 
 async def test_choosing_a_resume_moves_the_mark(session, session_factory):
     site = await _site(session_factory)
-    first = aggregator_resume_row(site, url="https://hh.ru/r/1", is_chosen=True)
+    first = aggregator_resume_row(site, url="https://hh.ru/r/1")
     second = aggregator_resume_row(site, title="Другое", url="https://hh.ru/r/2", position=1)
     await put(session_factory, first, second)
+    await put(session_factory, aggregator_switch_row(site, chosen_resume_id=first.id))
     async with session.begin():
         await choose_resume(session, site, second.id)
     async with session_factory() as fresh:
@@ -104,8 +109,9 @@ async def test_choosing_on_one_site_keeps_the_mark_on_another(session, session_f
     other = aggregator_row(host="other.test")
     await put(session_factory, other)
     mine = aggregator_resume_row(site, url="https://hh.ru/r/1")
-    await put(session_factory, mine,
-              aggregator_resume_row(other.id, url="https://other.test/r/1", is_chosen=True))
+    theirs = aggregator_resume_row(other.id, url="https://other.test/r/1")
+    await put(session_factory, mine, theirs)
+    await put(session_factory, aggregator_switch_row(other.id, chosen_resume_id=theirs.id))
     async with session.begin():
         await choose_resume(session, site, mine.id)
     assert await resume_marks(session_factory, other.id) == [("Разработчик", True)]
@@ -117,11 +123,15 @@ async def test_a_dropped_resume_leaves_the_site_without_a_chosen_one(session, se
     site = await _site(session_factory)
     other = aggregator_row(host="other.test")
     await put(session_factory, other)
+    dropped = aggregator_resume_row(site, url="https://hh.ru/r/1")
+    theirs = aggregator_resume_row(other.id, title="Чужое", url="https://other.test/r/1")
     await put(session_factory,
-              aggregator_resume_row(site, url="https://hh.ru/r/1", is_chosen=True),
+              dropped,
               aggregator_resume_row(site, title="Другое", url="https://hh.ru/r/2", position=1),
-              aggregator_resume_row(other.id, title="Чужое", url="https://other.test/r/1",
-                                    is_chosen=True))
+              theirs)
+    await put(session_factory,
+              aggregator_switch_row(site, chosen_resume_id=dropped.id),
+              aggregator_switch_row(other.id, chosen_resume_id=theirs.id))
     async with session.begin():
         await drop_resume(session, site, "https://hh.ru/r/1")
     assert await resume_marks(session_factory, site) == [("Другое", False)]
@@ -131,9 +141,9 @@ async def test_a_dropped_resume_leaves_the_site_without_a_chosen_one(session, se
 async def test_dropping_a_resume_already_gone_keeps_the_new_choice(session, session_factory):
     """Человек выбрал другое резюме, пока шёл отклик названным: уходит только названное."""
     site = await _site(session_factory)
-    await put(session_factory,
-              aggregator_resume_row(site, title="Выбрано заново", url="https://hh.ru/r/2",
-                                    is_chosen=True))
+    chosen = aggregator_resume_row(site, title="Выбрано заново", url="https://hh.ru/r/2")
+    await put(session_factory, chosen)
+    await put(session_factory, aggregator_switch_row(site, chosen_resume_id=chosen.id))
     async with session.begin():
         await drop_resume(session, site, "https://hh.ru/r/1")
     assert await resume_marks(session_factory, site) == [("Выбрано заново", True)]
@@ -141,7 +151,9 @@ async def test_dropping_a_resume_already_gone_keeps_the_new_choice(session, sess
 
 async def test_a_deleted_aggregator_takes_its_resumes_with_it(session, session_factory):
     site = await _site(session_factory)
-    await put(session_factory, aggregator_resume_row(site, is_chosen=True))
+    chosen = aggregator_resume_row(site)
+    await put(session_factory, chosen)
+    await put(session_factory, aggregator_switch_row(site, chosen_resume_id=chosen.id))
     async with session.begin():
         assert await delete_aggregator(session, site) == "ok"
     assert await all_rows(session_factory, AggregatorResume) == []

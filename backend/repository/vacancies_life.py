@@ -29,6 +29,7 @@ from backend.models import (
     VacancyEvent,
     VacancyStatusHistory,
 )
+from backend.repository.workspaces import active_workspace_id
 
 logger = logging.getLogger(__name__)
 
@@ -69,8 +70,11 @@ async def record_trash_event(
     разбор второй раз после сброса курсора канала, то же объявление агрегатора —
     на следующем обходе, и без сверки числа росли бы от каждого повтора. Без
     номера сверить не с чем, и отметка пишется всегда.
+
+    Профиль — активный: мусор отмечают разбор и прогон заново, оба идут в
+    месте прогона, где профиль сменить нельзя, и вакансия всегда в активном.
     """
-    mark = TrashEvent(reason=reason)
+    mark = TrashEvent(reason=reason, workspace_id=await active_workspace_id(session))
     if vacancy is not None:
         mark.source_channel_id = vacancy.source_channel_id
         mark.source_msg_id = vacancy.source_msg_id

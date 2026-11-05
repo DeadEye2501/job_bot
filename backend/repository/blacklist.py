@@ -4,16 +4,18 @@ import logging
 
 from typing import Literal
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.hosts import normalize_host
 from backend.models import Blacklist
-from backend.models.settings import AGGREGATOR_KIND, CHANNEL_KIND
+from backend.models.settings import AGGREGATOR_KIND, CHANNEL_KIND, blacklist_on_anywhere
 from backend.incoming import text_or_none
 
 from backend.repository import aggregators, channels
 from backend.repository.blacklist_marks import active_mark_of
+from backend.repository.workspace_switches import put_switch, switched_on_in
+from backend.repository.workspaces import active_workspace_id
 
 logger = logging.getLogger(__name__)
 
@@ -51,14 +53,15 @@ async def _hold_the_source_rule(session: AsyncSession, kind: str) -> None:
 async def set_blacklist_active(
     session: AsyncSession, blacklist_id: int, active: bool
 ) -> bool:
-    """Toggle Blacklist.active. Returns False if the row is missing.
-    Caller wraps in ``session.begin()``.
+    """Включить или выключить строку в активном профиле; ложь — строки нет.
+
+    Сделку держит зовущий.
     """
     row = await session.get(Blacklist, blacklist_id)
     if row is None:
         return False
     prev = row.active
-    row.active = bool(active)
+    await put_switch(session, row, await active_workspace_id(session), active=bool(active))
     if row.active:
         await _hold_the_source_rule(session, row.kind)
     if prev != row.active:
@@ -76,7 +79,8 @@ async def set_blacklist_active(
 async def deactivate_blacklist_values(
     session: AsyncSession, kind: str, candidates: list[str]
 ) -> int:
-    """Погасить активные строки этого рода под любым из написаний предмета.
+    """Погасить включённые в активном профиле строки этого рода под любым из
+    написаний предмета.
 
     Отдаёт число погашенных: окно по нему отличает «убрали» от «нечего
     было убирать». Строки не удаляются — решение остаётся видимым на
@@ -90,12 +94,13 @@ async def deactivate_blacklist_values(
 
     Транзакцию закрывает зовущий.
     """
-    done = await session.execute(
-        update(Blacklist)
-        .where(active_mark_of(kind, candidates))
-        .values(active=False)
-    )
-    return done.rowcount or 0
+    workspace_id = await active_workspace_id(session)
+    rows = (await session.scalars(
+        select(Blacklist).where(active_mark_of(kind, candidates, workspace_id))
+    )).all()
+    for row in rows:
+        await put_switch(session, row, workspace_id, active=False)
+    return len(rows)
 
 
 async def rename_blacklist_marks(
@@ -108,17 +113,23 @@ async def rename_blacklist_marks(
     прежнем написании — она продолжила бы отсеивать посты, а с карточки
     пропала бы: та ищет отметку по нынешнему написанию.
 
+    Запись общая, и переезжают строки, включённые хотя бы в одном профиле:
+    правка общего действует во всех. Выключенные везде остаются на прежнем
+    написании.
+
     Строка под новым написанием уже бывает заведена — так сливают две
-    отмеченные записи. Тогда действующей становится она, а переезжающие
-    гаснут: второй строки с тем же написанием не допускает и заведение, а
-    погашенная остаётся видимой на экране списка. Транзакцию закрывает
-    зовущий.
+    отмеченные записи. Тогда она включается в каждом профиле, где была
+    включена любая из переезжающих, а переезжающие там гаснут: второй строки с
+    тем же написанием не допускает и заведение, а погашенная остаётся видимой
+    на экране списка. Транзакцию закрывает зовущий.
     """
     if old_value == new_value:
         return
     moving = (
         await session.scalars(
-            select(Blacklist).where(active_mark_of(kind, [old_value]))
+            select(Blacklist).where(
+                Blacklist.kind == kind, Blacklist.value == old_value, blacklist_on_anywhere()
+            )
         )
     ).all()
     if not moving:
@@ -128,9 +139,10 @@ async def rename_blacklist_marks(
         if standing is None:
             row.value = new_value
             standing = row
-        else:
-            row.active = False
-    standing.active = True
+            continue
+        for workspace_id in await switched_on_in(session, row):
+            await put_switch(session, standing, workspace_id, active=True)
+            await put_switch(session, row, workspace_id, active=False)
     await _hold_the_source_rule(session, kind)
     logger.info(
         "Blacklist marks of kind=%s moved %r -> %r (rows=%d)",
@@ -234,8 +246,10 @@ async def _same_entry(
     ).first()
 
 
-def _reuse_existing(existing: Blacklist, reason: str | None) -> BlacklistOutcome:
-    """Поднять уже заведённую строку и сказать, чем это кончилось.
+async def _reuse_existing(
+    session: AsyncSession, existing: Blacklist, reason: str | None
+) -> BlacklistOutcome:
+    """Поднять уже заведённую строку в активном профиле и сказать, чем это кончилось.
 
     Снятая строка возвращается в список, поднятая остаётся как была.
     Причина дописывается только в пустое: у строки, заведённой раньше,
@@ -243,7 +257,7 @@ def _reuse_existing(existing: Blacklist, reason: str | None) -> BlacklistOutcome
     """
     outcome: BlacklistOutcome = "already_active"
     if not existing.active:
-        existing.active = True
+        await put_switch(session, existing, await active_workspace_id(session), active=True)
         outcome = "reactivated"
         logger.info(
             "Blacklist reactivated id=%d kind=%s value=%r",
@@ -259,10 +273,12 @@ def _reuse_existing(existing: Blacklist, reason: str | None) -> BlacklistOutcome
 async def _insert_blacklist(
     session: AsyncSession, kind: str, value: str, reason: str | None
 ) -> Blacklist:
-    """Завести новую строку списка — сразу действующую."""
-    row = Blacklist(kind=kind, value=value, reason=reason, active=True)
+    """Завести новую строку списка — включённую в активном профиле, в остальных
+    выключенную."""
+    row = Blacklist(kind=kind, value=value, reason=reason)
     session.add(row)
     await session.flush()
+    await put_switch(session, row, await active_workspace_id(session), active=True)
     logger.info(
         "Blacklist created id=%d kind=%s value=%r reason=%r",
         row.id,
@@ -298,7 +314,7 @@ async def create_blacklist(
 
     existing = await _same_entry(session, normalized_kind, normalized_value)
     if existing is not None:
-        row, outcome = existing, _reuse_existing(existing, normalized_reason)
+        row, outcome = existing, await _reuse_existing(session, existing, normalized_reason)
     else:
         row, outcome = await _insert_blacklist(
             session, normalized_kind, normalized_value, normalized_reason

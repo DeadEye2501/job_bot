@@ -18,7 +18,7 @@ from backend.bot.media import MEDIA_DIR
 from backend.models import BotMode, Message
 from tests.backend.fixtures.bot import row_saved_mid_send
 from tests.dbio import only_row, put
-from tests.factories import EPOCH, blacklist_row, photo_head
+from tests.factories import EPOCH, blacklist_row, blacklist_switch_row, photo_head
 
 
 def _file(tmp_path, name: str, size: int = 4):
@@ -218,7 +218,9 @@ async def test_a_blacklisted_hr_gets_no_files_either(
     chatting, session_factory, sending_unlocked, tmp_path
 ):
     """HR из чёрного списка файла не получает, и запись названа в отказе."""
-    await put(session_factory, blacklist_row("hr", "@maria"))
+    mark = blacklist_row("hr", "@maria")
+    await put(session_factory, mark)
+    await put(session_factory, blacklist_switch_row(mark.id, active=True))
     bot, client, hr = await chatting()
     src = _file(tmp_path, "снимок.png")
 

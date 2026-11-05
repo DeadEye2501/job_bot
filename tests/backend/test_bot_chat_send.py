@@ -15,7 +15,7 @@ import pytest
 from backend.models import BotMode, Message
 from tests.backend.fixtures.bot import row_saved_mid_send
 from tests.dbio import all_rows, only_row, put
-from tests.factories import EPOCH, blacklist_row
+from tests.factories import EPOCH, blacklist_row, blacklist_switch_row
 
 
 async def test_a_message_reaches_the_hr_and_the_chat(
@@ -116,7 +116,9 @@ async def test_a_blacklisted_hr_is_named_ahead_of_the_send_lock(
     Замок снимается одним переключателем, чёрный список — нет. Назови окно
     замок, и человек снимет его, чтобы упереться в то же самое.
     """
-    await put(session_factory, blacklist_row("hr", "@maria"))
+    mark = blacklist_row("hr", "@maria")
+    await put(session_factory, mark)
+    await put(session_factory, blacklist_switch_row(mark.id, active=True))
     bot, client, hr = await chatting(telegram_username="maria")
 
     with pytest.raises(RuntimeError, match="blacklist"):
@@ -158,7 +160,9 @@ async def test_a_blacklisted_hr_is_refused_with_the_entry_named(
 
     По ней пользователь и найдёт, что убрать, если передумал.
     """
-    await put(session_factory, blacklist_row("hr", "@maria"))
+    mark = blacklist_row("hr", "@maria")
+    await put(session_factory, mark)
+    await put(session_factory, blacklist_switch_row(mark.id, active=True))
     bot, client, hr = await chatting()
 
     with pytest.raises(RuntimeError, match="@maria"):

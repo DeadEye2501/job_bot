@@ -17,6 +17,7 @@ from tests.factories import (
     channel_row,
     days_ago,
     marked_channels,
+    switches_of_marks,
     vacancy_row,
 )
 
@@ -239,7 +240,9 @@ async def test_the_card_shows_an_active_mark_of_its_own_kind(
     """Отметка показывается, только если она включена и заведена для канала."""
     listed, switched_off, other_kind = marked_channels()
     await put(session_factory, listed, switched_off, other_kind)
-    await put(session_factory, *channel_marks())
+    marks = channel_marks()
+    await put(session_factory, *marks)
+    await put(session_factory, *switches_of_marks(marks))
 
     assert (await get_channel_detail(session, listed.id)).blacklist_value == "@listed"
     assert (await get_channel_detail(session, switched_off.id)).blacklist_value is None

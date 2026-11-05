@@ -15,6 +15,7 @@ from tests.factories import (
     company_row,
     hr_row,
     marked_companies,
+    switches_of_marks,
     vacancy_row,
 )
 
@@ -54,7 +55,9 @@ async def test_the_card_shows_an_active_mark_of_its_own_kind(
     """Отметка показывается, только если она включена и заведена для компании."""
     listed, switched_off, other_kind = marked_companies()
     await put(session_factory, listed, switched_off, other_kind)
-    await put(session_factory, *company_marks())
+    marks = company_marks()
+    await put(session_factory, *marks)
+    await put(session_factory, *switches_of_marks(marks))
 
     assert (await get_company_detail(session, listed.id)).blacklist_value == "Контур"
     assert (await get_company_detail(session, switched_off.id)).blacklist_value is None

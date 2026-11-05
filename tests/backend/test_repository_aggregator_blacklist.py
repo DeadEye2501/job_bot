@@ -16,7 +16,7 @@ from backend.repository.blacklist import (
 )
 from backend.repository.blacklist_candidates import list_blacklist_candidates
 from tests.dbio import all_rows, put
-from tests.factories import blacklist_row
+from tests.factories import aggregator_switch_row, blacklist_row, blacklist_switch_row
 from tests.factories_aggregators import aggregator_row, web_search_row
 
 
@@ -35,9 +35,14 @@ async def test_an_address_without_a_host_is_refused(session):
 async def test_an_address_edited_in_place_is_stored_as_the_host_too(session, session_factory):
     """Правка на месте — не дорога в обход: набранный адрес целиком не совпал
     бы с агрегатором, и тот тихо вышел бы из отсева при действующей записи."""
-    barred = aggregator_row(host="site.test", is_active=True, is_logged_in=True)
+    barred = aggregator_row(host="site.test", is_logged_in=True)
     entry = blacklist_row(kind="aggregator", value="old.test")
     await put(session_factory, barred, entry)
+    await put(
+        session_factory,
+        aggregator_switch_row(barred.id, is_active=True),
+        blacklist_switch_row(entry.id, active=True),
+    )
 
     async with session.begin():
         await update_blacklist(session, entry.id, value="https://www.Site.test/")
@@ -51,8 +56,9 @@ async def test_an_address_edited_in_place_is_stored_as_the_host_too(session, ses
 async def test_a_mark_on_a_site_covers_its_subdomain_aggregator(session, session_factory):
     """Поддомен сайта — тот же сайт, как и в отсеве ссылок: агрегатор на
     поддомене отмеченного сайта гаснет, не включается, не обходится и помечен."""
-    sub = aggregator_row(host="spb.site.test", is_active=True, is_logged_in=True)
+    sub = aggregator_row(host="spb.site.test", is_logged_in=True)
     await put(session_factory, sub)
+    await put(session_factory, aggregator_switch_row(sub.id, is_active=True))
 
     async with session.begin():
         await create_blacklist(session, kind="aggregator", value="site.test")
@@ -68,9 +74,14 @@ async def test_a_mark_on_a_site_covers_its_subdomain_aggregator(session, session
 
 
 async def test_an_entry_switches_the_aggregator_off(session, session_factory):
-    barred = aggregator_row(host="site.test", is_active=True, is_logged_in=True)
-    clean = aggregator_row(host="other.test", is_active=True, is_logged_in=True)
+    barred = aggregator_row(host="site.test", is_logged_in=True)
+    clean = aggregator_row(host="other.test", is_logged_in=True)
     await put(session_factory, barred, clean)
+    await put(
+        session_factory,
+        aggregator_switch_row(barred.id, is_active=True),
+        aggregator_switch_row(clean.id, is_active=True),
+    )
 
     async with session.begin():
         await create_blacklist(session, kind="aggregator", value="site.test")
@@ -80,9 +91,14 @@ async def test_an_entry_switches_the_aggregator_off(session, session_factory):
 
 
 async def test_switching_an_entry_back_on_switches_the_aggregator_off(session, session_factory):
-    site = aggregator_row(host="site.test", is_active=True, is_logged_in=True)
-    entry = blacklist_row("aggregator", "site.test", active=False)
+    site = aggregator_row(host="site.test", is_logged_in=True)
+    entry = blacklist_row("aggregator", "site.test")
     await put(session_factory, site, entry)
+    await put(
+        session_factory,
+        aggregator_switch_row(site.id, is_active=True),
+        blacklist_switch_row(entry.id, active=False),
+    )
 
     async with session.begin():
         await set_blacklist_active(session, entry.id, True)
@@ -92,7 +108,9 @@ async def test_switching_an_entry_back_on_switches_the_aggregator_off(session, s
 
 async def test_a_blacklisted_aggregator_cannot_be_switched_on(session, session_factory):
     site = aggregator_row(host="site.test", is_logged_in=True)
-    await put(session_factory, site, blacklist_row("aggregator", "site.test"))
+    entry = blacklist_row("aggregator", "site.test")
+    await put(session_factory, site, entry)
+    await put(session_factory, blacklist_switch_row(entry.id, active=True))
 
     async with session.begin():
         assert await set_aggregator_active(session, site.id, True) == "blacklisted"
@@ -103,9 +121,16 @@ async def test_the_round_skips_a_blacklisted_aggregator_even_when_switched_on(
     session, session_factory
 ):
     """Строку могли включить мимо окна; обход всё равно её не берёт, а «Поиск по сети» — берёт."""
-    barred = aggregator_row(host="site.test", is_active=True, is_logged_in=True)
-    web = web_search_row(is_active=True, is_logged_in=True)
-    await put(session_factory, barred, web, blacklist_row("aggregator", "site.test"))
+    barred = aggregator_row(host="site.test", is_logged_in=True)
+    web = web_search_row(is_logged_in=True)
+    entry = blacklist_row("aggregator", "site.test")
+    await put(session_factory, barred, web, entry)
+    await put(
+        session_factory,
+        aggregator_switch_row(barred.id, is_active=True),
+        aggregator_switch_row(web.id, is_active=True),
+        blacklist_switch_row(entry.id, active=True),
+    )
 
     assert [a.id for a in await round_sources(session)] == [web.id]
 
@@ -113,7 +138,9 @@ async def test_the_round_skips_a_blacklisted_aggregator_even_when_switched_on(
 async def test_the_list_and_the_card_show_the_mark(session, session_factory):
     barred = aggregator_row(host="site.test")
     clean = aggregator_row(host="other.test")
-    await put(session_factory, barred, clean, blacklist_row("aggregator", "site.test"))
+    entry = blacklist_row("aggregator", "site.test")
+    await put(session_factory, barred, clean, entry)
+    await put(session_factory, blacklist_switch_row(entry.id, active=True))
 
     listed = await list_aggregators_with_counts(session)
     _, _, value = await get_aggregator_detail(session, barred.id)

@@ -46,6 +46,12 @@ from backend.models.vacancy import (
     VacancyEvent,
     VacancyStatusHistory,
 )
+from backend.models.workspace import (
+    Workspace,
+    WorkspaceAggregator,
+    WorkspaceBlacklist,
+    WorkspaceChannel,
+)
 
 __all__ = [
     "HR",
@@ -84,6 +90,10 @@ __all__ = [
     "VacancyEvent",
     "VacancyStatus",
     "VacancyStatusHistory",
+    "Workspace",
+    "WorkspaceAggregator",
+    "WorkspaceBlacklist",
+    "WorkspaceChannel",
     "profile_experience_skills",
     "profile_project_skills",
 ]

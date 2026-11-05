@@ -10,6 +10,7 @@ from tests.dbio import put
 from tests.factories import (
     at,
     blacklist_row,
+    blacklist_switch_row,
     company_row,
     hr_row,
     unread_probe_with_a_neighbour,
@@ -134,12 +135,17 @@ async def test_the_blacklist_mark_is_set_under_either_spelling(
     by_id = hr_row(name="Борис", telegram_username="boris", telegram_user_id=222)
     clean = hr_row(name="Виктор", telegram_username="vik", telegram_user_id=333)
     await put(session_factory, by_username, by_id, clean)
+    by_username_mark = blacklist_row("hr", "@anna")
+    by_id_mark = blacklist_row("hr", "user_id:222")
+    switched_off = blacklist_row("hr", "@vik")
+    other_kind = blacklist_row("channel", "@vik")
+    await put(session_factory, by_username_mark, by_id_mark, switched_off, other_kind)
     await put(
         session_factory,
-        blacklist_row("hr", "@anna"),
-        blacklist_row("hr", "user_id:222"),
-        blacklist_row("hr", "@vik", active=False),
-        blacklist_row("channel", "@vik"),
+        blacklist_switch_row(by_username_mark.id, active=True),
+        blacklist_switch_row(by_id_mark.id, active=True),
+        blacklist_switch_row(switched_off.id, active=False),
+        blacklist_switch_row(other_kind.id, active=True),
     )
 
     found, _ = await list_hr_with_counts(session)

@@ -7,7 +7,7 @@
 from backend.models import TelegramChannel
 from backend.repository.channels import reset_channel_cursor
 from tests.dbio import put
-from tests.factories import channel_row
+from tests.factories import channel_row, channel_switch_row
 
 
 async def test_resetting_the_cursor_of_a_missing_channel_reports_failure(session):
@@ -19,8 +19,9 @@ async def test_resetting_the_cursor_makes_the_next_poll_start_over(
     session, session_factory
 ):
     """Сброс отметки стирает номер последнего разобранного сообщения."""
-    channel = channel_row(username="pyjobs", last_processed_msg_id=500)
+    channel = channel_row(username="pyjobs")
     await put(session_factory, channel)
+    await put(session_factory, channel_switch_row(channel.id, last_processed_msg_id=500))
 
     assert await reset_channel_cursor(session, channel.id) is True
 

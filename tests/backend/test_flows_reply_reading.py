@@ -21,7 +21,7 @@ from backend.models import HR, Message, Vacancy, VacancyStatus, VacancyStatusHis
 from backend.payloads import Classification
 from backend.repository.vacancies_life import delete_vacancy
 from tests.dbio import all_rows, only_row, put
-from tests.factories import blacklist_row, hr_row, message_row, vacancy_row
+from tests.factories import blacklist_row, blacklist_switch_row, hr_row, message_row, vacancy_row
 
 
 @pytest.fixture
@@ -135,7 +135,9 @@ async def test_a_blacklisted_hr_is_not_read_at_all(reading, session_factory):
     он тогда не попал, а разбирать его уже незачем.
     """
     pipeline, hr, vacancy, message = reading
-    await put(session_factory, blacklist_row("hr", "@maria"))
+    mark = blacklist_row("hr", "@maria")
+    await put(session_factory, mark)
+    await put(session_factory, blacklist_switch_row(mark.id, active=True))
     _buffer(pipeline, hr, vacancy, message, "давайте созвонимся")
 
     await dm_classify.classify_and_apply_for_hr(pipeline, hr.id)

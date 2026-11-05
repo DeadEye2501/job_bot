@@ -5,7 +5,7 @@ from backend.agent.tools_common import common_tools
 from backend.models import Aggregator
 from backend.payloads import SeenResume
 from backend.repository.agent_profile import build_agent_profile
-from tests.dbio import all_rows, put
+from tests.dbio import all_rows, put, reread
 from tests.factories import profile_row
 from tests.factories_aggregators import aggregator_row
 from tests.fakes.agent import TODAY, apply_job, kit_for, tool
@@ -15,6 +15,7 @@ async def test_the_profile_tool_gives_the_whole_profile(make_pipeline, session_f
     await put(session_factory, profile_row())
     site = aggregator_row()
     await put(session_factory, site)
+    site = await reread(session_factory, site)
     tools = common_tools(kit_for(await make_pipeline()), LoginJob(Source.of(site)))
 
     async with session_factory() as session:
@@ -27,6 +28,7 @@ async def test_a_reported_login_lands_on_its_own_aggregator(make_pipeline, sessi
     site = aggregator_row(is_logged_in=False)
     other = aggregator_row(host="other.test", is_logged_in=False)
     await put(session_factory, site, other)
+    site = await reread(session_factory, site)
     tools = common_tools(kit_for(await make_pipeline()), LoginJob(Source.of(site)))
 
     await tool(tools, "report_login")(logged_in=True)
@@ -38,6 +40,7 @@ async def test_a_reported_login_lands_on_its_own_aggregator(make_pipeline, sessi
 async def test_finish_records_the_outcome_of_the_session(make_pipeline, session_factory):
     site = aggregator_row()
     await put(session_factory, site)
+    site = await reread(session_factory, site)
     job = LoginJob(Source.of(site))
 
     await tool(common_tools(kit_for(await make_pipeline()), job), "finish")(result="done", reason="")
@@ -48,6 +51,7 @@ async def test_finish_records_the_outcome_of_the_session(make_pipeline, session_
 async def test_a_finish_the_role_does_not_know_is_refused(make_pipeline, session_factory):
     site = aggregator_row()
     await put(session_factory, site)
+    site = await reread(session_factory, site)
     job = LoginJob(Source.of(site))
 
     answer = await tool(common_tools(kit_for(await make_pipeline()), job), "finish")(
@@ -103,6 +107,7 @@ async def test_the_login_check_cannot_call_for_a_human(make_pipeline, session_fa
     «не вошёл» и закончить."""
     site = aggregator_row()
     await put(session_factory, site)
+    site = await reread(session_factory, site)
     tools = common_tools(kit_for(await make_pipeline()), LoginJob(Source.of(site)))
 
     assert "need_human" not in {one.__name__ for one in tools}
@@ -125,6 +130,7 @@ async def test_the_scan_calls_a_human_on_its_site_and_marks_its_login(
     """Сканирование по кнопке может упереться во вход заново и в капчу."""
     site = aggregator_row(is_logged_in=True)
     await put(session_factory, site)
+    site = await reread(session_factory, site)
     gate = _Gate()
     job = ScanJob(Source.of(site))
     tools = common_tools(kit_for(await make_pipeline(), gate=gate), job)
@@ -156,6 +162,7 @@ async def test_a_fill_reports_its_login_calls_a_human_and_finishes(make_pipeline
     """Заполнение резюме — работа на сайте: вход может слететь, капча — встретиться."""
     site = aggregator_row(is_logged_in=True)
     await put(session_factory, site)
+    site = await reread(session_factory, site)
     gate = _Gate()
     job = FillJob(Source.of(site))
     tools = common_tools(kit_for(await make_pipeline(), gate=gate), job)
@@ -173,6 +180,7 @@ async def test_a_fill_the_agent_could_not_finish_ends_as_failed(make_pipeline, s
     успех на полузаполненном резюме."""
     site = aggregator_row()
     await put(session_factory, site)
+    site = await reread(session_factory, site)
     job = FillJob(Source.of(site))
 
     await tool(common_tools(kit_for(await make_pipeline()), job), "finish")(
@@ -185,6 +193,7 @@ async def test_a_written_outcome_is_not_overwritten_by_a_later_finish(make_pipel
     """Нехватка данных — итог заполнения; «done» следом сделало бы его успехом."""
     site = aggregator_row()
     await put(session_factory, site)
+    site = await reread(session_factory, site)
     job = FillJob(Source.of(site), outcome=Finished("required_missing", "Гражданство"))
 
     await tool(common_tools(kit_for(await make_pipeline()), job), "finish")(result="done")

@@ -12,8 +12,8 @@ from backend.flows.aggregator_round import seek_source
 from backend.models import Aggregator, ProfileLanguage, Vacancy
 from tests.backend.fixtures.applying import PAGE
 from tests.backend.fixtures.flows import similar_by_hand
-from tests.dbio import all_rows, put
-from tests.factories import blacklist_row, profile_row
+from tests.dbio import all_rows, put, reread
+from tests.factories import blacklist_row, blacklist_switch_row, profile_row
 from tests.factories_aggregators import aggregator_row
 from tests.fakes.agent import LimitHit, captcha_step, finish_step, scripted_kit, submit_step
 
@@ -28,6 +28,7 @@ def seek(make_pipeline, session_factory):
     async def run(steps, human_limit=3600.0, on_kit=None, **source):
         row = aggregator_row(**{"host": "site.test", **source})
         await put(session_factory, row)
+        row = await reread(session_factory, row)
         kit = scripted_kit(await make_pipeline(), steps, human_limit=human_limit)
         if on_kit is not None:
             await on_kit(kit)
@@ -239,7 +240,9 @@ async def test_the_seeker_is_told_how_to_call_a_person(seek, parsed, host):
 
 
 async def test_the_web_seeker_hears_of_the_blacklisted_sites(seek, session_factory, parsed):
-    await put(session_factory, blacklist_row("aggregator", "barred.test"))
+    mark = blacklist_row("aggregator", "barred.test")
+    await put(session_factory, mark)
+    await put(session_factory, blacklist_switch_row(mark.id, active=True))
 
     step = finish_step()
 

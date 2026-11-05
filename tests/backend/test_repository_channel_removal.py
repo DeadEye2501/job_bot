@@ -9,7 +9,7 @@ from sqlalchemy import select
 from backend.models import TelegramChannel, TrashEvent, Vacancy
 from backend.repository.channels import delete_channel
 from tests.dbio import put
-from tests.factories import channel_row, vacancy_row
+from tests.factories import channel_row, trash_event_row, vacancy_row
 
 
 async def test_deleting_a_missing_channel_reports_nothing(session):
@@ -40,8 +40,8 @@ async def test_deleting_a_channel_detaches_its_vacancies_and_trash(
         session_factory,
         vacancy_row(title="была его", source_channel_id=doomed.id),
         vacancy_row(title="чужая", source_channel_id=spared.id),
-        TrashEvent(source_channel_id=doomed.id, source_msg_id=1, reason="мусор"),
-        TrashEvent(source_channel_id=spared.id, source_msg_id=2, reason="мусор"),
+        trash_event_row(source_channel_id=doomed.id, source_msg_id=1, reason="мусор"),
+        trash_event_row(source_channel_id=spared.id, source_msg_id=2, reason="мусор"),
     )
 
     assert await delete_channel(session, doomed.id) == 1

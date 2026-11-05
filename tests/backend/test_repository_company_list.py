@@ -7,7 +7,13 @@
 
 from backend.repository.companies_list import list_companies_with_counts
 from tests.dbio import put
-from tests.factories import company_marks, company_row, marked_companies, vacancy_row
+from tests.factories import (
+    company_marks,
+    company_row,
+    marked_companies,
+    switches_of_marks,
+    vacancy_row,
+)
 
 
 async def names(session, **kwargs) -> list[str]:
@@ -127,7 +133,9 @@ async def test_the_row_carries_its_count_and_blacklist_mark(session, session_fac
     """В строке списка едут счётчик вакансий и отметка чёрного списка."""
     listed, switched_off, other_kind = marked_companies()
     await put(session_factory, listed, switched_off, other_kind)
-    await put(session_factory, vacancy_row(company_id=listed.id), *company_marks())
+    marks = company_marks()
+    await put(session_factory, vacancy_row(company_id=listed.id), *marks)
+    await put(session_factory, *switches_of_marks(marks))
 
     found, _ = await list_companies_with_counts(session)
     rows = {r.company.name: r for r in found}

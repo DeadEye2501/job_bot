@@ -15,7 +15,7 @@ from backend.repository.companies_card import (
     update_company_fields,
 )
 from tests.dbio import put
-from tests.factories import blacklist_row, company_row
+from tests.factories import blacklist_row, blacklist_switch_row, company_row
 
 
 async def test_the_mark_follows_the_renamed_company(session, session_factory):
@@ -27,7 +27,9 @@ async def test_the_mark_follows_the_renamed_company(session, session_factory):
     """
     company = company_row(name="Ромашка")
     await put(session_factory, company)
-    await put(session_factory, blacklist_row("company", "Ромашка"))
+    mark = blacklist_row("company", "Ромашка")
+    await put(session_factory, mark)
+    await put(session_factory, blacklist_switch_row(mark.id, active=True))
 
     await update_company_fields(session, company.id, name="Ромашка Групп")
 
@@ -46,10 +48,10 @@ async def test_a_mark_of_another_kind_stays_where_it_was(session, session_factor
     """
     company = company_row(name="Ромашка")
     await put(session_factory, company)
+    marks = [blacklist_row("company", "Ромашка"), blacklist_row("hr", "Ромашка")]
+    await put(session_factory, *marks)
     await put(
-        session_factory,
-        blacklist_row("company", "Ромашка"),
-        blacklist_row("hr", "Ромашка"),
+        session_factory, *(blacklist_switch_row(m.id, active=True) for m in marks)
     )
 
     await update_company_fields(session, company.id, name="Ромашка Групп")
@@ -73,7 +75,9 @@ async def test_the_mark_of_the_absorbed_moves_to_the_survivor(
     absorbed = company_row(name="Ромашка")
     survivor = company_row(name="Ромашка Групп")
     await put(session_factory, absorbed, survivor)
-    await put(session_factory, blacklist_row("company", "Ромашка"))
+    mark = blacklist_row("company", "Ромашка")
+    await put(session_factory, mark)
+    await put(session_factory, blacklist_switch_row(mark.id, active=True))
 
     await merge_company(session, absorbed_id=absorbed.id, survivor_id=survivor.id)
 
@@ -91,10 +95,10 @@ async def test_two_marked_companies_leave_one_active_mark(session, session_facto
     absorbed = company_row(name="Ромашка")
     survivor = company_row(name="Берёзка")
     await put(session_factory, absorbed, survivor)
+    marks = [blacklist_row("company", "Ромашка"), blacklist_row("company", "Берёзка")]
+    await put(session_factory, *marks)
     await put(
-        session_factory,
-        blacklist_row("company", "Ромашка"),
-        blacklist_row("company", "Берёзка"),
+        session_factory, *(blacklist_switch_row(m.id, active=True) for m in marks)
     )
 
     await merge_company(session, absorbed_id=absorbed.id, survivor_id=survivor.id)
@@ -119,10 +123,13 @@ async def test_a_switched_off_mark_of_the_survivor_lights_up(
     absorbed = company_row(name="Ромашка")
     survivor = company_row(name="Берёзка")
     await put(session_factory, absorbed, survivor)
+    absorbed_mark = blacklist_row("company", "Ромашка")
+    survivor_mark = blacklist_row("company", "Берёзка")
+    await put(session_factory, absorbed_mark, survivor_mark)
     await put(
         session_factory,
-        blacklist_row("company", "Ромашка"),
-        blacklist_row("company", "Берёзка", active=False),
+        blacklist_switch_row(absorbed_mark.id, active=True),
+        blacklist_switch_row(survivor_mark.id, active=False),
     )
 
     await merge_company(session, absorbed_id=absorbed.id, survivor_id=survivor.id)

@@ -15,15 +15,13 @@ def test_a_fresh_database_gets_one_web_search_row(migrations_target):
     """Новая база получает строку «Поиск по сети»: без хоста, выключенной, со входом.
 
     Входа у поиска по сети нет. Заведись строка «не вошёл», её нельзя было бы
-    включить никогда.
+    включить никогда. Выключена она тем, что строки профиля у неё нет.
     """
     command.upgrade(alembic_config(), "head")
 
-    rows = sqlite_rows(
-        migrations_target,
-        "SELECT name, host, is_active, is_logged_in FROM aggregator",
-    )
-    assert rows == [("Поиск по сети", None, 0, 1)]
+    rows = sqlite_rows(migrations_target, "SELECT name, host, is_logged_in FROM aggregator")
+    assert rows == [("Поиск по сети", None, 1)]
+    assert sqlite_rows(migrations_target, "SELECT * FROM workspace_aggregator") == []
 
 
 async def test_the_same_contact_on_two_vacancies_is_allowed(session_factory):

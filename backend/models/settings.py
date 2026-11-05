@@ -2,12 +2,16 @@
 
 from sqlalchemy import (
     CheckConstraint,
+    ColumnElement,
     LargeBinary,
     UniqueConstraint,
+    exists,
+    false,
+    func,
     text,
 )
-from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.sql import expression
+from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy.orm import Mapped, column_property, mapped_column
 
 from backend.models.base import (
     Base,
@@ -17,6 +21,7 @@ from backend.models.base import (
     enum_column,
 )
 from backend.models.enums import BotMode, LlmConfigKind
+from backend.models.workspace import ACTIVE_WORKSPACE_ID, WorkspaceBlacklist, switch_in
 
 
 class BotState(IdMixin, Base):
@@ -55,12 +60,41 @@ BLACKLIST_KINDS: tuple[str, ...] = (
 
 
 class Blacklist(IdMixin, CreatedAtMixin, Base):
+    """Запись чёрного списка — общая; включена ли она, решает каждый профиль.
+
+    `active` — включённость в активном профиле, только для чтения: пишут её
+    через строку профиля (`workspace_switches.put_switch`).
+    """
+
     __tablename__ = "blacklist"
 
     kind: Mapped[str]
     value: Mapped[str]
     reason: Mapped[str | None]
-    active: Mapped[bool] = mapped_column(server_default=expression.true())
+
+    @hybrid_property
+    def active(self) -> bool:
+        return self._active
+
+
+def blacklist_on(workspace: int | ColumnElement[int]) -> ColumnElement[bool]:
+    """Условие «строка списка включена в этом профиле»; `workspace` — номер
+    или `ACTIVE_WORKSPACE_ID`. Строки профиля нет — выключена."""
+    return func.coalesce(
+        switch_in(WorkspaceBlacklist.active, WorkspaceBlacklist.blacklist_id, Blacklist.id,
+                  workspace),
+        false(),
+    )
+
+
+def blacklist_on_anywhere() -> ColumnElement[bool]:
+    """Условие «строка списка включена хотя бы в одном профиле»."""
+    return exists().where(
+        WorkspaceBlacklist.blacklist_id == Blacklist.id, WorkspaceBlacklist.active
+    )
+
+
+Blacklist._active = column_property(blacklist_on(ACTIVE_WORKSPACE_ID))
 
 
 class TgAccount(IdMixin, UpdatedAtMixin, Base):

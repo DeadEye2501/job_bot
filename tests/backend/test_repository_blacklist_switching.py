@@ -10,7 +10,7 @@ from backend.repository.blacklist import (
     set_blacklist_active,
 )
 from tests.dbio import put
-from tests.factories import blacklist_row
+from tests.factories import blacklist_row, blacklist_switch_row
 
 
 async def test_switching_a_missing_row_reports_failure(session):
@@ -27,9 +27,14 @@ async def test_the_mark_is_taken_off_every_spelling_of_the_same_subject(
     «убрать из чёрного списка» обязана погасить оба: оставшееся написание
     держало бы отметку дальше, а на экране её было бы нечем снять.
     """
-    by_name = blacklist_row("hr", "@maria", active=True)
-    by_number = blacklist_row("hr", "user_id:77", active=True)
+    by_name = blacklist_row("hr", "@maria")
+    by_number = blacklist_row("hr", "user_id:77")
     await put(session_factory, by_name, by_number)
+    await put(
+        session_factory,
+        blacklist_switch_row(by_name.id, active=True),
+        blacklist_switch_row(by_number.id, active=True),
+    )
 
     taken_off = await deactivate_blacklist_values(
         session, "hr", ["@maria", "user_id:77"]
@@ -49,7 +54,9 @@ async def test_a_second_taking_off_reports_that_there_was_nothing_to_take(
     против «в чёрном списке не было». Погашенная строка лежит на месте и
     видна на экране, но снятой второй раз не считается.
     """
-    await put(session_factory, blacklist_row("hr", "@maria", active=False))
+    mark = blacklist_row("hr", "@maria")
+    await put(session_factory, mark)
+    await put(session_factory, blacklist_switch_row(mark.id, active=False))
 
     taken_off = await deactivate_blacklist_values(session, "hr", ["@maria"])
 
@@ -64,9 +71,14 @@ async def test_taking_the_mark_off_spares_other_kinds_and_other_subjects(
     То же значение бывает и ником человека, и ником канала, и снятие
     отметки с человека не должно возвращать канал в работу.
     """
-    same_value_other_kind = blacklist_row("channel", "@maria", active=True)
-    other_subject = blacklist_row("hr", "@olga", active=True)
+    same_value_other_kind = blacklist_row("channel", "@maria")
+    other_subject = blacklist_row("hr", "@olga")
     await put(session_factory, same_value_other_kind, other_subject)
+    await put(
+        session_factory,
+        blacklist_switch_row(same_value_other_kind.id, active=True),
+        blacklist_switch_row(other_subject.id, active=True),
+    )
 
     taken_off = await deactivate_blacklist_values(session, "hr", ["@maria"])
 
@@ -77,8 +89,9 @@ async def test_taking_the_mark_off_spares_other_kinds_and_other_subjects(
 
 async def test_a_row_switches_both_ways(session, session_factory):
     """Строка гасится и включается обратно."""
-    row = blacklist_row("hr", "@maria", active=True)
+    row = blacklist_row("hr", "@maria")
     await put(session_factory, row)
+    await put(session_factory, blacklist_switch_row(row.id, active=True))
 
     assert await set_blacklist_active(session, row.id, False) is True
     assert (await session.get(Blacklist, row.id)).active is False

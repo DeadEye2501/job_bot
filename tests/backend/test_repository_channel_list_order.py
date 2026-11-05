@@ -7,7 +7,7 @@
 """
 
 from tests.dbio import put
-from tests.factories import channel_row, vacancy_row
+from tests.factories import channel_row, channel_switch_row, vacancy_row
 
 
 async def test_the_list_leads_with_the_most_prolific_channel(channel_titles, session_factory
@@ -68,9 +68,14 @@ async def test_a_channel_without_a_title_is_ordered_by_its_username(channel_titl
 
 async def test_a_deactivated_channel_keeps_its_place(channel_titles, session_factory):
     """Выключенный канал остаётся на своём месте по числу вакансий."""
-    off = channel_row(username="a", title="Выключён", is_active=False)
-    on = channel_row(username="b", title="Включён", is_active=True)
+    off = channel_row(username="a", title="Выключён")
+    on = channel_row(username="b", title="Включён")
     await put(session_factory, off, on)
+    await put(
+        session_factory,
+        channel_switch_row(off.id, is_active=False),
+        channel_switch_row(on.id, is_active=True),
+    )
     await put(session_factory, vacancy_row(source_channel_id=off.id))
 
     assert await channel_titles() == ["Выключён", "Включён"]

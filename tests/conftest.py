@@ -373,12 +373,20 @@ async def _clear_all_tables(engine: AsyncEngine) -> None:
 
 
 async def _empty_database(database_url) -> None:
-    """Очистить базу своим движком: чужой к этому моменту может быть закрыт."""
+    """Очистить базу своим движком: чужой к этому моменту может быть закрыт.
+
+    После уборки кладётся активный профиль 1: без активного профиля приложение
+    не живёт — его кладёт миграция, и уборка снесла бы его вместе с остальным.
+    """
     from adapters.db import make_engine
 
     cleaner = make_engine(database_url)
     try:
         await _clear_all_tables(cleaner)
+        async with cleaner.begin() as connection:
+            await connection.execute(
+                text("INSERT INTO workspace (id, is_active) VALUES (1, 1)")
+            )
     finally:
         await cleaner.dispose()
 

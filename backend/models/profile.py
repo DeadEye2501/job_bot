@@ -38,7 +38,10 @@ STACK_LINKS = (profile_experience_skills, profile_project_skills)
 
 
 class Profile(IdMixin, UpdatedAtMixin, Base):
+    """Анкета. Одна на профиль (`workspace`)."""
+
     __tablename__ = "profile"
+    __table_args__ = (UniqueConstraint("workspace_id", name="uq_profile_workspace"),)
 
     first_name: Mapped[str]
     last_name: Mapped[str]
@@ -74,6 +77,7 @@ class Profile(IdMixin, UpdatedAtMixin, Base):
     # модели живут в `free_preferences`, и в решения этот текст не входит.
     about_me: Mapped[str | None]
     resume_url: Mapped[str | None]
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspace.id"))
 
 
 class ProfileLanguage(IdMixin, Base):

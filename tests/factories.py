@@ -26,10 +26,15 @@ from backend.models import (
     StatusHistorySource,
     TelegramChannel,
     TgAccount,
+    TrashEvent,
     Vacancy,
     VacancyEvent,
     VacancyStatus,
     VacancyStatusHistory,
+    Workspace,
+    WorkspaceAggregator,
+    WorkspaceBlacklist,
+    WorkspaceChannel,
 )
 from backend.payloads import ParsedVacancy
 
@@ -180,6 +185,36 @@ def bot_state_row(mode: BotMode) -> BotState:
     return BotState(id=1, mode=mode)
 
 
+TEST_WORKSPACE_ID = 1
+"""Активный профиль, который стенд кладёт в пустую базу (`_empty_database`)."""
+
+
+def workspace_row(**overrides) -> Workspace:
+    """Строка профиля; по умолчанию неактивного — активный уже лежит в базе."""
+    return Workspace(**overrides)
+
+
+def channel_switch_row(channel_id: int, **values) -> WorkspaceChannel:
+    """Тумблер и отметка чтения канала в профиле; по умолчанию в активном."""
+    return WorkspaceChannel(
+        channel_id=channel_id, **{"workspace_id": TEST_WORKSPACE_ID, **values}
+    )
+
+
+def aggregator_switch_row(aggregator_id: int, **values) -> WorkspaceAggregator:
+    """Тумблер, отметка чтения и выбор резюме агрегатора в профиле; по умолчанию в активном."""
+    return WorkspaceAggregator(
+        aggregator_id=aggregator_id, **{"workspace_id": TEST_WORKSPACE_ID, **values}
+    )
+
+
+def blacklist_switch_row(blacklist_id: int, **values) -> WorkspaceBlacklist:
+    """Включённость записи чёрного списка в профиле; по умолчанию в активном."""
+    return WorkspaceBlacklist(
+        blacklist_id=blacklist_id, **{"workspace_id": TEST_WORKSPACE_ID, **values}
+    )
+
+
 def vacancy_row(**overrides) -> Vacancy:
     """Строка вакансии, годная к выдаче в список.
 
@@ -196,9 +231,15 @@ def vacancy_row(**overrides) -> Vacancy:
         "status": VacancyStatus.NEW,
         "is_parsed": True,
         "created_at": EPOCH,
+        "workspace_id": TEST_WORKSPACE_ID,
     }
     fields.update(overrides)
     return Vacancy(**fields)
+
+
+def trash_event_row(**overrides) -> TrashEvent:
+    """Отметка мусора в активном профиле."""
+    return TrashEvent(**{"workspace_id": TEST_WORKSPACE_ID, **overrides})
 
 
 def hr_row(**overrides) -> HR:
@@ -245,8 +286,8 @@ CV_REQUIRED_PROFILE = person_fields()
 
 
 def profile_row(**overrides) -> Profile:
-    """Строка профиля кандидата. Обязательные поля заполнены."""
-    return Profile(**person_fields(**overrides))
+    """Строка анкеты кандидата в активном профиле. Обязательные поля заполнены."""
+    return Profile(**{"workspace_id": TEST_WORKSPACE_ID, **person_fields(**overrides)})
 
 
 def profile_skill_row(profile_id: int, name: str, **overrides) -> ProfileSkill:
@@ -286,8 +327,11 @@ def project_row(profile_id: int, **overrides) -> ProfileProject:
 
 
 def blacklist_row(kind: str, value: str, **overrides) -> Blacklist:
-    """Строка чёрного списка. Род и значение задаются явно: по ним и ищут."""
-    fields = {"reason": None, "active": True}
+    """Строка чёрного списка. Род и значение задаются явно: по ним и ищут.
+
+    Включённость — не поле строки, а строка профиля (`blacklist_switch_row`).
+    """
+    fields = {"reason": None}
     fields.update(overrides)
     return Blacklist(kind=kind, value=value, **fields)
 
@@ -342,9 +386,24 @@ def unread_probe_with_a_neighbour(hr_id: int, other_hr_id: int) -> list[Message]
     ]
 
 
+_MARKS_SWITCHED_ON = (True, False, True)
+"""Включённость трёх отметок наборов `channel_marks()` и `company_marks()`:
+включённая своего рода, снятая своего рода и включённая чужого."""
+
+
+def switches_of_marks(marks: list[Blacklist]) -> list[WorkspaceBlacklist]:
+    """Включённость отметок набора в активном профиле — кладётся после самих
+    отметок: номер у них появляется только в базе."""
+    return [
+        blacklist_switch_row(mark.id, active=on)
+        for mark, on in zip(marks, _MARKS_SWITCHED_ON, strict=True)
+    ]
+
+
 def channel_marks() -> list[Blacklist]:
     """Три отметки, которыми проверяется правило «канал в чёрном списке»:
-    включённая своего рода, снятая своего рода и включённая чужого.
+    включённая своего рода, снятая своего рода и включённая чужого; включённость
+    кладёт `switches_of_marks`.
 
     Обстановка одна на всех, кто это правило читает: карточка, перечень и
     опознание. Разойдись они — снятая отметка осталась бы проверенной на
@@ -352,7 +411,7 @@ def channel_marks() -> list[Blacklist]:
     """
     return [
         blacklist_row("channel", "@listed"),
-        blacklist_row("channel", "@off", active=False),
+        blacklist_row("channel", "@off"),
         blacklist_row("hr", "@hr_like"),
     ]
 
@@ -394,7 +453,7 @@ def company_marks() -> list[Blacklist]:
     listed, switched_off, other_kind = _MARKED_COMPANIES
     return [
         blacklist_row("company", listed),
-        blacklist_row("company", switched_off, active=False),
+        blacklist_row("company", switched_off),
         blacklist_row("hr", other_kind),
     ]
 

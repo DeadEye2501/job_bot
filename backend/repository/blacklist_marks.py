@@ -4,11 +4,13 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import and_, select
+from sqlalchemy import ColumnElement, and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.models import Blacklist, HR
-from backend.models.settings import AGGREGATOR_KIND, HR_KIND
+from backend.models import HR, Blacklist, Workspace
+from backend.models.settings import AGGREGATOR_KIND, HR_KIND, blacklist_on
+from backend.models.workspace import ACTIVE_WORKSPACE_ID
+from backend.repository.workspace_switches import put_switch, switch_model
 
 _ACCOUNT_MARK_PREFIX = "user_id:"
 
@@ -40,9 +42,9 @@ def _account_id_of(value: str) -> int | None:
     return int(tail) if tail.isascii() and tail.isdigit() else None
 
 
-def active_mark_of(kind: str, candidates: list[str]):
-    """Условие «предмет отмечен»: активная строка своего рода под любым из
-    написаний предмета.
+def active_mark_of(kind: str, candidates: list[str], workspace: int | ColumnElement[int]):
+    """Условие «предмет отмечен в профиле»: включённая в нём строка своего рода
+    под любым из написаний предмета.
 
     Что считать отметкой, решается здесь одним объявлением: по этому же
     условию отметку и снимают (`blacklist.deactivate_blacklist_values`), а
@@ -52,12 +54,12 @@ def active_mark_of(kind: str, candidates: list[str]):
     return and_(
         Blacklist.kind == kind,
         Blacklist.value.in_(candidates),
-        Blacklist.active.is_(True),
+        blacklist_on(workspace),
     )
 
 
 async def active_blacklist_value(
-    session: AsyncSession, kind: str, candidates: list[str]
+    session: AsyncSession, kind: str, candidates: list[str], workspace: int | ColumnElement[int]
 ) -> str | None:
     """Точный `value` активной строки, под которой предмет числится в
     чёрном списке, — для чипа в карточке. None, если не числится.
@@ -71,7 +73,7 @@ async def active_blacklist_value(
     row = (
         await session.scalars(
             select(Blacklist)
-            .where(active_mark_of(kind, candidates))
+            .where(active_mark_of(kind, candidates, workspace))
             .order_by(Blacklist.id.asc())
             .limit(1)
         )
@@ -79,16 +81,18 @@ async def active_blacklist_value(
     return row.value if row else None
 
 
-async def active_blacklist_values(session: AsyncSession, kind: str) -> set[str]:
-    """Все активные значения этого рода одним запросом: перечням нужна
-    проверка вхождения на каждую строку, а не запрос на каждую.
+async def active_blacklist_values(
+    session: AsyncSession, kind: str, workspace: int | ColumnElement[int]
+) -> set[str]:
+    """Все включённые в профиле значения этого рода одним запросом: перечням
+    нужна проверка вхождения на каждую строку, а не запрос на каждую.
     """
     return set(
         (
             await session.scalars(
                 select(Blacklist.value).where(
                     Blacklist.kind == kind,
-                    Blacklist.active.is_(True),
+                    blacklist_on(workspace),
                 )
             )
         ).all()
@@ -193,28 +197,41 @@ class BlacklistMark:
 
     async def value(self, session: AsyncSession, row) -> str | None:
         """Написание действующей отметки предмета — для чипа и запретов; None — чист."""
-        return await active_blacklist_value(session, self.kind, self.candidates(row))
+        return await active_blacklist_value(
+            session, self.kind, self.candidates(row), ACTIVE_WORKSPACE_ID
+        )
 
     async def marked(self, session: AsyncSession) -> set[str]:
         """Написания всех действующих отметок рода — читаются разом для списка."""
-        return await active_blacklist_values(session, self.kind)
+        return await active_blacklist_values(session, self.kind, ACTIVE_WORKSPACE_ID)
 
     def among(self, row, values: set[str]) -> bool:
         """Отмечен ли предмет одной из заранее прочитанных строк своего рода."""
         return marked_by(self.candidates(row), values)
 
     async def switch_off(self, session: AsyncSession, model) -> int:
-        """Выключить включённые источники под действующей отметкой; сколько выключено.
+        """Выключить источники под отметкой в каждом профиле, где она включена;
+        сколько выключено по всем профилям.
 
-        Перебором строк, а не запросом: отметка ловит написания, которые
-        собирает питон (у сайта — и поддомены), а источников единицы.
-        Выключенные не трогаются. Сессию открывает и закрывает зовущий.
+        Каждый профиль отдельно: отметка и тумблер источника у профиля свои, и
+        источник гаснет только там, где его отметка действует. Перебором строк,
+        а не запросом: отметка ловит написания, которые собирает питон (у сайта —
+        и поддомены), а источников единицы. Выключенные не трогаются. Сессию
+        открывает и закрывает зовущий.
         """
-        marked = await self.marked(session)
-        if not marked:
-            return 0
-        rows = (await session.scalars(select(model).where(model.is_active.is_(True)))).all()
-        barred = [row for row in rows if self.among(row, marked)]
-        for row in barred:
-            row.is_active = False
-        return len(barred)
+        switches, link = switch_model(model)
+        flipped = 0
+        for workspace_id in (await session.scalars(select(Workspace.id))).all():
+            marked = await active_blacklist_values(session, self.kind, workspace_id)
+            if not marked:
+                continue
+            rows = (await session.scalars(
+                select(model)
+                .join(switches, getattr(switches, link) == model.id)
+                .where(switches.workspace_id == workspace_id, switches.is_active)
+            )).all()
+            barred = [row for row in rows if self.among(row, marked)]
+            for row in barred:
+                await put_switch(session, row, workspace_id, is_active=False)
+            flipped += len(barred)
+        return flipped

@@ -7,7 +7,13 @@
 
 from backend.models import TelegramChannel
 from tests.dbio import all_rows, put
-from tests.factories import blacklist_row, channel_row, company_row
+from tests.factories import (
+    blacklist_row,
+    blacklist_switch_row,
+    channel_row,
+    channel_switch_row,
+    company_row,
+)
 
 
 async def test_the_list_carries_kind_value_and_whether_it_is_on(
@@ -19,14 +25,21 @@ async def test_the_list_carries_kind_value_and_whether_it_is_on(
     вернут. Пропади признак, погашенная выглядела бы работающей, и человек
     считал бы себя огороженным.
     """
-    await put(session_factory, blacklist_row("keyword", "казино", active=False))
+    off, on = blacklist_row("keyword", "казино"), blacklist_row("keyword", "ставки")
+    await put(session_factory, off, on)
+    await put(
+        session_factory,
+        blacklist_switch_row(off.id, active=False),
+        blacklist_switch_row(on.id, active=True),
+    )
 
     answer = await ask(api.blacklist.list)
 
-    row = answer["ok"]["items"][0]
+    row, switched_on = answer["ok"]["items"]
     assert row["kind"] == "keyword"
     assert row["value"] == "казино"
     assert row["active"] is False
+    assert switched_on["active"] is True
 
 
 async def test_an_unknown_kind_is_refused(api, ask):
@@ -78,8 +91,9 @@ async def test_repeating_a_switched_off_entry_brings_it_back(
     Человек не помнит, что уже гасил её; он просто заводит снова. Останься
     запись погашенной, заслон не работал бы, а окно отвечало бы успехом.
     """
-    entry = blacklist_row("keyword", "казино", active=False)
+    entry = blacklist_row("keyword", "казино")
     await put(session_factory, entry)
+    await put(session_factory, blacklist_switch_row(entry.id, active=False))
 
     answer = await ask(api.blacklist.create, {"kind": "keyword", "value": "казино"})
     assert answer["ok"]["created"] is False
@@ -98,7 +112,9 @@ async def test_barring_a_channel_switches_it_off_right_away(
     базу, а не в список: показ списка чинит дрейф сам, и через него зелено
     было бы и без правила.
     """
-    await put(session_factory, channel_row(username="spam", title="Спам"))
+    channel = channel_row(username="spam", title="Спам")
+    await put(session_factory, channel)
+    await put(session_factory, channel_switch_row(channel.id, is_active=True))
 
     answer = await ask(api.blacklist.create, {"kind": "channel", "value": "@spam"})
 
@@ -148,6 +164,7 @@ async def test_a_switched_off_entry_stays_in_the_list(
     """
     entry = blacklist_row("keyword", "казино")
     await put(session_factory, entry)
+    await put(session_factory, blacklist_switch_row(entry.id, active=True))
 
     switched = await ask(api.blacklist.set_active, {"id": entry.id, "active": False})
     assert "ok" in switched
@@ -189,8 +206,13 @@ async def test_switching_a_barred_row_back_on_stops_its_channel(
     человек считал, что оградился.
     """
     channel = channel_row(username="spam", title="Спам")
-    row = blacklist_row(kind="channel", value="@spam", active=False)
+    row = blacklist_row(kind="channel", value="@spam")
     await put(session_factory, channel, row)
+    await put(
+        session_factory,
+        channel_switch_row(channel.id, is_active=True),
+        blacklist_switch_row(row.id, active=False),
+    )
 
     answer = await ask(api.blacklist.set_active, {"id": row.id, "active": True})
 

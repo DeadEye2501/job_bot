@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Profile
+from backend.repository.workspaces import active_workspace_id
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,7 @@ async def upsert_profile(session: AsyncSession, **fields) -> Profile:
     """
     profile = await get_profile(session)
     if profile is None:
-        profile = Profile(**fields)
+        profile = Profile(workspace_id=await active_workspace_id(session), **fields)
         session.add(profile)
     else:
         for key, value in fields.items():

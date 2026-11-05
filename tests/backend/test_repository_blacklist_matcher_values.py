@@ -7,7 +7,7 @@
 
 from backend.repository.blacklist_marks import load_active_blacklist_patterns
 from tests.dbio import put
-from tests.factories import blacklist_row, hr_row
+from tests.factories import blacklist_row, blacklist_switch_row, hr_row
 
 
 async def test_only_active_values_reach_the_matcher(session, session_factory):
@@ -16,11 +16,15 @@ async def test_only_active_values_reach_the_matcher(session, session_factory):
     Отбор ключевых слов не различает рода: одно и то же слово из имени
     компании и из текста вакансии отсеивает одинаково.
     """
+    casino = blacklist_row("keyword", "казино")
+    maria = blacklist_row("hr", "@maria")
+    changed_mind = blacklist_row("keyword", "передумал")
+    await put(session_factory, casino, maria, changed_mind)
     await put(
         session_factory,
-        blacklist_row("keyword", "казино", active=True),
-        blacklist_row("hr", "@maria", active=True),
-        blacklist_row("keyword", "передумал", active=False),
+        blacklist_switch_row(casino.id, active=True),
+        blacklist_switch_row(maria.id, active=True),
+        blacklist_switch_row(changed_mind.id, active=False),
     )
 
     assert sorted(await load_active_blacklist_patterns(session)) == sorted(
@@ -42,7 +46,9 @@ async def test_a_marked_person_is_sifted_out_by_their_nickname(
     """
     hr = hr_row(telegram_username="maria", telegram_user_id=111)
     await put(session_factory, hr)
-    await put(session_factory, blacklist_row("hr", "user_id:111", active=True))
+    mark = blacklist_row("hr", "user_id:111")
+    await put(session_factory, mark)
+    await put(session_factory, blacklist_switch_row(mark.id, active=True))
 
     assert "@maria" in await load_active_blacklist_patterns(session)
 
@@ -56,6 +62,8 @@ async def test_an_unmarked_person_lends_their_nickname_to_no_one(
     продолжать отсеивать посты его именем.
     """
     await put(session_factory, hr_row(telegram_username="anna", telegram_user_id=222))
-    await put(session_factory, blacklist_row("hr", "user_id:222", active=False))
+    mark = blacklist_row("hr", "user_id:222")
+    await put(session_factory, mark)
+    await put(session_factory, blacklist_switch_row(mark.id, active=False))
 
     assert "@anna" not in await load_active_blacklist_patterns(session)

@@ -31,6 +31,17 @@ async def only_row(session_factory, model):
         return (await session.scalars(select(model))).first()
 
 
+async def reread(session_factory, row):
+    """Та же строка, прочитанная заново из базы.
+
+    У строки, положенной `put()`, атрибуты профиля (`is_active`,
+    `last_run_at` и прочие из `models/workspace.py`) не загружены, и чтение их
+    после сессии падает `DetachedInstanceError`.
+    """
+    async with session_factory() as session:
+        return await session.get(type(row), row.id)
+
+
 async def all_rows(session_factory, model) -> list:
     """Все строки таблицы, прочитанные заново из базы.
 

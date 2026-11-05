@@ -7,10 +7,10 @@ import pytest
 from backend.agent.jobs import SeekJob, Source
 from backend.agent.stops import HumanTimeout, LimitExhausted
 from backend.agent.tools_seeker import seeker_tools
-from backend.models import ContactAddedBy, TrashEvent, Vacancy, VacancyContact, VacancyEvent
+from backend.models import ContactAddedBy, Vacancy, VacancyContact, VacancyEvent
 from tests.backend.fixtures.parse_stub import parse_into
-from tests.dbio import all_rows, put
-from tests.factories import blacklist_row, vacancy_row
+from tests.dbio import all_rows, put, reread
+from tests.factories import blacklist_row, blacklist_switch_row, trash_event_row, vacancy_row
 from tests.factories_aggregators import aggregator_row, web_search_row
 from tests.fakes.agent import kit_for, tool
 from tests.fakes.browser import FakeBrowser
@@ -24,6 +24,7 @@ async def _seeker(make_pipeline, session_factory, *, limit=5, row=None):
     """Искатель на своём источнике; ответ — задача, инструменты и набор."""
     site = row or aggregator_row(host="site.test")
     await put(session_factory, site)
+    site = await reread(session_factory, site)
     job = SeekJob(Source.of(site), limit=limit)
     kit = kit_for(await make_pipeline(), browser=FakeBrowser())
     return job, seeker_tools(kit, job), kit
@@ -68,7 +69,7 @@ async def test_an_unseen_number_is_new_and_a_foreign_page_is_not_ours(make_pipel
 
 async def test_a_page_deleted_as_junk_is_known_too(make_pipeline, session_factory):
     job, tools, _ = await _seeker(make_pipeline, session_factory)
-    await put(session_factory, TrashEvent(source_aggregator_id=job.source.id, source_key="vacancy/1"))
+    await put(session_factory, trash_event_row(source_aggregator_id=job.source.id, source_key="vacancy/1"))
 
     assert await tool(tools, "is_known")(url=PAGE) == "известна"
 
@@ -275,7 +276,9 @@ BARRED_PAGE = "https://jobs.barred.test/vacancy/1"
 
 async def _web_seeker(make_pipeline, session_factory):
     """Искатель «Поиска по сети», а у человека в отсеве сайт `barred.test`."""
-    await put(session_factory, blacklist_row("aggregator", "barred.test"))
+    mark = blacklist_row("aggregator", "barred.test")
+    await put(session_factory, mark)
+    await put(session_factory, blacklist_switch_row(mark.id, active=True))
     job, tools, _ = await _seeker(make_pipeline, session_factory, row=web_search_row())
     return job, tools
 
