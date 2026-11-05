@@ -29,6 +29,7 @@
     icon,
     creds,
     models,
+    listTrouble,
     pill,
     busy,
     sameAsChat,
@@ -45,7 +46,7 @@
 
   const embeds = $derived(sameAsChat !== undefined);
   const ownCreds = $derived(!shareable || sameAsChat !== true);
-  const placeholder = $derived(modelPlaceholder(models));
+  const placeholder = $derived(modelPlaceholder(models, listTrouble));
   // Незнакомый адрес отмечен как «своё»: пустая отметка читалась бы как
   // «поставщик не выбран», хотя адрес уже вписан.
   const chosenPreset = $derived(presetFor(creds.base_url));

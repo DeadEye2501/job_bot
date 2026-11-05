@@ -20,7 +20,7 @@ from tests.fakes.llm import (
 )
 
 # Своё, потому что зовущий один: путь родной для LM Studio, и спрашивают его
-# только проверки отбора загруженных моделей. Общие пары лежат у подделки —
+# только проверки отбора моделей по роду. Общие пары лежат у подделки —
 # они нужны и её собственным проверкам.
 NATIVE_MODELS = ("GET", "/api/v0/models")
 async def test_a_loaded_chat_model_passes_the_check():
@@ -103,16 +103,20 @@ async def test_all_model_ids_come_back_when_no_kind_is_asked_for():
     assert await list_models(client) == ["qwen", "bge-m3"]
 
 
-async def test_only_loaded_models_of_the_asked_kind_come_back():
-    """У LM Studio берутся только загруженные модели нужного рода."""
+async def test_every_downloaded_model_of_the_asked_kind_comes_back():
+    """У LM Studio берутся все скачанные модели нужного рода, и выгруженные тоже:
+    выбранную LM Studio подгрузит сама на первом обращении. Модель с поддержкой
+    картинок (`vlm`) — модель чата: таковы почти все нынешние, и без неё перечень
+    чата оставался пуст при скачанных моделях."""
     client = provider({
         NATIVE_MODELS: httpx.Response(200, json={"data": [
             {"id": "qwen", "state": "loaded", "type": "llm"},
             {"id": "llama", "state": "not-loaded", "type": "llm"},
-            {"id": "bge-m3", "state": "loaded", "type": "embeddings"},
+            {"id": "qwen3.5-4b", "state": "not-loaded", "type": "vlm"},
+            {"id": "bge-m3", "state": "not-loaded", "type": "embeddings"},
         ]}),
     })
-    assert await list_models(client, kind="chat") == ["qwen"]
+    assert await list_models(client, kind="chat") == ["qwen", "llama", "qwen3.5-4b"]
     assert await list_models(client, kind="embed") == ["bge-m3"]
 
 
@@ -159,13 +163,12 @@ async def test_a_broken_native_endpoint_leaves_its_trace_in_the_log(caplog):
     assert any(
         rec.exc_info for rec in caplog.records if rec.name == "adapters.lm_models"
     )
-async def test_nothing_loaded_is_not_the_same_as_no_native_path():
-    """Родной путь ответил пустотой — выгруженные модели наверх не идут.
+async def test_nothing_of_the_kind_is_not_the_same_as_no_native_path():
+    """Родной путь ответил пустотой — гадать по общему списку не идут.
 
-    Пустой ответ родного пути значит «этого рода не загружено ничего», а не
-    «пути нет». Спроси после него общий список — и в выбор вернутся ровно те
-    выгруженные модели, ради которых родной путь и заведён: выбравший такую
-    ждёт полминуты подкачки.
+    Пустой ответ родного пути значит «моделей этого рода нет», а не «пути
+    нет». Спроси после него общий список — и в выбор вернулись бы модели
+    другого рода, принятые за этот по имени.
     """
     client = provider({
         NATIVE_MODELS: httpx.Response(200, json={"data": []}),

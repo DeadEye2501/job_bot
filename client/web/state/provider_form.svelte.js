@@ -33,6 +33,12 @@ import {
 export function providerForm({ kind, call, alive }) {
   let creds = $state(blankCreds());
   let models = $state([]);
+  // Почему последний перечень не пришёл; пусто — пришёл.
+  let listTrouble = $state('');
+  // Номер последнего вопроса о перечне. Отвечают поставщики за разное время —
+  // неподнятый сервер отказывает через секунды, Claude Code отвечает сразу, — и
+  // ответ прежнего, доехавший последним, затёр бы перечень нынешнего.
+  let asking = 0;
   let probe = $state(idleProbe());
   // Эмбеддинги из файла модели, а не с сервера.
   let fromFile = $state(false);
@@ -44,16 +50,22 @@ export function providerForm({ kind, call, alive }) {
     if (probe.status !== 'idle') probe = idleProbe();
   }
 
-  /** Спросить у поставщика имена его моделей — молча.
+  /** Спросить у поставщика имена его моделей.
    *
    * Перечень — подсказка к полю, а не действие человека: спрашивается он на
-   * каждую правку адреса и ключа, и непóднятый поставщик отвечал бы отказом на
-   * каждый знак. Отказ не показывается, а отдаётся: по нажатию «Проверить» его
-   * читает тот, кто спрашивал.
+   * каждую правку адреса и ключа. Отказ не всплывает плашкой — непóднятый
+   * поставщик мигал бы ею на каждую правку, — а ложится в `listTrouble`, и
+   * его называет подсказка поля.
+   *
+   * Отдаёт ответ спросившему; пусто — ответ устарел или экрана уже нет, и
+   * говорить о нём нечего: строка состояния сказала бы про прежнего поставщика.
    */
   async function listModels() {
+    const turn = ++asking;
     const found = await askModels(call, { kind, ...creds });
-    if (alive.now) models = found.models;
+    if (!alive.now || turn !== asking) return null;
+    models = found.models;
+    listTrouble = found.trouble;
     return found;
   }
 
@@ -68,6 +80,10 @@ export function providerForm({ kind, call, alive }) {
     /** Имена моделей, которые назвал поставщик, — подсказка к полю имени. */
     get models() {
       return models;
+    },
+    /** Почему поставщик не назвал моделей; пусто — назвал или не спрашивали. */
+    get listTrouble() {
+      return listTrouble;
     },
     /** Исход проверки связи: `idleProbe()` с заполненным статусом. */
     get probe() {
@@ -115,7 +131,10 @@ export function providerForm({ kind, call, alive }) {
       fromFile = toFile;
       creds = sourceCreds(toFile);
       same = false;
+      // Вопрос к прежнему источнику ещё может быть в пути: его ответ сюда не ляжет.
+      asking += 1;
       models = [];
+      listTrouble = '';
       forget();
     },
     /** Спросить файл модели диалогом окна и положить его в поле.
