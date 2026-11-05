@@ -60,7 +60,7 @@
   );
   // У Claude Code нет ни адреса, ни ключа: поля просили бы вписать то, чего нет.
   const showAddress = $derived(!sharing && !addressless(form.creds.base_url));
-  const namePlaceholder = $derived(modelPlaceholder(form.models));
+  const namePlaceholder = $derived(modelPlaceholder(form.models, form.listTrouble));
   // Незнакомый адрес отмечен как «своё»: пустая отметка читалась бы как
   // «поставщик не выбран», хотя адрес уже вписан.
   const chosenPreset = $derived(presetFor(form.creds.base_url));
@@ -160,7 +160,7 @@
   async function askNames() {
     note = { tone: 'busy', text: 'Загружаем список моделей у провайдера...' };
     const found = await form.listModels();
-    if (!alive.now) return;
+    if (found === null) return;
     if (found.trouble) {
       note = { tone: 'err', text: found.trouble };
       return;
@@ -168,7 +168,7 @@
     if (!found.models.length) {
       note = {
         tone: 'err',
-        text: 'Провайдер не вернул ни одной модели — проверьте, что в LM Studio загружена модель.',
+        text: 'Провайдер не вернул ни одной модели — проверьте, что в LM Studio скачана модель.',
       };
       return;
     }

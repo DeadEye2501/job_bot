@@ -63,9 +63,7 @@ async def model_listed(client: LmClient, model: str) -> tuple[bool, list[str]]:
 
     **Перечень спрашивается без рода, и это здесь главное.** Отбор по роду у
     провайдеров, которые рода не отдают, идёт гаданием по имени, и живая
-    модель с неудачным именем стала бы «отсутствующей». А довод рода уводит
-    на родной путь LM Studio, который отбирает только загруженные, — и
-    простоявшая полчаса модель числилась бы отсутствующей тоже.
+    модель с неудачным именем стала бы «отсутствующей».
 
     Спрашивают отсюда двое, и вопрос у них общий: кнопка проверки связи
     добавляет к нему пробное обращение, лампочка здоровья не добавляет
@@ -135,18 +133,24 @@ def _looks_like_embed(name: str) -> bool:
     return any(mark in lowered for mark in _EMBED_MARKERS)
 
 
-async def _loaded_models(client: httpx.AsyncClient, kind: str) -> list[str] | None:
-    """Загруженные модели рода у LM Studio, либо `None`, если пути нет.
+# Какие роды LM Studio у какой нашей модели. `vlm` — модель чата, умеющая и
+# картинки: таковы почти все нынешние, и без неё перечень чата пустовал бы при
+# скачанных моделях.
+_NATIVE_TYPES = {"chat": ("llm", "vlm"), "embed": ("embeddings",)}
 
-    Родной путь LM Studio знает и род модели, и то, загружена ли она.
-    `/v1/models` у неё отдаёт все настроенные, и выбор выгруженной запускает
-    подкачку на полминуты — для выбора в окне это негодно.
+
+async def _native_models(client: httpx.AsyncClient, kind: str) -> list[str] | None:
+    """Скачанные модели рода у LM Studio, либо `None`, если пути нет.
+
+    Родной путь LM Studio знает род модели, и гадать по имени не нужно.
+    Выгруженные идут наравне с загруженными: выбранную LM Studio подгрузит
+    сама на первом обращении, если в ней включена загрузка по требованию
+    (Just-in-Time). Выключена — проверка связи скажет, что модели нет.
 
     Два пустых ответа тут разные, и путать их нельзя. `None` — родного пути у
     провайдера нет, спрашивать надо `/v1/models`. Пустой список — путь есть и
-    ответил: этого рода не загружено ничего. Спросить после него `/v1/models`
-    значило бы вернуть в окно ровно те выгруженные модели, ради которых
-    родной путь и заведён.
+    ответил: моделей этого рода нет. Спросить после него `/v1/models` значило
+    бы вернуть в окно модели другого рода, принятые за этот по имени.
     """
     try:
         r = await client.get("/api/v0/models")
@@ -163,14 +167,11 @@ async def _loaded_models(client: httpx.AsyncClient, kind: str) -> list[str] | No
         # без родного пути это не беда, а обычный ход.
         _log.debug("/api/v0/models probe failed; falling back to /v1/models", exc_info=True)
         return None
-    wanted_type = "llm" if kind == "chat" else "embeddings"
+    wanted = _NATIVE_TYPES[kind]
     return [
         m["id"]
         for m in data
-        if isinstance(m, dict)
-        and m.get("id")
-        and m.get("state") == "loaded"
-        and m.get("type") == wanted_type
+        if isinstance(m, dict) and m.get("id") and m.get("type") in wanted
     ]
 
 
@@ -180,7 +181,7 @@ async def list_models(
     """Return ids of models exposed by the provider.
 
     С родом ('chat' | 'embed') сперва спрашивается родной путь LM Studio —
-    он один умеет отобрать загруженные (см. `_loaded_models`). Без рода
+    он один называет род модели сам (см. `_native_models`). Без рода
     (например, для проверки связи) — полный список через совместимый с OpenAI
     ``/v1/models``.
     """
@@ -191,11 +192,11 @@ async def list_models(
     if isinstance(client, gguf_embed.ModelFile):
         return client.listed()
     if kind is not None:
-        loaded = await _loaded_models(client, kind)
-        if loaded is not None:
-            return loaded
+        native = await _native_models(client, kind)
+        if native is not None:
+            return native
         # Родного пути нет: полный список, и род придётся угадывать по имени —
-        # ни ``state``, ни ``type`` в нём не приходит.
+        # ``type`` в нём не приходит.
     r = await client.get("/v1/models")
     r.raise_for_status()
     ids = [m["id"] for m in r.json().get("data", []) if isinstance(m, dict) and m.get("id")]

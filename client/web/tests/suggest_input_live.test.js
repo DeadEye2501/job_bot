@@ -46,6 +46,18 @@ describe('живое поле с подсказкой', () => {
     }
   });
 
+  it('на фокусе заполненного поля виден весь перечень, а не одно записанное', async () => {
+    // Записанное имя — выбор, а не поиск: просей им перечень — и в поле модели
+    // с «sonnet» человек видел бы один «sonnet», будто других у поставщика нет.
+    const { shown, input } = field({ value: 'Анна', asked: false });
+
+    await fireEvent.focus(input);
+
+    for (const name of HRS) {
+      expect(within(shown.container).getByText(name)).toBeTruthy();
+    }
+  });
+
   it('набранное просеивает подсказку, не пряча её целиком', async () => {
     const { shown, input } = field();
 

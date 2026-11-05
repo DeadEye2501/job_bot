@@ -25,6 +25,7 @@ import {
   credsChanged,
   embedReading,
   mirrored,
+  modelPlaceholder,
   nextStep,
   probeLine,
   probePill,
@@ -280,6 +281,26 @@ describe('подсказка имён моделей', () => {
     // локальных они идут с приставкой поставщика через косую черту.
     expect(matching(found, 'QWEN')).toEqual(['qwen/qwen3-4b-2507']);
     expect(matching(found, 'bge')).toEqual(['text-embedding-bge-m3']);
+  });
+
+  it('отказ поставщика назван в пустом поле имени', () => {
+    // Без него неподнятый сервер выглядел бы как поставщик без моделей: поле
+    // пусто, подсказки нет, и почему — не сказано нигде.
+    expect(modelPlaceholder([], 'ConnectError: All connection attempts failed')).toContain(
+      'ConnectError: All connection attempts failed',
+    );
+    expect(modelPlaceholder(['a'], '')).toMatch(/выберите из списка/);
+  });
+
+  it('из отказа в два ряда в подсказку идёт первый', () => {
+    // Подсказка поля переносов не держит: справочная ссылка второй строки
+    // склеилась бы с кодом отказа и вытеснила бы его за край поля.
+    const said = modelPlaceholder(
+      [],
+      "Client error '401 Unauthorized'\nFor more information check: https://example.test",
+    );
+    expect(said).toContain('401 Unauthorized');
+    expect(said).not.toContain('For more information');
   });
 
   it('совпавших нет — перечень пуст', () => {

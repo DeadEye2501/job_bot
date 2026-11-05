@@ -308,4 +308,4 @@ pyproject.toml        # настройки pytest и ruff
 
 Версии боевых пакетов закреплены точно (см. `Pipfile`): их обновление — отдельный осознанный шаг, а не побочный эффект установки dev-зависимости. Dev-зависимости: `pytest`, `pytest-asyncio`, `ruff`.
 
-LLM-провайдер не привязан к коду — нужен любой OpenAI-совместимый endpoint с `/v1/chat/completions`, `/v1/embeddings` и `/v1/models`. Для LM Studio используется и его native `/api/v0/models` (фильтрация по `state=loaded` + `type` для UI-picker'а). Claude подключается без OpenAI-совместимости — своими надстройками (см. «Стек»).
+LLM-провайдер не привязан к коду — нужен любой OpenAI-совместимый endpoint с `/v1/chat/completions`, `/v1/embeddings` и `/v1/models`. Для LM Studio используется и его native `/api/v0/models` (отбор по `type` для UI-picker'а). Claude подключается без OpenAI-совместимости — своими надстройками (см. «Стек»).

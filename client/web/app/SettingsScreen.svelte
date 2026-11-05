@@ -291,6 +291,7 @@
         title="LLM для чата"
         creds={chat.creds}
         models={chat.models}
+        listTrouble={chat.listTrouble}
         pill={pills.chat}
         busy={chat.probe.status === 'busy'}
         onsave={saveChat}
@@ -307,6 +308,7 @@
         title="LLM для эмбеддингов"
         creds={embed.creds}
         models={embed.models}
+        listTrouble={embed.listTrouble}
         pill={pills.embed}
         busy={embed.probe.status === 'busy'}
         sameAsChat={embed.same}

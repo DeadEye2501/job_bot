@@ -50,9 +50,62 @@ describe('перечень имён моделей', () => {
     const listing = f.listModels();
     alive.now = false;
 
-    await listing;
-
+    expect(await listing).toBe(null);
     expect(f.models).toEqual([]);
+  });
+
+  it('поздний ответ прежнего поставщика не затирает перечень нынешнего', async () => {
+    // Неподнятый сервер отказывает через секунды, а Claude Code отвечает сразу:
+    // переключившийся за это время видел бы, как перечень Claude Code сменяется
+    // пустым отказом сервера, которого он уже не выбирал.
+    const late = held();
+    const { form: f } = form({
+      'settings.list_models': (payload) =>
+        payload.base_url === 'claude-code' ? { models: ['sonnet', 'opus'] } : late.promise,
+    });
+    f.creds = SERVER;
+    const stale = f.listModels();
+
+    await f.pickPreset('Claude Code');
+    late.give(Promise.reject(new Error('ConnectError')));
+
+    // Ответа нет и спросившему: строкой состояния мастер сказал бы про отказ
+    // сервера под полями Claude Code.
+    expect(await stale).toBe(null);
+    expect(f.models).toEqual(['sonnet', 'opus']);
+    expect(f.listTrouble).toBe('');
+  });
+
+  it('перечень прежнего источника не ложится после переключения на файл', async () => {
+    const late = held();
+    const { form: f } = form({ 'settings.list_models': () => late.promise });
+    f.creds = SERVER;
+    const stale = f.listModels();
+
+    f.switchSource(true);
+    late.give({ models: ['bge-m3'] });
+
+    expect(await stale).toBe(null);
+    expect(f.models).toEqual([]);
+  });
+
+  it('отказ поставщика остаётся при форме, пока следующий перечень не придёт', async () => {
+    let refuse = true;
+    const { form: f } = form({
+      'settings.list_models': () => {
+        if (refuse) throw new Error('ConnectError: All connection attempts failed');
+        return { models: ['a'] };
+      },
+    });
+    f.creds = SERVER;
+
+    await f.listModels();
+    expect(f.listTrouble).toBe('ConnectError: All connection attempts failed');
+
+    refuse = false;
+    await f.listModels();
+    expect(f.listTrouble).toBe('');
+    expect(f.models).toEqual(['a']);
   });
 });
 
