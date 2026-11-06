@@ -145,7 +145,7 @@ pipenv run python -m PyInstaller JobBot.spec --clean --noconfirm
 
 ```bash
 cd client/web && npm run build && cd ../..
-export PIPENV_PIPFILE=macos/Pipfile CMAKE_ARGS="-DGGML_METAL=on"
+export PIPENV_PIPFILE=macos/Pipfile CMAKE_ARGS="-DGGML_METAL=on -DLLAMA_OPENSSL=OFF"
 pipenv install --dev
 pipenv run python -m pytest macos/tests -q
 bash macos/make_icns.sh
