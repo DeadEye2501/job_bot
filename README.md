@@ -141,7 +141,7 @@ pipenv run python -m PyInstaller JobBot.spec --clean --noconfirm
 
 Мак-сборка живёт рядом с Windows-сборкой и её не трогает: свой `JobBot-macos.spec` и свои зависимости в `macos/Pipfile` (llama-cpp-python там собирается из исходников с Metal, добавлены Quartz и Cocoa из pyobjc). Там, где Windows-код завязан на WinAPI, на маке работает двойник рядом с ним (`*_macos.py`); выбирает его ветка `sys.platform == "darwin"`, а грузится он по имени строкой, чтобы в Windows-exe не попадал. Поддерживаются только Apple Silicon (arm64).
 
-Собирается на GitHub Actions (`.github/workflows/macos.yml`, раннер `macos-14`): тесты двойников из `macos/tests`, фронт, бандл, проверка запуска собранного, архив `JobBot-macos.zip` артефактом. Локально, на маке:
+Собирается на GitHub Actions (`.github/workflows/macos.yml`, раннер `macos-15`): тесты двойников из `macos/tests`, фронт, бандл, проверка запуска собранного, архив `JobBot-macos.zip` артефактом. Локально, на маке:
 
 ```bash
 cd client/web && npm run build && cd ../..
