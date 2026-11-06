@@ -44,23 +44,25 @@ _CHANNEL_VAC_STATUS_RANK: dict[str, int] = {
 
 
 async def _list_linked(session: AsyncSession, linked_to) -> list[Vacancy]:
-    """Разобранные вакансии, привязанные к предмету, свежими вперёд.
+    """Разобранные вакансии, привязанные к предмету, свежими вперёд; чужих профилей — внизу.
 
     Недоразобранные не показываются: строка, оставшаяся от прерванного
-    прогона, в списке карточки выглядела бы пустой.
+    прогона, в списке карточки выглядела бы пустой. Чужие внизу: по спеке они
+    показываются там серыми и некликабельными.
 
     Свежесть здесь наша, время заведения (`hr_card.LAST_VACANCY_ORDER`), и
-    порядок один с карточкой человека — иначе список и карточка называли бы
-    разные компании. Список канала ниже сортируется прежде всего по горячести
-    статуса, а свежестью разрешает равных — и свежесть там чужая, время выхода
-    поста: канал человек узнаёт по датам публикаций, а не по тому, когда до
-    них добрался бот.
+    среди своих порядок один с карточкой человека — иначе список и карточка
+    называли бы разные компании. Компанию карточка берёт по всем профилям,
+    поэтому она может прийти с чужой строки внизу. Список канала ниже
+    сортируется прежде всего по горячести статуса, а свежестью разрешает
+    равных — и свежесть там чужая, время выхода поста: канал человек узнаёт по
+    датам публикаций, а не по тому, когда до них добрался бот.
     """
     rows = (
         await session.scalars(
             select(Vacancy)
             .where(linked_to, PARSED_ONLY)
-            .order_by(*LAST_VACANCY_ORDER)
+            .order_by(Vacancy.in_active_workspace.desc(), *LAST_VACANCY_ORDER)
         )
     ).all()
     return list(rows)
@@ -70,8 +72,8 @@ async def list_vacancies_for_hr(
     session: AsyncSession,
     hr_id: int,
 ) -> list[Vacancy]:
-    """All parsed vacancies for an HR, newest-first. Powers the «список
-    вакансий» mini-list in the Contacts/HR detail pane.
+    """All parsed vacancies for an HR, newest-first, other workspaces last.
+    Powers the «список вакансий» mini-list in the Contacts/HR detail pane.
     """
     return await _list_linked(session, Vacancy.hr_id == hr_id)
 
@@ -79,7 +81,7 @@ async def list_vacancies_for_hr(
 async def list_vacancies_for_company(
     session: AsyncSession, company_id: int
 ) -> list[Vacancy]:
-    """All parsed vacancies linked to this company, newest-first."""
+    """All parsed vacancies linked to this company, newest-first, other workspaces last."""
     return await _list_linked(session, Vacancy.company_id == company_id)
 
 
@@ -90,8 +92,8 @@ def _from_source(kind: str, source_id: int):
 async def count_vacancies_from(session: AsyncSession, kind: str, source_id: int) -> int:
     """Сколько разобранных вакансий числится за источником — каналом или агрегатором.
 
-    Отбор тот же, что у списка рядом и у счётчика в карточке: мост сверяет с
-    этим числом пустую страницу и жалуется на расхождение. Считай оно иначе —
+    Отбор тот же, что у списка рядом, вместе с чужими профилями: мост сверяет
+    с этим числом пустую страницу и жалуется на расхождение. Считай оно иначе —
     жалоба приходила бы на всякий источник, у которого есть хоть одна
     недоразобранная строка, то есть на любой работающий.
     """
@@ -114,13 +116,14 @@ async def list_vacancies_from(
     Источник — род (`CHANNEL_KIND`, `AGGREGATOR_KIND`) и номер: канал и агрегатор
     листаются одинаково и различаются только колонкой ссылки.
 
-    Порядок — по горячести статуса, потом по свежести. Страница нужна потому,
-    что источники накапливают тысячи вакансий, и мини-список карточки грузит
-    их пачками; признак продолжения отдаёт запрос — см. `paging.trim_page`.
+    Порядок — свои, затем чужих профилей; внутри — по горячести статуса, потом
+    по свежести. Страница нужна потому, что источники накапливают тысячи
+    вакансий, и мини-список карточки грузит их пачками; признак продолжения
+    отдаёт запрос — см. `paging.trim_page`.
 
-    Недоразобранные не показываются — тем же отбором, что берут счётчик
-    источника и его числа: все трое обещают выдачу, и разойдись они, число в
-    пилюле перестало бы отвечать за список под ней.
+    Недоразобранные не показываются — тем же отбором, что берёт
+    `count_vacancies_from`: мост сверяет с ним пустую страницу. Числа карточки
+    считают только активный профиль, а список показывает и чужие.
     """
     status_rank = case(
         _CHANNEL_VAC_STATUS_RANK,
@@ -132,6 +135,7 @@ async def list_vacancies_from(
             select(Vacancy)
             .where(_from_source(kind, source_id), PARSED_ONLY)
             .order_by(
+                Vacancy.in_active_workspace.desc(),
                 status_rank.asc(),
                 VACANCY_APPEARED_AT.desc(),
                 Vacancy.id.desc(),

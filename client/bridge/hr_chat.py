@@ -7,6 +7,7 @@ import logging
 from backend.bot.chat import EMPTY_MESSAGE
 from backend.incoming import moment_or_none
 from backend.repository import messages as messages_repo
+from backend.repository.vacancies_common import foreign_vacancy_ids
 from client.bridge.answer import BAD_PAYLOAD, Denied, bad_fields, denied, reply
 from client.bridge.desktop import chosen_path, closed_dialog
 from client.bridge.page import read_page
@@ -70,10 +71,13 @@ class HrChat:
                 before_id=asked["before_id"],
                 before_sent_at=before_sent_at,
             )
+            foreign = await foreign_vacancy_ids(
+                session, [m.vacancy_id for m in msgs]
+            )
         return {
             **asked,
             "has_more": has_more,
-            "messages": [_message_row_to_dict(m) for m in msgs],
+            "messages": [_message_row_to_dict(m, m.vacancy_id in foreign) for m in msgs],
         }
 
     async def _sent(self, sending, hr_id: int, action: str) -> dict:

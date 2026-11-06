@@ -8,13 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.domain.funnel import APPLIED, FIT_EXCLUDE, RESPONDED, percent_or_none
 from backend.models import Vacancy
 from backend.payloads import SourceStats
-from backend.repository.vacancies_common import PARSED_ONLY, count_by_status
+from backend.repository.vacancies_common import SHOWN_HERE, count_by_status
 
 _RATE_WINDOW_DAYS = 30
 
 
 async def _vacancies_per_day(session: AsyncSession, from_source) -> float:
-    """Сколько разобранных вакансий в день источник приносит в последнем окне.
+    """Сколько показываемых вакансий в день источник приносит в последнем окне.
 
     Окно своё, а не «за всё время»: источник, замолчавший полгода назад,
     иначе выглядел бы таким же живым, как вчерашний.
@@ -24,7 +24,7 @@ async def _vacancies_per_day(session: AsyncSession, from_source) -> float:
         (
             await session.execute(
                 select(func.count(Vacancy.id))
-                .where(from_source, Vacancy.created_at >= since, PARSED_ONLY)
+                .where(from_source, Vacancy.created_at >= since, SHOWN_HERE)
             )
         ).scalar_one()
     )
@@ -43,7 +43,7 @@ async def source_stats(session: AsyncSession, from_source) -> SourceStats:
     время, а темп — за окно: доли говорят, каков источник вообще, темп — жив
     ли он сейчас.
     """
-    counts_by_enum = await count_by_status(session, from_source, PARSED_ONLY)
+    counts_by_enum = await count_by_status(session, from_source, SHOWN_HERE)
     per_day = await _vacancies_per_day(session, from_source)
     total = sum(counts_by_enum.values())
     fit_total = sum(

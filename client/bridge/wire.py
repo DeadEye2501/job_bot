@@ -42,6 +42,9 @@ def _vacancy_mini_row_to_dict(v) -> dict:
     `created_at`. Отдавать её всем троим значило бы размножить мёртвое поле, а
     у человека и компании оно ещё и разошлось бы с порядком — те списки
     отсортированы по дате заведения.
+
+    `foreign` — вакансия не активного профиля: по спеке окно показывает её
+    серой и некликабельной.
     """
     return {
         "id": v.id,
@@ -49,6 +52,7 @@ def _vacancy_mini_row_to_dict(v) -> dict:
         "status": v.status.value if v.status else "New",
         "score": v.score,
         "created_at": _iso(v.created_at),
+        "foreign": not v.in_active_workspace,
     }
 
 
@@ -347,10 +351,11 @@ def _hr_mini_row_to_dict(hr, vacancy_count: int) -> dict:
     return {**_hr_face(hr), "vacancy_count": vacancy_count}
 
 
-def _message_row_to_dict(m) -> dict:
+def _message_row_to_dict(m, foreign: bool) -> dict:
     """Письмо переписки — тем, из чего окно рисует пузырь.
 
     Вложение уезжает адресом, а не байтами: через канал байты не ходят.
+    `foreign` — письмо о вакансии не активного профиля: ссылка на неё серая.
     """
     return {
         "id": m.id,
@@ -360,6 +365,7 @@ def _message_row_to_dict(m) -> dict:
         "sent_at": _iso(m.sent_at),
         "read_at": _iso(m.read_at),
         "vacancy_id": m.vacancy_id,
+        "foreign": foreign,
         "is_edited": m.is_edited,
         "is_deleted": m.is_deleted,
         "media_kind": m.media_kind,

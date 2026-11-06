@@ -13,20 +13,21 @@ from backend.repository.stats_common import (
     stats_period_since,
     status_cond,
 )
-from backend.repository.vacancies_common import PARSED_ONLY
+from backend.repository.vacancies_common import SHOWN_HERE
 
 
 async def _ever_in(session: AsyncSession, statuses) -> int:
-    """Сколько разобранных вакансий когда-либо побывало в этих статусах.
+    """Сколько показываемых вакансий когда-либо побывало в этих статусах.
 
-    Соединение с вакансией тут не ради полей, а ради `is_parsed`: без него
+    Соединение с вакансией тут не ради полей, а ради `SHOWN_HERE`: без него
     ступени воронки считались бы по всем строкам истории, включая
-    неразобранные, и «откликнулись» выходило бы больше, чем «всего».
+    неразобранные и чужих профилей, и «откликнулись» выходило бы больше, чем
+    «всего».
     """
     return int((await session.execute(
         select(func.count(func.distinct(VacancyStatusHistory.vacancy_id)))
         .join(Vacancy, Vacancy.id == VacancyStatusHistory.vacancy_id)
-        .where(status_cond(statuses), PARSED_ONLY)
+        .where(status_cond(statuses), SHOWN_HERE)
     )).scalar_one())
 
 
@@ -38,7 +39,7 @@ async def _first_in_period(
     return int((await session.execute(
         select(func.count(sub.c.vid))
         .join(Vacancy, Vacancy.id == sub.c.vid)
-        .where(sub.c.first_at >= since, PARSED_ONLY)
+        .where(sub.c.first_at >= since, SHOWN_HERE)
     )).scalar_one())
 
 
@@ -51,7 +52,7 @@ async def _kpi_totals(session: AsyncSession) -> dict:
     """
     return {
         "total": int((await session.execute(
-            select(func.count(Vacancy.id)).where(PARSED_ONLY)
+            select(func.count(Vacancy.id)).where(SHOWN_HERE)
         )).scalar_one()),
         "applied_total": await _ever_in(session, VacancyStatus.APPLIED),
         "in_progress_total": await _ever_in(session, IN_PROGRESS_STEP),

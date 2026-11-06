@@ -6,8 +6,14 @@
 """
 
 from tests.client.conftest import WindowThatPicks
-from tests.dbio import put
-from tests.factories import hr_row, message_row, unread_probe
+from tests.dbio import put, put_other_workspace
+from tests.factories import (
+    OTHER_WORKSPACE_ID,
+    hr_row,
+    message_row,
+    unread_probe,
+    vacancy_row,
+)
 
 
 async def test_the_chat_tells_ours_from_theirs(api, ask, session_factory):
@@ -28,6 +34,27 @@ async def test_the_chat_tells_ours_from_theirs(api, ask, session_factory):
 
     said = {row["text"]: row["is_incoming"] for row in answer["ok"]["messages"]}
     assert said == {"здравствуйте": True, "добрый день": False}
+
+
+async def test_chat_marks_letters_about_foreign_vacancies(api, ask, session_factory):
+    """Ссылка на вакансию чужого профиля в чате серая; письмо без вакансии — своё."""
+    hr = hr_row()
+    await put_other_workspace(session_factory)
+    await put(session_factory, hr)
+    mine = vacancy_row(hr_id=hr.id)
+    foreign = vacancy_row(hr_id=hr.id, workspace_id=OTHER_WORKSPACE_ID)
+    await put(session_factory, mine, foreign)
+    await put(
+        session_factory,
+        message_row(hr_id=hr.id, text="своя", vacancy_id=mine.id, tg_message_id=1),
+        message_row(hr_id=hr.id, text="чужая", vacancy_id=foreign.id, tg_message_id=2),
+        message_row(hr_id=hr.id, text="без вакансии", tg_message_id=3),
+    )
+
+    answer = await ask(api.hr.messages, {"hr_id": hr.id})
+
+    marks = {row["text"]: row["foreign"] for row in answer["ok"]["messages"]}
+    assert marks == {"своя": False, "чужая": True, "без вакансии": False}
 
 
 async def test_the_window_can_ask_for_more_than_a_page_of_letters(

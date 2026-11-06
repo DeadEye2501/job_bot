@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.models import HR, Message
+from backend.models import HR, Message, Vacancy
 from backend.repository.hr_card import carry_hr_marks, hr_blacklist_candidates
 
 logger = logging.getLogger(__name__)
@@ -138,13 +138,19 @@ async def count_recent_outgoing_with_vacancy_for_hr(
     letter + CV (count==0) vs short follow-up без вложений (count>=1)».
     Cutoff считаем в Python, чтобы не зависеть от диалекта date-arithmetic.
 
+    Письма считаются только по вакансиям активного профиля: первый отклик из
+    другого профиля — полное письмо со своим резюме. В общее
+    `OUR_LETTER_ABOUT_A_VACANCY` условие не кладётся: по нему же привязывается
+    ответ HR, а привязка общая для всех профилей.
+
     SEND_LOCKED dev-режим Message-rows не пишет → в dev-сценариях count
     всегда 0, что и нужно: dev тестирует full-cover-letter путь.
     """
     cutoff = datetime.now(timezone.utc) - timedelta(days=window_days)
-    stmt = select(func.count(Message.id)).where(
+    stmt = select(func.count(Message.id)).join(Vacancy, Vacancy.id == Message.vacancy_id).where(
         Message.hr_id == hr_id,
         OUR_LETTER_ABOUT_A_VACANCY,
+        Vacancy.in_active_workspace,
         Message.vacancy_id != other_than,
         Message.sent_at >= cutoff,
     )

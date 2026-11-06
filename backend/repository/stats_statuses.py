@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.repository.stats_common import stats_period_since
 from backend.repository.vacancies_activity import entered_current_status_at
-from backend.repository.vacancies_common import PARSED_ONLY, count_by_status
+from backend.repository.vacancies_common import SHOWN_HERE, count_by_status
 
 
 async def get_stats_status_breakdown(
@@ -21,7 +21,7 @@ async def get_stats_status_breakdown(
     появления, соседние карточки противоречили бы друг другу.
     """
     since = stats_period_since(period)
-    conditions = [PARSED_ONLY]
+    conditions = [SHOWN_HERE]
     if since is not None:
         conditions.append(entered_current_status_at() >= since)
     by_status = await count_by_status(session, *conditions)

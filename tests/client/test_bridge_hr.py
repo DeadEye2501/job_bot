@@ -4,8 +4,8 @@
 ответ приходит не из базы, а от бота.
 """
 
-from tests.dbio import put
-from tests.factories import hr_row, vacancy_row
+from tests.dbio import put, put_other_workspace
+from tests.factories import OTHER_WORKSPACE_ID, hr_row, vacancy_row
 
 
 async def test_the_list_counts_vacancies_behind_each_hr(api, ask, session_factory):
@@ -57,6 +57,23 @@ async def test_only_this_hr_vacancies_are_shown(api, ask, session_factory):
 
     titles = [row["title"] for row in answer["ok"]["vacancies"]]
     assert titles == ["Моя"]
+
+
+async def test_hr_card_marks_foreign_vacancies(api, ask, session_factory):
+    """Вакансия чужого профиля помечена: по метке окно покажет её серой и некликабельной."""
+    hr = hr_row()
+    await put_other_workspace(session_factory)
+    await put(session_factory, hr)
+    await put(
+        session_factory,
+        vacancy_row(title="Своя", hr_id=hr.id),
+        vacancy_row(title="Чужая", hr_id=hr.id, workspace_id=OTHER_WORKSPACE_ID),
+    )
+
+    answer = await ask(api.hr.vacancies, {"hr_id": hr.id})
+
+    marks = {row["title"]: row["foreign"] for row in answer["ok"]["vacancies"]}
+    assert marks == {"Своя": False, "Чужая": True}
 
 
 async def test_merging_moves_the_vacancies_to_the_survivor(api, ask, session_factory):

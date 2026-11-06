@@ -64,11 +64,11 @@ async def to_apply(session_factory, vacancy_ids: list[int]) -> list[int]:
 
 
 async def new_to_apply(session_factory) -> list[int]:
-    """Всё, что ждёт отклика и разобрано, свежие первыми."""
+    """Всё, что ждёт отклика и разобрано в активном профиле, свежие первыми."""
     async with session_factory() as session:
         return list(await session.scalars(
             select(Vacancy.id)
-            .where(AWAITS_APPLICATION, PARSED_ONLY)
+            .where(AWAITS_APPLICATION, PARSED_ONLY, Vacancy.in_active_workspace)
             .order_by(*LAST_VACANCY_ORDER)
         ))
 

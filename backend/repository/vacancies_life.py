@@ -29,6 +29,7 @@ from backend.models import (
     VacancyEvent,
     VacancyStatusHistory,
 )
+from backend.models.workspace import ACTIVE_WORKSPACE_ID
 from backend.repository.workspaces import active_workspace_id
 
 logger = logging.getLogger(__name__)
@@ -62,7 +63,7 @@ async def repoint_vacancies(
 async def record_trash_event(
     session: AsyncSession, vacancy: Vacancy | None, reason: str | None
 ) -> None:
-    """Отметить объявление мусором. Одно объявление — одна отметка.
+    """Отметить объявление мусором. Одно объявление — одна отметка в профиле.
 
     Пишется до удаления строки вакансии: после него знать, сколько мусора
     прислал источник, было бы не из чего. Объявление узнают по номеру на
@@ -85,7 +86,7 @@ async def record_trash_event(
 
 
 async def source_trashed(session: AsyncSession, aggregator_id: int, key: str) -> bool:
-    """Отмечено ли мусором объявление с этим номером на этом агрегаторе."""
+    """Отмечено ли мусором в активном профиле объявление с этим номером на этом агрегаторе."""
     return await _marked(
         session,
         TrashEvent.source_aggregator_id == aggregator_id,
@@ -94,20 +95,26 @@ async def source_trashed(session: AsyncSession, aggregator_id: int, key: str) ->
 
 
 async def source_row(session: AsyncSession, aggregator_id: int, key: str) -> int | None:
-    """Заведённая вакансия с этим номером на этом агрегаторе; пусто — такой нет."""
+    """Вакансия активного профиля с этим номером на этом агрегаторе; пусто — такой нет."""
     return await session.scalar(select(Vacancy.id).where(
-        Vacancy.source_aggregator_id == aggregator_id, Vacancy.source_key == key
+        Vacancy.source_aggregator_id == aggregator_id, Vacancy.source_key == key,
+        Vacancy.in_active_workspace,
     ).limit(1))
 
 
 async def source_seen(session: AsyncSession, aggregator_id: int, key: str) -> bool:
-    """Видели ли номер на этом агрегаторе: вакансия с ним заведена или удалена как мусор."""
+    """Видели ли номер на этом агрегаторе в активном профиле.
+
+    Видели — вакансия с ним заведена или удалена как мусор. Чужой профиль не в
+    счёт: у каждого профиля свои вакансии, и объявление, заведённое там, здесь
+    новое.
+    """
     stored = await source_row(session, aggregator_id, key)
     return stored is not None or await source_trashed(session, aggregator_id, key)
 
 
 async def vacancies_at_address(session: AsyncSession, url: str) -> list[int]:
-    """Вакансии, чей собственный адрес — та же страница, по номеру.
+    """Вакансии активного профиля, чей собственный адрес — та же страница, по номеру.
 
     Сравниваются только собственные адреса строк (`source_url`): ссылки в
     тексте и контактах — упоминания, а не страница вакансии. Ссылка на пост у
@@ -123,7 +130,7 @@ async def vacancies_at_address(session: AsyncSession, url: str) -> list[int]:
         return []
     rows = await session.execute(
         select(Vacancy.id, Vacancy.source_url, Vacancy.source_msg_id)
-        .where(Vacancy.source_url.is_not(None))
+        .where(Vacancy.source_url.is_not(None), Vacancy.in_active_workspace)
         .order_by(Vacancy.id)
     )
     return [
@@ -133,7 +140,7 @@ async def vacancies_at_address(session: AsyncSession, url: str) -> list[int]:
 
 
 async def _trash_noted(session: AsyncSession, mark: TrashEvent) -> bool:
-    """Отмечено ли это объявление мусором раньше."""
+    """Отмечено ли это объявление мусором раньше в активном профиле."""
     if mark.source_key is not None:
         return await source_trashed(session, mark.source_aggregator_id, mark.source_key)
     if mark.source_msg_id is None:
@@ -146,7 +153,10 @@ async def _trash_noted(session: AsyncSession, mark: TrashEvent) -> bool:
 
 
 async def _marked(session: AsyncSession, *same) -> bool:
-    return (await session.scalar(select(TrashEvent.id).where(*same).limit(1))) is not None
+    """Есть ли отметка мусора активного профиля с этими признаками."""
+    return (await session.scalar(
+        select(TrashEvent.id).where(*same, TrashEvent.workspace_id == ACTIVE_WORKSPACE_ID).limit(1)
+    )) is not None
 
 
 async def delete_vacancy(session: AsyncSession, vacancy_id: int) -> bool:

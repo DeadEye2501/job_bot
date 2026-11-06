@@ -188,6 +188,9 @@ def bot_state_row(mode: BotMode) -> BotState:
 TEST_WORKSPACE_ID = 1
 """Активный профиль, который стенд кладёт в пустую базу (`_empty_database`)."""
 
+OTHER_WORKSPACE_ID = 2
+"""Неактивный профиль; его строку тест кладёт сам: `workspace_row(id=OTHER_WORKSPACE_ID)`."""
+
 
 def workspace_row(**overrides) -> Workspace:
     """Строка профиля; по умолчанию неактивного — активный уже лежит в базе."""

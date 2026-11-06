@@ -277,7 +277,9 @@ async def rerun_pipeline_for_vacancy(
 
 
 async def _orphan_rows(pipeline) -> list:
-    """Вакансии, заведённые, но так и не разобранные, старые первыми.
+    """Вакансии активного профиля, заведённые, но так и не разобранные, старые первыми.
+
+    Чужие ждут возврата в свой профиль: разбор идёт только в активном.
 
     Ник канала и номер поста берутся вместе с текстом: по ним объявление
     перечитывают заново. Ник — внешним соединением: канал могли снести, а
@@ -301,6 +303,7 @@ async def _orphan_rows(pipeline) -> list:
                 .where(
                     Vacancy.is_parsed.is_(False),
                     Vacancy.raw_text.is_not(None),
+                    Vacancy.in_active_workspace,
                 )
                 .order_by(Vacancy.id.asc())
             )
