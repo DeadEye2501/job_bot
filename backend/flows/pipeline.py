@@ -191,6 +191,15 @@ class IngestionPipeline:
         # дошедшее до нас, ложится в базу при любом исходе.
         self.shutting_down: bool = False
 
+    def forget_caches(self) -> None:
+        """Забыть слепки прежнего профиля после смены активного.
+
+        Слепки заводятся заново, а не сбрасывается отметка подъёма: `fill` без
+        векторов нужной длины прежнюю матрицу не затирает, и повторы искались
+        бы среди вакансий прежнего профиля.
+        """
+        _declare_caches(self)
+
     def mark_shutting_down(self) -> None:
         """Bot.run finally: с этого момента DM-handler ничего не делает."""
         self.shutting_down = True

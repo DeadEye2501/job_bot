@@ -145,14 +145,15 @@ def stored_media(relative: str) -> Path | None:
     return path if path.is_file() else None
 
 
-def store_profile_photo(blob: bytes, suffix: str) -> str:
-    """Записать присланное фото человека в каталог медиа; ответ — путь внутри него.
+def store_profile_photo(blob: bytes, suffix: str, workspace_id: int) -> str:
+    """Записать фото человека в каталог медиа профиля; ответ — путь внутри каталога медиа.
 
     Своя копия, а не ссылка на исходный файл: исходный человек волен перенести
-    или удалить. Фото с тем же расширением заменяется на месте.
+    или удалить. Каталог свой у профиля: удаление профиля сносит его копию, не
+    задевая чужую. Фото с тем же расширением заменяется на месте.
     """
-    relative = f"profile/photo{suffix}"
-    (MEDIA_DIR / "profile").mkdir(parents=True, exist_ok=True)
+    relative = f"profile/{workspace_id}/photo{suffix}"
+    (MEDIA_DIR / relative).parent.mkdir(parents=True, exist_ok=True)
     (MEDIA_DIR / relative).write_bytes(blob)
     return relative
 

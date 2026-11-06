@@ -14,6 +14,7 @@ from backend.bot.media import (
     store_profile_photo,
 )
 from backend.domain.image_types import image_type
+from backend.repository.workspaces import active_workspace_id
 
 from client.bridge.answer import denied, reply
 from client.bridge.desktop import chosen_path, closed_dialog, file_filter
@@ -55,7 +56,9 @@ class Photo:
 
         async def run() -> dict:
             previous = self._hub.rs.photo_path
-            relative = store_profile_photo(blob, suffix)
+            async with self._hub.session_factory() as session:
+                workspace_id = await active_workspace_id(session)
+            relative = store_profile_photo(blob, suffix, workspace_id)
             await self._hub.rs.set_photo_path(relative)
             if previous != relative:
                 drop_stored_media(previous)

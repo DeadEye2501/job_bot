@@ -115,13 +115,3 @@ async def count_by_status(
     for status, cnt in rows:
         counts[status] = int(cnt or 0)
     return counts
-
-
-async def foreign_vacancy_ids(session: AsyncSession, ids: list[int | None]) -> set[int]:
-    """Какие из вакансий принадлежат не активному профилю.
-
-    `None` — номер у письма без вакансии — не совпадает ни с чем.
-    """
-    return set(await session.scalars(
-        select(Vacancy.id).where(Vacancy.id.in_(ids), ~Vacancy.in_active_workspace)
-    ))

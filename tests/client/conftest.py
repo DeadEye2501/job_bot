@@ -18,7 +18,12 @@ from backend.log_buffer import get_handler
 from backend.runtime_settings import RuntimeSettings
 from client import window_size
 from client.bridge import Api, lifespan
+from tests.backend.fixtures.bot import busy_slot, make_bot
 from tests.fakes.ui_bot import UiBot
+
+# Настоящий бот на подделках и занятое место прогона — у проверок бота они те же:
+# замок профилей держит само место прогона, и подделке бота его не изобразить.
+__all__ = ["busy_slot", "make_bot"]
 
 
 class LoopRunner:

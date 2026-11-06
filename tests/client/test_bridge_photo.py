@@ -9,9 +9,11 @@ import base64
 import os
 
 from backend.bot.media import MEDIA_DIR, stored_media
+from backend.repository.workspaces import make_active
 from client.bridge.media import media_file
 from tests.client.conftest import WindowThatPicks
-from tests.factories import photo_head
+from tests.dbio import put_other_workspace
+from tests.factories import OTHER_WORKSPACE_ID, photo_head
 
 JPEG = photo_head(".jpg") + b"jpeg"
 PNG = photo_head(".png") + b"png"
@@ -107,3 +109,20 @@ async def test_a_copy_removed_by_hand_gets_no_address(api, ask, hub):
 
 async def test_without_a_photo_the_profile_shows_none(api, ask):
     assert (await ask(api.profile.get))["ok"]["photo_url"] is None
+
+
+async def test_a_photo_lands_in_the_folder_of_the_active_profile(api, ask, hub, session_factory):
+    """У каждого профиля своя копия: фото второго не затирает фото первого."""
+    await _stored(api, ask, PNG)
+    first = hub.rs.photo_path
+    await put_other_workspace(session_factory)
+    async with session_factory() as session:
+        async with session.begin():
+            await make_active(session, OTHER_WORKSPACE_ID)
+    await hub.rs.reload()
+
+    await _stored(api, ask, PNG)
+
+    assert hub.rs.photo_path == f"profile/{OTHER_WORKSPACE_ID}/photo.png"
+    assert stored_media(first).read_bytes() == PNG
+

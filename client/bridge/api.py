@@ -5,7 +5,7 @@
 плоский класс, как того требовал канал Qt с его единственным именем.
 
 Поверхность здесь одна и другой нет: обе формы окна — настроенное приложение и
-первый запуск — ходят в эти же одиннадцать доменов.
+первый запуск — ходят в эти же двенадцать доменов.
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ from client.bridge.system import System
 from client.bridge.stats import Stats
 from client.bridge.vacancies import Vacancies
 from client.bridge.wizard import Wizard
+from client.bridge.workspaces import Workspaces
 
 
 class Api:
@@ -39,3 +40,4 @@ class Api:
         self.system = System(hub)
         self.vacancies = Vacancies(hub)
         self.wizard = Wizard(hub)
+        self.workspaces = Workspaces(hub)
