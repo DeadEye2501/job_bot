@@ -17,15 +17,16 @@ async def active_workspace_id(session: AsyncSession) -> int:
 
 
 async def owning_workspace_id(session: AsyncSession, vacancy_id: int | None) -> int:
-    """Профиль вакансии; без вакансии — активный.
+    """Профиль вакансии; без вакансии или без её строки — активный.
 
     Без вакансии приходит письмо HR, которому мы не писали (`flows/dm.py`).
+    Строки нет, когда вакансию удалили, пока письмо по ней ждало разбора:
+    вердикт по ней отбросит `apply_classification`, а отклика на неё не будет.
     """
-    if vacancy_id is None:
-        return await active_workspace_id(session)
-    return (await session.scalars(
+    owner = None if vacancy_id is None else await session.scalar(
         select(Vacancy.workspace_id).where(Vacancy.id == vacancy_id)
-    )).one()
+    )
+    return owner if owner is not None else await active_workspace_id(session)
 
 
 async def make_active(session: AsyncSession, workspace_id: int) -> bool:

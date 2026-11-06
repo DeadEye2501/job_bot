@@ -6,20 +6,23 @@ from sqlalchemy.orm import selectinload
 
 from backend.incoming import date_or_refusal, str_list, text_or_none
 from backend.models import ProfileExperience, profile_experience_skills
+from backend.models.workspace import ACTIVE_WORKSPACE_ID
+from backend.repository.profile import profile_id_of
 from backend.repository.profile_records import RecordKind, replace_records, wipe_records
 
 
-async def wipe_experience(session: AsyncSession) -> None:
-    """Стереть места работы вместе со связками «место — навык»."""
-    await wipe_records(session, EXPERIENCE)
+async def wipe_experience(session: AsyncSession, profile_id: int) -> None:
+    """Стереть места работы анкеты вместе со связками «место — навык»."""
+    await wipe_records(session, EXPERIENCE, profile_id)
 
 
 async def list_experience(session: AsyncSession) -> list[ProfileExperience]:
-    """All ProfileExperience rows newest-first, with skills relationship loaded."""
+    """Места работы анкеты активного профиля, новые первыми, со стеком."""
     return list(
         (
             await session.scalars(
                 select(ProfileExperience)
+                .where(ProfileExperience.profile_id == profile_id_of(ACTIVE_WORKSPACE_ID))
                 .options(selectinload(ProfileExperience.skills))
                 .order_by(ProfileExperience.start_date.desc())
             )
@@ -50,7 +53,12 @@ def _experience_fields(row: dict) -> dict:
     }
 
 
-EXPERIENCE = RecordKind(ProfileExperience, profile_experience_skills, _experience_fields)
+EXPERIENCE = RecordKind(
+    ProfileExperience,
+    profile_experience_skills,
+    profile_experience_skills.c.experience_id,
+    _experience_fields,
+)
 
 
 async def save_experience(session: AsyncSession, rows: list[dict], profile_id: int) -> None:
