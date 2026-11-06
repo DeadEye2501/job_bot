@@ -7,10 +7,17 @@
 
 import pytest
 
-from backend.models import LlmConfigKind
+from backend.llm import cv as llm_cv
+from backend.models import LlmConfigKind, Profile
+from backend.repository.workspaces import make_active
 from tests.client.conftest import WindowThatPicks
-from tests.dbio import put
-from tests.factories import CV_REQUIRED_PROFILE, llm_config_row
+from tests.dbio import all_rows, put, put_other_workspace
+from tests.factories import (
+    CV_REQUIRED_PROFILE,
+    OTHER_WORKSPACE_ID,
+    TEST_WORKSPACE_ID,
+    llm_config_row,
+)
 from tests.fakes.llm import CHAT, chat_json
 
 
@@ -243,3 +250,37 @@ async def test_a_parsed_resume_fills_the_profile(
 
     shown = await ask(api.profile.get)
     assert shown["ok"]["profile"]["first_name"] == CV_REQUIRED_PROFILE["first_name"]
+
+
+@pytest.fixture
+async def switched_while_parsing(resume_on_disk, model_says, session_factory, monkeypatch):
+    """Резюме к разбору, а пока модель думает, активным становится второй профиль.
+
+    Отдаёт профили, у которых после разбора есть анкета.
+    """
+    await put_other_workspace(session_factory)
+    await resume_on_disk("Иван Петров, разработчик.")
+    model_says({"profile": CV_REQUIRED_PROFILE})
+    parse = llm_cv.parse_cv
+
+    async def switched_meanwhile(*args, **kwargs):
+        async with session_factory() as session, session.begin():
+            await make_active(session, OTHER_WORKSPACE_ID)
+        return await parse(*args, **kwargs)
+
+    monkeypatch.setattr(llm_cv, "parse_cv", switched_meanwhile)
+
+    async def with_profile() -> list[int]:
+        return [p.workspace_id for p in await all_rows(session_factory, Profile)]
+
+    return with_profile
+
+
+async def test_a_resume_lands_in_the_workspace_it_was_parsed_in(
+    api, ask, told, switched_while_parsing
+):
+    """Профиль, сменённый за время разбора, чужой анкеты не получает."""
+    await ask(api.profile.parse_cv)
+    assert (await told())["danger"] is False
+
+    assert await switched_while_parsing() == [TEST_WORKSPACE_ID]

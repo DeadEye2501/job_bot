@@ -4,12 +4,12 @@ import logging
 from collections.abc import Callable
 from typing import NamedTuple
 
-from sqlalchemy import Table, delete
+from sqlalchemy import Column, Table, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.skill_names import skill_key
 from backend.models import ProfileSkill
-from backend.repository.profile_skills import index_skill_keys, list_skills
+from backend.repository.profile_skills import index_skill_keys, list_skills_of
 
 logger = logging.getLogger(__name__)
 
@@ -29,24 +29,27 @@ class RowError(ValueError):
 
 
 class RecordKind(NamedTuple):
-    """Вид записи анкеты: модель, её связка с навыками и разбор строки окна в
-    поля модели. Разбор бросает ``ValueError`` с причиной словами."""
+    """Вид записи анкеты: модель, её связка с навыками, столбец связки с
+    номером записи и разбор строки окна в поля модели. Разбор бросает
+    ``ValueError`` с причиной словами."""
 
     model: type
     links: Table
+    record_id: Column
     fields_of: Callable[[dict], dict]
 
 
-async def wipe_records(session: AsyncSession, kind: RecordKind) -> None:
-    """Стереть записи вида вместе со связками «запись — навык».
+async def wipe_records(session: AsyncSession, kind: RecordKind, profile_id: int) -> None:
+    """Стереть записи вида в анкете вместе с их связками «запись — навык».
 
     Порядок несущий: проверка внешних ключей у этого движка включена, и
     сотри записи первыми — база отказала бы, потому что на них ещё смотрят
     связки. Стирают записи две дороги — разбор резюме и запись из окна, — и
     порядок у них один.
     """
-    await session.execute(delete(kind.links))
-    await session.execute(delete(kind.model))
+    mine = select(kind.model.id).where(kind.model.profile_id == profile_id)
+    await session.execute(delete(kind.links).where(kind.record_id.in_(mine)))
+    await session.execute(delete(kind.model).where(kind.model.profile_id == profile_id))
 
 
 def _stack_by_key(rows: list[ProfileSkill]) -> dict[str, ProfileSkill]:
@@ -105,9 +108,9 @@ async def replace_records(
     Строки пишутся в присланном порядке. Плохая строка отказывает ``RowError``
     до записи в базу. Сделку держит зовущий.
     """
-    by_key = _stack_by_key(await list_skills(session))
+    by_key = _stack_by_key(await list_skills_of(session, profile_id))
     parsed = _parsed_rows(rows, kind.fields_of)
-    await wipe_records(session, kind)
+    await wipe_records(session, kind, profile_id)
     await session.flush()
     for row, fields in parsed:
         record = kind.model(profile_id=profile_id, **fields)

@@ -2,7 +2,7 @@
 
 import logging
 
-from sqlalchemy import delete, select
+from sqlalchemy import ColumnElement, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.language_choice import (
@@ -12,23 +12,42 @@ from backend.domain.language_choice import (
     search_languages,
 )
 from backend.models import ProfileLanguage, Vacancy
+from backend.models.workspace import ACTIVE_WORKSPACE_ID
+from backend.repository.profile import profile_id_of
+from backend.repository.workspaces import owning_workspace_id
 
 logger = logging.getLogger(__name__)
+
+
+async def _languages_in(
+    session: AsyncSession, workspace_id: int | ColumnElement[int]
+) -> list[ProfileLanguage]:
+    """Языки анкеты профиля в порядке заведения."""
+    rows = await session.scalars(
+        select(ProfileLanguage)
+        .where(ProfileLanguage.profile_id == profile_id_of(workspace_id))
+        .order_by(ProfileLanguage.id)
+    )
+    return list(rows)
 
 
 async def list_profile_languages(
     session: AsyncSession,
 ) -> list[ProfileLanguage]:
-    """Return all profile_language rows ordered by id (insertion order)."""
-    rows = await session.scalars(
-        select(ProfileLanguage).order_by(ProfileLanguage.id)
-    )
-    return list(rows)
+    """Языки анкеты активного профиля в порядке заведения."""
+    return await _languages_in(session, ACTIVE_WORKSPACE_ID)
+
+
+async def read_user_language_in(
+    session: AsyncSession, workspace_id: int | ColumnElement[int]
+) -> str:
+    """Язык человека по анкете профиля — решение `domain/language_choice`."""
+    return person_language(candidate_languages(await _languages_in(session, workspace_id)))
 
 
 async def read_user_language(session: AsyncSession) -> str:
-    """Язык человека по его анкете — решение `domain/language_choice`."""
-    return person_language(candidate_languages(await list_profile_languages(session)))
+    """Язык человека по анкете активного профиля."""
+    return await read_user_language_in(session, ACTIVE_WORKSPACE_ID)
 
 
 async def read_search_languages(session: AsyncSession) -> list[str]:
@@ -39,11 +58,13 @@ async def read_search_languages(session: AsyncSession) -> list[str]:
 async def read_reply_language(session: AsyncSession, vacancy_id: int) -> str:
     """Язык отклика на вакансию — решение `domain/language_choice`.
 
-    Вакансии нет — язык человека: отклика на неё не будет, и откуда пропажа,
-    зовущий узнаёт сам, читая вакансию.
+    Человек — по анкете профиля вакансии. Вакансии нет — язык человека по
+    анкете активного: отклика на неё не будет, и откуда пропажа, зовущий
+    узнаёт сам, читая вакансию.
     """
     vacancy = await session.get(Vacancy, vacancy_id)
-    return reply_language(vacancy.language if vacancy else None, await read_user_language(session))
+    person = await read_user_language_in(session, await owning_workspace_id(session, vacancy_id))
+    return reply_language(vacancy.language if vacancy else None, person)
 
 
 async def replace_profile_languages(

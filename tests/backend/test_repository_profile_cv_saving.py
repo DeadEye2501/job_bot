@@ -71,7 +71,7 @@ async def test_the_previous_profile_is_wiped_not_merged(session, session_factory
         )
     )
 
-    await save_parsed_cv(session, parsed_cv())
+    await save_parsed_cv(session, parsed_cv(), workspace_id=TEST_WORKSPACE_ID, cv_path="")
 
     assert [p.first_name for p in (await session.scalars(select(Profile))).all()] == [
         "Иван"
@@ -96,7 +96,7 @@ async def test_a_new_resume_wipes_the_previous_projects(session, session_factory
         profile_project_skills.insert().values(project_id=project.id, skill_id=skill.id)
     )
 
-    await save_parsed_cv(session, parsed_cv())
+    await save_parsed_cv(session, parsed_cv(), workspace_id=TEST_WORKSPACE_ID, cv_path="")
 
     assert await list_projects(session) == []
     assert (
@@ -120,6 +120,7 @@ async def test_every_profile_field_reaches_the_row(session):
                 free_preferences="готов к переезду",
             )
         ),
+        workspace_id=TEST_WORKSPACE_ID, cv_path="",
     )
 
     saved = await get_profile(session)
@@ -144,6 +145,7 @@ async def test_languages_and_skills_are_written_with_the_profile(session):
             ],
             skills=[parsed_cv_skill("Python", level=5, aliases=["py"])],
         ),
+        workspace_id=TEST_WORKSPACE_ID, cv_path="",
     )
 
     profile = await get_profile(session)
@@ -167,6 +169,7 @@ async def test_a_place_is_linked_to_the_skills_it_names(session):
             skills=[parsed_cv_skill("PostgreSQL", aliases=["Postgres"]), parsed_cv_skill("Python")],
             experience=[parsed_cv_place(stack=["Python", "Postgres"])],
         ),
+        workspace_id=TEST_WORKSPACE_ID, cv_path="",
     )
 
     places = await list_experience(session)
@@ -180,7 +183,7 @@ async def test_projects_are_written_in_order_with_their_stack(session):
             parsed_cv_project(name="Бот", about=["Описание"], stack=["python"]),
             parsed_cv_project(name="Сайт"),
         ],
-    ))
+    ), workspace_id=TEST_WORKSPACE_ID, cv_path="")
 
     first, second = await list_projects(session)
     assert (first.name, first.about, [s.name for s in first.skills]) == (
@@ -198,6 +201,7 @@ async def test_a_skill_named_twice_in_a_stack_is_linked_once(session):
             skills=[parsed_cv_skill("PostgreSQL", aliases=["Postgres"])],
             experience=[parsed_cv_place(stack=["PostgreSQL", "Postgres"])],
         ),
+        workspace_id=TEST_WORKSPACE_ID, cv_path="",
     )
 
     places = await list_experience(session)
@@ -221,6 +225,7 @@ async def test_a_stack_item_is_matched_loosely(session, written):
             skills=[parsed_cv_skill("Docker Compose")],
             experience=[parsed_cv_place(stack=[written])],
         ),
+        workspace_id=TEST_WORKSPACE_ID, cv_path="",
     )
 
     places = await list_experience(session)
@@ -242,6 +247,7 @@ async def test_an_unknown_stack_item_is_dropped(session):
             skills=[parsed_cv_skill("Python"), parsed_cv_skill("Docker")],
             experience=[parsed_cv_place(stack=["Python", "Кобол"])],
         ),
+        workspace_id=TEST_WORKSPACE_ID, cv_path="",
     )
 
     places = await list_experience(session)
@@ -265,6 +271,7 @@ async def test_a_place_keeps_all_it_was_given(session):
                 )
             ]
         ),
+        workspace_id=TEST_WORKSPACE_ID, cv_path="",
     )
 
     saved = (await session.scalars(select(ProfileExperience))).all()[0]
@@ -276,28 +283,28 @@ async def test_a_place_keeps_all_it_was_given(session):
 
 
 async def test_the_path_to_the_file_is_recorded_alongside(session):
-    """Путь к файлу резюме записывается той же записью — в активный профиль."""
-    await save_parsed_cv(session, parsed_cv(), cv_path="cv/ivan.pdf")
+    """Путь к файлу резюме записывается той же записью — в названный профиль."""
+    await save_parsed_cv(
+        session, parsed_cv(),
+        workspace_id=TEST_WORKSPACE_ID, cv_path="cv/ivan.pdf",
+    )
 
     assert (await session.get(Workspace, TEST_WORKSPACE_ID)).cv_path == "cv/ivan.pdf"
 
 
 async def test_a_recorded_path_is_replaced_not_doubled(session):
     """Повторная запись заменяет прежний путь."""
-    await save_parsed_cv(session, parsed_cv(), cv_path="cv/старое.pdf")
+    await save_parsed_cv(
+        session, parsed_cv(),
+        workspace_id=TEST_WORKSPACE_ID, cv_path="cv/старое.pdf",
+    )
 
-    await save_parsed_cv(session, parsed_cv(), cv_path="cv/новое.pdf")
+    await save_parsed_cv(
+        session, parsed_cv(),
+        workspace_id=TEST_WORKSPACE_ID, cv_path="cv/новое.pdf",
+    )
 
     assert (await session.get(Workspace, TEST_WORKSPACE_ID)).cv_path == "cv/новое.pdf"
-
-
-async def test_without_a_path_nothing_is_recorded(session):
-    """Без пути к файлу прежний путь профиля не трогается."""
-    (await session.get(Workspace, TEST_WORKSPACE_ID)).cv_path = "cv/прежнее.pdf"
-
-    await save_parsed_cv(session, parsed_cv())
-
-    assert (await session.get(Workspace, TEST_WORKSPACE_ID)).cv_path == "cv/прежнее.pdf"
 
 
 async def test_a_new_resume_keeps_the_answers_it_did_not_give(session, session_factory):
@@ -307,7 +314,7 @@ async def test_a_new_resume_keeps_the_answers_it_did_not_give(session, session_f
         gender=Gender.FEMALE, first_name_latin="Anna",
     ))
 
-    await save_parsed_cv(session, parsed_cv())
+    await save_parsed_cv(session, parsed_cv(), workspace_id=TEST_WORKSPACE_ID, cv_path="")
 
     p = (await session.scalars(select(Profile))).one()
     assert (p.expected_salary, p.expected_salary_period, p.gender, p.first_name_latin) == (
@@ -322,7 +329,7 @@ async def test_a_new_resume_overrides_the_answers_it_gave(session, session_facto
 
     await save_parsed_cv(session, parsed_cv(profile=parsed_cv_profile(
         expected_salary=350000, gender=Gender.MALE, first_name_latin="Ivan",
-    )))
+    )), workspace_id=TEST_WORKSPACE_ID, cv_path="")
 
     p = (await session.scalars(select(Profile))).one()
     assert (p.expected_salary, p.gender, p.first_name_latin) == (350000, Gender.MALE, "Ivan")
@@ -344,7 +351,7 @@ async def test_a_new_resume_keeps_the_new_fields_it_did_not_give(session, sessio
     переживают разбор файла, где их нет: человек мог ввести их руками."""
     await put(session_factory, profile_row(**_TYPED_BY_HAND))
 
-    await save_parsed_cv(session, parsed_cv())
+    await save_parsed_cv(session, parsed_cv(), workspace_id=TEST_WORKSPACE_ID, cv_path="")
 
     assert _new_fields((await session.scalars(select(Profile))).one()) == _TYPED_BY_HAND
 
@@ -357,7 +364,10 @@ async def test_a_new_resume_overrides_the_new_fields_it_gave(session, session_fa
         "about_me": "Веду команды.", "resume_url": "https://hh.ru/resume/2",
     }
 
-    await save_parsed_cv(session, parsed_cv(profile=parsed_cv_profile(**fresh)))
+    await save_parsed_cv(
+        session, parsed_cv(profile=parsed_cv_profile(**fresh)),
+        workspace_id=TEST_WORKSPACE_ID, cv_path="",
+    )
 
     assert _new_fields((await session.scalars(select(Profile))).one()) == fresh
 
@@ -369,7 +379,10 @@ async def test_a_new_salary_does_not_borrow_the_old_currency(session, session_fa
         expected_salary_period=SalaryPeriod.MONTH,
     ))
 
-    await save_parsed_cv(session, parsed_cv(profile=parsed_cv_profile(expected_salary=5000)))
+    await save_parsed_cv(
+        session, parsed_cv(profile=parsed_cv_profile(expected_salary=5000)),
+        workspace_id=TEST_WORKSPACE_ID, cv_path="",
+    )
 
     p = (await session.scalars(select(Profile))).one()
     assert (p.expected_salary, p.expected_salary_currency, p.expected_salary_period) == (

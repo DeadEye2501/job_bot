@@ -2,12 +2,14 @@
 
 import logging
 
-from sqlalchemy import delete, select
+from sqlalchemy import ColumnElement, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.skill_names import index_by_key
 from backend.incoming import str_list
 from backend.models import STACK_LINKS, ProfileSkill
+from backend.models.workspace import ACTIVE_WORKSPACE_ID
+from backend.repository.profile import profile_id_of
 
 logger = logging.getLogger(__name__)
 
@@ -33,16 +35,25 @@ def index_skill_keys(
             )
 
 
-async def list_skills(session: AsyncSession) -> list[ProfileSkill]:
-    """All ProfileSkill rows ordered by id (preserves user-set order).
+async def list_skills_of(
+    session: AsyncSession, profile_id: int | ColumnElement[int]
+) -> list[ProfileSkill]:
+    """Навыки анкеты в порядке номеров (порядок, заданный человеком).
+
+    Номер — анкеты (`Profile.id`), а не профиля: его держат писатели анкеты.
 
     Порядок здесь не украшение: столкновение ключей навыков разрешается в
     пользу первого (`domain/skill_names.index_by_key`), и без `order_by`
     «первый» назначал бы читатель, ничем этого не обещавший.
     """
-    return list(
-        (await session.scalars(select(ProfileSkill).order_by(ProfileSkill.id))).all()
-    )
+    return list((await session.scalars(
+        select(ProfileSkill).where(ProfileSkill.profile_id == profile_id).order_by(ProfileSkill.id)
+    )).all())
+
+
+async def list_skills(session: AsyncSession) -> list[ProfileSkill]:
+    """Навыки анкеты активного профиля."""
+    return await list_skills_of(session, profile_id_of(ACTIVE_WORKSPACE_ID))
 
 
 def _skill_columns(row: dict) -> dict | None:
@@ -119,7 +130,7 @@ async def save_skills(
 
     Сделку держит зовущий.
     """
-    existing = {s.id: s for s in await list_skills(session)}
+    existing = {s.id: s for s in await list_skills_of(session, profile_id)}
     keep_ids = _upsert_skills(session, rows, existing, profile_id)
     drop_ids = set(existing.keys()) - keep_ids
     await _drop_skills(session, existing, drop_ids)

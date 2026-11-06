@@ -9,33 +9,32 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.models import (
     Profile,
     ProfileExperience,
-    ProfileLanguage,
     ProfileProject,
     ProfileSkill,
+    Workspace,
 )
 from backend.payloads import ParsedCv
-from backend.repository.profile import get_profile
+from backend.repository.profile import get_profile_in
 from backend.repository.profile_experience import wipe_experience
 from backend.repository.profile_languages import replace_profile_languages
 from backend.repository.profile_projects import wipe_projects
 from backend.repository.profile_records import link_stack
 from backend.repository.profile_skills import index_skill_keys
-from backend.repository.workspaces import active_workspace, active_workspace_id
 
 logger = logging.getLogger(__name__)
 
 
-async def _wipe_profile(session: AsyncSession) -> None:
+async def wipe_profile(session: AsyncSession, profile_id: int) -> None:
     """Стереть анкету целиком — разбор резюме пишет её заново, а не дописывает.
 
     Частичное слияние оставляло бы в анкете навыки и языки из прошлого
     резюме, и человек об этом не узнал бы.
     """
-    await wipe_experience(session)
-    await wipe_projects(session)
-    await session.execute(delete(ProfileSkill))
-    await session.execute(delete(ProfileLanguage))
-    await session.execute(delete(Profile))
+    await wipe_experience(session, profile_id)
+    await wipe_projects(session, profile_id)
+    await session.execute(delete(ProfileSkill).where(ProfileSkill.profile_id == profile_id))
+    await replace_profile_languages(session, profile_id, [])
+    await session.execute(delete(Profile).where(Profile.id == profile_id))
     await session.flush()
 
 
@@ -96,8 +95,7 @@ _KEPT_ACROSS_RESUMES = _SALARY + _PERSON
 стирает: человек вводит их руками, а файл приносит редко."""
 
 
-async def _answers_to_keep(session: AsyncSession) -> dict:
-    old = await get_profile(session)
+def _answers_to_keep(old: Profile | None) -> dict:
     if old is None:
         return {}
     return {name: getattr(old, name) for name in _KEPT_ACROSS_RESUMES}
@@ -141,22 +139,25 @@ def _new_profile(p, kept: dict, workspace_id: int) -> Profile:
 
 
 async def save_parsed_cv(
-    session: AsyncSession, parsed: ParsedCv, *, cv_path: str | None = None
+    session: AsyncSession, parsed: ParsedCv, *, workspace_id: int, cv_path: str
 ) -> None:
-    """Заменить анкету — с навыками, местами работы и проектами — разобранной.
+    """Заменить анкету профиля — с навыками, местами работы и проектами — разобранной.
 
-    Путь к резюме пишется той же сделкой: сбой между двумя записями оставил бы
-    разобранную анкету без записанного источника. Ответы для форм переносятся
-    в новую строку, если файл их не дал. Сделку держит зовущий.
+    Путь к резюме (`""` — пути нет) пишется той же сделкой: сбой между двумя
+    записями оставил бы разобранную анкету без записанного источника. Ответы
+    для форм переносятся в новую строку, если файл их не дал. Сделку держит
+    зовущий.
     """
-    kept = await _answers_to_keep(session)
-    await _wipe_profile(session)
+    old = await get_profile_in(session, workspace_id)
+    kept = _answers_to_keep(old)
+    if old is not None:
+        await wipe_profile(session, old.id)
 
-    profile = _new_profile(parsed.profile, kept, await active_workspace_id(session))
+    profile = _new_profile(parsed.profile, kept, workspace_id)
     session.add(profile)
     await session.flush()
 
-    # Стирание внутри писателя здесь холостое — таблица снесена целиком выше.
+    # Стирание внутри писателя здесь холостое — прежняя анкета снесена выше.
     # Так и оставлено: свой цикл ради экономии одного запроса на разбор резюме
     # означал бы второе место, знающее устройство строки языка.
     await replace_profile_languages(
@@ -169,10 +170,8 @@ async def save_parsed_cv(
         *_parsed_records(ProfileExperience, parsed.experience, profile.id, skill_lookup),
         *_parsed_records(ProfileProject, parsed.projects, profile.id, skill_lookup),
     ])
+    (await session.get(Workspace, workspace_id)).cv_path = cv_path
     await session.flush()
-    if cv_path is not None:
-        (await active_workspace(session)).cv_path = cv_path
-        await session.flush()
 
     logger.info(
         "Profile replaced: languages=%d skills=%d experiences=%d projects=%d cv_path=%s",

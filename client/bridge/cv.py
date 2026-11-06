@@ -10,6 +10,7 @@ from adapters.cv_text import READABLE_SUFFIXES, read_cv_text
 from backend.provider_config import LlmProviderConfig
 from backend.llm import cv as llm_cv
 from backend.repository.profile_cv import save_parsed_cv
+from backend.repository.workspaces import active_workspace_id
 
 from client.bridge.answer import denied, launched, reply
 from client.bridge.cv_file import _stat_cv
@@ -131,7 +132,12 @@ async def _parse_into_profile(hub, path: Path, chat: LlmProviderConfig) -> str:
     Анкета заменяется целиком, вместе с путём к файлу, одной сделкой: разбор
     без записанного источника оставил бы человека с чужой на вид анкетой и без
     следа, откуда она взялась.
+
+    Профиль запоминается до обращения к модели: разбор идёт больше минуты, и
+    сменённый за это время профиль не должен получить чужую анкету.
     """
+    async with hub.session_factory() as session:
+        workspace_id = await active_workspace_id(session)
     text, trouble = read_cv_text(path)
     if trouble is not None:
         return trouble
@@ -143,5 +149,5 @@ async def _parse_into_profile(hub, path: Path, chat: LlmProviderConfig) -> str:
 
     async with hub.session_factory() as session:
         async with session.begin():
-            await save_parsed_cv(session, parsed, cv_path=str(path))
+            await save_parsed_cv(session, parsed, workspace_id=workspace_id, cv_path=str(path))
     return "ok"

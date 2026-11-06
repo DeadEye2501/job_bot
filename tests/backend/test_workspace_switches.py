@@ -36,6 +36,7 @@ from backend.runtime_settings import RuntimeSettings
 from tests.dbio import only_row, put, put_other_workspace
 from tests.factories import (
     OTHER_WORKSPACE_ID,
+    TEST_WORKSPACE_ID,
     aggregator_switch_row,
     blacklist_row,
     blacklist_switch_row,
@@ -338,6 +339,11 @@ async def test_a_vacancy_is_owned_by_its_workspace(session_factory):
     async with session_factory() as session:
         assert await owning_workspace_id(session, vacancy.id) == OTHER_WORKSPACE_ID
         assert await owning_workspace_id(session, None) == 1
+
+
+async def test_a_vanished_vacancy_is_owned_by_the_active_workspace(session):
+    # Вакансию удалили, пока письмо по ней ждало разбора.
+    assert await owning_workspace_id(session, 999) == TEST_WORKSPACE_ID
 
 
 async def test_copied_switches_carry_toggles_and_choice_but_not_read_marks(session_factory):

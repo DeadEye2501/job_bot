@@ -8,7 +8,8 @@ from backend.flows.batches import report_failures
 from backend.llm.hr_reply import HrReplyAsk, classify_hr_reply
 from backend.models import VacancyStatus
 from backend.payloads import PendingReply
-from backend.repository.profile_languages import read_user_language
+from backend.repository.profile_languages import read_user_language_in
+from backend.repository.workspaces import owning_workspace_id
 from backend.repository.vacancy_status import apply_classification
 from backend.notify import fire
 
@@ -68,7 +69,10 @@ async def classify_and_apply(
     """
     vacancy_id, msg_id, status = target
     async with session_factory() as session:
-        language = await read_user_language(session)
+        # Письмо о вакансии замороженного профиля читается по анкете того профиля.
+        language = await read_user_language_in(
+            session, await owning_workspace_id(session, vacancy_id)
+        )
     verdict, trouble = await classify_hr_reply(
         HrReplyAsk(text, status, language), lm_client, lm_chat_model
     )
