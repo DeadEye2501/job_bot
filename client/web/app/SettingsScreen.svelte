@@ -1,6 +1,6 @@
 <script>
   // Экран настроек: учётная запись Telegram, оба поставщика моделей, пороги
-  // отбора, почта для откликов и удаление всех данных.
+  // отбора, почта для откликов, удаление текущего профиля и всех данных.
   //
   // Записывается всё по ходу, без кнопки «сохранить»: поле уезжает на мост,
   // когда его покидают. Так было и в прежнем окне, и это верно для настроек —
@@ -30,6 +30,7 @@
   } from '$state/settings.js';
 
   import TelegramLogin from './TelegramLogin.svelte';
+  import WorkspaceRemoval from './WorkspaceRemoval.svelte';
 
   let { ask, say } = $props();
 
@@ -325,6 +326,7 @@
       <PipelineSection values={pipeline} onsave={savePipeline} />
 
       <SettingsSection icon="warning" title="Опасная зона" danger>
+        <WorkspaceRemoval {ask} {say} />
         <div class="danger-row">
           <div>
             <div class="danger-text">Удалить все данные</div>

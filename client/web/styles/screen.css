@@ -31,6 +31,21 @@
   margin-left: 6px;
 }
 
+/* Правый край шапки: отметка о правке и кнопки экрана. По центру, а не по
+   линии шрифта, как сама шапка: у кнопки линии шрифта нет, и отметка
+   прилипла бы к её низу. */
+.page-head-side {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Кнопка профилей — в рамке: без неё значок в шапке читался бы как часть
+   отметки о правке. Обводка под курсором — общая, в accent-outline.css. */
+.workspace-btn {
+  border: 1px solid var(--border);
+}
+
 .updated-ts {
   font-size: 0.72rem;
   color: var(--text-tertiary);

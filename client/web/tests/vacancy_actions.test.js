@@ -174,7 +174,7 @@ describe('способы отклика в окне выбора', () => {
       { method: 'telegram', target: '@hr_name' },
       { method: 'email', target: 'hr@company.test' },
     ] });
-    expect(rows.map((r) => r.contact)).toEqual(['@hr_name', 'hr@company.test']);
+    expect(rows.map((r) => r.label)).toEqual(['@hr_name', 'hr@company.test']);
     expect(rows.every((r) => r.way)).toBe(true);
   });
 

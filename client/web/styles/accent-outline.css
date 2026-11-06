@@ -10,8 +10,9 @@
    заливка, и правило у неё поэтому шире здешнего. */
 
 .chip-add:hover,
-.new-box:hover,
-.stats-refresh-btn:hover {
+.new-box:hover:not(:disabled),
+.stats-refresh-btn:hover,
+.workspace-btn:hover {
   border-color: var(--accent);
   color: var(--accent);
 }
