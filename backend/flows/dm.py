@@ -10,6 +10,7 @@ from backend.bot.media import classify_media, download_media
 from backend.flows.auto_gate import status_open_for_auto
 from backend.message_text import extract_dm_text
 from backend.message_text import extract_text
+from backend.models import HR, Vacancy
 from backend.telegram_lookup import fetch_telegram_avatar
 from backend.telegram_time import tg_moment
 from backend.flows.dm_classify import classify_and_apply
@@ -21,6 +22,7 @@ from backend.repository.hr_identify import resolve_reply_target_vacancy
 from backend.repository.messages import find_outgoing_message
 from backend.repository.messages import save_incoming_message
 from backend.repository.messages import save_outgoing_message
+from backend.repository.workspaces import owning_workspace_id
 
 logger = logging.getLogger(__name__)
 
@@ -143,15 +145,19 @@ async def persist_outgoing_dm(session_factory, client, msg, hr_id: int) -> Outgo
     )
 
 
-async def _sender_to_listen_to(session_factory, msg):
-    """Кого слушать по этому письму: известный HR не из чёрного списка.
+async def _sender_to_listen_to(session_factory, msg) -> tuple[HR, int | None] | None:
+    """Кого слушать по этому письму: пара (HR, номер вакансии письма или None).
+
+    HR слушают, если он не отмечен в чёрном списке профиля вакансии письма, а
+    без вакансии — активного (`owning_workspace_id`): переписка идёт во всех
+    профилях, а отметка у каждого своя. Привязка к вакансии считается здесь
+    один раз: тот же номер и решает отметку, и ложится в строку письма.
 
     Пустота значит «разбирать нечего»: либо отправитель нам незнаком, либо
-    он в списке — и тогда переписка глохнет в обе стороны, потому что
-    исходящее блокируют заслоны отправки. Ни строки, ни разбора, ни смены
-    статуса вакансии заблокированный не получает.
+    он отмечен. Ни строки, ни разбора, ни смены статуса вакансии отмеченный
+    не получает.
     """
-    from backend.repository.hr_card import hr_blacklist_value
+    from backend.repository.hr_card import hr_blacklist_value_in
 
     logger.debug(
         "DM received: sender_id=%s username=%s",
@@ -161,9 +167,12 @@ async def _sender_to_listen_to(session_factory, msg):
         hr = await find_known_hr(session, msg.from_user.id, msg.from_user.username)
         if hr is None:
             return None
-        blacklisted = await hr_blacklist_value(session, hr)
+        vacancy_id = await _attributed_vacancy(session, hr.id, msg)
+        blacklisted = await hr_blacklist_value_in(
+            session, hr, await owning_workspace_id(session, vacancy_id)
+        )
     if not blacklisted:
-        return hr
+        return hr, vacancy_id
     logger.info(
         "DM from blacklisted HR ignored",
         extra={
@@ -215,12 +224,18 @@ def _incoming_row(
     )
 
 
-async def _save_incoming(session_factory, msg, attachment: _Attachment):
-    """Записать входящее письмо; отдать номер вакансии и номер строки.
+async def _save_incoming(
+    session_factory, msg, attachment: _Attachment, vacancy_id: int | None
+) -> int | None:
+    """Записать входящее письмо; отдать номер строки.
 
-    Пустая пара значит «дальше не идём»: HR исчез, письмо уже лежит (гонка
+    Пустота значит «дальше не идём»: HR исчез, письмо уже лежит (гонка
     живого с догоном) или не записалось. HR ищется заново нарочно: первый
     поиск шёл в своей сессии ради номера, куда класть файл.
+
+    Вакансию привязали ещё до скачивания вложения (`_sender_to_listen_to`), и
+    за время загрузки её могли удалить. Тогда письмо ложится без неё: строку
+    с пропавшей вакансией не пустит внешний ключ, и письмо пропало бы целиком.
     """
     async with session_factory() as session:
         try:
@@ -228,14 +243,15 @@ async def _save_incoming(session_factory, msg, attachment: _Attachment):
                 session, msg.from_user.id, msg.from_user.username
             )
             if hr is None:
-                return None, None
+                return None
             await refresh_hr_from_telegram(session, hr, msg.from_user, avatar=None)
-            vacancy_id = await _attributed_vacancy(session, hr.id, msg)
+            if vacancy_id is not None and await session.get(Vacancy, vacancy_id) is None:
+                vacancy_id = None
             new_msg = await save_incoming_message(
                 session, _incoming_row(msg, hr.id, vacancy_id, attachment)
             )
             await session.commit()
-            return vacancy_id, new_msg.id
+            return new_msg.id
         except IntegrityError:
             # Повтор: живой обработчик наложился на догон или два догона
             # пересеклись; строка уже в базе, разбор по ней прошёл первым
@@ -244,13 +260,13 @@ async def _save_incoming(session_factory, msg, attachment: _Attachment):
                 "DM duplicate skipped",
                 extra={"sender_id": msg.from_user.id, "tg_message_id": msg.id},
             )
-            return None, None
+            return None
         except Exception:
             logger.exception(
                 "DM persistence failed",
                 extra={"sender_id": msg.from_user.id, "tg_message_id": msg.id},
             )
-            return None, None
+            return None
 
 
 async def _status_open_for_reply(session_factory, vacancy_id: int):
@@ -303,15 +319,13 @@ async def _catch_up_avatar(session_factory, client, msg) -> None:
         )
 
 
-async def _receive(dm, msg, hr_lookup) -> tuple[int | None, int | None]:
+async def _receive(dm, msg, hr_lookup, vacancy_id: int | None) -> int | None:
     """Записать письмо, а легло — подтянуть картинку собеседника."""
     attachment = await _attachment_of(dm.client, msg, hr_lookup.id)
-    vacancy_id, new_msg_id = await _save_incoming(
-        dm.session_factory, msg, attachment
-    )
+    new_msg_id = await _save_incoming(dm.session_factory, msg, attachment, vacancy_id)
     if new_msg_id is not None and dm.client is not None and hr_lookup.avatar is None:
         await _catch_up_avatar(dm.session_factory, dm.client, msg)
-    return vacancy_id, new_msg_id
+    return new_msg_id
 
 
 async def _hand_to_classification(dm, msg, hr_id: int, subject) -> None:
@@ -346,10 +360,11 @@ async def process_dm(msg, dm: DmHelpers) -> int | None:
     """
     if not msg.from_user or msg.from_user.is_bot:
         return None
-    hr_lookup = await _sender_to_listen_to(dm.session_factory, msg)
-    if hr_lookup is None:
+    heard = await _sender_to_listen_to(dm.session_factory, msg)
+    if heard is None:
         return None
-    vacancy_id, new_msg_id = await _receive(dm, msg, hr_lookup)
+    hr_lookup, vacancy_id = heard
+    new_msg_id = await _receive(dm, msg, hr_lookup, vacancy_id)
     if new_msg_id is None:
         return None
     if vacancy_id is None:

@@ -99,10 +99,6 @@ class DmDebounce:
         self.bursts[hr_id] = together
         return dropped
 
-    def drop(self, hr_id: int) -> None:
-        """Бросить пачку неразобранной — так уходит написанное из чёрного."""
-        self.bursts.pop(hr_id, None)
-
     def waiting(self) -> list[int]:
         """Люди, чьи пачки ждут разбора."""
         return [hr_id for hr_id, burst in self.bursts.items() if burst]

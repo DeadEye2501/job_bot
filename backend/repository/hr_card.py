@@ -186,9 +186,10 @@ def hr_blacklist_candidates(hr: HR) -> list[str]:
 
 HR_BLACKLIST = BlacklistMark(HR_KIND, hr_blacklist_candidates)
 
-# Имя для зовущих вне репозитория: отправке и разбору писем нужно только
+# Имена для зовущих вне репозитория: отправке и разбору писем нужно только
 # «чем отмечен», а не вся отметка.
 hr_blacklist_value = HR_BLACKLIST.value
+hr_blacklist_value_in = HR_BLACKLIST.value_in
 
 
 async def delete_hr(session: AsyncSession, hr_id: int) -> bool:

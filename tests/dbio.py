@@ -14,6 +14,7 @@ import sqlite3
 
 from sqlalchemy import select
 
+from backend.models import Message
 from backend.repository.aggregator_resumes import resumes_of
 from tests.factories import OTHER_WORKSPACE_ID, workspace_row
 
@@ -56,6 +57,11 @@ async def all_rows(session_factory, model) -> list:
     """
     async with session_factory() as session:
         return list((await session.scalars(select(model))).all())
+
+
+async def their_letters(session_factory) -> list[Message]:
+    """Письма HR из переписки: наши лежат там же, и читать надо не их."""
+    return [m for m in await all_rows(session_factory, Message) if m.is_incoming]
 
 
 async def resume_marks(session_factory, aggregator_id: int) -> list[tuple[str, bool]]:

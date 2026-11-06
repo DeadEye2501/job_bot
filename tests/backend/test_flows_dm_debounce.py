@@ -132,16 +132,6 @@ def test_a_taken_burst_is_gone_from_the_bag():
     assert bag.take(7) == []
 
 
-def test_a_dropped_burst_is_gone():
-    """Брошенная пачка не разбирается вовсе — так уходит пачка из чёрного."""
-    bag = DmDebounce(cap=50, slots=2)
-    bag.remember(7, _letter(1, "одно"))
-
-    bag.drop(7)
-
-    assert bag.waiting() == []
-
-
 def test_only_the_filled_bursts_are_waiting():
     """В ожидающих числятся только те, у кого есть что разбирать."""
     bag = DmDebounce(cap=50, slots=2)
