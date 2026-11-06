@@ -13,7 +13,10 @@ jobs:
       contents: write
     env:
       PIPENV_PIPFILE: macos/Pipfile
-      CMAKE_ARGS: -DGGML_METAL=on
+      # HTTPS у llama.cpp выключен: вшитый в него cpp-httplib не собирается с
+      # OpenSSL 4 из Homebrew раннера, а HTTPS нужен только для скачивания
+      # модели по ссылке — приложение читает .gguf с диска.
+      CMAKE_ARGS: -DGGML_METAL=on -DLLAMA_OPENSSL=OFF
     steps:
       - uses: actions/checkout@v4
 
