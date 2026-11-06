@@ -24,7 +24,7 @@ from backend.repository.vacancies_activity import (
     join_activity,
 )
 from backend.repository.vacancies_card import VACANCY_NEIGHBOURS
-from backend.repository.vacancies_common import PARSED_ONLY
+from backend.repository.vacancies_common import SHOWN_HERE
 
 logger = logging.getLogger(__name__)
 
@@ -303,7 +303,7 @@ def _where_and_joins(f: VacancyFilter, freshness) -> tuple[list, set[str]]:
     фильтров чаще, чем с ними, и три лишних соединения на каждой странице
     стоили бы дороже, чем ветвление здесь.
     """
-    clauses: list = [PARSED_ONLY]
+    clauses: list = [SHOWN_HERE]
     joins: set[str] = set()
     for found, needed in (_search_clauses(f.search), _choice_clauses(f)):
         clauses.extend(found)
@@ -365,12 +365,12 @@ def _listing_stmt(f: VacancyFilter):
 
 
 async def _channel_options(session: AsyncSession) -> list[str]:
-    """Каналы, у которых есть хоть одна разобранная вакансия."""
+    """Каналы, у которых есть хоть одна показываемая вакансия."""
     rows = await session.execute(
         select(TelegramChannel.username)
         .join(Vacancy, Vacancy.source_channel_id == TelegramChannel.id)
         .where(
-            PARSED_ONLY,
+            SHOWN_HERE,
             TelegramChannel.username.is_not(None),
         )
         .distinct()
@@ -392,13 +392,13 @@ async def _company_options(session: AsyncSession) -> list[str]:
     linked_rows = await session.execute(
         select(Company.name)
         .join(Vacancy, Vacancy.company_id == Company.id)
-        .where(PARSED_ONLY, Company.name.is_not(None))
+        .where(SHOWN_HERE, Company.name.is_not(None))
         .distinct()
     )
     raw_rows = await session.execute(
         select(Vacancy.company_name)
         .where(
-            PARSED_ONLY,
+            SHOWN_HERE,
             Vacancy.company_name.is_not(None),
         )
         .distinct()

@@ -13,13 +13,14 @@ from backend.models import (
     VacancyStatus,
 )
 from backend.models.settings import AGGREGATOR_KIND, CHANNEL_KIND
+from backend.models.workspace import ACTIVE_WORKSPACE_ID
 from backend.repository.stats_common import (
     first_transition_subq,
     parsed_in_window,
     stats_period_since,
 )
 from backend.repository.stats_rows import SourceKey, pipeline_row, source_item
-from backend.repository.vacancies_common import PARSED_ONLY, SOURCE_LINKS
+from backend.repository.vacancies_common import SHOWN_HERE, SOURCE_LINKS
 
 _VACANCY_SOURCE = (SOURCE_LINKS[CHANNEL_KIND], SOURCE_LINKS[AGGREGATOR_KIND])
 """Ссылка вакансии на источник: ключ строки статистики — канал, затем агрегатор."""
@@ -80,12 +81,14 @@ async def _ingest_by_source(session: AsyncSession, since) -> list:
 
 
 async def _trash_events_by_source(session: AsyncSession, since) -> dict[SourceKey, int]:
-    """Сколько мусора удалено у каждого источника за то же окно.
+    """Сколько мусора удалено у каждого источника за то же окно в активном профиле.
 
     Отдельным запросом потому, что удалённых строк в `vacancy` уже нет:
     счёт живёт своей таблицей, и рамка времени у неё своя, но та же.
     """
-    where = [TrashEvent.created_at >= since] if since is not None else []
+    where = [TrashEvent.workspace_id == ACTIVE_WORKSPACE_ID]
+    if since is not None:
+        where.append(TrashEvent.created_at >= since)
     rows = (
         await session.execute(
             select(TrashEvent.source_channel_id, TrashEvent.source_aggregator_id,
@@ -110,7 +113,7 @@ async def _first_in_period_by_source(
     q = (
         select(*_VACANCY_SOURCE, sub.c.vid)
         .join(sub, sub.c.vid == Vacancy.id)
-        .where(PARSED_ONLY)
+        .where(SHOWN_HERE)
     )
     if since is not None:
         q = q.where(sub.c.first_at >= since)

@@ -53,7 +53,7 @@ async def _paged(hub: Hub, source: Source, source_id: int, page: Page) -> dict:
         rows, has_more = await vacancies_mini.list_vacancies_from(
             session, source.kind, source_id, limit=page.limit, offset=page.offset,
         )
-        # Пусто здесь при непустом счёте в карточке — беда, и по одному пустому
+        # Пусто здесь при непустом счёте источника — беда, и по одному пустому
         # списку не видно, где она: в запросе перечня или в эхе моста. Ноль
         # против N различает эти два места.
         if not rows:
@@ -62,7 +62,7 @@ async def _paged(hub: Hub, source: Source, source_id: int, page: Page) -> dict:
                 logger.warning(
                     "%s=%d: перечень вакансий пуст, а строк с этим "
                     "источником %d (потолок=%d сдвиг=%d) — разойтись со "
-                    "счётчиком карточки он не должен",
+                    "счётом источника он не должен",
                     source.key, source_id, total, page.limit, page.offset,
                 )
     return {

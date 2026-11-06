@@ -13,7 +13,7 @@ from backend.repository.stats_common import (
     stats_period_since,
     status_cond,
 )
-from backend.repository.vacancies_common import PARSED_ONLY
+from backend.repository.vacancies_common import SHOWN_HERE
 
 
 async def _applied_in_period(
@@ -21,14 +21,14 @@ async def _applied_in_period(
 ) -> dict[int, datetime]:
     """Когда откликнулись — по вакансиям, отклик на которые попал в окно.
 
-    Берём разобранные вакансии, у которых ПЕРВЫЙ переход в Applied случился
+    Берём показываемые вакансии (`SHOWN_HERE`), у которых ПЕРВЫЙ переход в Applied случился
     внутри окна (по `VacancyStatusHistory.changed_at`): ровно те отклики,
     которые мы делали в этот период. Отбор по разбору тот же, что у соседних
     ступеней экрана — считая по своему множеству, ступень разводила бы числа
     двух экранов молча.
     """
     first_applied_subq = first_transition_subq(VacancyStatus.APPLIED)
-    where_clauses = [PARSED_ONLY]
+    where_clauses = [SHOWN_HERE]
     if since is not None:
         where_clauses.append(first_applied_subq.c.first_at >= since)
     rows = (

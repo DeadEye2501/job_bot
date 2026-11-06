@@ -115,7 +115,9 @@ async def similar_vacancy_id(pipeline, embedding: list[float], threshold: float 
 
 
 async def ensure_embedding_cache(pipeline, width: int) -> None:
-    """Поднять векторы вакансий в память один раз за жизнь конвейера.
+    """Поднять векторы вакансий активного профиля в память один раз за жизнь конвейера.
+
+    Повтор ищется только среди своих: вакансия другого профиля здесь не повтор.
 
     Здесь только поход в базу: что делать с векторами чужой длины, решает сам
     кэш (`domain/dedup.EmbeddingCache`). Отброшенные он же и считает — число
@@ -128,7 +130,7 @@ async def ensure_embedding_cache(pipeline, width: int) -> None:
         rows = (
             await session.execute(
                 select(Vacancy.id, Vacancy.embedding).where(
-                    Vacancy.embedding.is_not(None)
+                    Vacancy.embedding.is_not(None), Vacancy.in_active_workspace
                 )
             )
         ).all()

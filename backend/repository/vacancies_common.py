@@ -26,6 +26,14 @@ PARSED_ONLY = Vacancy.is_parsed.is_(True)
 тем, что человек увидит, открыв канал.
 """
 
+SHOWN_HERE = and_(PARSED_ONLY, Vacancy.in_active_workspace)
+"""Отбор выдачи экранов: разобранная вакансия активного профиля.
+
+Чужой профиль не виден ни в списке, ни в поиске, ни в числах. `PARSED_ONLY`
+без профиля остаётся мини-спискам карточек, где чужие вакансии стоят внизу,
+и перечню людей компании, где люди общие.
+"""
+
 
 def by_vacancy_count(label):
     """Порядок «кто принёс больше вакансий», а при равенстве — по подписи.
@@ -43,21 +51,21 @@ def by_vacancy_count(label):
 
 
 def with_vacancy_counts(subject, link, label):
-    """Предметы со счётом разобранных вакансий, плодовитые сверху.
+    """Предметы со счётом показываемых вакансий, плодовитые сверху.
 
     Один запрос на три перечня — людей, компаний и каналов: спрашивают они
     одно и то же, а разойдись формы, у одного из них счёт однажды перестал бы
     совпадать с тем, что показывают соседи.
 
     Отбор стоит в условии присоединения, а не в ``where``: в ``where`` он
-    выбросил бы из списка предмет без единой разобранной вакансии, а тот
-    обязан остаться в нём с нулём.
+    выбросил бы из списка предмет без единой показываемой вакансии, а тот
+    обязан остаться в нём с нулём. Сам перечень от профиля не зависит.
     """
     return counted_vacancies(subject, link).order_by(*by_vacancy_count(label))
 
 
 def counted_vacancies(subject, link):
-    """Предметы со счётом разобранных вакансий, без порядка.
+    """Предметы со счётом показываемых вакансий, без порядка.
 
     Порознь от запроса выше, потому что не всякий перечень ставит плодовитых
     сверху: агрегаторы держат «Поиск по сети» первым и дальше порядок
@@ -65,7 +73,7 @@ def counted_vacancies(subject, link):
     """
     return (
         select(subject, func.count(Vacancy.id).label("cnt"))
-        .outerjoin(Vacancy, and_(link == subject.id, PARSED_ONLY))
+        .outerjoin(Vacancy, and_(link == subject.id, SHOWN_HERE))
         .group_by(subject.id)
     )
 
@@ -107,3 +115,13 @@ async def count_by_status(
     for status, cnt in rows:
         counts[status] = int(cnt or 0)
     return counts
+
+
+async def foreign_vacancy_ids(session: AsyncSession, ids: list[int | None]) -> set[int]:
+    """Какие из вакансий принадлежат не активному профилю.
+
+    `None` — номер у письма без вакансии — не совпадает ни с чем.
+    """
+    return set(await session.scalars(
+        select(Vacancy.id).where(Vacancy.id.in_(ids), ~Vacancy.in_active_workspace)
+    ))

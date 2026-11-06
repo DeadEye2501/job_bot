@@ -15,6 +15,7 @@ import sqlite3
 from sqlalchemy import select
 
 from backend.repository.aggregator_resumes import resumes_of
+from tests.factories import OTHER_WORKSPACE_ID, workspace_row
 
 
 async def put(session_factory, *rows) -> None:
@@ -23,6 +24,11 @@ async def put(session_factory, *rows) -> None:
         async with session.begin():
             for row in rows:
                 session.add(row)
+
+
+async def put_other_workspace(session_factory) -> None:
+    """Положить второй, неактивный профиль — `OTHER_WORKSPACE_ID`."""
+    await put(session_factory, workspace_row(id=OTHER_WORKSPACE_ID))
 
 
 async def only_row(session_factory, model):

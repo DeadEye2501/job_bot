@@ -14,7 +14,7 @@ from datetime import datetime, time, timedelta, timezone
 from sqlalchemy import func, select
 
 from backend.models import Vacancy, VacancyStatusHistory
-from backend.repository.vacancies_common import PARSED_ONLY
+from backend.repository.vacancies_common import SHOWN_HERE
 
 
 def status_cond(statuses):
@@ -44,13 +44,13 @@ def first_transition_subq(statuses):
 
 
 def parsed_in_window(since) -> list:
-    """Условия «разобранная вакансия, заведённая в окне»; без окна — только разбор.
+    """Условия «показываемая вакансия, заведённая в окне»; без окна — только показ (`SHOWN_HERE`).
 
     Кирпич этот берут трое: дельта числа вакансий, частота технологий и
     ингест по каналам. Набранный порознь, он разъезжался бы молча — три
     числа одного экрана считались бы по трём разным множествам строк.
     """
-    conditions = [PARSED_ONLY]
+    conditions = [SHOWN_HERE]
     if since is not None:
         conditions.append(Vacancy.created_at >= since)
     return conditions

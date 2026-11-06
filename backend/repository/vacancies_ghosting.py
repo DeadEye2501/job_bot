@@ -30,6 +30,9 @@ logger = logging.getLogger(__name__)
 async def _silence_candidates(session: AsyncSession):
     """Вакансии, которым срок молчания вообще считается, с их отметками.
 
+    Только активного профиля: замороженный гаснет на первом обороте после
+    возврата в него — время молчания при этом шло.
+
     Один заход в базу вместо 1+2N: последние отметки собраны заранее
     подзапросами. Соединение внешнее потому, что у свежей вакансии может не
     быть ни писем, ни истории.
@@ -53,7 +56,10 @@ async def _silence_candidates(session: AsyncSession):
                 last_human_touch_at(),
             )
             .outerjoin(last_msg_subq, last_msg_subq.c.vid == Vacancy.id)
-            .where(Vacancy.status.in_([s for s in GHOSTING_ELIGIBLE_FROM]))
+            .where(
+                Vacancy.status.in_([s for s in GHOSTING_ELIGIBLE_FROM]),
+                Vacancy.in_active_workspace,
+            )
         )
     ).all()
 

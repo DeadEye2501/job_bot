@@ -1,6 +1,6 @@
 """Перечни HR со счётчиками."""
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models import Company, HR, Message, Vacancy
@@ -13,6 +13,7 @@ from backend.repository.paging import searched_page
 from backend.repository.search import matches_search
 from backend.repository.vacancies_common import (
     PARSED_ONLY,
+    SHOWN_HERE,
     by_vacancy_count,
     with_vacancy_counts,
 )
@@ -172,12 +173,18 @@ async def list_hrs_for_company(
 ) -> list[tuple[HR, int]]:
     """Distinct HRs that have at least one vacancy at this company, with
     the count of vacancies they brought to it. Ordered by count desc.
+
+    Люди — все, кто привёл вакансию компании в любом профиле: перечень HR
+    общий. Счёт — только по активному профилю, как в остальных числах.
     """
+    brought = select(Vacancy.hr_id).where(Vacancy.company_id == company_id, PARSED_ONLY)
     rows = (
         await session.execute(
             select(HR, func.count(Vacancy.id).label("cnt"))
-            .join(Vacancy, Vacancy.hr_id == HR.id)
-            .where(Vacancy.company_id == company_id, PARSED_ONLY)
+            .outerjoin(Vacancy, and_(
+                Vacancy.hr_id == HR.id, Vacancy.company_id == company_id, SHOWN_HERE
+            ))
+            .where(HR.id.in_(brought))
             .group_by(HR.id)
             .order_by(*by_vacancy_count(HR.name))
         )

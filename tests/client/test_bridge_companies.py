@@ -4,8 +4,8 @@
 вакансиями: там его делают из другого окна и по другому поводу.
 """
 
-from tests.dbio import put
-from tests.factories import company_row, hr_row, vacancy_row
+from tests.dbio import put, put_other_workspace
+from tests.factories import OTHER_WORKSPACE_ID, company_row, hr_row, vacancy_row
 
 
 async def test_the_list_counts_vacancies_and_marks_the_blacklisted(
@@ -152,6 +152,23 @@ async def test_only_this_company_vacancies_are_shown(api, ask, session_factory):
 
     titles = [row["title"] for row in answer["ok"]["vacancies"]]
     assert titles == ["Моя"]
+
+
+async def test_company_card_marks_foreign_vacancies(api, ask, session_factory):
+    """Вакансия чужого профиля помечена: по метке окно покажет её серой и некликабельной."""
+    company = company_row()
+    await put_other_workspace(session_factory)
+    await put(session_factory, company)
+    await put(
+        session_factory,
+        vacancy_row(title="Своя", company_id=company.id),
+        vacancy_row(title="Чужая", company_id=company.id, workspace_id=OTHER_WORKSPACE_ID),
+    )
+
+    answer = await ask(api.companies.vacancies, {"company_id": company.id})
+
+    marks = {row["title"]: row["foreign"] for row in answer["ok"]["vacancies"]}
+    assert marks == {"Своя": False, "Чужая": True}
 
 
 async def test_the_people_of_a_company_are_found_through_its_vacancies(
