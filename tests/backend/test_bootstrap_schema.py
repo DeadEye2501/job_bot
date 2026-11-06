@@ -23,6 +23,8 @@
 
 import re
 
+import pytest
+
 from alembic import command
 
 from backend.bootstrap import alembic_config, ensure_schema
@@ -130,8 +132,12 @@ def _revisions_in(paths) -> set[str]:
     return found
 
 
-def test_the_build_carries_every_revision_the_sources_can_reach():
+@pytest.mark.parametrize("spec_name", ["JobBot.spec", "JobBot-macos.spec"])
+def test_the_build_carries_every_revision_the_sources_can_reach(spec_name):
     """История миграций в сборке покрывает ту же, до которой доходят исходники.
+
+    Обе сборки, Windows и мака: список миграций у каждой спеки свой, и забытая
+    в одной ревизия роняет на старте только её.
 
     Каталог данных у сборки и у исходников один. Запуск из исходников доводит
     базу до своей последней ревизии и пишет её в `alembic_version`; собранный
@@ -147,7 +153,7 @@ def test_the_build_carries_every_revision_the_sources_can_reach():
     на свежем клоне её в `versions/` нет вовсе. Забытая в сборке новая ревизия
     краснеет всё так же — она была бы слева и не нашлась бы справа.
     """
-    spec = (ROOT / "JobBot.spec").read_text(encoding="utf-8")
+    spec = (ROOT / spec_name).read_text(encoding="utf-8")
     bundled = [
         ROOT / name
         for name in re.findall(r"'(alembic/[^']+[.]py)'", spec)
