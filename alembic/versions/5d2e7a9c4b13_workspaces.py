@@ -43,7 +43,8 @@ def _create_workspace() -> None:
     sa.Column('cv_path', sa.String(), server_default='', nullable=False),
     sa.Column('photo_path', sa.String(), server_default='', nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    sqlite_autoincrement=True,
     )
     op.create_index('uq_workspace_active', 'workspace', ['is_active'], unique=True, postgresql_where=sa.text('is_active'), sqlite_where=sa.text('is_active'))
     op.execute(

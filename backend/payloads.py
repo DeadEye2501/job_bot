@@ -415,6 +415,16 @@ class ChannelDetail:
 
 
 @dataclass(frozen=True)
+class WorkspaceRow:
+    """Профиль в перечне. `title` — должность анкеты; `None` — должности нет:
+    пустая строка или анкеты нет вовсе."""
+
+    id: int
+    title: str | None
+    is_active: bool
+
+
+@dataclass(frozen=True)
 class SeenResume:
     """Резюме, увиденное сканированием сайта. Места своего не несёт: место —
     порядок в списке, который сканирование отдаёт в порядке сайта."""

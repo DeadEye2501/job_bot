@@ -1,9 +1,14 @@
-"""Профили: какой активен, чей номер у вакансии, смена активного."""
+"""Профили: перечень, заведение, какой активен, чей номер у вакансии, смена активного.
+
+Удаление профиля живёт соседом (`workspace_removal.py`): ему нужны писатели
+вакансий и анкеты, а они сами ввозят этот модуль.
+"""
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.models import Vacancy, Workspace
+from backend.models import Profile, Vacancy, Workspace
+from backend.payloads import WorkspaceRow
 
 
 async def active_workspace(session: AsyncSession) -> Workspace:
@@ -14,6 +19,28 @@ async def active_workspace(session: AsyncSession) -> Workspace:
 async def active_workspace_id(session: AsyncSession) -> int:
     """Номер активного профиля."""
     return (await active_workspace(session)).id
+
+
+async def list_workspaces(session: AsyncSession) -> list[WorkspaceRow]:
+    """Профили по номеру, с должностью анкеты: по ней профиль и называют."""
+    rows = await session.execute(
+        select(Workspace.id, Profile.title, Workspace.is_active)
+        .outerjoin(Profile, Profile.workspace_id == Workspace.id)
+        .order_by(Workspace.id)
+    )
+    return [WorkspaceRow(id=i, title=title or None, is_active=active) for i, title, active in rows]
+
+
+async def add_workspace(session: AsyncSession, *, cv_path: str) -> int:
+    """Завести неактивный профиль с путём резюме (`""` — пути нет). Сделку держит зовущий.
+
+    Путь пишется здесь, а не разбором резюме: у копии профиля без анкеты
+    `save_parsed_cv` не зовётся, и записать путь больше некому.
+    """
+    workspace = Workspace(cv_path=cv_path)
+    session.add(workspace)
+    await session.flush()
+    return workspace.id
 
 
 async def owning_workspace_id(session: AsyncSession, vacancy_id: int | None) -> int:

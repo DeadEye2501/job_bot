@@ -351,11 +351,10 @@ def _hr_mini_row_to_dict(hr, vacancy_count: int) -> dict:
     return {**_hr_face(hr), "vacancy_count": vacancy_count}
 
 
-def _message_row_to_dict(m, foreign: bool) -> dict:
+def _message_row_to_dict(m) -> dict:
     """Письмо переписки — тем, из чего окно рисует пузырь.
 
     Вложение уезжает адресом, а не байтами: через канал байты не ходят.
-    `foreign` — письмо о вакансии не активного профиля: ссылка на неё серая.
     """
     return {
         "id": m.id,
@@ -365,7 +364,6 @@ def _message_row_to_dict(m, foreign: bool) -> dict:
         "sent_at": _iso(m.sent_at),
         "read_at": _iso(m.read_at),
         "vacancy_id": m.vacancy_id,
-        "foreign": foreign,
         "is_edited": m.is_edited,
         "is_deleted": m.is_deleted,
         "media_kind": m.media_kind,

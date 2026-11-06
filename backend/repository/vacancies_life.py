@@ -15,7 +15,7 @@
 
 import logging
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import ColumnElement, delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.hosts import row_address, vacancy_address_key
@@ -170,36 +170,39 @@ async def delete_vacancy(session: AsyncSession, vacancy_id: int) -> bool:
 
     Caller wraps in ``session.begin()``.
     """
-    vacancy = await session.get(Vacancy, vacancy_id)
-    if vacancy is None:
+    if await session.get(Vacancy, vacancy_id) is None:
         return False
-    await session.execute(
-        update(Message)
-        .where(Message.vacancy_id == vacancy_id)
-        .values(vacancy_id=None)
-    )
-    applications = select(Application.id).where(Application.vacancy_id == vacancy_id)
-    await session.execute(
-        delete(Screening).where(Screening.application_id.in_(applications))
-    )
-    await session.execute(delete(Application).where(Application.vacancy_id == vacancy_id))
-    await session.execute(
-        delete(VacancyContact).where(VacancyContact.vacancy_id == vacancy_id)
-    )
-    await session.execute(
-        delete(VacancyStatusHistory).where(
-            VacancyStatusHistory.vacancy_id == vacancy_id
-        )
-    )
-    await session.execute(
-        delete(VacancyEvent).where(VacancyEvent.vacancy_id == vacancy_id)
-    )
-    await session.delete(vacancy)
-    await session.flush()
+    await _purge_vacancies(session, Vacancy.id == vacancy_id)
     logger.info(
         "Deleted vacancy %d (msgs detached, dependent rows purged)", vacancy_id
     )
     return True
+
+
+async def delete_vacancies_of_workspace(session: AsyncSession, workspace_id: int) -> None:
+    """Удалить все вакансии профиля тем же порядком, что `delete_vacancy`. Сделку держит зовущий.
+
+    Разом, а не по одной: по одной это восемь запросов на вакансию в одной
+    сделке, и на тысячах вакансий запись в базу заперта дольше срока ожидания
+    — письмо HR, пришедшее в это время, не легло бы.
+    """
+    await _purge_vacancies(session, Vacancy.workspace_id == workspace_id)
+
+
+async def _purge_vacancies(session: AsyncSession, chosen: ColumnElement[bool]) -> None:
+    """Удалить отобранные вакансии с детьми; у писем ссылка на них снимается."""
+    ids = select(Vacancy.id).where(chosen)
+    await session.execute(
+        update(Message).where(Message.vacancy_id.in_(ids)).values(vacancy_id=None)
+    )
+    applications = select(Application.id).where(Application.vacancy_id.in_(ids))
+    await session.execute(
+        delete(Screening).where(Screening.application_id.in_(applications))
+    )
+    for child in (Application, VacancyContact, VacancyStatusHistory, VacancyEvent):
+        await session.execute(delete(child).where(child.vacancy_id.in_(ids)))
+    await session.execute(delete(Vacancy).where(chosen))
+    await session.flush()
 
 
 async def add_vacancy_event(

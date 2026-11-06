@@ -23,6 +23,10 @@ class Workspace(IdMixin, CreatedAtMixin, Base):
 
     Пустая строка пути значит «пути нет»: значение одно, а не два
     (`NULL` и `''`), чтобы его не сравнивали двумя способами.
+
+    Номер удалённого профиля не достаётся новому (`AUTOINCREMENT`): разбор
+    резюме идёт мимо места прогона и пишет в запомненный номер — с повтором
+    номера анкета удалённого профиля легла бы в новый, а не упала бы на ключе.
     """
 
     __tablename__ = "workspace"
@@ -34,6 +38,7 @@ class Workspace(IdMixin, CreatedAtMixin, Base):
             postgresql_where=text("is_active"),
             sqlite_where=text("is_active"),
         ),
+        {"sqlite_autoincrement": True},
     )
 
     is_active: Mapped[bool] = mapped_column(server_default=expression.false())

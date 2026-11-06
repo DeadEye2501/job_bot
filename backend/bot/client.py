@@ -33,6 +33,7 @@ from backend.bot import slot
 from backend.bot import turn
 from backend.bot import update
 from backend.bot import work
+from backend.bot import workspaces
 from backend.flows.pipeline import IngestionPipeline, LmProviders
 from backend.domain.apply_order import Way
 from backend.models import BotMode
@@ -286,7 +287,9 @@ class Bot:
         """Занято ли место прогона — идёт ли обход, прогон источника или разбор.
 
         Спрашивает окно: пока модель занята прогоном, оно не задаёт ей своих
-        вопросов — параллельной работы модели быть не должно.
+        вопросов — параллельной работы модели быть не должно. По нему же окно
+        показывает смену и удаление профиля запертыми: их работа идёт в том же
+        месте прогона.
         """
         task = self.current_poll_task
         return task is not None and not task.done()
@@ -416,3 +419,12 @@ class Bot:
 
     async def delete_aggregator(self, aggregator_id) -> str:
         return await aggregators.delete_aggregator(self, aggregator_id)
+
+    async def ui_create_workspace(self, way) -> int | slot.CycleOutcome:
+        return await workspaces.create(self, way)
+
+    async def ui_switch_workspace(self, workspace_id) -> bool | slot.CycleOutcome:
+        return await workspaces.switch(self, workspace_id)
+
+    async def ui_delete_workspace(self) -> str:
+        return await workspaces.delete(self)

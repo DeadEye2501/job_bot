@@ -38,6 +38,9 @@ ANSWERS = {
     "apply_all": "ok",
     "update": "ok",
     "aggregator_deleted": "ok",
+    "workspace_created": 2,
+    "workspace_switched": True,
+    "workspace_deleted": "deleted",
 }
 
 
@@ -164,3 +167,15 @@ class UiBot:
     async def delete_aggregator(self, aggregator_id: int) -> str:
         self.calls.append(("delete_aggregator", aggregator_id))
         return self.answers["aggregator_deleted"]
+
+    async def ui_create_workspace(self, way: str) -> int | str:
+        self.calls.append(("ui_create_workspace", way))
+        return self.answers["workspace_created"]
+
+    async def ui_switch_workspace(self, workspace_id: int) -> bool | str:
+        self.calls.append(("ui_switch_workspace", workspace_id))
+        return self.answers["workspace_switched"]
+
+    async def ui_delete_workspace(self) -> str:
+        self.calls.append(("ui_delete_workspace",))
+        return self.answers["workspace_deleted"]
