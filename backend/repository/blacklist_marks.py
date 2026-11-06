@@ -196,9 +196,15 @@ class BlacklistMark:
     candidates: Callable[[Any], list[str]]
 
     async def value(self, session: AsyncSession, row) -> str | None:
-        """Написание действующей отметки предмета — для чипа и запретов; None — чист."""
+        """Написание отметки предмета в активном профиле — для чипа и запретов; None — чист."""
+        return await self.value_in(session, row, ACTIVE_WORKSPACE_ID)
+
+    async def value_in(
+        self, session: AsyncSession, row, workspace_id: int | ColumnElement[int]
+    ) -> str | None:
+        """Написание отметки предмета, действующей в профиле; None — там чист."""
         return await active_blacklist_value(
-            session, self.kind, self.candidates(row), ACTIVE_WORKSPACE_ID
+            session, self.kind, self.candidates(row), workspace_id
         )
 
     async def marked(self, session: AsyncSession) -> set[str]:

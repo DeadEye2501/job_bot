@@ -128,19 +128,25 @@ async def _run_debounced_classify(pipeline, hr_id: int) -> None:
         pipeline.dm_debounce.end(current)
 
 
-async def _blacklisted_now(pipeline, hr_id: int) -> str | None:
-    """Написание, из-за которого HR числится в чёрном списке прямо сейчас.
+async def _blacklisted_now(pipeline, hr_id: int, vacancy_id: int) -> str | None:
+    """Написание, из-за которого HR числится в чёрном списке профиля вакансии
+    прямо сейчас.
 
     Спрашивается заново: человек мог попасть в список между приходом
     письма и сроком разбора. Входящие от него в копилку уже не ложатся, но
-    накопленный до этого пакет разбирать тоже незачем.
+    накопленный до этого пакет разбирать тоже незачем. Профиль — вакансии, а
+    не активный: тем же правилом письмо пускали в копилку (`flows/dm.py`).
     """
     from backend.models import HR
-    from backend.repository.hr_card import hr_blacklist_value
+    from backend.repository.hr_card import hr_blacklist_value_in
 
     async with pipeline.session_factory() as session:
         hr_row = await session.get(HR, hr_id)
-        return await hr_blacklist_value(session, hr_row) if hr_row else None
+        if hr_row is None:
+            return None
+        return await hr_blacklist_value_in(
+            session, hr_row, await owning_workspace_id(session, vacancy_id)
+        )
 
 
 async def _ask_and_apply(pipeline, hr_id: int, burst: list, target) -> None:
@@ -202,20 +208,21 @@ async def classify_and_apply_for_hr(pipeline, hr_id: int) -> None:
     пакет → apply_classification. Используется и из debounce-тика,
     и из drain-on-OFF в `cancel_pending_dm_classifications`.
     """
-    bl_value = await _blacklisted_now(pipeline, hr_id)
-    if bl_value:
-        logger.info(
-            "debounced classify: hr %d in blacklist (%s) — drop burst",
-            hr_id, bl_value,
-        )
-        pipeline.dm_debounce.drop(hr_id)
-        return
+    # Пачку забирают до проверки: отметку решает профиль вакансии её
+    # последнего письма, а отмеченному пачка уходит неразобранной.
     buf = pipeline.dm_debounce.take(hr_id)
     if not buf:
         return
     last = buf[-1]
     vacancy_id = last["vacancy_id"]
     msg_id = last["msg_id"]
+    bl_value = await _blacklisted_now(pipeline, hr_id, vacancy_id)
+    if bl_value:
+        logger.info(
+            "debounced classify: hr %d in blacklist (%s) — drop burst",
+            hr_id, bl_value,
+        )
+        return
     # Срезаем здесь, а не полагаемся на `should_apply_status` внутри
     # `apply_classification`: тот отобьёт вердикт уже после обращения к
     # модели, то есть заплатив за него.

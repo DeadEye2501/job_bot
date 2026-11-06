@@ -25,7 +25,7 @@ def _outlasts_the_wait(started: asyncio.Event):
     """
 
     async def reading(pipeline, hr_id):
-        pipeline.dm_debounce.drop(hr_id)
+        pipeline.dm_debounce.take(hr_id)
         started.set()
         await asyncio.Event().wait()
 

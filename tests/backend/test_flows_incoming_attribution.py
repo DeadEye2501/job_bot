@@ -18,9 +18,10 @@ from backend.models import HR, Message, Vacancy, VacancyStatus
 from backend.payloads import Classification, PendingReply
 from backend.repository.messages import save_incoming_message
 from backend.repository.vacancies_life import delete_vacancy
-from tests.dbio import all_rows, only_row, put
+from tests.dbio import all_rows, only_row, put, their_letters
 from tests.factories import at, hr_row, message_row, vacancy_row
-from tests.fakes.telegram_objects import TG_EPOCH, incoming, message, user
+from tests.fakes.telegram import FakeTelegramClient
+from tests.fakes.telegram_objects import TG_EPOCH, incoming, message, photo, user
 
 
 async def _two_vacancies(session_factory):
@@ -85,11 +86,6 @@ async def _one_vacancy(session_factory, *, title, status):
     return hr, vacancy
 
 
-async def _their_letters(session_factory) -> list:
-    """Письма HR из переписки: наши лежат там же, и читать надо не их."""
-    return [m for m in await all_rows(session_factory, Message) if m.is_incoming]
-
-
 def _ignore(*args):
     """Накопитель, которому всё равно.
 
@@ -110,7 +106,7 @@ async def test_a_reply_lands_on_the_vacancy_it_answers(session_factory, deliver)
         incoming(text="да, давайте", reply_to_message_id=100), schedule=_ignore
     )
 
-    saved = await _their_letters(session_factory)
+    saved = await their_letters(session_factory)
     assert [m.vacancy_id for m in saved] == [by_title["прежняя"].id]
 
 
@@ -126,7 +122,7 @@ async def test_a_letter_without_a_reply_lands_on_what_we_wrote_about(
 
     await deliver(incoming(text="да, давайте"), schedule=_ignore)
 
-    saved = await _their_letters(session_factory)
+    saved = await their_letters(session_factory)
     assert [m.vacancy_id for m in saved] == [by_title["последняя"].id]
 
 
@@ -150,7 +146,7 @@ async def test_the_letter_time_is_read_in_our_scale(session_factory, deliver):
 
     await deliver(incoming(text="да, давайте", date=stamped), schedule=_ignore)
 
-    saved = await _their_letters(session_factory)
+    saved = await their_letters(session_factory)
     assert [m.vacancy_id for m in saved] == [by_title["прежняя"].id]
 
 
@@ -168,7 +164,7 @@ async def test_a_reply_to_something_unknown_falls_back_to_what_we_wrote_about(
         incoming(text="да, давайте", reply_to_message_id=999), schedule=_ignore
     )
 
-    saved = await _their_letters(session_factory)
+    saved = await their_letters(session_factory)
     assert [m.vacancy_id for m in saved] == [by_title["последняя"].id]
 
 
@@ -191,7 +187,7 @@ async def test_a_letter_from_an_hr_we_never_wrote_to_lands_without_a_vacancy(
 
     await deliver(incoming(text="да, давайте"), schedule=_ignore)
 
-    saved = await _their_letters(session_factory)
+    saved = await their_letters(session_factory)
     assert [m.vacancy_id for m in saved] == [None]
 
 
@@ -268,7 +264,7 @@ async def test_a_letter_about_a_new_vacancy_reaches_no_reader(
     )
 
     assert scheduled == []
-    saved = await _their_letters(session_factory)
+    saved = await their_letters(session_factory)
     assert [m.text for m in saved] == ["здравствуйте, вы откликались?"]
 
 
@@ -289,7 +285,7 @@ async def test_a_vacancy_beyond_automation_reaches_no_reader(session_factory, de
     )
 
     assert scheduled == []
-    saved = await _their_letters(session_factory)
+    saved = await their_letters(session_factory)
     assert [m.text for m in saved] == ["да, давайте"]
 
 
@@ -323,12 +319,38 @@ async def test_a_letter_about_a_vanished_vacancy_does_not_break_the_intake(
     with caplog.at_level(logging.INFO, logger="backend.flows.dm"):
         await deliver(incoming(text="да, давайте"), schedule=None)
 
-    saved = await _their_letters(session_factory)
+    saved = await their_letters(session_factory)
     assert [m.text for m in saved] == ["да, давайте"]
     assert await all_rows(session_factory, Vacancy) == []
     assert [
         rec.getMessage() for rec in caplog.records if rec.name == "backend.flows.dm"
     ] == [f"vacancy {vacancy.id}: status=gone closed for auto, skip classification"]
+
+
+async def test_a_vacancy_deleted_while_the_attachment_downloads_keeps_the_letter(
+    session_factory, deliver
+):
+    """Письмо по вакансии, удалённой, пока качалось вложение, ложится без неё.
+
+    Вакансию привязывают до скачивания: по её профилю решается чёрный список,
+    а качать файл от того, кого слушать не велено, незачем. Внешний ключ
+    строку с пропавшей вакансией не пустит, и письмо потерялось бы целиком.
+    """
+    _, vacancy = await _one_vacancy(
+        session_factory, title="к отклику", status=VacancyStatus.APPLIED
+    )
+    client = FakeTelegramClient()
+
+    async def lose_the_vacancy(_file_name):
+        async with session_factory() as other, other.begin():
+            await delete_vacancy(other, vacancy.id)
+
+    client.on_download = lose_the_vacancy
+
+    await deliver(incoming(text="вот резюме", photo=photo()), client=client)
+
+    saved = await their_letters(session_factory)
+    assert [(m.text, m.vacancy_id) for m in saved] == [("вот резюме", None)]
 
 
 async def test_without_a_buffer_the_letter_is_read_on_the_spot(session_factory, monkeypatch, deliver):
@@ -407,6 +429,6 @@ async def test_the_quote_of_our_own_letter_does_not_go_to_the_reader(session_fac
 
     await deliver(quoted, schedule=lambda *a: scheduled.append(a))
 
-    saved = await _their_letters(session_factory)
+    saved = await their_letters(session_factory)
     assert saved[0].text.startswith("↪ Откликаюсь на вакансию")
     assert scheduled[0][1].text == "да, давайте"
