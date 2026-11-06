@@ -58,7 +58,7 @@ describe('отклик из карточки', () => {
     const { asked } = screen([MAIL]);
     await respond();
 
-    expect(document.querySelector('.way-row')).toBeNull();
+    expect(document.querySelector('.choose-row')).toBeNull();
     expect(sent(asked)).toEqual([
       ['vacancies.apply_via', { vacancy_id: 7, method: 'email', target: 'hr@example.com' }],
     ]);
@@ -85,7 +85,7 @@ describe('отклик из карточки', () => {
     const { asked } = screen([TG, FORM, MAIL]);
     await respond();
 
-    const rows = document.querySelectorAll('.way-row');
+    const rows = document.querySelectorAll('.choose-row');
     expect(rows).toHaveLength(3);
     expect(sent(asked)).toEqual([]);
 
@@ -97,7 +97,7 @@ describe('отклик из карточки', () => {
     expect(sent(asked)).toEqual([
       ['vacancies.apply_via', { vacancy_id: 7, method: 'email', target: 'hr@example.com' }],
     ]);
-    expect(document.querySelector('.way-row')).toBeNull();
+    expect(document.querySelector('.choose-row')).toBeNull();
   });
 
   it('пока ничего не выбрано, подтверждать нечего', async () => {
@@ -128,7 +128,7 @@ describe('отклик из карточки', () => {
   it('окно, открытое до обхода, запирает подтверждение, когда обход начался', async () => {
     const { asked } = screen([TG, FORM, MAIL]);
     await respond();
-    document.querySelectorAll('.way-row')[2].click();
+    document.querySelectorAll('.choose-row')[2].click();
     flushSync();
 
     roundGoes();

@@ -7,7 +7,8 @@
   // оценка, на другом — положение дел.
   //
   // Строка нажимается и уводит к самой вакансии: из карточки канала смотрят,
-  // что он приносит, и тут же открывают принесённое.
+  // что он приносит, и тут же открывают принесённое. Вакансия другого профиля
+  // не открывается: её карточка живёт в том профиле, а не в этом.
   import MiniList from './MiniList.svelte';
   import { UNNAMED } from '$state/unnamed.js';
   import { shortAgo } from '$state/vacancies.js';
@@ -21,6 +22,7 @@
   {loading}
   listClass="vacs-mini"
   rowClass="vac-mini-row"
+  offTip={(one) => (one.foreign ? 'Вакансия другого профиля' : '')}
   {onpick}
 >
   {#snippet row(one)}

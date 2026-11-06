@@ -45,7 +45,7 @@ export function actionBlocks(card, lockedTip, running) {
  * и `way` у каждой строки — то, что мост ждёт обратно в `vacancies.apply_via`.
  */
 export function applyChoices(found) {
-  return found.ways.map((way) => ({ key: `${way.method} ${way.target}`, contact: way.target, way }));
+  return found.ways.map((way) => ({ key: `${way.method} ${way.target}`, label: way.target, way }));
 }
 
 export const NO_WAYS = 'Откликнуться некуда: нет доступных способов';

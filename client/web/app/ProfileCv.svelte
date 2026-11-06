@@ -14,6 +14,7 @@
   import PhotoCropDialog from '$components/PhotoCropDialog.svelte';
   import PhotoFrame from '$components/PhotoFrame.svelte';
   import ProfilePerson from '$components/ProfilePerson.svelte';
+  import { afterPick } from '$state/after_pick.js';
   import { living } from '$state/alive.js';
   import { autosave } from '$state/autosave.js';
   import { saveKey } from '$state/keys.js';
@@ -28,6 +29,9 @@
     profileSheet,
     updatedNote,
   } from '$state/profile.js';
+
+  import CvUpload from './CvUpload.svelte';
+  import WorkspaceSwitch from './WorkspaceSwitch.svelte';
 
   // Пауза перед записью набранного. Короче — и мост получает вопрос на каждое
   // слово, длиннее — и человек успевает уйти с вкладки, не дождавшись записи.
@@ -169,22 +173,6 @@
     return save();
   }
 
-  /** Выбрать другой файл резюме.
-   *
-   * Путь спрашивает мост диалогом самого окна: браузер отдаёт выбранный файл
-   * содержимым, а не путём, — а отклику нужен именно путь.
-   */
-  function replaceCv() {
-    return afterPick(ask('profile.pick'), refresh);
-  }
-
-  /** Дождаться выбора файла и сделать следующее; закрытый диалог не меняет ничего. */
-  async function afterPick(picking, next) {
-    const answer = await picking;
-    if (answer === null || !alive.now || answer.cancelled) return;
-    await next(answer);
-  }
-
   async function openCv() {
     await ask('profile.open');
   }
@@ -192,7 +180,7 @@
   /** Выбрать фото: файл спрашивает мост диалогом окна, а нужную часть снимка
    *  вырезают в окне обрезки под пропорцию рамки. */
   function pickPhoto(ratio) {
-    return afterPick(ask('profile.pick_photo'), (answer) => {
+    return afterPick(ask('profile.pick_photo'), alive, (answer) => {
       cropping = { image: answer.image, ratio };
     });
   }
@@ -218,7 +206,10 @@
 {:else}
   <div class="page-head">
     <div class="page-title">Профиль / CV</div>
-    <div class="updated-ts">{updatedNote(form.updated_at)}</div>
+    <div class="page-head-side">
+      <div class="updated-ts">{updatedNote(form.updated_at)}</div>
+      <WorkspaceSwitch {ask} onswitched={refresh} />
+    </div>
   </div>
 
   {#snippet field(one)}
@@ -280,7 +271,7 @@
   <div class="form-grid cv-line">
     <CvFileRow {meta}>
       {#snippet actions()}
-        <button class="btn" type="button" onclick={replaceCv}>Заменить</button>
+        <CvUpload {ask} onchanged={refresh} />
         <button class="btn" type="button" disabled={!cvOpenable(meta)} onclick={openCv}>
           Открыть
         </button>

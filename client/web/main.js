@@ -78,7 +78,7 @@ import './styles/resume-list.css';
 import './styles/chat.css';
 import './styles/channel-stats.css';
 import './styles/address-dialog.css';
-import './styles/apply-ways.css';
+import './styles/choose-dialog.css';
 import './styles/login-mark.css';
 import './styles/blacklist.css';
 import './styles/blacklist-dialog.css';

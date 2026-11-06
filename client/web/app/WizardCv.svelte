@@ -11,12 +11,10 @@
   import CvFileRow from '$components/CvFileRow.svelte';
   import WizardFoot from '$components/WizardFoot.svelte';
   import WizardStatus from '$components/WizardStatus.svelte';
+  import { PARSE_CV } from '$state/cv_ways.js';
   import { cvModes, cvReady } from '$state/wizard.js';
 
   let { ask, busy, onback, onnext } = $props();
-
-  // Метка вести разбора резюме: её ставит мост, по ней шаг ждёт свою весть.
-  const PARSE_CV = 'parse_cv';
 
   const MODES = cvModes();
 

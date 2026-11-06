@@ -5,7 +5,7 @@
   // Стоит правой панелью рядом со списком: вакансию читают, не теряя из виду
   // соседние, — рядом с ними и решают, стоит ли она отклика.
 
-  import ApplyWaysDialog from '$components/ApplyWaysDialog.svelte';
+  import ChooseDialog from '$components/ChooseDialog.svelte';
   import Avatar from '$components/Avatar.svelte';
   import ConfirmDialog from '$components/ConfirmDialog.svelte';
   import NotesField from '$components/NotesField.svelte';
@@ -412,7 +412,9 @@
 {/if}
 
 {#if choosing !== null}
-  <ApplyWaysDialog
+  <ChooseDialog
+    icon="send"
+    title="Куда откликнуться"
     rows={choosing}
     locked={blocks.send}
     onapply={send}
