@@ -5,6 +5,7 @@
 // проверить, не подменяя часы всей странице.
 
 import { dayOf } from './dates.js';
+import { appLocale } from './language.js';
 import { GRADES } from './profile.js';
 import { matching } from './search.js';
 
@@ -180,7 +181,7 @@ export function activeCount(filter) {
  *  пяти строк. У каналов потолка нет — их десятки. */
 export const COMPANY_MAX = 80;
 
-/** Имена для выбора: просеянные поиском, выстроенные по-русски и обрезанные
+/** Имена для выбора: просеянные поиском, выстроенные по языку приложения и обрезанные
  *  потолком, если его назвали.
  *
  * Мост отдаёт их в порядке базы — по кодам букв «ё» и строчные уехали бы в
@@ -188,6 +189,6 @@ export const COMPANY_MAX = 80;
  */
 export function pickNames(names, search, limit = names.length) {
   return [...matching(names, search)]
-    .sort((one, other) => one.localeCompare(other, 'ru'))
+    .sort(new Intl.Collator(appLocale()).compare)
     .slice(0, limit);
 }

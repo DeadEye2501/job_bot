@@ -6,8 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.models import CoverLetter
 from backend.repository.workspaces import active_workspace_id
 
-LETTER_FIELDS = ("ru", "ru_short", "en", "en_short")
-"""Четыре письма: полное и короткое, по-русски и по-английски."""
+LETTER_FIELDS = ("app", "app_short", "en", "en_short")
+"""Четыре письма: полное и короткое, на языке приложения и по-английски."""
 
 
 async def get_letters(session: AsyncSession) -> CoverLetter | None:

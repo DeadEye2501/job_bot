@@ -24,8 +24,8 @@ def upgrade() -> None:
     op.add_column('profile', sa.Column('linkedin_url', sa.String(), nullable=True))
     op.create_table('cover_letter',
     sa.Column('workspace_id', sa.Integer(), nullable=False),
-    sa.Column('ru', sa.String(), nullable=True),
-    sa.Column('ru_short', sa.String(), nullable=True),
+    sa.Column('app', sa.String(), nullable=True),
+    sa.Column('app_short', sa.String(), nullable=True),
     sa.Column('en', sa.String(), nullable=True),
     sa.Column('en_short', sa.String(), nullable=True),
     sa.ForeignKeyConstraint(['workspace_id'], ['workspace.id'], ondelete='CASCADE'),

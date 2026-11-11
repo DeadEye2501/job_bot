@@ -7,6 +7,7 @@ import { WEEKDAYS } from './calendar.js';
 import { channelName } from './channels.js';
 import { fillPercent } from './chosen.js';
 import { dayIso } from './dates.js';
+import { appLocale } from './language.js';
 import { blankFilter } from './vacancy_filter.js';
 
 /** Сроки, за которые считают, — от короткого к длинному.
@@ -155,13 +156,14 @@ const SOURCE_ROW = {
  * по кодам символов заглавные встали бы впереди строчных.
  */
 export function sourceRows(channels) {
+  const order = new Intl.Collator(appLocale(), { sensitivity: 'base' });
   return channels
     .map((one) => ({
       ...one,
       key: `${one.kind}:${one.id ?? one.aggregator_id ?? ''}`,
       ...SOURCE_ROW[one.kind](one),
     }))
-    .sort((a, b) => b.total - a.total || a.label.localeCompare(b.label, 'ru', { sensitivity: 'base' }));
+    .sort((a, b) => b.total - a.total || order.compare(a.label, b.label));
 }
 
 /** Конверсия канала: подпись и доля для полоски-метра.

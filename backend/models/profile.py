@@ -82,7 +82,7 @@ class Profile(IdMixin, UpdatedAtMixin, Base):
 
 
 class CoverLetter(Base):
-    """Сопроводительные письма профиля: полное и короткое, по-русски и по-английски.
+    """Сопроводительные письма профиля: полное и короткое, на языке приложения и по-английски.
 
     Строка своя, а не колонки анкеты: разбор резюме стирает анкету и пишет её
     заново, а писем модель не приносит; анкету к тому же не завести без имени
@@ -94,8 +94,8 @@ class CoverLetter(Base):
     workspace_id: Mapped[int] = mapped_column(
         ForeignKey("workspace.id", ondelete="CASCADE"), primary_key=True
     )
-    ru: Mapped[str | None]
-    ru_short: Mapped[str | None]
+    app: Mapped[str | None]
+    app_short: Mapped[str | None]
     en: Mapped[str | None]
     en_short: Mapped[str | None]
 

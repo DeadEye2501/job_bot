@@ -92,7 +92,7 @@ async def test_after_two_rejections_the_model_is_not_asked_again(make_pipeline, 
 
 
 async def _ready(session_factory) -> None:
-    await put(session_factory, CoverLetter(workspace_id=TEST_WORKSPACE_ID, ru="Полное письмо", ru_short="Кратко"))
+    await put(session_factory, CoverLetter(workspace_id=TEST_WORKSPACE_ID, app="Полное письмо", app_short="Кратко"))
 
 
 async def test_a_ready_letter_goes_instead_of_the_apps_one(make_pipeline, session_factory):

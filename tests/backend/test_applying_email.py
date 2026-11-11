@@ -113,7 +113,7 @@ async def test_the_letter_needs_no_agent(mail_case):
 
 
 async def _ready_letters(kit, vacancy, **letters) -> None:
-    """Готовые письма человека, русская вакансия и модель, причёсывающая её название."""
+    """Готовые письма человека, вакансия на языке приложения и модель, причёсывающая её название."""
     await put(kit.pipeline.session_factory, CoverLetter(workspace_id=TEST_WORKSPACE_ID, **letters))
     async with kit.pipeline.session_factory() as session:
         row = await session.get(Vacancy, vacancy.id)
@@ -124,7 +124,7 @@ async def _ready_letters(kit, vacancy, **letters) -> None:
 
 async def test_a_ready_full_letter_goes_with_a_subject_from_the_template(mail_case):
     kit, vacancy, outbox = await mail_case()
-    await _ready_letters(kit, vacancy, ru="Полное письмо", ru_short="Короткое")
+    await _ready_letters(kit, vacancy, app="Полное письмо", app_short="Короткое")
 
     assert await via_email(kit, vacancy.id, MAIL) == "applied"
 
@@ -135,7 +135,7 @@ async def test_a_ready_full_letter_goes_with_a_subject_from_the_template(mail_ca
 
 async def test_without_a_full_letter_the_short_one_goes(mail_case):
     kit, vacancy, outbox = await mail_case()
-    await _ready_letters(kit, vacancy, ru_short="Короткое")
+    await _ready_letters(kit, vacancy, app_short="Короткое")
 
     await via_email(kit, vacancy.id, MAIL)
 
@@ -145,7 +145,7 @@ async def test_without_a_full_letter_the_short_one_goes(mail_case):
 async def test_a_ready_letter_does_not_gather_the_profile_for_the_model(mail_case, monkeypatch):
     """Письмо уже есть: анкета для модели не собирается."""
     kit, vacancy, outbox = await mail_case()
-    await _ready_letters(kit, vacancy, ru="Полное письмо")
+    await _ready_letters(kit, vacancy, app="Полное письмо")
 
     async def gathered(*args):
         raise AssertionError("анкета для модели собрана")
@@ -157,7 +157,7 @@ async def test_a_ready_letter_does_not_gather_the_profile_for_the_model(mail_cas
 
 async def test_a_deleted_vacancy_with_a_ready_letter_is_gone(mail_case):
     kit, vacancy, outbox = await mail_case()
-    await _ready_letters(kit, vacancy, ru="Полное письмо")
+    await _ready_letters(kit, vacancy, app="Полное письмо")
     async with kit.pipeline.session_factory() as session, session.begin():
         await delete_vacancy(session, vacancy.id)
 

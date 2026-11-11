@@ -152,7 +152,7 @@ async def test_the_letter_is_delivered_to_the_hr_account_and_kept_in_the_chat(te
 
 
 async def _ready_letters(kit, vacancy, **letters) -> None:
-    """Готовые письма человека и русская вакансия."""
+    """Готовые письма человека и вакансия на языке приложения."""
     await put(kit.pipeline.session_factory, CoverLetter(workspace_id=TEST_WORKSPACE_ID, **letters))
     async with kit.pipeline.session_factory() as session:
         (await session.get(Vacancy, vacancy.id)).language = "Русский"
@@ -161,7 +161,7 @@ async def _ready_letters(kit, vacancy, **letters) -> None:
 
 async def test_a_ready_short_letter_goes_with_the_resume_instead_of_the_model_one(telegram_case):
     kit, vacancy, sent = await telegram_case()
-    await _ready_letters(kit, vacancy, ru="Полное письмо", ru_short="Короткое письмо")
+    await _ready_letters(kit, vacancy, app="Полное письмо", app_short="Короткое письмо")
 
     assert await via_telegram(kit, vacancy.id, TG) == "applied"
 
@@ -171,7 +171,7 @@ async def test_a_ready_short_letter_goes_with_the_resume_instead_of_the_model_on
 
 async def test_a_ready_letter_to_an_hr_written_before_still_goes_with_the_resume(telegram_case):
     kit, vacancy, sent = await telegram_case(prior_letter=True)
-    await _ready_letters(kit, vacancy, ru_short="Короткое письмо")
+    await _ready_letters(kit, vacancy, app_short="Короткое письмо")
 
     await via_telegram(kit, vacancy.id, TG)
 
@@ -181,7 +181,7 @@ async def test_a_ready_letter_to_an_hr_written_before_still_goes_with_the_resume
 
 async def test_a_ready_letter_too_long_for_a_caption_leaves_the_letter_to_the_model(telegram_case):
     kit, vacancy, sent = await telegram_case()
-    await _ready_letters(kit, vacancy, ru_short="а" * 1025)
+    await _ready_letters(kit, vacancy, app_short="а" * 1025)
 
     await via_telegram(kit, vacancy.id, TG)
 
@@ -191,7 +191,7 @@ async def test_a_ready_letter_too_long_for_a_caption_leaves_the_letter_to_the_mo
 
 async def test_a_ready_letter_goes_without_the_resume_when_there_is_none(telegram_case):
     kit, vacancy, sent = await telegram_case(resume=False)
-    await _ready_letters(kit, vacancy, ru_short="Короткое письмо")
+    await _ready_letters(kit, vacancy, app_short="Короткое письмо")
 
     assert await via_telegram(kit, vacancy.id, TG) == "applied"
 

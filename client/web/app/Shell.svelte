@@ -14,6 +14,7 @@
   import { living } from '$state/alive.js';
   import { hearAwaited } from '$state/awaited.svelte.js';
   import { blockedTip } from '$state/health.js';
+  import { holdLocale } from '$state/language.js';
   import { hearRound } from '$state/round.svelte.js';
   import { settleHandMade } from '$state/new_vacancy.js';
   import BottomBar from './BottomBar.svelte';
@@ -76,6 +77,7 @@
 
   let plaqueTimer = null;
   let setupClock = null;
+  let localeHeld = false;
   const alive = living();
 
   /** Сказать человеку о беде. Плашка одна: вторая беда сменяет первую, а не
@@ -107,17 +109,29 @@
     }
   }
 
-  /** Спросить, пройдена ли первая настройка.
+  /** Спросить язык приложения и пройдена ли первая настройка.
    *
    * Спрашивается один раз при подъёме окна: отметку ставит сам мастер, и
-   * второй раз она за жизнь окна не меняется.
+   * второй раз она за жизнь окна не меняется. Язык — тем же заходом: до
+   * ответа окно показывает только «Загрузка…», и ни один перечень не
+   * сортируется без языка.
    */
   async function askSetup() {
-    const now = await ask('wizard.state');
+    // Порознь и разом: язык не меняется за жизнь окна, и пришедший однажды
+    // не переспрашивается, пока переспрашивается отметка мастера.
+    const [language, now] = await Promise.all([
+      localeHeld ? null : ask('system.language'),
+      ask('wizard.state'),
+    ]);
+    if (language !== null) {
+      holdLocale(language.locale);
+      document.documentElement.lang = language.locale;
+      localeHeld = true;
+    }
     // Отказ не считается ответом: сочти мы его за «настройка пройдена», мастер
-    // спрятался бы навсегда, а приложение открылось бы пустым. Спросим снова с
-    // ближайшим ударом своих часов.
-    if (now === null) return;
+    // спрятался бы навсегда, а приложение открылось бы пустым; без языка
+    // перечни не отсортировать. Спросим снова с ближайшим ударом своих часов.
+    if (!localeHeld || now === null) return;
     setup = now;
     clearInterval(setupClock);
   }

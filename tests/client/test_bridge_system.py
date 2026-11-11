@@ -12,6 +12,7 @@ import httpx
 import pytest
 
 from backend.app_version import VERSION
+from backend.domain.language_choice import APP_LOCALE
 from backend.models import VacancyStatus
 from tests.fakes.github_release import release_answer, serve_latest
 from tests.dbio import put
@@ -51,6 +52,11 @@ async def test_the_first_request_brings_the_whole_snapshot(api, ask):
     assert snapshot["health"]["db"] is True
     assert snapshot["unread"]["count"] == 0
     assert snapshot["mode"] == "Off"
+
+
+async def test_the_window_gets_the_app_language_from_the_backend(api, ask):
+    """Своего языка окно не держит: код приходит отсюда."""
+    assert (await ask(api.system.language))["ok"] == {"locale": APP_LOCALE}
 
 
 async def test_the_version_comes_with_whether_this_copy_can_update(api, ask, monkeypatch):

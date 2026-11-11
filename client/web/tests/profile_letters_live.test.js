@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 //
-// Вкладка Letters: четыре письма профиля — русская пара над чертой, английская
+// Вкладка Letters: четыре письма профиля — пара на языке приложения над чертой, английская
 // под ней — и запись набранного.
 
 import { cleanup, render, screen } from '@testing-library/svelte';
@@ -34,7 +34,7 @@ function letters(stored, shortMax = 1024) {
   return asked;
 }
 
-const EMPTY = { ru: null, ru_short: null, en: null, en_short: null };
+const EMPTY = { app: null, app_short: null, en: null, en_short: null };
 
 function typeInto(field, text) {
   field.value = text;
@@ -51,8 +51,8 @@ describe('вкладка Letters', () => {
     expect(tabs.slice(0, 3)).toEqual(['CV', 'Letters', 'Skills']);
   });
 
-  it('показывает записанные письма: русская пара над чертой, английская под ней', async () => {
-    letters({ ru: 'Здравствуйте', ru_short: 'Коротко', en: 'Hello', en_short: null });
+  it('показывает записанные письма: пара на языке приложения над чертой, английская под ней', async () => {
+    letters({ app: 'Здравствуйте', app_short: 'Коротко', en: 'Hello', en_short: null });
     await vi.waitFor(() => screen.getByPlaceholderText('Full cover letter'));
 
     const order = [...document.querySelector('.letters').children].map(
@@ -69,15 +69,15 @@ describe('вкладка Letters', () => {
   });
 
   it('набранное уезжает на мост всеми четырьмя письмами', async () => {
-    const asked = letters({ ...EMPTY, ru: 'Здравствуйте' });
+    const asked = letters({ ...EMPTY, app: 'Здравствуйте' });
     await vi.waitFor(() => screen.getByPlaceholderText('Short cover letter'));
 
     typeInto(screen.getByPlaceholderText('Short cover letter'), 'Short');
     await settled();
 
     expect(asked.filter(([method]) => method === 'profile.save_letters').at(-1)[1]).toEqual({
-      ru: 'Здравствуйте',
-      ru_short: '',
+      app: 'Здравствуйте',
+      app_short: '',
       en: '',
       en_short: 'Short',
     });

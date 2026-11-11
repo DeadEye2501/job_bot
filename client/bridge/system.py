@@ -20,6 +20,7 @@ from functools import partial
 
 from adapters import lm_models
 from backend import health
+from backend.domain.language_choice import APP_LOCALE
 from backend.flows.handover import new_to_apply
 from backend.models import BotMode
 from backend.repository.bot_mode import read_mode, write_mode
@@ -82,6 +83,11 @@ class System(Journal, Wipe, Desktop, AppUpdate):
         self._models_in_flight = False
         self._timing = False
         self._open_journal()
+
+    def language(self) -> dict:
+        """Язык приложения кодом: окно своего не держит, а берёт этот —
+        задан он в одном месте, `APP_LOCALE`."""
+        return {"ok": {"locale": APP_LOCALE}}
 
     def initial(self) -> dict:
         """Всё, что нижняя полоса показывает всегда, — одним ответом.

@@ -14,7 +14,6 @@ from backend.agent.tools_letter import letter_ask
 from backend.applying.resume_link import resume_for_letter
 from backend.applying.result import GONE, Dropped, Missed, Outcome, delivered
 from backend.domain.apply_order import Way
-from backend.domain.language_choice import is_russian
 from backend.domain.letter_choice import ready_letter
 from backend.llm.agent_letter import Letter, write_letter
 from backend.llm.letter_subject import letter_subject
@@ -74,7 +73,7 @@ async def _ready(kit: AgentKit, vacancy_id: int, language: str) -> Letter | None
     if vacancy is None:
         return None
     pipeline = kit.pipeline
-    subject = await letter_subject(vacancy.title or "", is_russian(language), pipeline.lm_client,
+    subject = await letter_subject(vacancy.title or "", language, pipeline.lm_client,
                                    pipeline.lm_chat_model)
     return Letter(subject, body)
 

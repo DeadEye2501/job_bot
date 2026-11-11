@@ -103,7 +103,7 @@ async def _source(session_factory, cv_path: str = "C:/cv.pdf") -> int:
     (MEDIA_DIR / "profile" / "1" / "photo.jpg").write_bytes(PHOTO)
     await _set_paths(session_factory, cv_path, "profile/1/photo.jpg")
     await put(session_factory, CoverLetter(
-        workspace_id=TEST_WORKSPACE_ID, ru="Здравствуйте", ru_short="Коротко",
+        workspace_id=TEST_WORKSPACE_ID, app="Здравствуйте", app_short="Коротко",
         en="Hello", en_short="Short",
     ))
     return resume.id
@@ -113,7 +113,7 @@ async def _letters(session_factory, workspace_id: int) -> tuple | None:
     """Письма профиля четвёркой; строки писем нет — пусто."""
     async with session_factory() as session:
         row = await session.get(CoverLetter, workspace_id)
-    return None if row is None else (row.ru, row.ru_short, row.en, row.en_short)
+    return None if row is None else (row.app, row.app_short, row.en, row.en_short)
 
 
 async def _workspace(session_factory, workspace_id: int) -> Workspace | None:

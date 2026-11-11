@@ -15,6 +15,38 @@ from backend.domain.taxonomy import CEFR_LEVELS, LEVEL_REQUIRED_WHEN_UNTOLD, NAT
 FALLBACK_LANGUAGE = "English"
 """Язык человека, у которого в анкете нет родного."""
 
+INTERNATIONAL_LANGUAGE = "English"
+"""Язык готового письма к отклику не на языке приложения.
+
+Значение то же, что у `FALLBACK_LANGUAGE`, но правило другое: язык человека
+без родного и язык второй пары писем меняются порознь, и одна константа на оба
+незаметно меняла бы второе вместе с первым."""
+
+
+@dataclass(frozen=True)
+class _AppLanguage:
+    """Язык, на котором может работать приложение.
+
+    `starts` и `codes` — как его называют: язык поста назван на нём самом, а
+    язык анкеты человек вписывает своими словами — «Русский», «русский язык»,
+    «Russian», «RU».
+    """
+
+    name: str
+    starts: tuple[str, ...]
+    codes: tuple[str, ...]
+
+
+_APP_LANGUAGES = {"ru": _AppLanguage("Русский", ("русск", "russ"), ("ru", "rus"))}
+
+APP_LOCALE = "ru"
+"""Язык приложения кодом — единственное место, где он задан: бэкенд берёт его
+отсюда, окно получает через мост. Выбора пока нет. Кода без записи в
+`_APP_LANGUAGES` приложение не примет и не запустится."""
+
+APP_LANGUAGE = _APP_LANGUAGES[APP_LOCALE].name
+"""Язык приложения названием — так его видят промпты и выбор готового письма."""
+
 
 @dataclass(frozen=True)
 class CandidateLanguage:
@@ -46,17 +78,18 @@ def search_languages(languages: Iterable[CandidateLanguage]) -> list[str]:
     return [lang.name for lang in languages if lang.level in usable] or [person_language(languages)]
 
 
-_RUSSIAN_STARTS = ("русск", "russ")
-_RUSSIAN_CODES = ("ru", "rus")
-"""Имена русского языка: язык поста назван на нём самом, а язык анкеты человек
-вписывает своими словами — «Русский», «русский язык», «Russian», «RU»."""
-
-
-def is_russian(language: str) -> bool:
-    """Русский ли язык отклика. Готовых писем две пары — русская и английская,
-    — и всякий не русский отклик получает английскую: это язык международный."""
+def in_app_language(language: str) -> bool:
+    """На языке ли приложения `language` — названный любым из его имён."""
+    app = _APP_LANGUAGES[APP_LOCALE]
     name = language.strip().casefold()
-    return name in _RUSSIAN_CODES or name.startswith(_RUSSIAN_STARTS)
+    return name in app.codes or name.startswith(app.starts)
+
+
+def letter_language(language: str) -> str:
+    """Язык готового письма к отклику на `language`: язык приложения, если отклик
+    на нём, иначе международный. Готовых писем две пары — на языке приложения и
+    международная."""
+    return APP_LANGUAGE if in_app_language(language) else INTERNATIONAL_LANGUAGE
 
 
 def reply_language(vacancy_language: str | None, person: str) -> str:

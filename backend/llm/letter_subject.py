@@ -10,6 +10,7 @@ import logging
 import httpx
 
 from adapters.lm_chat import CUT_BY_LIMIT, ChatRequest, chat
+from backend.domain.language_choice import APP_LANGUAGE, INTERNATIONAL_LANGUAGE, letter_language
 from backend.llm.agent_letter import short_dash
 from backend.llm.external import external_block
 from backend.llm.rules import in_reply_language
@@ -23,10 +24,16 @@ MAX_POSITION_TOKENS = 1200
 # Длиннее должность не бывает; длиннее — уже пересказ поста.
 MAX_POSITION_CHARS = 80
 
-_BARE = {True: "Отклик на вакансию", False: "Job application"}
-"""Тема без должности — по тому, русское ли письмо."""
+_TEMPLATES = {
+    "Русский": ("Отклик на вакансию", "Отклик на вакансию: {}"),
+    "English": ("Job application", "Application for {}"),
+}
+"""Шаблоны темы по имени языка: без должности и с ней."""
 
-_WITH_POSITION = {True: "Отклик на вакансию: {}", False: "Application for {}"}
+# Выбраны при загрузке, а не по ходу отклика: язык приложения без своих
+# шаблонов роняет запуск KeyError, а не отклик, уже идущий к работодателю.
+_BARE = {lang: _TEMPLATES[lang][0] for lang in (APP_LANGUAGE, INTERNATIONAL_LANGUAGE)}
+_WITH_POSITION = {lang: _TEMPLATES[lang][1] for lang in (APP_LANGUAGE, INTERNATIONAL_LANGUAGE)}
 
 POSITION_PROMPT = """Задача — назвать должность по названию вакансии так, как её пишут в теме письма-отклика: «Python-разработчик», «Senior Product Designer».
 
@@ -48,22 +55,27 @@ def _request(title: str, language: str) -> ChatRequest:
     )
 
 
-async def letter_subject(title: str, russian: bool, client: httpx.AsyncClient, model: str) -> str:
+async def letter_subject(title: str, reply_language: str, client: httpx.AsyncClient,
+                         model: str) -> str:
     """Тема письма: шаблон с должностью, а без названия или без ответа модели — шаблон без неё.
+
+    Язык темы — язык готового письма к отклику на `reply_language`
+    (`letter_language`): тема и письмо не расходятся языком.
 
     Тема без должности остаётся темой: отказывать в отклике из-за неё незачем.
 
     Кавычки и точку по краям модели случается поставить вопреки наставлению,
     а тире в теме — то же, что у темы, которую пишет модель письма.
     """
+    language = letter_language(reply_language)
     if not title.strip():
-        return _BARE[russian]
-    answer = await chat(client, model, _request(title, "Русский" if russian else "English"), logger)
+        return _BARE[language]
+    answer = await chat(client, model, _request(title, language), logger)
     position = short_dash((answer.text or "").strip(" «»\"'.").strip())
     # Оборванный на пределе ответ — обрубок должности, а не она.
     cut = answer.finish_reason == CUT_BY_LIMIT
     if cut or not position or "\n" in position or len(position) > MAX_POSITION_CHARS:
         if answer.text:
             logger.info("letter_subject: ответ модели не похож на должность: %r", answer.text[:120])
-        return _BARE[russian]
-    return _WITH_POSITION[russian].format(position)
+        return _BARE[language]
+    return _WITH_POSITION[language].format(position)
