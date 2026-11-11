@@ -20,22 +20,15 @@ def test_first_installed_wins(monkeypatch, tmp_path):
     _system, apps = _bases(monkeypatch, tmp_path)
     brave = _install(apps, "Brave Browser.app/Contents/MacOS/Brave Browser")
 
-    assert browser_macos.find_browser() == InstalledBrowser(BRAVE, None, brave)
+    assert browser_macos.find_browser() == InstalledBrowser(BRAVE, brave)
 
 
-def test_chrome_before_edge_and_channel(monkeypatch, tmp_path):
+def test_chrome_before_edge(monkeypatch, tmp_path):
     system, _apps = _bases(monkeypatch, tmp_path)
     chrome = _install(system, "Google Chrome.app/Contents/MacOS/Google Chrome")
     _install(system, "Microsoft Edge.app/Contents/MacOS/Microsoft Edge")
 
-    assert browser_macos.find_browser() == InstalledBrowser(CHROME, "chrome", chrome)
-
-
-def test_chrome_in_home_has_no_channel(monkeypatch, tmp_path):
-    _system, apps = _bases(monkeypatch, tmp_path)
-    chrome = _install(apps, "Google Chrome.app/Contents/MacOS/Google Chrome")
-
-    assert browser_macos.find_browser() == InstalledBrowser(CHROME, None, chrome)
+    assert browser_macos.find_browser() == InstalledBrowser(CHROME, chrome)
 
 
 def test_nothing_installed(monkeypatch, tmp_path):
@@ -51,4 +44,4 @@ def test_app_search_finds_mac_browser(monkeypatch, tmp_path):
     _system, apps = _bases(monkeypatch, tmp_path)
     brave = _install(apps, "Brave Browser.app/Contents/MacOS/Brave Browser")
 
-    assert browser.find_browser() == InstalledBrowser(BRAVE, None, brave)
+    assert browser.find_browser() == InstalledBrowser(BRAVE, brave)

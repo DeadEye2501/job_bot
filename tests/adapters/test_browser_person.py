@@ -12,43 +12,25 @@ import pytest
 
 from adapters.browser import BROWSER_DIR
 from tests.fakes.browser import CHROME
-from tests.fakes.playwright import driven_host
+from tests.fakes.playwright import BrowserProcess, driven_host
 
 
-class _Process:
-    """Процесс браузера: живёт, пока его не погасят или не выйдет сам."""
+class _Process(BrowserProcess):
+    """Процесс браузера человека: выходит ли сам, закрыв окно, и показал ли окно."""
 
     def __init__(self, exits_with_window: bool):
-        self.pid = 4242
+        super().__init__()
         self.exits_with_window = exits_with_window
         self.showed = False
-        self.returncode = None
-        self.terminated = False
-        self._done = asyncio.Event()
-
-    async def wait(self) -> int:
-        await self._done.wait()
-        return self.returncode
-
-    def terminate(self) -> None:
-        self.terminated = True
-        self._exit()
-
-    def _exit(self) -> None:
-        self.returncode = 0
-        self._done.set()
 
 
 def _host(monkeypatch, windows: list[bool], *, exits_with_window=True):
     """Хозяин браузера на подделках. `windows` — видно ли окно процесса на
     каждом взгляде; кончились — окна нет. Ответ — хозяин, запуски, Playwright, процесс."""
-    (host, playwright), started = driven_host(monkeypatch), []
+    host, playwright = driven_host(monkeypatch)
     process = _Process(exits_with_window)
+    playwright.person = lambda: process
     seen = iter(windows)
-
-    async def spawn(*argv, **_options):
-        started.append(argv)
-        return process
 
     def has_window(pid):
         shown = next(seen, False)
@@ -56,15 +38,13 @@ def _host(monkeypatch, windows: list[bool], *, exits_with_window=True):
             process.showed = True
         elif process.showed and process.exits_with_window:
             # Закрытый браузер выходит не в тот же миг: он ещё дописывает профиль.
-            asyncio.get_running_loop().call_later(0.02, process._exit)
+            asyncio.get_running_loop().call_later(0.02, process.exit)
         return shown and pid == process.pid
 
-    monkeypatch.setattr("adapters.browser.asyncio.create_subprocess_exec", spawn)
     monkeypatch.setattr("adapters.browser.has_window", has_window)
-    monkeypatch.setattr("adapters.browser.tie_to_app", lambda _pid: None)
     monkeypatch.setattr("adapters.browser._WINDOW_POLL_SEC", 0)
     monkeypatch.setattr("adapters.browser._OWN_EXIT_SEC", 0.2)
-    return host, started, playwright, process
+    return host, playwright.started, playwright, process
 
 
 async def test_a_person_logs_in_with_a_plain_browser_on_the_site_profile(monkeypatch):
@@ -73,7 +53,7 @@ async def test_a_person_logs_in_with_a_plain_browser_on_the_site_profile(monkeyp
 
     assert await host.let_person_in(7, "https://site.test/", 60) is True
 
-    ((program, *args),) = started
+    program, *args = started[-1]
     assert program == str(CHROME.executable)
     assert f"--user-data-dir={BROWSER_DIR / '7'}" in args and args[-1] == "https://site.test/"
     assert not any(arg.startswith("--remote-debugging") for arg in args)
@@ -126,3 +106,16 @@ async def test_a_stopped_login_puts_the_browser_out(monkeypatch):
         await login
 
     assert process.terminated
+
+
+async def test_the_agent_starts_the_browser_as_the_person_does_plus_its_port(monkeypatch):
+    """Агенту браузер запускается тем же процессом, что человеку: сайт, впустивший
+    человека, видит тот же браузер. Сверх входа — только порт для подключения и
+    снятый с него признак управляемого браузера."""
+    host, started, _, _ = _host(monkeypatch, [True])
+    await host.let_person_in(7, "https://site.test/", 60)
+    await host.page()
+
+    person, agent = started
+    assert agent == (*person[:-1], "--remote-debugging-port=0",
+                     "--disable-blink-features=AutomationControlled", "about:blank")

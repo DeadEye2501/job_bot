@@ -19,8 +19,7 @@ async def page_with(html: str):
     if browser is None:
         pytest.skip("на машине нет Chrome или Edge — скрипт исполнять негде")
     async with async_playwright() as playwright:
-        launched = await playwright.chromium.launch(
-            channel=browser.channel, executable_path=str(browser.executable) if browser.executable else None)
+        launched = await playwright.chromium.launch(executable_path=str(browser.executable))
         one = await launched.new_page()
         await one.set_content(html)
         yield one

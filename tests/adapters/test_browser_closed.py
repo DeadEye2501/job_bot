@@ -1,5 +1,7 @@
 """Окно браузера агента, закрытое человеком, — это «Стоп», а не повод открыть его снова."""
 
+import asyncio
+
 import pytest
 
 from adapters.browser import BrowserClosed
@@ -74,3 +76,17 @@ async def test_the_app_closing_its_own_profile_stops_nothing(monkeypatch):
     await host.close()
 
     assert stops == []
+
+
+async def test_a_window_closed_while_the_browser_is_leaving_is_noticed(monkeypatch):
+    """Браузер, окно которого закрыл человек, выходит, не ответив на просьбу выйти:
+    ждать ответа — висеть до «Стопа», так и не узнав о закрытии."""
+    stops = []
+    host, playwright = driven_host(monkeypatch, lambda: stops.append(1))
+    playwright.leaves_silently = True
+    await host.open_profile(1)
+    playwright.contexts[0].pages.clear()
+
+    await asyncio.wait_for(host.notice_closed(), 5)
+
+    assert stops == [1] and playwright.driven[0].returncode == 0

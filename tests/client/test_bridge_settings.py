@@ -162,7 +162,7 @@ async def test_the_aggregator_snapshot_names_the_browser_and_what_locks_the_agen
     from adapters.browser import InstalledBrowser
 
     monkeypatch.setattr("client.bridge.settings.find_browser",
-                        lambda: InstalledBrowser("Opera", None, Path("C:/Opera/opera.exe")))
+                        lambda: InstalledBrowser("Opera", Path("C:/Opera/opera.exe")))
     aggregators = (await ask(api.settings.get))["ok"]["aggregators"]
 
     assert aggregators["browser"] == "Opera" and aggregators["lock"] == NO_DRIVER

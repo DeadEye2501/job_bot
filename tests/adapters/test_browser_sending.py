@@ -1,6 +1,6 @@
 """Профиль под симуляцией отклика: данные с сайта не уходят, капча проходится."""
 
-from adapters.browser import hold_sending
+from adapters.browser import _NO_SERVICE_WORKERS, hold_sending
 from tests.fakes.playwright import driven_host
 
 
@@ -71,5 +71,5 @@ async def test_a_profile_opened_not_to_send_holds_every_request(monkeypatch):
     await host.open_profile(1, sending=True)
 
     held, free = playwright.contexts
-    assert held.routes == [("**/*", hold_sending)] and held.options["service_workers"] == "block"
-    assert free.routes == [] and free.options["service_workers"] == "allow"
+    assert held.routes == [("**/*", hold_sending)] and held.init_scripts == [_NO_SERVICE_WORKERS]
+    assert free.routes == [] and free.init_scripts == []

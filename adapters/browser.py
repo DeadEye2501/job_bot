@@ -1,5 +1,5 @@
-"""Браузер на профилях агрегаторов: агент водит его через Playwright, человек
-входит в нём обычным процессом."""
+"""Браузер на профилях агрегаторов: и человеку, и агенту он запускается обычным
+процессом, агент подключается к нему через Playwright."""
 
 import asyncio
 import contextlib
@@ -26,6 +26,17 @@ BROWSER_DIR = get_data_dir() / "browser"
 # и полсекунды задержки он не заметит.
 _WINDOW_POLL_SEC = 0.5
 
+# Как часто смотреть, записал ли запущенный для агента браузер свой порт.
+_PORT_POLL_SEC = 0.1
+
+# Чем браузер агента отличается от браузера входа. Без порта агенту не к чему
+# подключиться, а с одним портом страница видит `navigator.webdriver = true`,
+# и по нему сайт может узнать управляемый браузер.
+_DRIVEN_FLAGS = ("--remote-debugging-port=0", "--disable-blink-features=AutomationControlled")
+
+# Так же глушит регистрацию сервис-воркеров Playwright в своём `service_workers="block"`.
+_NO_SERVICE_WORKERS = "if (navigator.serviceWorker) navigator.serviceWorker.register = async () => {};"
+
 # Сколько ждать, пока закрытый окном браузер выйдет сам. Браузер на Chromium
 # копит куки до тридцати секунд, прежде чем записать их на диск; на выходе он
 # пишет их сразу, а оставшийся в фоне за это время успеет записать сам.
@@ -47,27 +58,21 @@ BROWSER_NAMES = CHROME, OPERA, BRAVE, VIVALDI, YANDEX, EDGE = (
 @dataclass(frozen=True)
 class InstalledBrowser:
     name: str
-    channel: str | None
     executable: Path
 
 
 def find_browser() -> InstalledBrowser | None:
-    """Первый найденный: Chrome, Opera, Brave, Vivaldi, Яндекс.Браузер, Edge.
-
-    Chrome и Edge Playwright водит по имени канала, остальных — по пути к
-    исполняемому файлу. Путь известен у всех: человеку для входа браузер
-    запускается им самим, без Playwright (`BrowserHost.let_person_in`).
-    """
+    """Первый найденный: Chrome, Opera, Brave, Vivaldi, Яндекс.Браузер, Edge."""
     # Двойник грузится строкой, чтобы мак-модуль не попал в Windows-сборку.
     if sys.platform == "darwin":
         return importlib.import_module("adapters.browser_macos").find_browser()
     for found in (
-        _installed(CHROME, "Google/Chrome/Application/chrome.exe", "chrome"),
+        _installed(CHROME, "Google/Chrome/Application/chrome.exe"),
         _opera(),
         _installed(BRAVE, "BraveSoftware/Brave-Browser/Application/brave.exe"),
         _installed(VIVALDI, "Vivaldi/Application/vivaldi.exe"),
         _installed(YANDEX, "Yandex/YandexBrowser/Application/browser.exe"),
-        _installed(EDGE, "Microsoft/Edge/Application/msedge.exe", "msedge"),
+        _installed(EDGE, "Microsoft/Edge/Application/msedge.exe"),
     ):
         if found is not None:
             return found
@@ -82,9 +87,9 @@ def _first(relative: str) -> Path | None:
     return next((path for path in _candidates(relative) if path.is_file()), None)
 
 
-def _installed(name: str, relative: str, channel: str | None = None) -> InstalledBrowser | None:
+def _installed(name: str, relative: str) -> InstalledBrowser | None:
     found = _first(relative)
-    return InstalledBrowser(name, channel, found) if found else None
+    return InstalledBrowser(name, found) if found else None
 
 
 def _opera() -> InstalledBrowser | None:
@@ -95,7 +100,7 @@ def _opera() -> InstalledBrowser | None:
             key=lambda d: [int(p) for p in d.name.split(".") if p.isdigit()],
         )
         if versions:
-            return InstalledBrowser(OPERA, None, versions[-1] / "opera.exe")
+            return InstalledBrowser(OPERA, versions[-1] / "opera.exe")
     return None
 
 
@@ -120,6 +125,8 @@ class BrowserHost:
         self._always_visible = always_visible
         self._on_closed = on_closed
         self._playwright = None
+        self._process = None
+        self._driven = None
         self._context = None
         self._profile_id: int | None = None
         self._sending = True
@@ -144,11 +151,11 @@ class BrowserHost:
         """Открыть человеку профиль на этом адресе обычным браузером и ждать, пока
         он закроет окно; ответ — закрыл ли за срок.
 
-        Обычным процессом, а не через Playwright: вход Google отказывает браузеру,
-        которым управляет программа («браузер или приложение небезопасны»), и
-        узнаёт его не по одному признаку, который можно спрятать. Ведомый браузер
-        на профиле закрывается до запуска — профиль держит один браузер, — и
-        следующий зов агента открывает профиль там, где человек начинал.
+        Без порта для агента: вход Google отказывает браузеру, которым управляет
+        программа («браузер или приложение небезопасны»), и узнаёт его не по
+        одному признаку, который можно спрятать. Ведомый браузер на профиле
+        закрывается до запуска — профиль держит один браузер, — и следующий зов
+        агента открывает профиль там, где человек начинал.
 
         Чем бы ни кончилось — закрытым окном, сроком, «Стопом», — процесс гасится:
         иные браузеры после закрытия окна живут в фоне и держали бы профиль, а
@@ -160,11 +167,7 @@ class BrowserHost:
         await self._close_context()
         self._profile_id, self._sending, self._last_url = profile_id, True, url
         self._stopped = False
-        process = await asyncio.create_subprocess_exec(
-            str(self._browser.executable), f"--user-data-dir={BROWSER_DIR / str(profile_id)}",
-            "--no-first-run", "--no-default-browser-check", url,
-        )
-        tie_to_app(process.pid)
+        process = await _start(self._browser, BROWSER_DIR / str(profile_id), url)
         try:
             closed = await _window_closed(process, limit_sec)
             if closed:
@@ -231,12 +234,26 @@ class BrowserHost:
         if self._playwright is None:
             self._playwright = await async_playwright().start()
             tie_children_named("node.exe")
-        self._context = await self._playwright.chromium.launch_persistent_context(
-            str(BROWSER_DIR / str(self._profile_id)),
-            headless=False,
-            **context_options(self._browser, sending=self._sending),
-        )
+        profile = BROWSER_DIR / str(self._profile_id)
+        # Браузер не стирает файл порта и на выходе: прежний звал бы на чужой порт.
+        port_file = profile / "DevToolsActivePort"
+        port_file.unlink(missing_ok=True)
+        process = await _start(self._browser, profile, "about:blank", *_DRIVEN_FLAGS)
+        try:
+            port = await _debugging_port(process, port_file)
+            driven = await self._playwright.chromium.connect_over_cdp(f"http://127.0.0.1:{port}")
+        except BaseException:
+            # Не подключённый браузер — сбой или «Стоп» — ничего не успел, и гасить
+            # его можно; брошенный, он держал бы профиль, и следующий запуск
+            # отдавал бы себя ему.
+            if process.returncode is None:
+                process.terminate()
+                await process.wait()
+            raise
+        self._process, self._driven, self._context = process, driven, driven.contexts[0]
+        await _forbid_downloads(self._driven)
         if not self._sending:
+            await self._context.add_init_script(_NO_SERVICE_WORKERS)
             await self._context.route("**/*", hold_sending)
         self._context.on("close", self._forget_context)
         self._context.on("page", _accept_dialogs)
@@ -284,9 +301,77 @@ class BrowserHost:
             self._on_closed()
 
     async def _close_context(self) -> None:
-        if self._context is not None:
-            context, self._context = self._context, None
-            await context.close()
+        """Закрыть браузер агента выходом, а не гашением: погашенный, он унёс бы
+        с собой куки, ещё не записанные на диск."""
+        if self._process is None:
+            return
+        process, driven = self._process, self._driven
+        self._process, self._driven, self._context = None, None, None
+        # Ждётся выход процесса, а не ответ на просьбу: браузер, который уже
+        # выходит — окно закрыл человек, — рвёт связь, не ответив, а Playwright
+        # при обрыве отклоняет запросы только корневой сессии, не этой.
+        asking = asyncio.create_task(_ask_to_quit(driven))
+        try:
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(process.wait(), _OWN_EXIT_SEC)
+        finally:
+            asking.cancel()
+            if process.returncode is None:
+                process.terminate()
+                await process.wait()
+            await driven.close()
+        # Исход просьбы читается только после закрытия без ошибки: прочитанный в
+        # `finally`, он подменил бы собой ошибку или «Стоп» самого закрытия.
+        await asyncio.wait([asking])
+        if not asking.cancelled():
+            asking.result()
+
+
+async def _ask_to_quit(driven) -> None:
+    """Попросить браузер выйти: иные после закрытия окна живут в фоне на связи."""
+    from playwright.async_api import Error as PlaywrightError
+
+    # Вышедший браузер связь уже оборвал, и просить некого: судит выход процесса.
+    with contextlib.suppress(PlaywrightError):
+        session = await driven.new_browser_cdp_session()
+        await session.send("Browser.close")
+
+
+async def _start(browser: InstalledBrowser, profile: Path, url: str, *flags: str):
+    """Браузер на профиле обычным процессом — один запуск и для человека, и для агента."""
+    process = await asyncio.create_subprocess_exec(
+        str(browser.executable), f"--user-data-dir={profile}",
+        "--no-first-run", "--no-default-browser-check", *flags, url,
+    )
+    tie_to_app(process.pid)
+    return process
+
+
+async def _debugging_port(process, port_file: Path) -> str:
+    """Порт, открытый браузером агенту: первая строка файла, который он пишет в профиле.
+
+    Второй строки ждать, чтобы не прочесть недописанный номер. Вышедший процесс
+    порта не откроет: профиль уже держит другой браузер, и тот принял запуск себе.
+    """
+    while process.returncode is None:
+        with contextlib.suppress(FileNotFoundError):
+            lines = port_file.read_text().splitlines()
+            if len(lines) == 2:
+                return lines[0]
+        await asyncio.sleep(_PORT_POLL_SEC)
+    raise RuntimeError(f"браузер агента вышел, не открыв порт (код {process.returncode})")
+
+
+async def _forbid_downloads(driven) -> None:
+    """Загрузки запрещены самим браузером, а не словами агенту: файл с чужого
+    сайта на диске человека — риск, который наставление не закрывает, а скачивать
+    агенту нечего — свои файлы он прикладывает сам.
+
+    Подключение по CDP само разрешает загрузки в папку Playwright, поэтому
+    запрет ставится после него.
+    """
+    session = await driven.new_browser_cdp_session()
+    await session.send("Browser.setDownloadBehavior", {"behavior": "deny"})
 
 
 async def _window_closed(process, limit_sec: float) -> bool:
@@ -317,25 +402,11 @@ _GOOGLE_CAPTCHA_PATH = "/recaptcha/"
 _CLOUDFLARE_CHECK_PATH = "/cdn-cgi/challenge-platform/"
 
 
-def context_options(browser: InstalledBrowser, *, sending: bool) -> dict:
-    """С чем запускается браузер агента.
-
-    Загрузки запрещены всегда, и запрещены самим браузером, а не словами агенту:
-    файл с чужого сайта на диске человека — риск, который наставление не
-    закрывает, а скачивать агенту нечего — свои файлы он прикладывает сам.
-    Запросы сервис-воркера идут мимо перехвата: при удержании их нет вовсе.
-    """
-    return {
-        "channel": browser.channel,
-        # Канал Playwright находит сам; путь ему нужен только без канала.
-        "executable_path": None if browser.channel else str(browser.executable),
-        "service_workers": "allow" if sending else "block",
-        "accept_downloads": False,
-    }
-
-
 async def hold_sending(route) -> None:
     """Оборвать запрос, несущий данные на сервер, — кроме ответа капче.
+
+    Запросы сервис-воркера идут мимо перехвата, поэтому при удержании их
+    регистрация заглушена (`_NO_SERVICE_WORKERS`).
 
     Последнюю кнопку формы код не знает, а подпись у неё бывает любой; отправка
     же данных — всегда такой запрос. Капча — проверка человека, а не отклик:

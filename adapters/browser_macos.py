@@ -11,26 +11,21 @@ from adapters.browser import BRAVE, CHROME, EDGE, OPERA, VIVALDI, YANDEX, Instal
 _SYSTEM_APPS = Path("/Applications")
 
 _INSIDE = (
-    (CHROME, "Google Chrome.app/Contents/MacOS/Google Chrome", "chrome"),
-    (OPERA, "Opera.app/Contents/MacOS/Opera", None),
-    (BRAVE, "Brave Browser.app/Contents/MacOS/Brave Browser", None),
-    (VIVALDI, "Vivaldi.app/Contents/MacOS/Vivaldi", None),
-    (YANDEX, "Yandex.app/Contents/MacOS/Yandex", None),
-    (EDGE, "Microsoft Edge.app/Contents/MacOS/Microsoft Edge", "msedge"),
+    (CHROME, "Google Chrome.app/Contents/MacOS/Google Chrome"),
+    (OPERA, "Opera.app/Contents/MacOS/Opera"),
+    (BRAVE, "Brave Browser.app/Contents/MacOS/Brave Browser"),
+    (VIVALDI, "Vivaldi.app/Contents/MacOS/Vivaldi"),
+    (YANDEX, "Yandex.app/Contents/MacOS/Yandex"),
+    (EDGE, "Microsoft Edge.app/Contents/MacOS/Microsoft Edge"),
 )
-"""Браузер, путь к исполняемому внутри папки программ, канал Playwright."""
+"""Браузер и путь к исполняемому внутри папки программ."""
 
 
 def find_browser() -> InstalledBrowser | None:
-    """Первый найденный: Chrome, Opera, Brave, Vivaldi, Яндекс.Браузер, Edge.
-
-    Канал ставится только находке в `/Applications`: каналы `chrome` и
-    `msedge` Playwright ищет там. Установленному в `~/Applications` канал не
-    дан, и Playwright запускает его по пути.
-    """
-    for name, inside, channel in _INSIDE:
+    """Первый найденный: Chrome, Opera, Brave, Vivaldi, Яндекс.Браузер, Edge."""
+    for name, inside in _INSIDE:
         for base in (_SYSTEM_APPS, Path.home() / "Applications"):
             path = base / inside
             if path.is_file():
-                return InstalledBrowser(name, channel if base == _SYSTEM_APPS else None, path)
+                return InstalledBrowser(name, path)
     return None

@@ -7,8 +7,8 @@ from playwright.async_api import TimeoutError as PlaywrightTimeout
 
 from adapters.browser import InstalledBrowser
 
-CHROME = InstalledBrowser("Chrome", "chrome", Path("C:/Chrome/chrome.exe"))
-"""Установленный браузер, какой находит `find_browser`: с каналом и путём."""
+CHROME = InstalledBrowser("Chrome", Path("C:/Chrome/chrome.exe"))
+"""Установленный браузер, какой находит `find_browser`."""
 
 
 class _Chooser:
