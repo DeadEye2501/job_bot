@@ -1,5 +1,6 @@
 """Сопроводительные письма профиля: вкладка Letters читает и пишет их через мост."""
 
+from adapters.telegram import CAPTION_LIMIT
 from backend.flows.workspaces import switch_workspace
 from tests.dbio import put_other_workspace
 from tests.factories import OTHER_WORKSPACE_ID
@@ -8,8 +9,9 @@ EMPTY = {"ru": None, "ru_short": None, "en": None, "en_short": None}
 
 
 async def test_a_profile_without_letters_answers_with_four_blanks(api, ask):
-    """Вкладка рисуется тем, что пришло: все четыре поля — даже пустыми."""
-    assert (await ask(api.profile.letters))["ok"] == {"letters": EMPTY}
+    """Вкладка рисуется тем, что пришло: все четыре поля — даже пустыми — и
+    предел короткого письма, подпись Telegram."""
+    assert (await ask(api.profile.letters))["ok"] == {"letters": EMPTY, "short_max": CAPTION_LIMIT}
 
 
 async def test_saved_letters_come_back_trimmed_and_blanks_become_absent(api, ask):

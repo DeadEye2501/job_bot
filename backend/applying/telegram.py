@@ -46,7 +46,8 @@ class _Errand:
 
 
 async def via_telegram(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome:
-    """Письмо HR в Telegram: первое за окно — с резюме, дальше вдогон без него."""
+    """Письмо HR в Telegram: готовое с резюме или от модели — первое за окно с
+    резюме, дальше вдогон без него."""
     errand = await _errand(kit, vacancy_id)
     if errand is None:
         return GONE

@@ -86,10 +86,10 @@ def _letter_of(text: str | None) -> Letter | None:
     subject, body = obj.get("subject"), str_or_none(obj.get("body"))
     if not isinstance(subject, str) or body is None:
         return None
-    return Letter(_short_dash(subject.strip()), _short_dash(body))
+    return Letter(short_dash(subject.strip()), short_dash(body))
 
 
-def _short_dash(text: str) -> str:
+def short_dash(text: str) -> str:
     return text.replace("—", "-")
 
 

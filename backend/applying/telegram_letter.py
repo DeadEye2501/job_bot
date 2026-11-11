@@ -1,13 +1,17 @@
-"""Письмо HR в Telegram: первое с резюме или вдогон без него."""
+"""Письмо HR в Telegram: готовое письмо человека или письмо модели — первое с
+резюме или вдогон без него."""
 
 import logging
 from dataclasses import dataclass
 
+from adapters.telegram import CAPTION_LIMIT
 from backend.agent.kit import AgentKit
 from backend.applying.resume_link import resume_for_letter
+from backend.domain.letter_choice import ready_letter
 from backend.llm.cover_letter import LetterPost, generate_cover_letter
 from backend.models import Vacancy
 from backend.payloads import DIRECT_PARSED_FIELDS, ParsedVacancy
+from backend.repository.cover_letters import get_letters
 
 logger = logging.getLogger(__name__)
 
@@ -40,15 +44,25 @@ def format_channel_ref(channel_username: str | None) -> str | None:
 
 
 async def compose_letter(kit: AgentKit, parsed: ParsedVacancy, post: LetterPost, vacancy_id: int):
-    """Письмо модели; первое за окно — с резюме файлом или ссылкой, вдогон — без:
-    резюме у HR уже есть. При беде — пара «пусто и код отказа».
+    """Письмо к отправке; при беде — пара «пусто и код отказа».
 
-    Письмо вдогон пишет та же модель, а не готовая строка: отклик целиком идёт
+    Короткое готовое письмо человека, если оно есть и влезает в подпись, идёт
+    с резюме при любом счёте прежних писем: человек написал его на любой
+    отклик, а не вдогон. Резюме нет вовсе — письмо уходит без него, а не
+    отказом: отклик без резюме лучше, чем никакого.
+    Иначе письмо пишет модель: первое за окно — с резюме файлом или ссылкой,
+    вдогон — без: резюме у HR уже есть.
+
+    Письмо вдогон пишет та же модель, а не заготовка кода: отклик целиком идёт
     на языке вакансии. Название и канал вплетает в текст сама модель: готовая
     приставка поверх живого письма читается штампом. Анкета — та же, что видит
     агент: на просьбу поста письмо отвечает из анкеты, и урезанная анкета
     отвечала бы «обсудим» на то, что в ней есть.
     """
+    ready = ready_letter(await kit.read(get_letters), post.language, CAPTION_LIMIT, short=True)
+    if ready is not None:
+        resume = await resume_for_letter(kit.pipeline)
+        return (Letter(ready, None) if resume is None else Letter(resume.under(ready), resume.file)), None
     profile = await kit.read(kit.profile_text)
     if not profile:
         logger.warning("vacancy %d: анкета пуста, письмо не пишется", vacancy_id)

@@ -6,10 +6,10 @@ from sqlalchemy import select
 
 from backend.applying.result import Missed, TelegramClosed
 from backend.applying.telegram import via_telegram
-from backend.models import Application, ApplicationVia, Message, Profile, Vacancy
+from backend.models import Application, ApplicationVia, CoverLetter, Message, Profile, Vacancy
 from tests.backend.fixtures.applying import TG
 from tests.dbio import all_rows, put
-from tests.factories import days_ago, message_row
+from tests.factories import TEST_WORKSPACE_ID, days_ago, message_row
 
 
 
@@ -149,3 +149,51 @@ async def test_the_letter_is_delivered_to_the_hr_account_and_kept_in_the_chat(te
     ((target, _, _),) = sent
     (message,) = await all_rows(kit.pipeline.session_factory, Message)
     assert target == 777 and message.vacancy_id == vacancy.id and not message.is_incoming
+
+
+async def _ready_letters(kit, vacancy, **letters) -> None:
+    """Готовые письма человека и русская вакансия."""
+    await put(kit.pipeline.session_factory, CoverLetter(workspace_id=TEST_WORKSPACE_ID, **letters))
+    async with kit.pipeline.session_factory() as session:
+        (await session.get(Vacancy, vacancy.id)).language = "Русский"
+        await session.commit()
+
+
+async def test_a_ready_short_letter_goes_with_the_resume_instead_of_the_model_one(telegram_case):
+    kit, vacancy, sent = await telegram_case()
+    await _ready_letters(kit, vacancy, ru="Полное письмо", ru_short="Короткое письмо")
+
+    assert await via_telegram(kit, vacancy.id, TG) == "applied"
+
+    ((_, text, attachment),) = sent
+    assert text == "Короткое письмо" and attachment is not None
+
+
+async def test_a_ready_letter_to_an_hr_written_before_still_goes_with_the_resume(telegram_case):
+    kit, vacancy, sent = await telegram_case(prior_letter=True)
+    await _ready_letters(kit, vacancy, ru_short="Короткое письмо")
+
+    await via_telegram(kit, vacancy.id, TG)
+
+    _, text, attachment = sent[-1]
+    assert text == "Короткое письмо" and attachment is not None
+
+
+async def test_a_ready_letter_too_long_for_a_caption_leaves_the_letter_to_the_model(telegram_case):
+    kit, vacancy, sent = await telegram_case()
+    await _ready_letters(kit, vacancy, ru_short="а" * 1025)
+
+    await via_telegram(kit, vacancy.id, TG)
+
+    ((_, text, _),) = sent
+    assert text.startswith("Здравствуйте! Откликаюсь")
+
+
+async def test_a_ready_letter_goes_without_the_resume_when_there_is_none(telegram_case):
+    kit, vacancy, sent = await telegram_case(resume=False)
+    await _ready_letters(kit, vacancy, ru_short="Короткое письмо")
+
+    assert await via_telegram(kit, vacancy.id, TG) == "applied"
+
+    ((_, text, attachment),) = sent
+    assert text == "Короткое письмо" and attachment is None

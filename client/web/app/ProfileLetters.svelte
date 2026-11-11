@@ -12,21 +12,26 @@
   import { oneWrite } from '$state/one_write.js';
   import { TYPING_DELAY } from '$state/profile.js';
 
-  // Пары по языкам: между ними встаёт черта.
+  const FULL_MAX = 4000;
+
+  // Пары по языкам: между ними встаёт черта. Предел короткого приходит с моста:
+  // длиннее подписи Telegram отклик молча взял бы письмо модели, и держит его
+  // само поле.
   const GROUPS = [
     [
-      { key: 'ru', placeholder: 'Полное сопроводительное письмо', max: 4000 },
-      { key: 'ru_short', placeholder: 'Короткое сопроводительное письмо', max: 2000 },
+      { key: 'ru', placeholder: 'Полное сопроводительное письмо' },
+      { key: 'ru_short', placeholder: 'Короткое сопроводительное письмо', short: true },
     ],
     [
-      { key: 'en', placeholder: 'Full cover letter', max: 4000 },
-      { key: 'en_short', placeholder: 'Short cover letter', max: 2000 },
+      { key: 'en', placeholder: 'Full cover letter' },
+      { key: 'en_short', placeholder: 'Short cover letter', short: true },
     ],
   ];
 
   let { ask } = $props();
 
   let form = $state(null);
+  let shortMax = $state(null);
 
   const alive = living();
 
@@ -37,6 +42,7 @@
   async function refresh() {
     const now = await ask('profile.letters');
     if (now === null || !alive.now) return;
+    shortMax = now.short_max;
     form = Object.fromEntries(Object.entries(now.letters).map(([key, text]) => [key, text ?? '']));
     saver.known(JSON.stringify(form));
   }
@@ -65,7 +71,7 @@
       {#if at > 0}<div class="letters-split span-2"></div>{/if}
       {#each group as one (one.key)}
         <DelayedTextarea
-          maxlength={one.max}
+          maxlength={one.short ? shortMax : FULL_MAX}
           placeholder={one.placeholder}
           lines={10}
           value={form[one.key]}

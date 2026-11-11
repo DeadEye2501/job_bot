@@ -7,10 +7,13 @@ import time
 import pytest
 
 from backend.applying.email import via_email
-from backend.applying.result import Missed
-from backend.models import Application, ApplicationVia
+from backend.applying.result import GONE, Missed
+from backend.models import Application, ApplicationVia, CoverLetter, Vacancy
+from backend.repository.vacancies_life import delete_vacancy
 from tests.backend.fixtures.applying import MAIL
-from tests.dbio import all_rows
+from tests.dbio import all_rows, put
+from tests.factories import TEST_WORKSPACE_ID
+from tests.fakes.llm import CHAT, chat_response, provider
 from tests.waiting import wait_until
 
 
@@ -107,3 +110,55 @@ async def test_the_letter_needs_no_agent(mail_case):
     kit, vacancy, _ = await mail_case()
     await via_email(kit, vacancy.id, MAIL)
     assert kit.run_session.plans == [] and kit.browser.calls == []
+
+
+async def _ready_letters(kit, vacancy, **letters) -> None:
+    """Готовые письма человека, русская вакансия и модель, причёсывающая её название."""
+    await put(kit.pipeline.session_factory, CoverLetter(workspace_id=TEST_WORKSPACE_ID, **letters))
+    async with kit.pipeline.session_factory() as session:
+        row = await session.get(Vacancy, vacancy.id)
+        row.language, row.title = "Русский", "Ищем питон-разработчика на фулл-тайм"
+        await session.commit()
+    kit.pipeline.lm_client = provider({CHAT: chat_response("Python-разработчик")})
+
+
+async def test_a_ready_full_letter_goes_with_a_subject_from_the_template(mail_case):
+    kit, vacancy, outbox = await mail_case()
+    await _ready_letters(kit, vacancy, ru="Полное письмо", ru_short="Короткое")
+
+    assert await via_email(kit, vacancy.id, MAIL) == "applied"
+
+    (mail,) = outbox
+    assert mail.body == "Полное письмо" and mail.attachment is not None
+    assert mail.subject == "Отклик на вакансию: Python-разработчик"
+
+
+async def test_without_a_full_letter_the_short_one_goes(mail_case):
+    kit, vacancy, outbox = await mail_case()
+    await _ready_letters(kit, vacancy, ru_short="Короткое")
+
+    await via_email(kit, vacancy.id, MAIL)
+
+    assert outbox[0].body == "Короткое"
+
+
+async def test_a_ready_letter_does_not_gather_the_profile_for_the_model(mail_case, monkeypatch):
+    """Письмо уже есть: анкета для модели не собирается."""
+    kit, vacancy, outbox = await mail_case()
+    await _ready_letters(kit, vacancy, ru="Полное письмо")
+
+    async def gathered(*args):
+        raise AssertionError("анкета для модели собрана")
+
+    monkeypatch.setattr("backend.applying.email.letter_ask", gathered)
+
+    assert await via_email(kit, vacancy.id, MAIL) == "applied"
+
+
+async def test_a_deleted_vacancy_with_a_ready_letter_is_gone(mail_case):
+    kit, vacancy, outbox = await mail_case()
+    await _ready_letters(kit, vacancy, ru="Полное письмо")
+    async with kit.pipeline.session_factory() as session, session.begin():
+        await delete_vacancy(session, vacancy.id)
+
+    assert await via_email(kit, vacancy.id, MAIL) == GONE and outbox == []

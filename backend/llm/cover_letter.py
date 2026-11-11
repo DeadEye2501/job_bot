@@ -8,6 +8,7 @@ from dataclasses import dataclass
 import httpx
 
 from adapters.lm_chat import CUT_BY_LIMIT, ChatRequest, chat
+from adapters.telegram import CAPTION_LIMIT
 
 from backend.payloads import ParsedVacancy
 
@@ -264,7 +265,7 @@ def _letter_refusal(text: str, finish_reason) -> str | None:
     """
     if not text:
         return "пусто"
-    if len(text) > 1024:
+    if len(text) > CAPTION_LIMIT:
         return "длиннее подписи Telegram"
     # Уцелевшая скобка после подстановки значит, что модель сочинила свою
     # заглушку.

@@ -46,6 +46,19 @@ def search_languages(languages: Iterable[CandidateLanguage]) -> list[str]:
     return [lang.name for lang in languages if lang.level in usable] or [person_language(languages)]
 
 
+_RUSSIAN_STARTS = ("русск", "russ")
+_RUSSIAN_CODES = ("ru", "rus")
+"""Имена русского языка: язык поста назван на нём самом, а язык анкеты человек
+вписывает своими словами — «Русский», «русский язык», «Russian», «RU»."""
+
+
+def is_russian(language: str) -> bool:
+    """Русский ли язык отклика. Готовых писем две пары — русская и английская,
+    — и всякий не русский отклик получает английскую: это язык международный."""
+    name = language.strip().casefold()
+    return name in _RUSSIAN_CODES or name.startswith(_RUSSIAN_STARTS)
+
+
 def reply_language(vacancy_language: str | None, person: str) -> str:
     """Язык отклика: язык вакансии, а неизвестен он — язык человека.
 

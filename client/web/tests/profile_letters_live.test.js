@@ -19,14 +19,15 @@ const PLACEHOLDERS = [
   'Short cover letter',
 ];
 
-/** Вкладка, которой мост отдаёт эти письма; ответ — что у моста спрашивали. */
-function letters(stored) {
+/** Вкладка, которой мост отдаёт эти письма и предел короткого; ответ — что у
+ *  моста спрашивали. */
+function letters(stored, shortMax = 1024) {
   const asked = [];
   render(ProfileLetters, {
     props: {
       ask: async (method, payload) => {
         asked.push([method, payload]);
-        return method === 'profile.letters' ? { letters: stored } : {};
+        return method === 'profile.letters' ? { letters: stored, short_max: shortMax } : {};
       },
     },
   });
@@ -80,6 +81,13 @@ describe('вкладка Letters', () => {
       en: '',
       en_short: 'Short',
     });
+  });
+
+  it('короткое письмо не длиннее предела, названного мостом; полное — своего', async () => {
+    letters(EMPTY, 700);
+    await vi.waitFor(() => screen.getByPlaceholderText('Short cover letter'));
+
+    expect(PLACEHOLDERS.map((one) => screen.getByPlaceholderText(one).maxLength)).toEqual([4000, 700, 4000, 700]);
   });
 
   it('письма, набранные теми же, что записаны, заново не записываются', async () => {

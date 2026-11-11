@@ -1,5 +1,5 @@
-"""Отклик письмом без агента: модель приложения пишет, сервер почты принимает,
-отклик записывается."""
+"""Отклик письмом без агента: письмо готовое или от модели приложения, сервер
+почты принимает, отклик записывается."""
 
 import asyncio
 import logging
@@ -14,9 +14,13 @@ from backend.agent.tools_letter import letter_ask
 from backend.applying.resume_link import resume_for_letter
 from backend.applying.result import GONE, Dropped, Missed, Outcome, delivered
 from backend.domain.apply_order import Way
-from backend.llm.agent_letter import write_letter
-from backend.models import ApplicationVia
+from backend.domain.language_choice import is_russian
+from backend.domain.letter_choice import ready_letter
+from backend.llm.agent_letter import Letter, write_letter
+from backend.llm.letter_subject import letter_subject
+from backend.models import ApplicationVia, Vacancy
 from backend.repository.applications import ApplicationEntry
+from backend.repository.cover_letters import get_letters
 from backend.repository.mail_account import get_mail_account
 from backend.repository.profile_languages import read_reply_language
 
@@ -24,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 async def via_email(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome:
-    """Письмо от модели приложения, SMTP, запись — одним шагом: ушедшее и
+    """Готовое письмо человека или письмо модели приложения, SMTP, запись — одним шагом: ушедшее и
     не записанное письмо дало бы второе на следующем отклике.
 
     Почта и резюме проверяются до письма: не с чем отправить — незачем ни
@@ -37,12 +41,14 @@ async def via_email(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome:
     if resume is None:
         return Missed("нет ни файла резюме, ни ссылки на него")
     language = await kit.read(lambda session: read_reply_language(session, vacancy_id))
-    ask = await letter_ask(kit, vacancy_id, language, None)
-    if ask is None:
-        return GONE
-    letter, issues = await write_letter(ask, kit.pipeline.lm_client, kit.pipeline.lm_chat_model)
+    letter = await _ready(kit, vacancy_id, language)
     if letter is None:
-        return Missed(f"письмо не написано: {'; '.join(issues)}")
+        ask = await letter_ask(kit, vacancy_id, language, None)
+        if ask is None:
+            return GONE
+        letter, issues = await write_letter(ask, kit.pipeline.lm_client, kit.pipeline.lm_chat_model)
+        if letter is None:
+            return Missed(f"письмо не написано: {'; '.join(issues)}")
     # Тема тоже уходит работодателю: подтверждается вместе с письмом.
     kept = await confirmed(kit, vacancy_id, [text_item("Тема", "text", letter.subject),
                                              text_item("Текст", "letter", resume.under(letter.body))])
@@ -52,6 +58,25 @@ async def via_email(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome:
     mail = OutgoingMail(way.target, " ".join(kept[0]["value"].split()), kept[1]["value"], resume.file)
     sending = asyncio.ensure_future(_send_and_record(kit, vacancy_id, account, mail))
     return await asyncio.shield(sending)
+
+
+async def _ready(kit: AgentKit, vacancy_id: int, language: str) -> Letter | None:
+    """Полное готовое письмо человека с темой по шаблону; писем нет — пусто.
+
+    Предела у почты нет, и короткое письмо берётся, только если полного нет.
+    Сверку фактов готовое письмо не проходит: его написал сам человек. Анкета
+    для модели здесь не собирается: письмо уже есть, а теме нужно одно название.
+    Удалённая вакансия — тоже пусто: её отбивает путь письма модели.
+    """
+    async with kit.pipeline.session_factory() as session:
+        body = ready_letter(await get_letters(session), language, None)
+        vacancy = await session.get(Vacancy, vacancy_id) if body is not None else None
+    if vacancy is None:
+        return None
+    pipeline = kit.pipeline
+    subject = await letter_subject(vacancy.title or "", is_russian(language), pipeline.lm_client,
+                                   pipeline.lm_chat_model)
+    return Letter(subject, body)
 
 
 async def _send_and_record(kit: AgentKit, vacancy_id: int, account: MailAccountConfig,

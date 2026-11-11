@@ -76,6 +76,9 @@ def make_client(tg: TgAccountConfig) -> Client:
 # симуляции и для записи отклика.
 SEND_LOCKED = False
 
+CAPTION_LIMIT = 1024
+"""Предел подписи к файлу: письмо с резюме уходит подписью к нему."""
+
 
 async def send_dm(
     client: Client,

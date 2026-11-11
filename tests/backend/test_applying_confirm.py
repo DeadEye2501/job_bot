@@ -11,9 +11,10 @@ from backend.applying import run
 from backend.applying.email import via_email
 from backend.applying.result import Dropped
 from backend.applying.telegram import via_telegram
-from backend.models import Application, Message, Vacancy, VacancyStatus
+from backend.models import Application, CoverLetter, Message, Vacancy, VacancyStatus
 from tests.backend.fixtures.applying import MAIL, TG
-from tests.dbio import all_rows, only_row
+from tests.dbio import all_rows, only_row, put
+from tests.factories import TEST_WORKSPACE_ID
 from tests.fakes.agent import answering_gate, edited, finished, under_confirmation
 from tests.waiting import wait_until
 
@@ -127,3 +128,18 @@ async def test_with_auto_apply_on_nobody_is_asked(telegram_case):
     assert await via_telegram(dataclasses.replace(kit, gate=gate), vacancy.id, TG) == "applied"
 
     assert asked == [] and len(sent) == 1
+
+
+async def test_a_ready_letter_is_shown_in_the_window_and_goes_as_the_person_left_it(telegram_case):
+    """Готовое письмо человек тоже видит и правит под вакансию: в окне оно то
+    же, что записано, а уходит правленым."""
+    kit, vacancy, sent = await telegram_case()
+    await put(kit.pipeline.session_factory, CoverLetter(workspace_id=TEST_WORKSPACE_ID, en_short="Short one"))
+    kit, asked = await _confirming(kit, edited({"Текст": "Short one, edited"}))
+
+    assert await via_telegram(kit, vacancy.id, TG) == "applied"
+
+    ((item,),) = [one["items"] for one in asked]
+    assert item["value"] == "Short one"
+    ((_, text, _),) = sent
+    assert text == "Short one, edited"

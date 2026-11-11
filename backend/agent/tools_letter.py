@@ -1,11 +1,13 @@
-"""Инструмент письма для отклика: пишет приложение или сверяется письмо агента."""
+"""Инструмент письма для отклика: готовое письмо человека, письмо приложения или сверка письма агента."""
 
 from collections.abc import Callable
 
 from backend.agent.jobs import ApplyJob
 from backend.agent.kit import AgentKit
+from backend.domain.letter_choice import ready_letter
 from backend.llm.agent_letter import Letter, LetterAsk, check_letter, write_letter
 from backend.models import Vacancy
+from backend.repository.cover_letters import get_letters
 
 CHECKS_ALLOWED = 2
 """Сколько раз проверка второй моделью смотрит предложение агента — письмо или
@@ -15,10 +17,22 @@ _ENOUGH = "отбито дважды: отправляй без письма, е
 
 
 def letter_tools(kit: AgentKit, job: ApplyJob) -> list[Callable]:
-    """Инструмент письма своей вакансии; кто пишет письмо, задаёт `job.letter_writer`."""
+    """Инструмент письма своей вакансии.
+
+    Готовое письмо человека, влезающее в поле, отдаётся при любом
+    `job.letter_writer`: человек написал его сам, и сочинять поверх незачем.
+    Готового нет — кто пишет письмо, задаёт `job.letter_writer`.
+    """
 
     async def letter(limit: int = 0, subject: str = "", body: str = "") -> str:
         """Письмо для отклика на языке отклика из задания; limit — предел знаков поля, 0 — без предела. Если письмо пишешь ты — передай subject и body на сверку."""
+        # Принесённое письмо агента — на сверку: готовое уже было бы отдано
+        # на первый зов, и подменять им сверку значило бы отдать письмо не
+        # под тот предел, с которым агент его писал.
+        if not body.strip():
+            ready = ready_letter(await kit.read(get_letters), job.language, limit or None)
+            if ready is not None:
+                return f"Готовое письмо человека, вставь как есть:\n{ready}"
         if job.letter_checks >= CHECKS_ALLOWED:
             return _ENOUGH
         if job.letter_writer == "agent" and not body.strip():

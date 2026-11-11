@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from adapters.telegram import CAPTION_LIMIT
 from backend.incoming import text_or_none
 from backend.repository import cover_letters as letters_repo
 from client.bridge.answer import BAD_PAYLOAD, bad_fields, reply
@@ -15,7 +16,9 @@ class Letters:
     """
 
     def letters(self) -> dict:
-        """Письма активного профиля — все четыре, ненаписанные пустыми."""
+        """Письма активного профиля — все четыре, ненаписанные пустыми, — и
+        предел короткого: оно уходит в Telegram подписью к резюме, и длиннее
+        подписи отклик взял бы письмо модели."""
 
         async def run() -> dict:
             async with self._hub.session_factory() as session:
@@ -24,7 +27,8 @@ class Letters:
                 "letters": {
                     name: None if row is None else getattr(row, name)
                     for name in letters_repo.LETTER_FIELDS
-                }
+                },
+                "short_max": CAPTION_LIMIT,
             }
 
         return reply(self._hub.runner, run())

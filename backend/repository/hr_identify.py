@@ -135,7 +135,8 @@ async def count_recent_outgoing_with_vacancy_for_hr(
     как впервые.
 
     Используется в auto / manual send-ветке для решения «полный cover
-    letter + CV (count==0) vs short follow-up без вложений (count>=1)».
+    letter + CV (count==0) vs short follow-up без вложений (count>=1)» —
+    у письма модели: готовое письмо человека уходит с CV при любом счёте.
     Cutoff считаем в Python, чтобы не зависеть от диалекта date-arithmetic.
 
     Письма считаются только по вакансиям активного профиля: первый отклик из

@@ -2,7 +2,8 @@
 
 from backend.agent.tools_letter import letter_tools
 from tests.dbio import put
-from tests.factories import vacancy_row
+from backend.models import CoverLetter
+from tests.factories import TEST_WORKSPACE_ID, vacancy_row
 from tests.fakes.agent import apply_job, kit_for, tool
 from tests.fakes.llm import CHAT, letter_answer, factcheck_answer, messages_of, provider
 
@@ -88,3 +89,45 @@ async def test_after_two_rejections_the_model_is_not_asked_again(make_pipeline, 
     answer = await letter(subject="S", body="Третье.")
 
     assert answer.startswith("отбито дважды") and len(client.sent) == 2
+
+
+async def _ready(session_factory) -> None:
+    await put(session_factory, CoverLetter(workspace_id=TEST_WORKSPACE_ID, ru="Полное письмо", ru_short="Кратко"))
+
+
+async def test_a_ready_letter_goes_instead_of_the_apps_one(make_pipeline, session_factory):
+    job, client, letter = await _letter(make_pipeline, session_factory, [])
+    await _ready(session_factory)
+
+    answer = await letter()
+
+    assert answer.endswith("\nПолное письмо") and client.sent == []
+
+
+async def test_a_ready_letter_goes_even_when_the_agent_writes_letters(make_pipeline, session_factory):
+    job, client, letter = await _letter(make_pipeline, session_factory, [], writer="agent")
+    await _ready(session_factory)
+
+    answer = await letter()
+
+    assert answer.endswith("\nПолное письмо") and client.sent == []
+
+
+async def test_a_field_too_short_for_the_full_letter_gets_the_short_one(make_pipeline, session_factory):
+    job, client, letter = await _letter(make_pipeline, session_factory, [])
+    await _ready(session_factory)
+
+    answer = await letter(limit=10)
+
+    assert answer.endswith("\nКратко")
+
+
+async def test_the_agents_own_letter_is_checked_even_with_a_ready_one_at_hand(make_pipeline, session_factory):
+    """Принесённое агентом письмо идёт на сверку: готовое под предел поля уже
+    не влезло, и отдать его теперь, без предела, значило бы отдать длинное."""
+    job, client, letter = await _letter(make_pipeline, session_factory, [factcheck_answer("ok")], writer="agent")
+    await _ready(session_factory)
+
+    answer = await letter(subject="Отклик", body="Готов работать.")
+
+    assert answer == "письмо принято"
