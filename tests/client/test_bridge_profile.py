@@ -35,7 +35,10 @@ async def test_a_saved_person_comes_back_on_the_next_request(api, ask):
     только тем, что пришло. Не вернись анкета — человек увидел бы пустую
     форму и заполнил бы её второй раз поверх сохранённой.
     """
-    await _saved_person(api, ask, education="МГУ", location="Москва")
+    await _saved_person(
+        api, ask, education="МГУ", location="Москва",
+        linkedin_url=" https://www.linkedin.com/in/ivan ",
+    )
 
     answer = await ask(api.profile.get)
 
@@ -54,6 +57,7 @@ async def test_a_saved_person_comes_back_on_the_next_request(api, ask):
         "location": "Москва",
         "telegram_username": None,
         "github_url": None,
+        "linkedin_url": "https://www.linkedin.com/in/ivan",
         "education": "МГУ",
         "free_preferences": None,
         "expected_salary": None,

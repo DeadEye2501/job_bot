@@ -185,6 +185,7 @@ def _parse_profile(data: dict) -> ParsedCvProfile | None:
         location=str_or_none(data.get("location")),
         telegram_username=str_or_none(data.get("telegram_username")),
         github_url=str_or_none(data.get("github_url")),
+        linkedin_url=str_or_none(data.get("linkedin_url")),
         education=str_or_none(data.get("education")),
         work_format=normalize_enum_list(data.get("work_format"), WORK_FORMATS),
         grades=normalize_enum_list(data.get("grades"), GRADES),

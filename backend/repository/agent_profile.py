@@ -63,6 +63,7 @@ def _person_lines(p, languages, today: date) -> list[str]:
         f"Телефон: {p.phone or 'не указан'}",
         f"Telegram: {p.telegram_username or 'не указан'}",
         f"GitHub: {p.github_url or 'не указан'}",
+        f"LinkedIn: {p.linkedin_url or 'не указан'}",
         f"Ссылка на резюме: {p.resume_url or 'не указана'}",
         f"Образование: {p.education or 'не указано'}",
         f"Ожидаемая зарплата: {_salary(p)}",

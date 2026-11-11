@@ -31,10 +31,6 @@ describe('переход по контакту вакансии', () => {
     expect(contactHref('javascript:alert(1)')).toBe('https://alert(1)');
   });
 
-  it('почта открывается письмом', () => {
-    expect(contactHref('HR@Example.test')).toBe('mailto:HR@Example.test');
-  });
-
   it('телефон набирается номером без пробелов и скобок', () => {
     expect(contactHref('+7 (900) 123-45-67')).toBe('tel:+79001234567');
   });

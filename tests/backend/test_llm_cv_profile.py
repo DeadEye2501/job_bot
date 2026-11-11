@@ -394,6 +394,12 @@ async def test_the_new_personal_fields_come_through_the_parse():
     )
 
 
+async def test_the_linkedin_link_comes_through_the_parse():
+    parsed = await parse_profile(linkedin_url="https://www.linkedin.com/in/ivan")
+
+    assert parsed.profile.linkedin_url == "https://www.linkedin.com/in/ivan"
+
+
 async def test_blank_new_personal_fields_become_absent():
     parsed = await parse_profile(
         patronymic=" ", patronymic_latin="", citizenship="  ", about_me="  ", resume_url="",

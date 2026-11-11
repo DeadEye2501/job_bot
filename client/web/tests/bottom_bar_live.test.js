@@ -14,11 +14,18 @@
 import { cleanup } from '@testing-library/svelte';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { awaited } from '../state/awaited.svelte.js';
+import { PARSE_CV } from '../state/cv_ways.js';
 import { applyNote } from '../state/progress.js';
 import { bar } from './bottom_bar_stub.js';
 import { settled } from './settled.js';
 
-afterEach(cleanup);
+// Учёт ожиданий общий на весь файл: оставленное упавшей проверкой ожидание
+// разбора зажигало бы полосы и в следующих.
+afterEach(() => {
+  cleanup();
+  awaited.cancel(PARSE_CV);
+});
 
 /** Подписи по бокам полос: что идёт — слева, счёт — справа. */
 function sides() {
@@ -139,6 +146,32 @@ describe('живая нижняя полоса', () => {
 
     expect(sides()).toEqual(['Разбор отложенных', 'Вакансия 2 из 4']);
     expect(document.querySelector('.progress-fill').getAttribute('style')).toContain('width: 25%');
+  });
+
+  it('разбор резюме бежит полосами, пока ждут его итог', async () => {
+    // Разбор не занимает место прогона, и вести о начале у него нет: без своего
+    // признака полоса молчала бы всю минуту разбора.
+    bar({ db: true, tg: true, chat: true, embed: true });
+    awaited.start(PARSE_CV, () => {});
+    await settled();
+
+    expect(sides()).toEqual(['Разбор резюме…', '']);
+    expect(document.querySelector('.progress-bar').dataset.indeterminate).toBe('true');
+
+    awaited.cancel(PARSE_CV);
+    await settled();
+
+    expect(document.querySelector('.progress-wrap')).toBeNull();
+  });
+
+  it('прогон посреди разбора резюме показывает свой ход', async () => {
+    const { handlers } = bar({ db: true, tg: true, chat: true, embed: true });
+    awaited.start(PARSE_CV, () => {});
+    handlers.ingestion_started();
+    handlers.progress_update({ stage: 'aggregator', label: 'Обход hh.ru', current: 3, total: 10 });
+    await settled();
+
+    expect(sides()).toEqual(['Обход hh.ru', 'Найдено 3 из 10']);
   });
 
   it('работа агента на сайте называет себя подписью', async () => {

@@ -20,6 +20,32 @@ afterEach(() => {
   card = null;
 });
 
+/** Кнопка контакта вакансии по его значению. */
+function contactButton(value) {
+  return [...card.host.querySelectorAll('.vac-contact > button')].find((one) => one.textContent.trim() === value);
+}
+
+/** Прогнать проверку с подменённым буфером обмена; `run` получает список
+ *  положенного в буфер.
+ *
+ * Буфер подменён на одну проверку: оставленный подменённым, он отвечал бы и
+ * соседним файлам, что пойдут в том же окружении.
+ */
+async function withClipboard(run) {
+  const own = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+  const copied = [];
+  Object.defineProperty(navigator, 'clipboard', {
+    value: { writeText: async (text) => copied.push(text) },
+    configurable: true,
+  });
+  try {
+    await run(copied);
+  } finally {
+    if (own) Object.defineProperty(navigator, 'clipboard', own);
+    else delete navigator.clipboard;
+  }
+}
+
 function screen(extra = {}) {
   card = mountVacancyCard((method, payload) => ({ vacancy: vacancyDetail(payload, extra) }));
   return { asked: card.asked, change: card.change, text: () => card.host.textContent };
@@ -59,15 +85,7 @@ describe('живая карточка вакансии', () => {
   });
 
   it('нажатие на название кладёт его в буфер обмена и говорит об этом', async () => {
-    // Буфер подменён на одну проверку: оставленный подменённым, он отвечал бы
-    // и соседним файлам, что пойдут в том же окружении.
-    const own = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
-    const copied = [];
-    Object.defineProperty(navigator, 'clipboard', {
-      value: { writeText: async (text) => copied.push(text) },
-      configurable: true,
-    });
-    try {
+    await withClipboard(async (copied) => {
       screen({ title: 'Повар в бистро' });
       await settled();
 
@@ -76,10 +94,31 @@ describe('живая карточка вакансии', () => {
 
       expect(copied).toEqual(['Повар в бистро']);
       expect(card.said).toContain('Название скопировано');
-    } finally {
-      if (own) Object.defineProperty(navigator, 'clipboard', own);
-      else delete navigator.clipboard;
-    }
+    });
+  });
+
+  it('нажатие на почту в контактах кладёт её в буфер, а не открывает письмом', async () => {
+    // Письмо открывает почтовая программа системы, а её может не быть: адрес
+    // нужен человеку текстом, вставить в свою почту.
+    await withClipboard(async (copied) => {
+      const { asked } = screen({ contacts: [{ id: 1, value: 'hr@example.test' }] });
+      await settled();
+
+      contactButton('hr@example.test').click();
+      await settled();
+
+      expect(copied).toEqual(['hr@example.test']);
+      expect(card.said).toContain('Почта скопирована');
+      expect(asked.some((one) => one.method === 'system.open_url')).toBe(false);
+    });
+  });
+
+  it('почта в контактах не подсвечивается ссылкой, прочие контакты — да', async () => {
+    screen({ contacts: [{ id: 1, value: 'hr@example.test' }, { id: 2, value: 'example.test/jobs' }] });
+    await settled();
+
+    expect(contactButton('hr@example.test').classList).not.toContain('link-hover');
+    expect(contactButton('example.test/jobs').classList).toContain('link-hover');
   });
 
   it('удаление вакансии уходит на мост только после подтверждения', async () => {

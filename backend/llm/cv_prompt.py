@@ -51,6 +51,7 @@ PARSE_CV_PROMPT = """Ты парсишь CV специалиста и извле
     "location": "string | null",
     "telegram_username": "string | null",
     "github_url": "string | null",
+    "linkedin_url": "string | null",
     "education": "string | null",
     "work_format": [""" + " | ".join(f'"{one}"' for one in WORK_FORMATS) + """, ...],
     "grades": [""" + " | ".join(f'"{one}"' for one in GRADES) + """, ...],
@@ -100,6 +101,7 @@ PARSE_CV_PROMPT = """Ты парсишь CV специалиста и извле
 - location: город и страна как написаны в резюме («Город B1, Страна A», «City C, Country D»), либо null.
 - telegram_username: только @username (без t.me/ и без https://). Если в тексте "https://t.me/foobar" — верни "@foobar".
 - github_url: ссылка на профиль GitHub как в резюме, без параметров после «?»; иначе null.
+- linkedin_url: ссылка на профиль LinkedIn как в резюме, без параметров после «?»; иначе null.
 - education: строка вида "учебное заведение, специальность, степень, год"; несколько — через "; ", от последнего; нет — null.
 - work_format: подмножество из """ + " / ".join(WORK_FORMATS) + """ — формат работы, который кандидат рассматривает, только если резюме называет его одним из этих слов: """ + FORMAT_MARKERS + """. [] если не назван.
 - grades: подмножество из """ + " / ".join(GRADES) + """ — только если человек сам называет свой уровень одним из этих слов: """ + GRADE_MARKERS + """. Должности прошлых мест работы, стаж и объём ответственности уровнем не являются. Слов нет или сомневаешься — [].

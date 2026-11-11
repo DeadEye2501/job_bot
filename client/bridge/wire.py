@@ -115,6 +115,7 @@ def _profile_to_dict(p, languages=None) -> dict | None:
         "location": p.location,
         "telegram_username": p.telegram_username,
         "github_url": p.github_url,
+        "linkedin_url": p.linkedin_url,
         "education": p.education,
         "free_preferences": p.free_preferences,
         "expected_salary": p.expected_salary,

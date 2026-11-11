@@ -20,6 +20,7 @@ export const SYSTEM_TABS = [
 /** Вкладки раздела «Профиль». Подписи английские — так они и стояли. */
 export const PROFILE_TABS = [
   { key: 'cv', label: 'CV' },
+  { key: 'letters', label: 'Letters' },
   { key: 'skills', label: 'Skills' },
   { key: 'experience', label: 'Experience' },
   { key: 'projects', label: 'Projects' },

@@ -26,6 +26,7 @@ def parsed_cv_profile(**overrides) -> ParsedCvProfile:
         location=None,
         telegram_username=None,
         github_url=None,
+        linkedin_url=None,
         education=None,
         work_format=[],
         grades=[],

@@ -19,11 +19,14 @@
   import SignalButton from '$components/SignalButton.svelte';
   import UnreadBadge from '$components/UnreadBadge.svelte';
   import { attempts } from '$state/attempts.js';
+  import { awaited } from '$state/awaited.svelte.js';
+  import { PARSE_CV } from '$state/cv_ways.js';
   import { LAMPS, allAlive, blockedTip, shouldTurnOff } from '$state/health.js';
   import { healthNow, keepHealth } from '$state/health_now.svelte.js';
   import { OFF } from '$state/modes.js';
   import {
     COUNTLESS_STAGES,
+    PARSING_CV,
     STARTING,
     applyNote,
     bar,
@@ -101,11 +104,14 @@
 
   const locked = $derived(!allAlive(health));
   const lockedTip = $derived(blockedTip(health));
-  const note = $derived(single ?? sweepNote(channels, messages));
+  // Разбор резюме места прогона не занимает и вестей о ходе не шлёт: полосы
+  // бегут, пока окно ждёт его итог. Идёт заодно прогон — полосы его.
+  const parsing = $derived(awaited.pending(PARSE_CV) && !round.running);
+  const note = $derived(parsing ? PARSING_CV : (single ?? sweepNote(channels, messages)));
   // Плашка человека встаёт на место полос. Полосы и подписи по их бокам
   // показываются вместе, по одному условию: подписи плашке не нужны.
   const plateShown = $derived(round.human && !unfolded);
-  const barsShown = $derived(round.running && !plateShown);
+  const barsShown = $derived((round.running || parsing) && !plateShown);
   // Обновиться во время прогона нельзя — проверить можно всегда.
   const updateLocked = $derived(newer !== null && round.running);
   // Копия из исходников проверяет как exe, а качать ей нечего: подменить
@@ -335,9 +341,11 @@
         ondone={done}
       />
     {:else if barsShown}
+      <!-- Ход прошлого прогона стирает только начало следующего: без нулей
+           разбор показал бы его застывшие полосы. -->
       <ProgressBars
-        channels={bar(channels.current, channels.total)}
-        messages={bar(messages.current, messages.total)}
+        channels={parsing ? bar(0, 0) : bar(channels.current, channels.total)}
+        messages={parsing ? bar(0, 0) : bar(messages.current, messages.total)}
       />
     {/if}
   </div>

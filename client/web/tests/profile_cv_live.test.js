@@ -104,6 +104,29 @@ describe('новые поля анкеты', () => {
     });
   });
 
+  it('контакты стоят двумя строками: Telegram, почта, телефон и под ними LinkedIn, GitHub', async () => {
+    sheet(null);
+    await vi.waitFor(() => screen.getByPlaceholderText('LinkedIn (URL)'));
+
+    const rows = [screen.getByPlaceholderText('Telegram (@username)'), screen.getByPlaceholderText('LinkedIn (URL)')]
+      .map((one) => [...one.parentElement.children].map((field) => field.placeholder));
+
+    expect(rows).toEqual([
+      ['Telegram (@username)', 'Email *', 'Телефон'],
+      ['LinkedIn (URL)', 'GitHub (URL)'],
+    ]);
+  });
+
+  it('набранный LinkedIn уезжает на мост записью анкеты', async () => {
+    sheet(null);
+    await vi.waitFor(() => screen.getByPlaceholderText('LinkedIn (URL)'));
+
+    typeInto(screen.getByPlaceholderText('LinkedIn (URL)'), 'https://www.linkedin.com/in/ivan');
+    await settled();
+
+    expect(saved.at(-1)).toMatchObject({ linkedin_url: 'https://www.linkedin.com/in/ivan' });
+  });
+
   it('дату набирают цифрами подряд, точки встают сами, уходит ISO', async () => {
     sheet(null);
     const born = await vi.waitFor(() => screen.getByPlaceholderText('дд.мм.гггг'));

@@ -178,6 +178,7 @@ class ParsedCvProfile:
     location: str | None
     telegram_username: str | None
     github_url: str | None
+    linkedin_url: str | None
     education: str | None
     work_format: list[str]
     grades: list[str]

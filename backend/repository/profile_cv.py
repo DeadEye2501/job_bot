@@ -130,6 +130,7 @@ def _new_profile(p, kept: dict, workspace_id: int) -> Profile:
         location=p.location,
         telegram_username=p.telegram_username,
         github_url=p.github_url,
+        linkedin_url=p.linkedin_url,
         education=p.education,
         work_format=list(p.work_format),
         grades=list(p.grades),

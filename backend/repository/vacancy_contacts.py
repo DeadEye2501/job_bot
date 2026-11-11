@@ -7,7 +7,7 @@
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.domain.contact_keys import contact_key
+from backend.domain.contact_keys import contact_key, written_contact
 from backend.models import ContactAddedBy, Vacancy, VacancyContact
 
 
@@ -41,7 +41,7 @@ async def add_contact(
     второй строкой не заводится. Если прежняя строка — находка разбора, она
     переходит к тому, кто подтвердил контакт: иначе следующий разбор её бы стёр.
     """
-    value = value.strip()
+    value = written_contact(value)
     key = contact_key(value)
     if not key:
         return

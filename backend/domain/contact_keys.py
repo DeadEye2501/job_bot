@@ -10,7 +10,8 @@ from backend.domain.hosts import address_parts, is_arrival_mark
 EMAIL_PATTERN = r"[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}"
 PHONE_PATTERN = r"\+?\d[\d\s()-]{7,}\d"
 
-_SCHEMES = ("mailto:", "tel:")
+_MAILTO = "mailto:"
+_SCHEMES = (_MAILTO, "tel:")
 _ADDRESS_RE = re.compile(EMAIL_PATTERN)
 _PHONE_RE = re.compile(PHONE_PATTERN)
 
@@ -29,6 +30,19 @@ def contact_key(value: str) -> str:
     if _PHONE_RE.fullmatch(text):
         return re.sub(r"\D", "", text)
     return _link_key(text) if _linkish(text) else text
+
+
+def written_contact(value: str) -> str:
+    """Контакт, каким он ложится в базу: без пробелов по краям, почта — без `mailto:`.
+
+    Схема приходит с адресом спрятанной ссылки (`extract_post_text`), и модель
+    отдаёт её контактом как есть. Сам контакт — почта: карточка копирует её, а
+    не открывает письмом.
+    """
+    text = value.strip()
+    if text.startswith(_MAILTO) and is_address(text):
+        return text[len(_MAILTO):]
+    return text
 
 
 def is_address(value: str) -> bool:

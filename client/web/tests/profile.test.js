@@ -137,6 +137,7 @@ describe('что уезжает на мост', () => {
       phone: '',
       telegram_username: '',
       github_url: '',
+      linkedin_url: '',
       location: '',
       education: '',
       about_me: '',

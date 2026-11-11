@@ -40,6 +40,25 @@ async def test_an_extra_way_to_apply_becomes_a_contact_of_the_vacancy(
     assert (await only_row(session_factory, Vacancy)).notes is None
 
 
+async def test_a_mail_written_as_a_mailto_link_lies_as_a_bare_address(
+    parsing, session_factory
+):
+    """Почта со схемой `mailto:` ложится голым адресом: карточка копирует почту,
+    а `mailto:` открыла бы письмом."""
+    pipeline, vacancy = parsing
+    pipeline.parsed = parsed_vacancy(
+        title="Python-разработчик", other_contacts=["mailto:Jobs@Example.com"]
+    )
+
+    await parse.parse_and_update_vacancy(
+        pipeline, vacancy.id, "текст", "jobs", allow_delete=False
+    )
+
+    assert await _contacts(session_factory) == [
+        ("Jobs@Example.com", "jobs@example.com", "parse")
+    ]
+
+
 async def test_the_parse_leaves_the_persons_notes_alone(parsing, session_factory):
     """Заметка человека переживает разбор с найденным контактом."""
     pipeline, vacancy = parsing

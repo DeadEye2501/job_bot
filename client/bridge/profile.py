@@ -25,6 +25,7 @@ from client.bridge.choices import _filter_languages
 from client.bridge.cv import Cv
 from client.bridge.cv_file import _stat_cv
 from client.bridge.hub import Hub
+from client.bridge.letters import Letters
 from client.bridge.media import _media_url
 from client.bridge.photo import Photo
 from client.bridge.refusals import PROFILE_FIRST
@@ -36,15 +37,15 @@ from client.bridge.wire import (
 )
 
 
-class Profile(Cv, Photo):
+class Profile(Cv, Photo, Letters):
     """Экран «Профиль» целиком: чем окно спрашивает анкету и чем правит.
 
-    Файл резюме и фото — у примесей рядом: сама анкета и файлы, которые к ней
-    прилагаются, живут порознь и правятся порознь, а окно видит их одним
-    экраном.
+    Файл резюме, фото и сопроводительные письма — у примесей рядом: сама анкета
+    и то, что к ней прилагается, живут порознь и правятся порознь, а окно видит
+    их одним экраном.
 
     Секреты: анкета отдаётся окну как есть — почта, телефон, ник в Telegram,
-    ссылка на GitHub, город, образование и полный путь к резюме. Это осознанно:
+    ссылки на GitHub и LinkedIn, город, образование и полный путь к резюме. Это осознанно:
     приложение однопользовательское, а страница живёт в своём окне, не в сети.
     """
 
@@ -198,6 +199,7 @@ def _read_profile_fields(payload: dict) -> dict:
         "location": text_or_none(payload.get("location")),
         "telegram_username": text_or_none(payload.get("telegram_username")),
         "github_url": text_or_none(payload.get("github_url")),
+        "linkedin_url": text_or_none(payload.get("linkedin_url")),
         "education": text_or_none(payload.get("education")),
         "free_preferences": text_or_none(payload.get("free_preferences")),
         "expected_salary": amount_or_none(payload.get("expected_salary")),

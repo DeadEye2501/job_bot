@@ -383,6 +383,7 @@
       contacts={card.contacts}
       {ask}
       onopen={outside}
+      oncopy={(value) => copy(value, 'Почта скопирована')}
       onchanged={(contacts) => (card = { ...card, contacts })}
     />
   </div>

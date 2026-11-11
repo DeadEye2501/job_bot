@@ -13,6 +13,7 @@ from backend.flows import embeddings
 from backend.flows.workspaces import create_workspace, delete_active_workspace, switch_workspace
 from backend.models import (
     HR,
+    CoverLetter,
     Message,
     Profile,
     ProfileExperience,
@@ -101,7 +102,18 @@ async def _source(session_factory, cv_path: str = "C:/cv.pdf") -> int:
     (MEDIA_DIR / "profile" / "1").mkdir(parents=True, exist_ok=True)
     (MEDIA_DIR / "profile" / "1" / "photo.jpg").write_bytes(PHOTO)
     await _set_paths(session_factory, cv_path, "profile/1/photo.jpg")
+    await put(session_factory, CoverLetter(
+        workspace_id=TEST_WORKSPACE_ID, ru="Здравствуйте", ru_short="Коротко",
+        en="Hello", en_short="Short",
+    ))
     return resume.id
+
+
+async def _letters(session_factory, workspace_id: int) -> tuple | None:
+    """Письма профиля четвёркой; строки писем нет — пусто."""
+    async with session_factory() as session:
+        row = await session.get(CoverLetter, workspace_id)
+    return None if row is None else (row.ru, row.ru_short, row.en, row.en_short)
 
 
 async def _workspace(session_factory, workspace_id: int) -> Workspace | None:
@@ -149,6 +161,7 @@ async def test_an_empty_workspace_has_nothing_and_is_active(session_factory):
     ]
     assert await _profile_of(session_factory, made) is None
     assert await _switches(session_factory, made) == []
+    assert await _letters(session_factory, made) is None
     workspace = await _workspace(session_factory, made)
     assert (workspace.cv_path, workspace.photo_path) == ("", "")
 
@@ -173,6 +186,8 @@ async def test_personal_data_carries_only_the_person(session_factory):
     assert workspace.photo_path == f"profile/{made}/photo.jpg"
     assert stored_media(workspace.photo_path).read_bytes() == PHOTO
     assert await _switches(session_factory, made) == []
+    # Письмо пишется под должность, а её личные данные не переносят.
+    assert await _letters(session_factory, made) is None
 
 
 async def test_a_copy_carries_everything_but_vacancies_and_read_marks(session_factory):
@@ -198,6 +213,10 @@ async def test_a_copy_carries_everything_but_vacancies_and_read_marks(session_fa
     assert (site.is_active, site.last_run_at, site.chosen_resume_id) == (True, None, resume_id)
     assert mark.active is True
     assert await _vacancies_of(session_factory, made) == []
+    assert await _letters(session_factory, made) == ("Здравствуйте", "Коротко", "Hello", "Short")
+    assert await _letters(session_factory, TEST_WORKSPACE_ID) == (
+        "Здравствуйте", "Коротко", "Hello", "Short"
+    )
 
 
 async def test_copying_a_workspace_without_a_profile_still_copies_the_rest(session_factory):
@@ -270,6 +289,7 @@ async def test_deleting_takes_the_workspace_and_keeps_shared_rows(session_factor
     assert await all_rows(session_factory, ProfileSkill) == []
     assert await _switches(session_factory, TEST_WORKSPACE_ID) == []
     assert len(await _switches(session_factory, 3)) == 1
+    assert await all_rows(session_factory, CoverLetter) == []
     assert stored_media("profile/1/photo.jpg") is None
     assert cv.read_bytes() == b"%PDF"
 

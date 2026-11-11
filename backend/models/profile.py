@@ -51,6 +51,7 @@ class Profile(IdMixin, UpdatedAtMixin, Base):
     location: Mapped[str | None]
     telegram_username: Mapped[str | None]
     github_url: Mapped[str | None]
+    linkedin_url: Mapped[str | None]
     education: Mapped[str | None]
     # Подмножества перечней из backend/domain/taxonomy.py. Колонка JSON, так
     # что база чужое значение не отсеет — это делает код на входе.
@@ -78,6 +79,25 @@ class Profile(IdMixin, UpdatedAtMixin, Base):
     about_me: Mapped[str | None]
     resume_url: Mapped[str | None]
     workspace_id: Mapped[int] = mapped_column(ForeignKey("workspace.id"))
+
+
+class CoverLetter(Base):
+    """Сопроводительные письма профиля: полное и короткое, по-русски и по-английски.
+
+    Строка своя, а не колонки анкеты: разбор резюме стирает анкету и пишет её
+    заново, а писем модель не приносит; анкету к тому же не завести без имени
+    и почты, а письма пишут и раньше. Удаляется вместе с профилем — каскадом.
+    """
+
+    __tablename__ = "cover_letter"
+
+    workspace_id: Mapped[int] = mapped_column(
+        ForeignKey("workspace.id", ondelete="CASCADE"), primary_key=True
+    )
+    ru: Mapped[str | None]
+    ru_short: Mapped[str | None]
+    en: Mapped[str | None]
+    en_short: Mapped[str | None]
 
 
 class ProfileLanguage(IdMixin, Base):

@@ -22,6 +22,7 @@ from backend.models.enums import (
 from backend.models.message import Message
 from backend.models.profile import (
     STACK_LINKS,
+    CoverLetter,
     Profile,
     ProfileExperience,
     ProfileLanguage,
@@ -67,6 +68,7 @@ __all__ = [
     "BotState",
     "Company",
     "ContactAddedBy",
+    "CoverLetter",
     "Gender",
     "LlmConfig",
     "LlmConfigKind",

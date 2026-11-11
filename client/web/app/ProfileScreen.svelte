@@ -1,5 +1,5 @@
 <script>
-  // Раздел «Профиль»: четыре вкладки одного домена.
+  // Раздел «Профиль»: пять вкладок одного домена.
   //
   // Вкладка сама читает своё при появлении и сама же гасит своё при уходе:
   // держать все разом значило бы спрашивать мост о том, чего никто не видит.
@@ -12,6 +12,7 @@
   import { PROFILE_TABS } from '$state/sections.js';
 
   import ProfileCv from './ProfileCv.svelte';
+  import ProfileLetters from './ProfileLetters.svelte';
   import ProfileRecords from './ProfileRecords.svelte';
   import ProfileSkills from './ProfileSkills.svelte';
 
@@ -23,6 +24,8 @@
 <div class="screen-body">
   {#if tab === 'cv'}
     <ProfileCv {ask} />
+  {:else if tab === 'letters'}
+    <ProfileLetters {ask} />
   {:else if tab === 'skills'}
     <ProfileSkills {ask} />
   {:else if tab === 'experience'}

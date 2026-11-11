@@ -114,6 +114,7 @@ async def test_every_profile_field_reaches_the_row(session):
                 location="Тбилиси",
                 telegram_username="ivan",
                 github_url="https://github.com/ivan",
+                linkedin_url="https://www.linkedin.com/in/ivan",
                 education="МГУ",
                 work_format=["remote", "hybrid"],
                 grades=["senior"],
@@ -128,6 +129,7 @@ async def test_every_profile_field_reaches_the_row(session):
     assert saved.location == "Тбилиси"
     assert saved.telegram_username == "ivan"
     assert saved.github_url == "https://github.com/ivan"
+    assert saved.linkedin_url == "https://www.linkedin.com/in/ivan"
     assert saved.education == "МГУ"
     assert saved.work_format == ["remote", "hybrid"]
     assert saved.grades == ["senior"]

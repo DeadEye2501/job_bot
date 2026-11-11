@@ -59,7 +59,7 @@ async def profile_as_parsed(session: AsyncSession) -> ParsedCv | None:
 
 def personal_part(parsed: ParsedCv) -> ParsedCv:
     """Только личные данные анкеты: ФИО и их латиница, пол, дата рождения,
-    гражданство, email, телефон, город, Telegram, GitHub и языки.
+    гражданство, email, телефон, город, Telegram, GitHub, LinkedIn и языки.
 
     Должность — пустая строка: колонка обязательна, а профиль без должности
     называется «Без должности».

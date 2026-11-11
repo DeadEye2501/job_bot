@@ -8,6 +8,11 @@ import { KB, MB } from './units.js';
 
 /** Грейды, какими их выбирают в анкете. Значения едут на мост и совпадают с
  *  перечнем `backend/domain/taxonomy.py`. */
+/** Пауза перед записью набранного во вкладках анкеты. Короче — и мост получает
+ *  вопрос на каждое слово, длиннее — и человек успевает уйти с вкладки, не
+ *  дождавшись записи. */
+export const TYPING_DELAY = 800;
+
 export const GRADES = [
   { value: 'junior', label: 'Junior' },
   { value: 'middle', label: 'Middle' },
@@ -117,6 +122,7 @@ export function blankProfile() {
     phone: '',
     telegram_username: '',
     github_url: '',
+    linkedin_url: '',
     location: '',
     education: '',
     about_me: '',

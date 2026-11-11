@@ -10,9 +10,9 @@
   import VacancyContacts from '$components/VacancyContacts.svelte';
   import { contactAdding } from '$state/contact_adding.svelte.js';
   import { NEW_CARD } from '$state/new_card.js';
-  import { contactHref } from '$state/vacancy_contacts.js';
+  import { contactHref, isEmail } from '$state/vacancy_contacts.js';
 
-  let { vacancyId, contacts, ask, onopen, onchanged } = $props();
+  let { vacancyId, contacts, ask, onopen, oncopy, onchanged } = $props();
 
   /** Отдать карточке список из ответа — только своей вакансии: ответ о
    *  прежней, приехавший после выбора другой, встал бы под неё. */
@@ -35,7 +35,9 @@
 
 <VacancyContacts
   {contacts}
+  copyable={isEmail}
   onopen={(value) => onopen(contactHref(value))}
+  {oncopy}
   onadd={() => (newContact.adding = true)}
   onremove={remove}
 />

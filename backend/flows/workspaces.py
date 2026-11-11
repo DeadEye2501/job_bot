@@ -15,6 +15,7 @@ from sqlalchemy import func, select
 
 from backend.bot.media import drop_stored_media, store_profile_photo, stored_media
 from backend.models import Workspace
+from backend.repository.cover_letters import copy_letters
 from backend.repository.profile_copy import personal_part, profile_as_parsed
 from backend.repository.profile_cv import save_parsed_cv
 from backend.repository.workspace_removal import delete_workspace_rows
@@ -30,7 +31,8 @@ CreateWay = Literal["empty", "personal", "copy"]
 async def create_workspace(session_factory, way: CreateWay) -> int:
     """Завести профиль из активного этим способом и сделать его активным; ответ — его номер.
 
-    Файл резюме переносит только копия: в личных данных его нет. Фото
+    Файл резюме и сопроводительные письма переносит только копия: в личных
+    данных их нет — письмо пишется под должность, а не под человека. Фото
     переносят копия и личные данные — своей копией в каталоге нового профиля.
     Её путь пишется второй сделкой, после файла: упади запись файла — профиль
     останется без фото, а не с путём на несуществующий файл.
@@ -50,6 +52,7 @@ async def create_workspace(session_factory, way: CreateWay) -> int:
                 )
             if way == "copy":
                 await copy_switches(session, source_id, made)
+                await copy_letters(session, source_id, made)
             await make_active(session, made)
     if photo is not None:
         relative = store_profile_photo(photo.read_bytes(), photo.suffix, made)

@@ -64,6 +64,7 @@ import './styles/choice-row.css';
 import './styles/choice-line.css';
 import './styles/lang-rows.css';
 import './styles/cv-file.css';
+import './styles/letters.css';
 import './styles/new-box.css';
 import './styles/collapsible.css';
 import './styles/collapse-arrow.css';

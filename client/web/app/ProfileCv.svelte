@@ -22,6 +22,7 @@
   import { alone, toggled } from '$state/chosen.js';
   import {
     GRADES,
+    TYPING_DELAY,
     WORK_FORMATS,
     blankProfile,
     cvOpenable,
@@ -33,20 +34,22 @@
   import CvUpload from './CvUpload.svelte';
   import WorkspaceSwitch from './WorkspaceSwitch.svelte';
 
-  // Пауза перед записью набранного. Короче — и мост получает вопрос на каждое
-  // слово, длиннее — и человек успевает уйти с вкладки, не дождавшись записи.
-  const TYPING_DELAY = 800;
-
   let { ask } = $props();
 
   // Пределы длины держит только окно: ни мост, ни база длину полей анкеты не
   // меряют. `must` — поле, без которого мост анкету не примет вовсе. Звёздочка в
   // подсказке говорит о том же, но только пока поле пустое и подсказка видна.
-  const CONTACT_FIELDS = [
-    { key: 'email', placeholder: 'Email *', max: 254, must: true },
-    { key: 'phone', placeholder: 'Телефон', max: 32 },
-    { key: 'telegram_username', placeholder: 'Telegram (@username)', max: 64 },
-    { key: 'github_url', placeholder: 'GitHub (URL)', max: 255 },
+  // Строками: сверху способы связи, под ними ссылки на профили.
+  const CONTACT_ROWS = [
+    [
+      { key: 'telegram_username', placeholder: 'Telegram (@username)', max: 64 },
+      { key: 'email', placeholder: 'Email *', max: 254, must: true },
+      { key: 'phone', placeholder: 'Телефон', max: 32 },
+    ],
+    [
+      { key: 'linkedin_url', placeholder: 'LinkedIn (URL)', max: 255 },
+      { key: 'github_url', placeholder: 'GitHub (URL)', max: 255 },
+    ],
   ];
 
   let loaded = $state(false);
@@ -234,7 +237,11 @@
       <ProfilePerson {form} {field} onset={setField} onpickone={pickOne} />
     </div>
 
-    {#each CONTACT_FIELDS as one (one.key)}{@render field(one)}{/each}
+    {#each CONTACT_ROWS as row, at (at)}
+      <div class="field-line span-2">
+        {#each row as one (one.key)}{@render field(one)}{/each}
+      </div>
+    {/each}
 
     <DelayedTextarea
       maxlength="1000"

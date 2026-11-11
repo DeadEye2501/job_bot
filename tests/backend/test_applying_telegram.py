@@ -97,10 +97,12 @@ async def test_the_letter_model_gets_the_whole_profile(telegram_case):
     async with kit.pipeline.session_factory() as session:
         profile = (await session.scalars(select(Profile))).one()
         profile.github_url, profile.first_name_latin = "https://github.com/someone", "Ivan"
+        profile.linkedin_url = "https://www.linkedin.com/in/someone"
         await session.commit()
     await via_telegram(kit, vacancy.id, TG)
     ((_, text, _),) = sent
     assert "https://github.com/someone" in text and "Ivan" in text
+    assert "https://www.linkedin.com/in/someone" in text
 
 
 async def test_a_rerun_writes_the_full_letter_again(telegram_case):
