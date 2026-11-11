@@ -17,11 +17,12 @@ from pyrogram.handlers import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from adapters import lm_studio, telegram
+from adapters import telegram
 from backend.applying import run
 from backend.bot import hand_made
 from backend.bot import rerun
 from backend.bot import loop
+from backend.bot import model_links
 from backend.bot import updates
 from backend.bot import chat
 from backend.bot import channels
@@ -34,7 +35,7 @@ from backend.bot import turn
 from backend.bot import update
 from backend.bot import work
 from backend.bot import workspaces
-from backend.flows.pipeline import IngestionPipeline, LmProviders
+from backend.flows.pipeline import IngestionPipeline
 from backend.domain.apply_order import Way
 from backend.models import BotMode
 from backend.notify import fire
@@ -45,38 +46,15 @@ from backend.runtime_settings import RuntimeSettings
 logger = logging.getLogger(__name__)
 
 
-def _shares_provider(a, b) -> bool:
-    """Two LLM provider configs share the same httpx client if endpoint+auth match.
-
-    Model name is intentionally NOT compared — model is per-request, not on
-    the client.
-    """
-    return (
-        a is not None
-        and b is not None
-        and a.base_url == b.base_url
-        and a.api_key == b.api_key
-    )
-
-
 def _open_connections(bot, runtime_settings: RuntimeSettings) -> None:
-    """Соединения на весь срок жизни бота: Telegram и две модели."""
+    """Соединения бота: Telegram на весь срок его жизни, модели — до смены поставщика."""
     # If construction fails partway through, any half-built httpx
     # clients will be closed by GC (with a ResourceWarning). We don't
     # try to clean them up here because httpx has no sync close() and
     # we can't await from sync __init__ — and init failure means the
     # process is about to exit anyway.
     bot.client = telegram.make_client(runtime_settings.tg)
-    bot.lm_client = lm_studio.make_client(runtime_settings.chat)
-    bot.lm_chat_model = runtime_settings.chat.model
-    # Reuse the chat httpx client for embeddings if both providers point
-    # at the same endpoint with the same auth.
-    bot.lm_embed_client = (
-        bot.lm_client
-        if _shares_provider(runtime_settings.chat, runtime_settings.embed)
-        else lm_studio.make_client(runtime_settings.embed)
-    )
-    bot.lm_embed_model = runtime_settings.embed.model
+    bot.models = model_links.ModelLinks(runtime_settings.chat, runtime_settings.embed)
 
 
 def _subscribe_to_updates(bot) -> None:
@@ -240,12 +218,7 @@ class Bot:
         self.ingestion = IngestionPipeline(
             client=self.client,
             session_factory=self.session_factory,
-            models=LmProviders(
-                chat_client=self.lm_client,
-                chat_model=self.lm_chat_model,
-                embed_client=self.lm_embed_client,
-                embed_model=self.lm_embed_model,
-            ),
+            models=self.models.providers,
             apply=self.apply_vacancies,
             runtime_settings=self.rs,
         )
@@ -293,6 +266,10 @@ class Bot:
         """
         task = self.current_poll_task
         return task is not None and not task.done()
+
+    async def reconnect_models(self) -> None:
+        """Перейти на поставщиков моделей, записанных в настройках сейчас."""
+        await model_links.reconnect(self)
 
     def kick(self) -> None:
         """Wake the loop so the next poll runs immediately instead of waiting.

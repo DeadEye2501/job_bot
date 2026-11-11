@@ -12,6 +12,7 @@ import httpx
 import pytest
 
 from adapters import gguf_embed
+from backend.domain.dedup import EmbeddingCache
 from backend.flows import embeddings
 from tests.fakes.gguf import failing_engine, model_file
 from tests.fakes.llm import embeddings_refused, embeddings_request
@@ -33,6 +34,7 @@ class _Pipeline:
     def __init__(self, client) -> None:
         self.lm_embed_client = client
         self.lm_embed_model = "bge"
+        self.embeddings = EmbeddingCache()
 
 
 async def test_a_text_the_provider_choked_on_gives_no_fingerprint(caplog):

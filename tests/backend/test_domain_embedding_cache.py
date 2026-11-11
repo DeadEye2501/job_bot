@@ -120,3 +120,75 @@ def test_an_emptied_cache_takes_new_vectors():
     cache.append(2, [0.0, 1.0])
 
     assert cache.match([0.0, 1.0], threshold=0.9) == 2
+
+
+def test_a_cache_of_another_width_is_lifted_anew():
+    """Кэш, длина которого разошлась с нынешней моделью, поднимается заново.
+
+    Первым в кэш мог попасть вектор прежней модели, посчитанный до её смены:
+    оставленный, такой кэш не принял бы ни одного вектора новой.
+    """
+    cache = EmbeddingCache()
+    cache.fill([(1, [1.0, 0.0])], width=2)
+
+    cache.settle_width(3)
+    cache.append(2, [0.0, 0.0, 1.0])
+
+    assert cache.loaded is False
+    assert cache.match([0.0, 0.0, 1.0], threshold=0.9) == 2
+
+
+def test_the_same_width_keeps_the_cache():
+    """Та же длина кэш не трогает: подъём из базы идёт один раз за жизнь."""
+    cache = EmbeddingCache()
+    cache.fill([(1, [1.0, 0.0])], width=2)
+
+    cache.settle_width(2)
+
+    assert cache.loaded is True
+    assert cache.match([1.0, 0.0], threshold=0.9) == 1
+
+
+def test_a_vector_added_while_lifting_survives_the_lift():
+    """Вектор, дописанный, пока шло чтение базы, подъём не стирает.
+
+    Чтение начато до того, как вакансию записали, и её в прочитанном нет;
+    стёртый, её вектор не узнал бы перепоста до перезапуска.
+    """
+    cache = EmbeddingCache()
+    cache.append(2, [0.0, 1.0])
+
+    cache.fill([(1, [1.0, 0.0])], width=2)
+
+    assert cache.match([0.0, 1.0], threshold=0.9) == 2
+    assert cache.match([1.0, 0.0], threshold=0.9) == 1
+
+
+def test_a_lift_drops_a_vector_of_another_width_added_meanwhile():
+    """Подъём выбрасывает дописанный за время чтения вектор чужой длины.
+
+    Его посчитала прежняя модель, а длину кэшу уже назвала нынешняя:
+    оставленный, он не дал бы встать ни одному вектору новой модели.
+    """
+    cache = EmbeddingCache()
+    cache.append(2, [0.0, 1.0])
+
+    cache.fill([], width=3)
+    cache.append(3, [0.0, 0.0, 1.0])
+
+    assert cache.match([0.0, 0.0, 1.0], threshold=0.9) == 3
+
+
+def test_a_lift_keeps_the_vector_recounted_while_reading():
+    """Вектор, пересчитанный прогоном заново за время чтения, не уступает прочитанному.
+
+    Прочитанное из базы старее: чтение начато до записи нового вектора, и
+    взявший его кэш узнавал бы вакансию по тексту, которого у неё уже нет.
+    """
+    cache = EmbeddingCache()
+    cache.append(1, [0.0, 1.0])
+
+    cache.fill([(1, [1.0, 0.0])], width=2)
+
+    assert cache.match([1.0, 0.0], threshold=0.9) is None
+    assert cache.match([0.0, 1.0], threshold=0.9) == 1

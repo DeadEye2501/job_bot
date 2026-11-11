@@ -167,3 +167,20 @@ async def test_an_engine_failure_on_the_probe_text_is_answered_not_raised(monkey
     ok, detail = await lm_models.check_model(ModelFile(path), path, "embed")
 
     assert not ok and "llama_decode" in detail
+
+
+async def test_a_retired_file_does_not_load_its_model_again(journal, tmp_path):
+    """Сменённый в настройках файл свою модель больше не грузит.
+
+    Обращение, ждавшее замка во время смены, иначе загрузило бы прежнюю модель
+    заново — сотни мегабайт ради вектора, который всё равно посчитают
+    нынешней моделью.
+    """
+    client = ModelFile(model_file(tmp_path))
+    await client.embed("раз")
+
+    await client.retire()
+
+    with pytest.raises(ModelUnavailable):
+        await client.embed("два")
+    assert journal == ["загружена", "закрыта"]

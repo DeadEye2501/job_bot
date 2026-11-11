@@ -122,7 +122,16 @@ class Settings(Login, Llm, Mail):
         app = app if isinstance(app, dict) else None
 
         async def run() -> dict:
-            applied = await self._apply_providers(creds)
+            try:
+                applied = await self._apply_providers(creds)
+            finally:
+                # И после сорвавшейся записи: записанный до сбоя поставщик уже
+                # в настройках. Без бота переподключать нечего — поднимется он
+                # уже под записанное.
+                # Читается раз: выход из аккаунта снимает бота из потока окна.
+                bot = self._hub.bot
+                if bot is not None:
+                    await bot.reconnect_models()
             if app is not None:
                 try:
                     await self._apply_app(app, applied)

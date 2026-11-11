@@ -136,6 +136,20 @@ class LmProviders:
     embed_model: str
 
 
+def _take_models(pipeline, models: LmProviders) -> None:
+    """Соединения с моделями — полями, которые соседи читают на каждом обращении.
+
+    Читают их там, а не берут копию при сборке: смена поставщика
+    (`use_models`) иначе не доходила бы до них. Копию берёт только
+    `dm_helpers`, но в бою модель по ней не зовут: письмо уходит разбору
+    через `schedule_dm_classification`, а он читает поля конвейера.
+    """
+    pipeline.lm_client = models.chat_client
+    pipeline.lm_embed_client = models.embed_client
+    pipeline.lm_chat_model = models.chat_model
+    pipeline.lm_embed_model = models.embed_model
+
+
 class IngestionPipeline:
     """Конвейер: сотрудники, кэши и работа над вакансией от поста до отклика.
 
@@ -167,10 +181,7 @@ class IngestionPipeline:
     ) -> None:
         self.client = client
         self.session_factory = session_factory
-        self.lm_client = models.chat_client
-        self.lm_embed_client = models.embed_client
-        self.lm_chat_model = models.chat_model
-        self.lm_embed_model = models.embed_model
+        _take_models(self, models)
         # Отклик на отобранное: откликатель с набором агента бота.
         self.apply = apply
         self.rs = runtime_settings
@@ -192,6 +203,15 @@ class IngestionPipeline:
         # соединение. Сама запись входящего письма отметки не читает: письмо,
         # дошедшее до нас, ложится в базу при любом исходе.
         self.shutting_down: bool = False
+
+    def use_models(self, models: LmProviders) -> None:
+        """Перейти на другие соединения с моделями, не останавливая работу.
+
+        Кэш векторов здесь не трогается: под длину новой модели отпечатков он
+        поднимется сам, когда её назовёт первый вектор новой модели
+        (`EmbeddingCache.settle_width`).
+        """
+        _take_models(self, models)
 
     def forget_caches(self) -> None:
         """Забыть слепки прежнего профиля после смены активного.

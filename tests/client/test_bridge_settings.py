@@ -9,6 +9,7 @@ from pathlib import Path
 
 from backend.agent.availability import NO_DRIVER
 from backend.models import AppSetting
+from tests.fakes.ui_bot import UiBot
 
 
 async def test_an_empty_model_name_is_refused_before_saving(api, ask):
@@ -165,3 +166,39 @@ async def test_the_aggregator_snapshot_names_the_browser_and_what_locks_the_agen
     aggregators = (await ask(api.settings.get))["ok"]["aggregators"]
 
     assert aggregators["browser"] == "Opera" and aggregators["lock"] == NO_DRIVER
+
+
+async def test_saved_settings_reach_the_running_bot(api, ask, hub):
+    """Записанный поставщик доходит до бота, который уже работает.
+
+    Соединения с моделями бот собирает при подъёме: не скажи ему мост о
+    записи, он ходил бы к прежнему поставщику до перезапуска приложения.
+    """
+    bot = UiBot()
+    hub.bot = bot
+
+    await ask(api.settings.save,
+              {"chat": {"base_url": "http://localhost:1234", "api_key": "", "model": "qwen"}})
+
+    assert bot.calls == [("reconnect_models",)]
+
+
+async def test_a_half_written_save_still_reaches_the_running_bot(api, ask, hub, monkeypatch):
+    """Запись, сорвавшаяся на втором поставщике, первого до бота всё равно доводит.
+
+    Чат к этому мигу уже лежит в настройках: не узнай о нём бот, он ходил бы
+    к прежнему чату, пока человек не сохранит настройки ещё раз.
+    """
+    bot = UiBot()
+    hub.bot = bot
+
+    async def busy_base(**_fields):
+        raise RuntimeError("база занята")
+
+    monkeypatch.setattr(hub.rs, "set_embed", busy_base)
+    provider = {"base_url": "http://localhost:1234", "api_key": "", "model": "qwen"}
+
+    answer = await ask(api.settings.save, {"chat": provider, "embed": provider})
+
+    assert "ok" not in answer
+    assert bot.calls == [("reconnect_models",)]

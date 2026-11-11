@@ -73,8 +73,8 @@ class AsyncRunner:
         # Cancel pending tasks so aclose / disconnect handlers в finally
         # блоках Bot.run / IngestionPipeline получают шанс отработать
         # до смерти loop'а. Таймаут расширен с 3с до 15с — Bot.run
-        # finally делает `await client.stop()` Pyrogram'а + два
-        # `await lm_*.aclose()`, на flaky-сети это легко 5-10с.
+        # finally делает `await client.stop()` Pyrogram'а и закрывает
+        # соединения с моделями, на flaky-сети это легко 5-10с.
         # Раньше cancel_pending уезжал по таймауту и тут же loop.stop()
         # рубил cleanup'ы посередине.
         async def _cancel_pending() -> None:

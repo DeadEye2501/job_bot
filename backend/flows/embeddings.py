@@ -65,18 +65,35 @@ async def embed_text(pipeline, text: str, what: str) -> list[float] | None:
     завели и второй раз не увидят, а молчит поставщик сразу для всех постов.
     Записи здесь такой беде нет: пишет её тот, кто ловит, — ему видно, чем
     кончился обход.
+
+    Модель, сменённая в настройках, пока шёл запрос, — повод посчитать
+    заново, а не отдать ответ: отданный вектор называет кэшу повторов длину
+    векторов нынешней модели (`EmbeddingCache.settle_width`), и вектор
+    прежней назвал бы её неверно. По той же причине ничего не значит и беда
+    прежней модели.
     """
-    try:
-        return await lm_embed.embed(
-            pipeline.lm_embed_client,
-            pipeline.lm_embed_model,
-            text[:_EMBED_MAX_CHARS],
-        )
-    except Exception as trouble:
-        if _is_about_the_provider(trouble):
-            raise ProviderIsSilent(what) from trouble
-        logger.exception("%s: не вышло посчитать отпечаток, пропускаю", what)
-        return None
+    while True:
+        asked = (pipeline.lm_embed_client, pipeline.lm_embed_model)
+        try:
+            vector = await lm_embed.embed(*asked, text[:_EMBED_MAX_CHARS])
+        except Exception as trouble:
+            if _model_changed(pipeline, asked):
+                logger.info("%s: прежняя модель отпечатков не ответила (%r), считаю новой",
+                            what, trouble)
+                continue
+            if _is_about_the_provider(trouble):
+                raise ProviderIsSilent(what) from trouble
+            logger.exception("%s: не вышло посчитать отпечаток, пропускаю", what)
+            return None
+        if not _model_changed(pipeline, asked):
+            pipeline.embeddings.settle_width(len(vector))
+            return vector
+        logger.info("%s: модель отпечатков сменилась посреди запроса, считаю заново", what)
+
+
+def _model_changed(pipeline, asked: tuple) -> bool:
+    """Сменились ли соединение или модель отпечатков с тех пор, как спросили."""
+    return (pipeline.lm_embed_client, pipeline.lm_embed_model) != asked
 
 
 async def embed_or_none(pipeline, text: str, what: str) -> list[float] | None:

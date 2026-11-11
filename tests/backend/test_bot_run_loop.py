@@ -251,12 +251,12 @@ async def test_leaving_the_loop_closes_both_model_connections(make_bot, caught_u
     открытым переживает бота и держит гнездо до конца работы приложения.
     """
     bot = wire(await make_bot(embed_url="http://векторы.test"), FakeIngestion())
-    assert bot.lm_embed_client is not bot.lm_client
+    assert bot.models.providers.embed_client is not bot.models.providers.chat_client
 
     await bot.run(once=True)
 
-    assert bot.lm_client.closed == 1
-    assert bot.lm_embed_client.closed == 1
+    assert bot.models.providers.chat_client.closed == 1
+    assert bot.models.providers.embed_client.closed == 1
 
 
 async def test_a_shared_model_connection_is_closed_once(chatting, caught_up):
@@ -267,11 +267,11 @@ async def test_a_shared_model_connection_is_closed_once(chatting, caught_up):
     """
     bot, client, _ = await chatting()
     wire(bot, FakeIngestion())
-    assert bot.lm_client is bot.lm_embed_client
+    assert bot.models.providers.chat_client is bot.models.providers.embed_client
 
     await bot.run(once=True)
 
-    assert bot.lm_client.closed == 1
+    assert bot.models.providers.chat_client.closed == 1
 
 
 async def test_an_already_disconnected_client_is_not_a_failure(chatting, caught_up):
@@ -289,7 +289,7 @@ async def test_an_already_disconnected_client_is_not_a_failure(chatting, caught_
 
     await bot.run(once=True)
 
-    assert bot.lm_client.closed == 1
+    assert bot.models.providers.chat_client.closed == 1
 
 
 async def test_a_broken_disconnect_does_not_leave_connections_open(
@@ -305,7 +305,7 @@ async def test_a_broken_disconnect_does_not_leave_connections_open(
 
     await bot.run(once=True)
 
-    assert bot.lm_client.closed == 1
+    assert bot.models.providers.chat_client.closed == 1
 
 
 async def test_a_connection_that_never_came_up_still_closes_the_rest(
@@ -328,7 +328,7 @@ async def test_a_connection_that_never_came_up_still_closes_the_rest(
     with pytest.raises(OSError):
         await bot.run(once=True)
 
-    assert bot.lm_client.closed == 1
+    assert bot.models.providers.chat_client.closed == 1
 
 
 async def test_switching_off_drains_the_text_waiting_to_be_read(

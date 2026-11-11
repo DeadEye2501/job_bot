@@ -192,7 +192,7 @@ async def test_a_text_without_an_embedding_leaves_no_half_made_row(
     перепостов."""
 
     async def no_answer(client, model, text):
-        return None
+        raise RuntimeError("embed: empty data in response")
 
     monkeypatch.setattr("adapters.lm_embed.embed", no_answer)
 

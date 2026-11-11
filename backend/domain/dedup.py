@@ -66,11 +66,28 @@ class EmbeddingCache:
     """
 
     def __init__(self) -> None:
+        self._empty()
+
+    def _empty(self) -> None:
         self.ids = np.empty((0,), dtype=np.int64)
         self.matrix = np.empty((0, 0), dtype=np.float32)
         # Поднимали ли уже. Подъём идёт один раз за жизнь конвейера, и без
         # этой отметки его повторяли бы на каждый пост.
         self.loaded = False
+        # Длина векторов в кэше; пусто — ни подъёма, ни дописки ещё не было.
+        self.width: int | None = None
+
+    def settle_width(self, width: int) -> None:
+        """Принять длину векторов нынешней модели; кэш другой длины поднимется заново.
+
+        Длину кэшу задаёт первый попавший в него вектор, а им может оказаться
+        вектор прежней модели, посчитанный до смены её в настройках и
+        дошедший до кэша после. Такой кэш не принял бы ни одного вектора
+        новой модели до перезапуска. Называет длину тот, кто знает, что
+        вектор посчитан нынешней моделью (`flows/embeddings.embed_text`).
+        """
+        if self.width is not None and self.width != width:
+            self._empty()
 
     def fill(
         self, pairs: Iterable[tuple[int, list[float]]], width: int
@@ -82,14 +99,21 @@ class EmbeddingCache:
         подъём целиком — то есть отсев повторов перестаёт работать вовсе.
         Отброшенные не потеря: вектор прежней модели живёт в другом
         пространстве, и сравнивать его с нынешними нечем.
+
+        Дописанное, пока шло чтение, остаётся, если оно нынешней длины, и
+        берёт верх над прочитанным: вакансию записали — или пересчитали ей
+        вектор — после начала чтения.
         """
         rows = list(pairs)
         fit = [(vacancy_id, vector) for vacancy_id, vector in rows
                if len(vector) == width]
-        if fit:
-            self.ids = np.array([i for i, _ in fit], dtype=np.int64)
-            self.matrix = np.array([v for _, v in fit], dtype=np.float32)
+        added = list(zip(self.ids.tolist(), self.matrix)) if self.width == width else []
+        known = {vacancy_id for vacancy_id, _ in added}
+        kept = [(i, v) for i, v in fit if i not in known] + added
+        self.ids = np.array([i for i, _ in kept], dtype=np.int64)
+        self.matrix = np.array([v for _, v in kept], dtype=np.float32)
         self.loaded = True
+        self.width = width
         return len(rows) - len(fit)
 
     def append(self, vacancy_id: int, vector: list[float]) -> None:
@@ -107,6 +131,7 @@ class EmbeddingCache:
         vec = np.asarray(vector, dtype=np.float32)
         if self.matrix.size == 0:
             self.matrix = vec.reshape(1, -1)
+            self.width = len(vec)
         else:
             self.matrix = np.vstack([self.matrix, vec])
         self.ids = np.append(self.ids, vacancy_id)

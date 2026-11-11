@@ -204,9 +204,7 @@ async def _disconnect(bot) -> None:
     # осталась бы навсегда, показывая зелёный огонёк у бота, который уже
     # отключил Telegram.
     bot.loop = None
-    if bot.lm_embed_client is not bot.lm_client:
-        await bot.lm_embed_client.aclose()
-    await bot.lm_client.aclose()
+    await bot.models.close()
 
 
 async def _turn_done(bot) -> None:

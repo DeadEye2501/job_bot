@@ -79,6 +79,9 @@ class UiBot:
     def kick(self) -> None:
         self.calls.append(("kick",))
 
+    async def reconnect_models(self) -> None:
+        self.calls.append(("reconnect_models",))
+
     async def run(self, *, once: bool = False) -> None:
         """Работа бота, которая сразу кончается.
 

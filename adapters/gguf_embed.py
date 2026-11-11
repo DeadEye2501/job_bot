@@ -58,6 +58,8 @@ class ModelFile:
         self.path = path
         self._model = None
         self._lock = threading.Lock()
+        # Сменён в настройках: модель больше не грузится — см. `retire`.
+        self._retired = False
 
     async def embed(self, text: str) -> list[float]:
         """Вектор текста; счёт в отдельном потоке, петлю бота он не держит."""
@@ -65,6 +67,8 @@ class ModelFile:
 
     def _embed_now(self, text: str) -> list[float]:
         with self._lock:
+            if self._retired:
+                raise ModelUnavailable(f"модель сменена в настройках: {self.path}")
             if self._model is None:
                 self._model = self._load()
             vector = self._model.embed(text)
@@ -103,6 +107,20 @@ class ModelFile:
     async def aclose(self) -> None:
         """Выгрузить модель; следующий текст загрузит её заново."""
         await asyncio.to_thread(self._release)
+
+    async def retire(self) -> None:
+        """Выгрузить модель насовсем: файл сменили в настройках.
+
+        Обращение, ждавшее замка, иначе загрузило бы прежнюю модель заново —
+        сотни мегабайт и секунды ради вектора, который всё равно выбросят: его
+        считают заново нынешней моделью (`flows/embeddings.embed_text`).
+        """
+        await asyncio.to_thread(self._retire_now)
+
+    def _retire_now(self) -> None:
+        with self._lock:
+            self._retired = True
+        self._release()
 
     def _release(self) -> None:
         with self._lock:
