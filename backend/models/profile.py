@@ -13,7 +13,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.models.base import Base, IdMixin, UpdatedAtMixin, enum_column
-from backend.models.enums import Gender, SalaryPeriod
+from backend.models.enums import Gender, PreferenceKind, SalaryPeriod
 
 profile_experience_skills = Table(
     "profile_experience_skills",
@@ -61,7 +61,6 @@ class Profile(IdMixin, UpdatedAtMixin, Base):
     grades: Mapped[list[str]] = mapped_column(
         JSON, server_default=text("'[]'")
     )
-    free_preferences: Mapped[str | None]
     expected_salary: Mapped[int | None]
     expected_salary_currency: Mapped[str | None]
     expected_salary_period: Mapped[SalaryPeriod | None] = mapped_column(
@@ -75,7 +74,7 @@ class Profile(IdMixin, UpdatedAtMixin, Base):
     birth_date: Mapped[date | None]
     citizenship: Mapped[str | None]
     # Готовый текст для людей: им заполняют «О себе» на сайтах. Указания
-    # модели живут в `free_preferences`, и в решения этот текст не входит.
+    # модели живут в `ProfilePreference`, и в решения этот текст не входит.
     about_me: Mapped[str | None]
     resume_url: Mapped[str | None]
     workspace_id: Mapped[int] = mapped_column(ForeignKey("workspace.id"))
@@ -98,6 +97,20 @@ class CoverLetter(Base):
     app_short: Mapped[str | None]
     en: Mapped[str | None]
     en_short: Mapped[str | None]
+
+
+class ProfilePreference(IdMixin, Base):
+    """Строка предпочтений анкеты: вид и свободный текст; порядок — по `id`.
+
+    Строками, а не одним текстом: вид решает, кто строку читает (`domain/
+    preferences`), и человек видит и правит его у каждой строки.
+    """
+
+    __tablename__ = "profile_preference"
+
+    profile_id: Mapped[int] = mapped_column(ForeignKey("profile.id"))
+    kind: Mapped[PreferenceKind] = mapped_column(enum_column(PreferenceKind, "preference_kind"))
+    text: Mapped[str]
 
 
 class ProfileLanguage(IdMixin, Base):

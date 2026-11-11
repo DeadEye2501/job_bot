@@ -11,9 +11,10 @@ from datetime import date
 import pytest
 from sqlalchemy import select
 
-from backend.payloads import ParsedCvLanguage
+from backend.payloads import ParsedCvLanguage, ParsedCvPreference
 from backend.models import (
     Gender,
+    PreferenceKind,
     Profile,
     ProfileExperience,
     ProfileLanguage,
@@ -26,6 +27,7 @@ from backend.models import (
 from backend.repository.profile import get_profile
 from backend.repository.profile_cv import save_parsed_cv
 from backend.repository.profile_experience import list_experience
+from backend.repository.profile_preferences import list_profile_preferences
 from backend.repository.profile_projects import list_projects
 from backend.repository.profile_skills import list_skills
 from tests.dbio import put
@@ -118,7 +120,6 @@ async def test_every_profile_field_reaches_the_row(session):
                 education="МГУ",
                 work_format=["remote", "hybrid"],
                 grades=["senior"],
-                free_preferences="готов к переезду",
             )
         ),
         workspace_id=TEST_WORKSPACE_ID, cv_path="",
@@ -133,7 +134,37 @@ async def test_every_profile_field_reaches_the_row(session):
     assert saved.education == "МГУ"
     assert saved.work_format == ["remote", "hybrid"]
     assert saved.grades == ["senior"]
-    assert saved.free_preferences == "готов к переезду"
+
+
+async def test_preferences_are_written_with_the_profile(session):
+    first = [ParsedCvPreference(PreferenceKind.BAN, "без гемблинга"),
+             ParsedCvPreference(PreferenceKind.INFO, "есть права")]
+
+    await save_parsed_cv(session, parsed_cv(preferences=first),
+                         workspace_id=TEST_WORKSPACE_ID, cv_path="")
+
+    assert [(one.kind, one.text) for one in await list_profile_preferences(session)] == [
+        (PreferenceKind.BAN, "без гемблинга"), (PreferenceKind.INFO, "есть права"),
+    ]
+
+
+async def test_the_next_cv_keeps_the_preferences_and_adds_only_new_ones(session):
+    """Следующее резюме строк не стирает: их размечает человек, а резюме о
+    предпочтениях чаще молчит. Строку с тем же текстом оно не дублирует и
+    вида у лежащей не меняет."""
+    first = [ParsedCvPreference(PreferenceKind.BAN, "без гемблинга")]
+    await save_parsed_cv(session, parsed_cv(preferences=first),
+                         workspace_id=TEST_WORKSPACE_ID, cv_path="")
+
+    again = [ParsedCvPreference(PreferenceKind.INFO, "Без гемблинга"),
+             ParsedCvPreference(PreferenceKind.WISH, "продукт")]
+    await save_parsed_cv(session, parsed_cv(preferences=again),
+                         workspace_id=TEST_WORKSPACE_ID, cv_path="")
+    await save_parsed_cv(session, parsed_cv(), workspace_id=TEST_WORKSPACE_ID, cv_path="")
+
+    assert [(one.kind, one.text) for one in await list_profile_preferences(session)] == [
+        (PreferenceKind.BAN, "без гемблинга"), (PreferenceKind.WISH, "продукт"),
+    ]
 
 
 async def test_languages_and_skills_are_written_with_the_profile(session):

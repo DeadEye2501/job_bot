@@ -141,7 +141,6 @@ describe('что уезжает на мост', () => {
       location: '',
       education: '',
       about_me: '',
-      free_preferences: '',
       resume_url: '',
       expected_salary: '',
       expected_salary_currency: '',
@@ -149,6 +148,7 @@ describe('что уезжает на мост', () => {
       grades: [],
       work_format: [],
       languages: [],
+      preferences: [],
       updated_at: null,
     });
   });

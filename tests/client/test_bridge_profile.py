@@ -6,7 +6,8 @@
 
 from tests.factories import person_fields
 
-PERSON = person_fields()
+# Строки предпочтений окно шлёт всегда — пустым перечнем, когда их нет.
+PERSON = {**person_fields(), "preferences": []}
 
 
 async def _saved_person(api, ask, **extra) -> None:
@@ -59,7 +60,6 @@ async def test_a_saved_person_comes_back_on_the_next_request(api, ask):
         "github_url": None,
         "linkedin_url": "https://www.linkedin.com/in/ivan",
         "education": "МГУ",
-        "free_preferences": None,
         "expected_salary": None,
         "expected_salary_currency": None,
         "expected_salary_period": None,
@@ -71,6 +71,7 @@ async def test_a_saved_person_comes_back_on_the_next_request(api, ask):
         "grades": [],
         "work_format": [],
         "languages": [],
+        "preferences": [],
     }
 
 
@@ -190,6 +191,35 @@ async def test_an_unknown_language_level_becomes_the_usual_one(api, ask):
 
     languages = answer["ok"]["profile"]["languages"]
     assert languages == [{"language": "английский", "level": "B2"}]
+
+
+async def test_preferences_come_back_in_their_order_without_blank_rows(api, ask):
+    """Строки предпочтений возвращаются как записаны, а заведённая и не
+    набранная строка не ложится пустой: окно пишет анкету по ходу правки."""
+    await _saved_person(api, ask, preferences=[
+        {"kind": "ban", "text": " не работаю с гемблингом "},
+        {"kind": "info", "text": "  "},
+        {"kind": "wish", "text": "предпочитаю продуктовые компании"},
+    ])
+
+    answer = await ask(api.profile.get)
+
+    assert answer["ok"]["profile"]["preferences"] == [
+        {"kind": "ban", "text": "не работаю с гемблингом"},
+        {"kind": "wish", "text": "предпочитаю продуктовые компании"},
+    ]
+
+
+async def test_an_unknown_preference_kind_is_refused_and_nothing_is_written(api, ask):
+    """Вид выбирают списком, и чужой — битая нагрузка: запрет, записанный
+    наугад пожеланием, молча пропускал бы вакансии, которые человек отсёк."""
+    await _saved_person(api, ask, preferences=[{"kind": "ban", "text": "без крипты"}])
+
+    answer = await ask(api.profile.save, {**PERSON, "preferences": [{"kind": "rule", "text": "x"}]})
+
+    assert answer["fail"] == "fields"
+    preferences = (await ask(api.profile.get))["ok"]["profile"]["preferences"]
+    assert preferences == [{"kind": "ban", "text": "без крипты"}]
 
 
 async def test_skills_without_a_person_are_refused_by_name(api, ask):

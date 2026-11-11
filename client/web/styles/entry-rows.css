@@ -1,0 +1,50 @@
+/* Строки анкеты одной таблицей (`EntryRows`): в строке текст, выбор из списка
+   и крестик, — и «Добавить» последней строкой во всю ширину. Общая рамка — та
+   же, что у полей одной рамкой (`input-pair.css`); здесь раскладка ячеек.
+
+   Обрезки по рамке нет нарочно: из ячейки выбора выпадает список, и рамка
+   его срезала бы. Подложка у ячеек прозрачная, поэтому угол таблицы им не
+   нужен. */
+
+.entry-table {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+}
+
+.entry-row {
+  display: grid;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Ширина ячейки выбора — по самому длинному варианту: уровня языка и вида
+   предпочтения. */
+.entry-table.lang .entry-row {
+  grid-template-columns: 1fr 96px var(--control-height);
+}
+
+.entry-table.pref .entry-row {
+  grid-template-columns: 1fr 128px var(--control-height);
+}
+
+.entry-row > * + * {
+  border-left: 1px solid var(--border);
+}
+
+.entry-table .input,
+.entry-table .cdd-btn {
+  background: transparent;
+}
+
+/* «native» показывается с прописной, рядом с C2 и B1 — оно тут такая же
+   ступень, как они, и строчным читается как обмолвка. Правится показом, а не
+   значением: значение уходит на мост, а тот знает уровни строчными. */
+.entry-table.lang .cdd-label,
+.entry-table.lang .cdd-option {
+  text-transform: capitalize;
+}
+
+/* Вид кнопки — общий, в add-link.css; своё здесь — высота строки таблицы. */
+.entry-add {
+  min-height: var(--control-height);
+}

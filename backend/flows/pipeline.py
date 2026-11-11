@@ -23,12 +23,14 @@ from backend.flows import channels
 from backend.flows import rerun
 from backend.flows import cleanup
 from backend.flows import ghosting
+from backend.domain.preferences import of_kind
 from backend.llm import candidate
 from backend.llm.candidate import CandidateProfile
-from backend.models import ProfileSkill
+from backend.models import PreferenceKind, ProfileSkill
 from backend.repository.blacklist_marks import load_active_blacklist_patterns
 from backend.repository.profile import get_profile
 from backend.repository.profile_languages import list_profile_languages
+from backend.repository.profile_preferences import list_profile_preferences
 from backend.repository.profile_skills import list_skills
 
 
@@ -269,9 +271,12 @@ class IngestionPipeline:
             )
             profile = await get_profile(session)
             languages = await list_profile_languages(session)
+            preferences = await list_profile_preferences(session)
             self.profile_cache = replace(
                 candidate.build_candidate_profile(profile, languages),
                 known_skills=self.skills_cache,
+                bans=of_kind(preferences, PreferenceKind.BAN),
+                info=of_kind(preferences, PreferenceKind.INFO),
             )
         logger.info(
             "loaded resources: %d skills, %d blacklist patterns, "

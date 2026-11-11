@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from backend.domain.taxonomy import LANGUAGE_LEVELS
+from backend.incoming import text_or_none
+from backend.models import PreferenceKind
 
 
 def _filter_languages(items) -> list[tuple[str, str]]:
@@ -39,4 +41,19 @@ def _filter_languages(items) -> list[tuple[str, str]]:
             continue
         seen[key] = len(out)
         out.append((name, level))
+    return out
+
+
+def _filter_preferences(items: list[dict]) -> list[tuple[PreferenceKind, str]]:
+    """Строки предпочтений из окна; строка без текста выпадает.
+
+    Без текста — заведённая и не набранная строка: окно пишет анкету по ходу
+    правки. Чужой вид бросает `ValueError`: окно выбирает его списком, и
+    чужое значит битую нагрузку, а не умолчание.
+    """
+    out = []
+    for item in items:
+        text = text_or_none(item["text"])
+        if text:
+            out.append((PreferenceKind(item["kind"]), text))
     return out

@@ -17,11 +17,12 @@ from backend.payloads import REQUIRED_PROFILE_FIELDS
 from backend.repository import profile as profile_repo
 from backend.repository import profile_experience as experience_repo
 from backend.repository import profile_languages as languages_repo
+from backend.repository import profile_preferences as preferences_repo
 from backend.repository import profile_projects as projects_repo
 from backend.repository import profile_skills as skills_repo
 from backend.repository.profile_records import RowError
 from client.bridge.answer import BAD_PAYLOAD, Denied, bad_fields, denied, reply
-from client.bridge.choices import _filter_languages
+from client.bridge.choices import _filter_languages, _filter_preferences
 from client.bridge.cv import Cv
 from client.bridge.cv_file import _stat_cv
 from client.bridge.hub import Hub
@@ -63,9 +64,10 @@ class Profile(Cv, Photo, Letters):
                     if profile is not None
                     else []
                 )
+                preferences = await preferences_repo.list_profile_preferences(session)
             cv_path = self._hub.rs.cv_path
             return {
-                "profile": _profile_to_dict(profile, languages),
+                "profile": _profile_to_dict(profile, languages, preferences),
                 "cv_path": cv_path,
                 "cv_meta": _stat_cv(cv_path),
                 "photo_url": _photo_url(self._hub.rs.photo_path),
@@ -74,10 +76,11 @@ class Profile(Cv, Photo, Letters):
         return reply(self._hub.runner, run())
 
     def save(self, payload: dict) -> dict:
-        """Записать анкету целиком, вместе с языками."""
+        """Записать анкету целиком, вместе с языками и строками предпочтений."""
         try:
             fields = _read_profile_fields(payload)
             languages = _filter_languages(payload.get("languages"))
+            preferences = _filter_preferences(payload["preferences"])
         except BAD_PAYLOAD as e:
             return bad_fields("save", e)
 
@@ -91,6 +94,9 @@ class Profile(Cv, Photo, Letters):
                     profile = await profile_repo.upsert_profile(session, **fields)
                     await languages_repo.replace_profile_languages(
                         session, profile.id, languages
+                    )
+                    await preferences_repo.replace_profile_preferences(
+                        session, profile.id, preferences
                     )
             return {}
 
@@ -201,7 +207,6 @@ def _read_profile_fields(payload: dict) -> dict:
         "github_url": text_or_none(payload.get("github_url")),
         "linkedin_url": text_or_none(payload.get("linkedin_url")),
         "education": text_or_none(payload.get("education")),
-        "free_preferences": text_or_none(payload.get("free_preferences")),
         "expected_salary": amount_or_none(payload.get("expected_salary")),
         "expected_salary_currency": currency_sign(
             text_or_none(payload.get("expected_salary_currency"))

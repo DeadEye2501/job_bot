@@ -15,9 +15,11 @@ from backend.models import (
     HR,
     CoverLetter,
     Message,
+    PreferenceKind,
     Profile,
     ProfileExperience,
     ProfileLanguage,
+    ProfilePreference,
     ProfileProject,
     ProfileSkill,
     TelegramChannel,
@@ -86,6 +88,8 @@ async def _source(session_factory, cv_path: str = "C:/cv.pdf") -> int:
         session_factory,
         resume,
         ProfileLanguage(profile_id=person.id, language="Русский", level="native"),
+        ProfilePreference(profile_id=person.id, kind=PreferenceKind.BAN, text="без гемблинга"),
+        ProfilePreference(profile_id=person.id, kind=PreferenceKind.INFO, text="есть права"),
         experience_row(person.id, company="Контур", skills=[skill]),
         project_row(person.id, name="Бот", skills=[skill]),
     )
@@ -179,7 +183,7 @@ async def test_personal_data_carries_only_the_person(session_factory):
     assert person.expected_salary_currency is None
     languages = await _of(session_factory, ProfileLanguage, person.id)
     assert [(lang.language, lang.level) for lang in languages] == [("Русский", "native")]
-    for model in (ProfileSkill, ProfileExperience, ProfileProject):
+    for model in (ProfileSkill, ProfileExperience, ProfileProject, ProfilePreference):
         assert await _of(session_factory, model, person.id) == []
     workspace = await _workspace(session_factory, made)
     assert workspace.cv_path == ""
@@ -204,6 +208,10 @@ async def test_a_copy_carries_everything_but_vacancies_and_read_marks(session_fa
     assert [(p.company, [s.name for s in p.skills]) for p in places] == [("Контур", ["Python"])]
     projects = await _of(session_factory, ProfileProject, person.id)
     assert [(p.name, [s.name for s in p.skills]) for p in projects] == [("Бот", ["Python"])]
+    preferences = await _of(session_factory, ProfilePreference, person.id)
+    assert [(p.kind, p.text) for p in preferences] == [
+        (PreferenceKind.BAN, "без гемблинга"), (PreferenceKind.INFO, "есть права"),
+    ]
     workspace = await _workspace(session_factory, made)
     assert workspace.cv_path == "C:/cv.pdf"
     assert stored_media(workspace.photo_path).read_bytes() == PHOTO
@@ -287,6 +295,7 @@ async def test_deleting_takes_the_workspace_and_keeps_shared_rows(session_factor
     assert [t.source_key for t in await all_rows(session_factory, TrashEvent)] == ["чужой"]
     assert [p.first_name for p in await all_rows(session_factory, Profile)] == ["Пётр"]
     assert await all_rows(session_factory, ProfileSkill) == []
+    assert await all_rows(session_factory, ProfilePreference) == []
     assert await _switches(session_factory, TEST_WORKSPACE_ID) == []
     assert len(await _switches(session_factory, 3)) == 1
     assert await all_rows(session_factory, CoverLetter) == []

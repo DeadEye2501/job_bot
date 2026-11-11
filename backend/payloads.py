@@ -24,6 +24,7 @@ from backend.models import (
     HR,
     Company,
     Gender,
+    PreferenceKind,
     SalaryPeriod,
     TelegramChannel,
     Vacancy,
@@ -182,7 +183,6 @@ class ParsedCvProfile:
     education: str | None
     work_format: list[str]
     grades: list[str]
-    free_preferences: str | None
     expected_salary: int | None
     expected_salary_currency: str | None
     expected_salary_period: SalaryPeriod | None
@@ -201,6 +201,12 @@ class ParsedCvProfile:
 class ParsedCvLanguage:
     language: str
     level: str
+
+
+@dataclass(frozen=True)
+class ParsedCvPreference:
+    kind: PreferenceKind
+    text: str
 
 
 @dataclass(frozen=True)
@@ -235,6 +241,7 @@ class ParsedCvProject:
 class ParsedCv:
     profile: ParsedCvProfile
     languages: list[ParsedCvLanguage]
+    preferences: list[ParsedCvPreference]
     skills: list[ParsedCvSkill]
     experience: list[ParsedCvExperience]
     projects: list[ParsedCvProject]

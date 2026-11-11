@@ -9,7 +9,7 @@
 подхватится со следующего цикла, а не немедленно.
 """
 
-from backend.models import Profile, ProfileLanguage
+from backend.models import PreferenceKind, Profile, ProfileLanguage, ProfilePreference
 from tests.dbio import only_row, put
 from tests.factories import (
     blacklist_row,
@@ -95,6 +95,26 @@ async def test_the_candidate_slice_is_rebuilt(make_pipeline, session_factory):
     assert [(x.name, x.level) for x in pipeline.profile_cache.languages] == [
         ("Английский", "B1")
     ]
+
+
+async def test_bans_and_info_are_lifted_each_to_its_own_place(make_pipeline, session_factory):
+    """Запреты судит один зов, сведения читает другой, а пожелания до
+    проверки вакансии не доходят вовсе: они только для откликов."""
+    await put(session_factory, profile_row())
+    profile = await only_row(session_factory, Profile)
+    await put(
+        session_factory,
+        ProfilePreference(profile_id=profile.id, kind=PreferenceKind.BAN, text="без гемблинга"),
+        ProfilePreference(profile_id=profile.id, kind=PreferenceKind.WISH, text="продукт"),
+        ProfilePreference(profile_id=profile.id, kind=PreferenceKind.INFO, text="есть права"),
+        ProfilePreference(profile_id=profile.id, kind=PreferenceKind.BAN, text="без крипты"),
+    )
+    pipeline = await make_pipeline()
+
+    await pipeline.reload_resources()
+
+    assert pipeline.profile_cache.bans == ["без гемблинга", "без крипты"]
+    assert pipeline.profile_cache.info == ["есть права"]
 
 
 async def test_an_empty_base_leaves_empty_caches(make_pipeline):

@@ -4,13 +4,15 @@ from datetime import date
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.domain.preferences import of_kind
 from backend.domain.salary import salary_text
 from backend.domain.tenure import full_years, place_period, worked_years, years_text
 from backend.llm.candidate import GENDER_WORDS, candidate_languages, format_languages
-from backend.models import SalaryPeriod
+from backend.models import PreferenceKind, SalaryPeriod
 from backend.repository.profile import get_profile
 from backend.repository.profile_experience import list_experience
 from backend.repository.profile_languages import list_profile_languages
+from backend.repository.profile_preferences import list_profile_preferences
 from backend.repository.profile_projects import list_projects
 from backend.repository.profile_skills import list_skills
 
@@ -30,6 +32,7 @@ async def build_agent_profile(session: AsyncSession, today: date, photo: bool) -
     projects = await list_projects(session)
     skills = await list_skills(session)
     languages = await list_profile_languages(session)
+    preferences = await list_profile_preferences(session)
     return "\n".join([
         *_person_lines(profile, languages, today),
         f"Фото: {'есть' if photo else 'нет'}",
@@ -38,8 +41,20 @@ async def build_agent_profile(session: AsyncSession, today: date, photo: bool) -
         "Опыт работы:", *_place_lines(places),
         "Проекты:", *_project_lines(projects),
         f"О себе: {profile.about_me or 'не указано'}",
-        f"Предпочтения: {profile.free_preferences or 'не указаны'}",
+        # Запреты — и здесь, хоть их и судит проверка вакансии: заведённую
+        # человеком вакансию она не судит, а вопросы форм («готовы к
+        # командировкам?») спрашивают как раз то, что в запретах записано.
+        "Запреты человека (этого он не примет ни при каких условиях):",
+        *_preference_lines(of_kind(preferences, PreferenceKind.BAN)),
+        "Пожелания человека (выполняй по возможности; не выходит — действуй как обычно, будто пожелания нет):",
+        *_preference_lines(of_kind(preferences, PreferenceKind.WISH)),
+        "Сведения от человека (бери, только когда их прямо спрашивают; к месту и не к месту не вставляй):",
+        *_preference_lines(of_kind(preferences, PreferenceKind.INFO)),
     ])
+
+
+def _preference_lines(texts: list[str]) -> list[str]:
+    return [f"- {text}" for text in texts] or ["- нет"]
 
 
 def _person_lines(p, languages, today: date) -> list[str]:

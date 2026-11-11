@@ -103,7 +103,7 @@ def _enum_value(member) -> str | None:
     return member.value if member is not None else None
 
 
-def _profile_to_dict(p, languages=None) -> dict | None:
+def _profile_to_dict(p, languages, preferences) -> dict | None:
     if p is None:
         return None
     return {
@@ -117,7 +117,6 @@ def _profile_to_dict(p, languages=None) -> dict | None:
         "github_url": p.github_url,
         "linkedin_url": p.linkedin_url,
         "education": p.education,
-        "free_preferences": p.free_preferences,
         "expected_salary": p.expected_salary,
         "expected_salary_currency": p.expected_salary_currency,
         "expected_salary_period": _enum_value(p.expected_salary_period),
@@ -134,8 +133,9 @@ def _profile_to_dict(p, languages=None) -> dict | None:
         "work_format": list(p.work_format or []),
         "languages": [
             {"language": lang.language, "level": lang.level}
-            for lang in (languages or [])
+            for lang in languages
         ],
+        "preferences": [{"kind": one.kind.value, "text": one.text} for one in preferences],
         "updated_at": _iso(p.updated_at),
     }
 

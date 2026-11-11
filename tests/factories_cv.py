@@ -30,7 +30,6 @@ def parsed_cv_profile(**overrides) -> ParsedCvProfile:
         education=None,
         work_format=[],
         grades=[],
-        free_preferences=None,
         expected_salary=None,
         expected_salary_currency=None,
         expected_salary_period=None,
@@ -74,6 +73,7 @@ def parsed_cv(**overrides) -> ParsedCv:
     fields = {
         "profile": parsed_cv_profile(),
         "languages": [],
+        "preferences": [],
         "skills": [],
         "experience": [],
         "projects": [],

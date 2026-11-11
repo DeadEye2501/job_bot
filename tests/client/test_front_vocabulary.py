@@ -1,6 +1,6 @@
 """Согласие перечней окна с перечнями бэкенда.
 
-Шесть перечней объявлены дважды: раз на питоне, раз в `client/web/state/`.
+Семь перечней объявлены дважды: раз на питоне, раз в `client/web/state/`.
 Свести их в одно объявление сегодня нечем — мост списками их не отдаёт, а
 превращать константы окна в данные, приезжающие с моста, значит переписать
 шесть модулей состояния и всех их потребителей. Пока этого не сделано,
@@ -27,7 +27,7 @@ from backend.domain.verdict import (
     blacklist_refusal,
     decide_vacancy_status,
 )
-from backend.models.enums import BotMode, VacancyStatus
+from backend.models.enums import BotMode, PreferenceKind, VacancyStatus
 from backend.models.settings import BLACKLIST_KINDS
 from tests.paths import ROOT
 
@@ -151,6 +151,11 @@ def test_language_levels_match() -> None:
     """Порядок у окна свой — от высшего к младшему: так их и выбирают. Сверяется
     состав, а не порядок."""
     assert sorted(_strings("profile.js", "LANG_LEVELS")) == sorted(LANGUAGE_LEVELS)
+
+
+def test_preference_kinds_match() -> None:
+    """Вид, которого мост не знает, отбивает запись анкеты целиком."""
+    assert _values("profile.js", "PREFERENCE_KINDS") == [kind.value for kind in PreferenceKind]
 
 
 def test_blacklist_kinds_match() -> None:

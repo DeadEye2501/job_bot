@@ -10,7 +10,7 @@ from datetime import date
 import pytest
 
 from backend.llm.cv import parse_cv
-from backend.models import Gender, SalaryPeriod
+from backend.models import Gender, PreferenceKind, SalaryPeriod
 from tests.factories import CV_REQUIRED_PROFILE
 from tests.fakes.llm import CHAT, chat_response, provider
 
@@ -154,6 +154,32 @@ async def test_a_native_language_is_recognised_in_both_spellings(native):
     }), text=f"Языки: Deutsch — {native}")
 
     assert ("Deutsch", "native") in [(x.language, x.level) for x in parsed.languages]
+
+
+async def test_preferences_come_with_their_kinds_and_rows_without_one_are_dropped():
+    """Строка без вида или текста выпадает одна: прочие из того же ответа
+    остаются, и человек поправит их в анкете."""
+    parsed = await parse_answer(json.dumps({
+        "profile": CV_REQUIRED_PROFILE,
+        "preferences": [
+            {"kind": "ban", "text": " не рассматриваю гемблинг "},
+            {"kind": "rule", "text": "чужой вид"},
+            {"kind": "info", "text": "  "},
+            {"text": "без вида"},
+            {"kind": "WISH", "text": "продуктовые компании"},
+        ],
+    }))
+
+    assert [(one.kind, one.text) for one in parsed.preferences] == [
+        (PreferenceKind.BAN, "не рассматриваю гемблинг"),
+        (PreferenceKind.WISH, "продуктовые компании"),
+    ]
+
+
+async def test_an_answer_without_preferences_gives_no_rows():
+    parsed = await parse_profile()
+
+    assert parsed.preferences == []
 
 
 async def test_a_language_with_an_unknown_level_keeps_the_highest_one():

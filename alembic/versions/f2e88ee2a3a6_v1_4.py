@@ -1,7 +1,7 @@
 """v1.4
 
-Новые поля и сущности версии 1.4 — одной ревизией: ссылка на LinkedIn в анкете
-и сопроводительные письма профиля.
+Новые поля и сущности версии 1.4 — одной ревизией: ссылка на LinkedIn в анкете,
+сопроводительные письма профиля и предпочтения строками вместо свободного текста.
 
 Revision ID: f2e88ee2a3a6
 Revises: 5d2e7a9c4b13
@@ -21,6 +21,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    # Пересборка `profile` при включённых ключах упирается в ссылающиеся на неё
+    # строки (`test_migration_engine.py`); гасится до первой записи.
+    op.execute("PRAGMA foreign_keys=OFF")
     op.add_column('profile', sa.Column('linkedin_url', sa.String(), nullable=True))
     op.create_table('cover_letter',
     sa.Column('workspace_id', sa.Integer(), nullable=False),
@@ -31,8 +34,24 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['workspace_id'], ['workspace.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('workspace_id')
     )
+    op.create_table('profile_preference',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('profile_id', sa.Integer(), nullable=False),
+    sa.Column('kind', sa.Enum('ban', 'wish', 'info', name='preference_kind'), nullable=False),
+    sa.Column('text', sa.String(), nullable=False),
+    sa.ForeignKeyConstraint(['profile_id'], ['profile.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    # Старый текст не переносится: вид каждой строки размечает человек, а не
+    # миграция.
+    with op.batch_alter_table('profile') as batch:
+        batch.drop_column('free_preferences')
 
 
 def downgrade() -> None:
+    op.execute("PRAGMA foreign_keys=OFF")
+    with op.batch_alter_table('profile') as batch:
+        batch.add_column(sa.Column('free_preferences', sa.String(), nullable=True))
+    op.drop_table('profile_preference')
     op.drop_table('cover_letter')
     op.drop_column('profile', 'linkedin_url')

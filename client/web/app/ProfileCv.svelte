@@ -9,7 +9,7 @@
   import { call } from '$api/bridge.js';
   import CvFileRow from '$components/CvFileRow.svelte';
   import DelayedTextarea from '$components/DelayedTextarea.svelte';
-  import LangRows from '$components/LangRows.svelte';
+  import EntryRows from '$components/EntryRows.svelte';
   import ChoiceRow from '$components/ChoiceRow.svelte';
   import PhotoCropDialog from '$components/PhotoCropDialog.svelte';
   import PhotoFrame from '$components/PhotoFrame.svelte';
@@ -22,11 +22,12 @@
   import { alone, toggled } from '$state/chosen.js';
   import {
     GRADES,
+    LANGUAGE_ROWS,
+    PREFERENCE_ROWS,
     TYPING_DELAY,
     WORK_FORMATS,
     blankProfile,
     cvOpenable,
-    langRow,
     profileSheet,
     updatedNote,
   } from '$state/profile.js';
@@ -138,19 +139,38 @@
     saver.typed(JSON.stringify(sheet()));
   }
 
-  function editLang(index, part) {
-    const rows = form.languages.map((one, at) => (at === index ? { ...one, ...part } : one));
-    form = { ...form, languages: rows };
-    return save();
+  // Строки таблиц анкеты — языки и предпочтения; `kind` — описание таблицы.
+  function editRow(kind, index, part) {
+    const rows = form[kind.field].map((one, at) => (at === index ? { ...one, ...part } : one));
+    form = { ...form, [kind.field]: rows };
+    return rows[index];
   }
 
-  function addLang() {
-    form = { ...form, languages: [...form.languages, langRow()] };
-  }
-
-  function dropLang(index) {
-    form = { ...form, languages: form.languages.filter((_, at) => at !== index) };
-    return save();
+  /** Обработчики таблицы строк: текст пишется по остановке набора, как
+   *  прочие поля, выбор — сразу.
+   *
+   * Выбор в строке без текста не пишется: мост такую строку выбрасывает, а
+   * анкета, перечитанная после записи, унесла бы её из окна вместе с
+   * выбранным. Строка уедет с текстом — и выбор с ней.
+   */
+  function rowsOf(kind) {
+    return {
+      ontyped: (index, part) => {
+        editRow(kind, index, part);
+        saver.typed(JSON.stringify(sheet()));
+      },
+      onflush: () => saver.flush(),
+      onpick: (index, part) => {
+        if (editRow(kind, index, part)[kind.text.key]) save();
+      },
+      onadd: () => {
+        form = { ...form, [kind.field]: [...form[kind.field], kind.blank()] };
+      },
+      onremove: (index) => {
+        form = { ...form, [kind.field]: form[kind.field].filter((_, at) => at !== index) };
+        save();
+      },
+    };
   }
 
   function pickGrade(value) {
@@ -254,7 +274,7 @@
     <ChoiceRow options={GRADES} chosen={grades} look="seg" onpick={pickGrade} />
     <ChoiceRow options={WORK_FORMATS} chosen={formats} look="seg" onpick={pickFormat} />
 
-    <LangRows rows={form.languages} onedit={editLang} onadd={addLang} onremove={dropLang} />
+    <EntryRows rows={form.languages} kind={LANGUAGE_ROWS} {...rowsOf(LANGUAGE_ROWS)} />
 
     <DelayedTextarea
       maxlength="4000"
@@ -265,14 +285,7 @@
       onflush={() => saver.flush()}
     />
 
-    <DelayedTextarea
-      maxlength="2000"
-      placeholder="Дополнительные инструкции и ограничения для поиска"
-      lines={10}
-      value={form.free_preferences}
-      ontyped={(text) => typed('free_preferences', text)}
-      onflush={() => saver.flush()}
-    />
+    <EntryRows rows={form.preferences} kind={PREFERENCE_ROWS} {...rowsOf(PREFERENCE_ROWS)} />
   </div>
 
   <div class="form-grid cv-line">

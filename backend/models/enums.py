@@ -80,3 +80,16 @@ class SalaryPeriod(enum.Enum):
 class Gender(enum.Enum):
     MALE = "male"
     FEMALE = "female"
+
+
+class PreferenceKind(enum.Enum):
+    """Вид строки предпочтений анкеты.
+
+    Запрет отсекает вакансию; пожелание выполняется по возможности, а не
+    выходит — всё делается как без него; сведения берутся, только когда их
+    прямо спрашивают.
+    """
+
+    BAN = "ban"
+    WISH = "wish"
+    INFO = "info"

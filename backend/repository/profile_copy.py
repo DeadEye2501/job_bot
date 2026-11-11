@@ -12,6 +12,7 @@ from backend.payloads import (
     ParsedCv,
     ParsedCvExperience,
     ParsedCvLanguage,
+    ParsedCvPreference,
     ParsedCvProfile,
     ParsedCvProject,
     ParsedCvSkill,
@@ -19,6 +20,7 @@ from backend.payloads import (
 from backend.repository.profile import get_profile
 from backend.repository.profile_experience import list_experience
 from backend.repository.profile_languages import list_profile_languages
+from backend.repository.profile_preferences import list_profile_preferences
 from backend.repository.profile_projects import list_projects
 from backend.repository.profile_skills import list_skills
 
@@ -43,6 +45,10 @@ async def profile_as_parsed(session: AsyncSession) -> ParsedCv | None:
         languages=[
             ParsedCvLanguage(**_columns(lang, ParsedCvLanguage))
             for lang in await list_profile_languages(session)
+        ],
+        preferences=[
+            ParsedCvPreference(**_columns(one, ParsedCvPreference))
+            for one in await list_profile_preferences(session)
         ],
         skills=[ParsedCvSkill(**_columns(s, ParsedCvSkill)) for s in await list_skills(session)],
         experience=[
@@ -72,13 +78,13 @@ def personal_part(parsed: ParsedCv) -> ParsedCv:
             education=None,
             work_format=[],
             grades=[],
-            free_preferences=None,
             expected_salary=None,
             expected_salary_currency=None,
             expected_salary_period=None,
             about_me=None,
             resume_url=None,
         ),
+        preferences=[],
         skills=[],
         experience=[],
         projects=[],

@@ -46,12 +46,13 @@ from backend.llm.cv_native import with_native_language
 from backend.llm.cv_prompt import PARSE_CV_PROMPT
 from backend.llm.external import external_block
 from backend.llm.rules import NOT_A_SKILL_SECTIONS
-from backend.models import Gender, SalaryPeriod
+from backend.models import Gender, PreferenceKind, SalaryPeriod
 from backend.payloads import (
     REQUIRED_PROFILE_FIELDS,
     ParsedCv,
     ParsedCvExperience,
     ParsedCvLanguage,
+    ParsedCvPreference,
     ParsedCvProfile,
     ParsedCvProject,
     ParsedCvSkill,
@@ -189,7 +190,6 @@ def _parse_profile(data: dict) -> ParsedCvProfile | None:
         education=str_or_none(data.get("education")),
         work_format=normalize_enum_list(data.get("work_format"), WORK_FORMATS),
         grades=normalize_enum_list(data.get("grades"), GRADES),
-        free_preferences=str_or_none(data.get("free_preferences")),
         expected_salary=amount_or_none(data.get("expected_salary")),
         expected_salary_currency=currency_sign(
             str_or_none(data.get("expected_salary_currency"))
@@ -313,6 +313,17 @@ def _parse_project(item) -> ParsedCvProject | None:
     )
 
 
+def _parse_preference(item) -> ParsedCvPreference | None:
+    """Строка предпочтений из ответа модели; без вида или текста — пусто."""
+    if not isinstance(item, dict):
+        return None
+    kind = enum_member_or_none(item.get("kind"), PreferenceKind)
+    text = str_or_none(item.get("text"))
+    if kind is None or not text:
+        return None
+    return ParsedCvPreference(kind=kind, text=text)
+
+
 def _parsed_items(raw: object, parse) -> list:
     """Перечень из ответа модели: каждый элемент разобран, негодные отброшены;
     не перечень вовсе — пусто."""
@@ -337,6 +348,7 @@ def _parse_cv_json(answer: str) -> ParsedCv | None:
     return ParsedCv(
         profile=profile,
         languages=_parse_languages(data.get("languages")),
+        preferences=_parsed_items(data.get("preferences"), _parse_preference),
         skills=_parsed_items(data.get("skills"), _parse_skill),
         experience=_parsed_items(data.get("experience"), _parse_experience),
         projects=_parsed_items(data.get("projects"), _parse_project),

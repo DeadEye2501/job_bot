@@ -6,7 +6,9 @@ from datetime import date
 from backend.llm.rules import LATIN_NAME_RULE
 from backend.models import (
     Gender,
+    PreferenceKind,
     ProfileLanguage,
+    ProfilePreference,
     SalaryPeriod,
     profile_experience_skills,
     profile_project_skills,
@@ -243,3 +245,34 @@ async def test_languages_come_with_their_levels(session, session_factory):
     await put(session_factory, ProfileLanguage(profile_id=person.id, language="Испанский", level="B2"))
 
     assert "Испанский — B2" in await build_agent_profile(session, TODAY, photo=False)
+
+
+async def test_each_kind_of_preference_reaches_the_agent_under_its_own_heading(
+    session, session_factory
+):
+    """Запреты агенту тоже нужны: заведённую человеком вакансию проверка не
+    судит, а вопросы форм спрашивают то, что в запретах записано."""
+    person = await _person(session_factory)
+    await put(
+        session_factory,
+        ProfilePreference(profile_id=person.id, kind=PreferenceKind.WISH, text="зарплату не называть"),
+        ProfilePreference(profile_id=person.id, kind=PreferenceKind.INFO, text="аккредитация не важна"),
+        ProfilePreference(profile_id=person.id, kind=PreferenceKind.BAN, text="без командировок"),
+    )
+
+    text = await build_agent_profile(session, TODAY, photo=False)
+
+    bans = text.split("Запреты человека")[1].split("Пожелания человека")[0]
+    wishes = text.split("Пожелания человека")[1].split("Сведения от человека")[0]
+    info = text.split("Сведения от человека")[1]
+    assert bans.count("\n- ") == 1 and "- без командировок" in bans
+    assert wishes.count("\n- ") == 1 and "- зарплату не называть" in wishes
+    assert info.count("\n- ") == 1 and "- аккредитация не важна" in info
+
+
+async def test_no_preferences_are_named_absent(session, session_factory):
+    await _person(session_factory)
+
+    text = await build_agent_profile(session, TODAY, photo=False)
+
+    assert text.count("\n- нет") == 3

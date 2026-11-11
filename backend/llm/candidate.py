@@ -25,7 +25,8 @@ class CandidateProfile:
     Заполняет их не сборщик, а зовущий: `build_candidate_profile` читает
     анкету, а навыки лежат отдельным слепком у конвейера, и он дописывает их
     сюда сам. Соберёшь профиль в новом месте и не допишешь — наставление
-    получит прочерк вместо навыков, и заметить это будет нечем.
+    получит прочерк вместо навыков, и заметить это будет нечем. Так же
+    дописываются запреты и сведения из строк предпочтений анкеты.
     """
 
     title: str | None = None
@@ -34,7 +35,8 @@ class CandidateProfile:
     grades: list[str] = field(default_factory=list)
     work_formats: list[str] = field(default_factory=list)
     languages: list[CandidateLanguage] = field(default_factory=list)
-    free_preferences: str | None = None
+    bans: list[str] = field(default_factory=list)
+    info: list[str] = field(default_factory=list)
     known_skills: list[ProfileSkill] = field(default_factory=list)
 
     @property
@@ -110,5 +112,4 @@ def build_candidate_profile(
         grades=list(profile.grades or []),
         work_formats=list(profile.work_format or []),
         languages=candidate_languages(languages),
-        free_preferences=profile.free_preferences,
     )

@@ -33,7 +33,6 @@ def test_the_slice_carries_what_the_validator_reads():
         location="Тверь",
         grades=["middle", "senior"],
         work_format=["remote"],
-        free_preferences="без релокации",
         citizenship="Страна Q9",
     )
 
@@ -44,7 +43,6 @@ def test_the_slice_carries_what_the_validator_reads():
     assert got.citizenship == "Страна Q9"
     assert got.grades == ["middle", "senior"]
     assert got.work_formats == ["remote"]
-    assert got.free_preferences == "без релокации"
 
 
 def test_languages_come_with_their_levels():

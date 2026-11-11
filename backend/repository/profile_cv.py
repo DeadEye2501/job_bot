@@ -6,6 +6,7 @@ from dataclasses import asdict
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.domain.preferences import merged_preferences
 from backend.models import (
     Profile,
     ProfileExperience,
@@ -17,6 +18,10 @@ from backend.payloads import ParsedCv
 from backend.repository.profile import get_profile_in
 from backend.repository.profile_experience import wipe_experience
 from backend.repository.profile_languages import replace_profile_languages
+from backend.repository.profile_preferences import (
+    list_profile_preferences_in,
+    replace_profile_preferences,
+)
 from backend.repository.profile_projects import wipe_projects
 from backend.repository.profile_records import link_stack
 from backend.repository.profile_skills import index_skill_keys
@@ -34,6 +39,7 @@ async def wipe_profile(session: AsyncSession, profile_id: int) -> None:
     await wipe_projects(session, profile_id)
     await session.execute(delete(ProfileSkill).where(ProfileSkill.profile_id == profile_id))
     await replace_profile_languages(session, profile_id, [])
+    await replace_profile_preferences(session, profile_id, [])
     await session.execute(delete(Profile).where(Profile.id == profile_id))
     await session.flush()
 
@@ -134,7 +140,6 @@ def _new_profile(p, kept: dict, workspace_id: int) -> Profile:
         education=p.education,
         work_format=list(p.work_format),
         grades=list(p.grades),
-        free_preferences=p.free_preferences,
         **_answers(p, kept),
     )
 
@@ -146,11 +151,15 @@ async def save_parsed_cv(
 
     Путь к резюме (`""` — пути нет) пишется той же сделкой: сбой между двумя
     записями оставил бы разобранную анкету без записанного источника. Ответы
-    для форм переносятся в новую строку, если файл их не дал. Сделку держит
-    зовущий.
+    для форм переносятся в новую строку, если файл их не дал; строки
+    предпочтений остаются все, и к ним дописываются новые из файла. Сделку
+    держит зовущий.
     """
     old = await get_profile_in(session, workspace_id)
     kept = _answers_to_keep(old)
+    kept_preferences = [
+        (row.kind, row.text) for row in await list_profile_preferences_in(session, workspace_id)
+    ]
     if old is not None:
         await wipe_profile(session, old.id)
 
@@ -160,11 +169,16 @@ async def save_parsed_cv(
 
     # Стирание внутри писателя здесь холостое — прежняя анкета снесена выше.
     # Так и оставлено: свой цикл ради экономии одного запроса на разбор резюме
-    # означал бы второе место, знающее устройство строки языка.
+    # означал бы второе место, знающее устройство строк языков и предпочтений.
     await replace_profile_languages(
         session,
         profile.id,
         [(lang.language, lang.level) for lang in parsed.languages],
+    )
+    await replace_profile_preferences(
+        session,
+        profile.id,
+        merged_preferences(kept_preferences, [(one.kind, one.text) for one in parsed.preferences]),
     )
     skill_lookup = await _add_parsed_skills(session, profile.id, parsed.skills)
     session.add_all([

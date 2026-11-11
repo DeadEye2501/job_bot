@@ -50,6 +50,13 @@ export const SALARY_PERIODS = [
  *  и они должны попадаться первыми. */
 export const LANG_LEVELS = ['native', 'C2', 'C1', 'B2', 'B1', 'A2', 'A1'];
 
+/** Виды строк предпочтений. Значения — перечень `PreferenceKind`. */
+export const PREFERENCE_KINDS = [
+  { value: 'ban', label: 'Запрет' },
+  { value: 'wish', label: 'Пожелание' },
+  { value: 'info', label: 'Сведения' },
+];
+
 /** Размер файла человеческими единицами.
  *
  * Доли килобайта не показываются: они ничего не говорят и занимают место в
@@ -126,7 +133,6 @@ export function blankProfile() {
     location: '',
     education: '',
     about_me: '',
-    free_preferences: '',
     resume_url: '',
     expected_salary: '',
     expected_salary_currency: '',
@@ -134,6 +140,7 @@ export function blankProfile() {
     grades: [],
     work_format: [],
     languages: [],
+    preferences: [],
     updated_at: null,
   };
 }
@@ -160,4 +167,45 @@ export function profileSheet(form, grades, formats) {
  */
 export function langRow() {
   return { language: '', level: 'B2' };
+}
+
+/** Пустая строка предпочтений.
+ *
+ * Вид — сведения: они ничего не отсеивают и ни к чему агента не обязывают,
+ * пока человек не выбрал вид сам.
+ */
+export function preferenceRow() {
+  return { kind: 'info', text: '' };
+}
+
+/** Таблицы строк анкеты (`EntryRows`): поле анкеты со строками, текст и выбор
+ *  строки, раскладка ячеек, подписи и пустая строка. */
+export const LANGUAGE_ROWS = {
+  field: 'languages',
+  text: { key: 'language', placeholder: 'Язык', max: 50 },
+  choice: { key: 'level', options: LANG_LEVELS.map((level) => ({ value: level, label: level })) },
+  look: 'lang',
+  removeTitle: 'Удалить язык',
+  addLabel: '+ Добавить язык',
+  blank: langRow,
+};
+
+export const PREFERENCE_ROWS = {
+  field: 'preferences',
+  text: { key: 'text', placeholder: 'Предпочтение для поиска и откликов', max: 500 },
+  choice: { key: 'kind', options: PREFERENCE_KINDS },
+  look: 'pref',
+  removeTitle: 'Удалить строку',
+  addLabel: '+ Добавить предпочтение',
+  blank: preferenceRow,
+};
+
+/** Подпись варианта выбора по его значению и значение по подписи: список
+ *  показывает подписи, а в анкету ложатся значения. */
+export function choiceLabel(choice, value) {
+  return choice.options.find((one) => one.value === value).label;
+}
+
+export function choiceValue(choice, label) {
+  return choice.options.find((one) => one.label === label).value;
 }

@@ -62,7 +62,7 @@ import './styles/settings-section.css';
 import './styles/pipeline.css';
 import './styles/choice-row.css';
 import './styles/choice-line.css';
-import './styles/lang-rows.css';
+import './styles/entry-rows.css';
 import './styles/cv-file.css';
 import './styles/letters.css';
 import './styles/new-box.css';

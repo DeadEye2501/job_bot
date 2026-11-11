@@ -104,12 +104,23 @@ async def test_a_vacancy_is_not_deleted_by_a_verdict_nobody_asked_for(
 
 
 async def test_every_fit_question_is_asked_when_nothing_blocks(parsing):
-    """Прошедшую вакансию спрашивают обо всём: роль, языки, место, предпочтения."""
+    """Прошедшую вакансию спрашивают обо всём: роль, языки, место, запреты."""
     pipeline, vacancy = parsing
+    pipeline.profile_cache = replace(pipeline.profile_cache, bans=["не работаю с гемблингом"])
 
     await parse.parse_and_update_vacancy(pipeline, vacancy.id, "текст", "jobs")
 
     assert pipeline.fit_asked == ["роль", "языки", "место", "предпочтения"]
+
+
+async def test_without_bans_the_question_about_them_is_not_asked(parsing):
+    """Запретов нет — нарушать нечего, и зов о них не стоит ни времени, ни токенов."""
+    pipeline, vacancy = parsing
+    pipeline.profile_cache = replace(pipeline.profile_cache, bans=[])
+
+    await parse.parse_and_update_vacancy(pipeline, vacancy.id, "текст", "jobs")
+
+    assert pipeline.fit_asked == ["роль", "языки", "место"]
 
 
 async def test_a_refusal_from_the_second_question_stops_the_third(

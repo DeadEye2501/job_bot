@@ -65,16 +65,84 @@ function typeInto(field, text) {
   field.dispatchEvent(new Event('blur'));
 }
 
-describe('поле личных предпочтений', () => {
-  it('растёт не выше десяти строк, а образование — без предела', async () => {
-    // Раскладки в jsdom нет, и высоту не измерить: проверяется, что поле
-    // объявило предел, по которому его подгоняет `fitHeight`.
-    sheet({ name: 'cv.pdf', size: 2048, exists: true });
+describe('строки анкеты таблицей', () => {
+  /** Выбрать в выпадающем списке строки вариант с этой подписью. */
+  async function pick(row, label) {
+    row.querySelector('.cdd button').click();
+    await settled();
+    [...row.querySelectorAll('.cdd-option')].find((one) => one.textContent.trim() === label).click();
+    await settled();
+  }
 
-    const wishes = await vi.waitFor(() => screen.getByPlaceholderText('Дополнительные инструкции и ограничения для поиска'));
-    const education = screen.getByPlaceholderText('Образование');
+  async function addedRow(addLabel, placeholder) {
+    sheet(null);
+    (await vi.waitFor(() => screen.getByText(addLabel))).click();
+    await settled();
+    return screen.getByPlaceholderText(placeholder).closest('.entry-row');
+  }
 
-    expect(wishes.dataset.lines).toBe('10');
+  it('предпочтение уезжает на мост текстом и выбранным видом', async () => {
+    const row = await addedRow('+ Добавить предпочтение', 'Предпочтение для поиска и откликов');
+
+    typeInto(row.querySelector('input'), 'не работаю с гемблингом');
+    await pick(row, 'Запрет');
+
+    expect(saved.at(-1).preferences).toEqual([{ kind: 'ban', text: 'не работаю с гемблингом' }]);
+  });
+
+  it('вид, выбранный до текста, не пишется пустой строкой и уезжает вместе с текстом', async () => {
+    const row = await addedRow('+ Добавить предпочтение', 'Предпочтение для поиска и откликов');
+
+    await pick(row, 'Запрет');
+    const before = saved.length;
+    typeInto(row.querySelector('input'), 'без гемблинга');
+    await settled();
+
+    expect(before).toBe(0);
+    expect(saved.at(-1).preferences).toEqual([{ kind: 'ban', text: 'без гемблинга' }]);
+  });
+
+  it('Ctrl+Enter в строке записывает набранное, не уходя из поля', async () => {
+    const row = await addedRow('+ Добавить предпочтение', 'Предпочтение для поиска и откликов');
+    const field = row.querySelector('input');
+
+    field.value = 'есть права';
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }));
+    await settled();
+
+    expect(saved.at(-1).preferences).toEqual([{ kind: 'info', text: 'есть права' }]);
+  });
+
+  it('крестик убирает строку предпочтения', async () => {
+    const row = await addedRow('+ Добавить предпочтение', 'Предпочтение для поиска и откликов');
+    typeInto(row.querySelector('input'), 'есть права');
+    await settled();
+
+    row.querySelector('.remove-cross').click();
+    await settled();
+
+    expect(saved.at(-1).preferences).toEqual([]);
+  });
+
+  it('язык уезжает на мост названием и выбранным уровнем', async () => {
+    const row = await addedRow('+ Добавить язык', 'Язык');
+
+    typeInto(row.querySelector('input'), 'Испанский');
+    await pick(row, 'C1');
+
+    expect(saved.at(-1).languages).toEqual([{ language: 'Испанский', level: 'C1' }]);
+  });
+});
+
+describe('поля текста', () => {
+  it('образование растёт без предела', async () => {
+    // Раскладки в jsdom нет, и высоту не измерить: проверяется, что поле не
+    // объявило предела, по которому его подгоняет `fitHeight`.
+    sheet(null);
+
+    const education = await vi.waitFor(() => screen.getByPlaceholderText('Образование'));
+
     expect(education.dataset.lines).toBeUndefined();
   });
 
