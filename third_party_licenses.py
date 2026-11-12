@@ -12,8 +12,9 @@ from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parent
 
-# Тексты, которых нет в колёсах: proxy-tools и pyobjc-core выходят без файла
-# лицензии, а llama.cpp вшит в колесо llama-cpp-python под лицензией только
+# Тексты, которых нет в колёсах: proxy-tools, pyobjc-core,
+# pyobjc-framework-security и pyobjc-framework-uniformtypeidentifiers выходят
+# без файла лицензии, а llama.cpp вшит в колесо llama-cpp-python под лицензией только
 # самой обёртки. Имя файла — имя пакета в замке.
 _SUPPLIED = _ROOT / 'licenses'
 
