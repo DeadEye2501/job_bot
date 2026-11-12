@@ -9,8 +9,10 @@
 подхватится со следующего цикла, а не немедленно.
 """
 
-from backend.models import PreferenceKind, Profile, ProfileLanguage, ProfilePreference
+from backend.domain.named_salary import SalaryAsk
+from backend.models import PreferenceKind, Profile, ProfileLanguage, ProfilePreference, SalaryPeriod
 from tests.dbio import only_row, put
+from tests.fakes.exchange_rates import RATES, rates_answer, serve_rates
 from tests.factories import (
     blacklist_row,
     blacklist_switch_row,
@@ -129,6 +131,23 @@ async def test_an_empty_base_leaves_empty_caches(make_pipeline):
     assert pipeline.skills_cache == []
     assert pipeline.blacklist_patterns == []
     assert pipeline.profile_cache.title is None
+    assert pipeline.salary_ask == SalaryAsk()
+
+
+async def test_the_salary_and_the_rates_are_lifted_into_memory(make_pipeline, session_factory, monkeypatch):
+    """Зарплата анкеты и курсы поднимаются в память для отсева по зарплате;
+    курсы — уже обновлённые от источника: засеянный рубль — 80, источник — 70."""
+    await put(session_factory, profile_row(
+        minimum_salary=2000, expected_salary=4000,
+        expected_salary_currency="€", expected_salary_period=SalaryPeriod.YEAR,
+    ))
+    serve_rates(monkeypatch, rates_answer({**RATES, "RUB": 70.0}))
+    pipeline = await make_pipeline()
+
+    await pipeline.reload_resources()
+
+    assert pipeline.salary_ask == SalaryAsk(2000, 4000, "€", SalaryPeriod.YEAR)
+    assert pipeline.rates["₽"] == 70.0
 
 
 async def test_the_second_reload_sees_the_edits(make_pipeline, session_factory):

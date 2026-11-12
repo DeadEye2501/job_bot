@@ -33,6 +33,7 @@ from backend.models.profile import (
     profile_experience_skills,
     profile_project_skills,
 )
+from backend.models.rates import CurrencyRate
 from backend.models.settings import (
     BLACKLIST_KINDS,
     AppSetting,
@@ -57,6 +58,7 @@ from backend.models.workspace import (
 )
 
 __all__ = [
+    "CurrencyRate",
     "HR",
     "Aggregator",
     "AggregatorResume",

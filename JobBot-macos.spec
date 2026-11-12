@@ -38,6 +38,7 @@ datas = [
     ('alembic/versions/032b8b1c9f8a_init.py', 'alembic/versions'),
     ('alembic/versions/5d2e7a9c4b13_workspaces.py', 'alembic/versions'),
     ('alembic/versions/f2e88ee2a3a6_v1_4.py', 'alembic/versions'),
+    ('alembic/versions/56fc744cc3df_salary.py', 'alembic/versions'),
     *collect_data_files('playwright'),
     (write_notices('macos/Pipfile.lock', 'build/THIRD_PARTY_LICENSES.txt'), '.'),
 ]

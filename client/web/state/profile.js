@@ -34,12 +34,12 @@ export const GENDERS = [
   { value: 'female', label: 'Ж' },
 ];
 
-/** Валюты ожидаемой зарплаты — знаками, какими их хранит мост. Перечень тот
+/** Валюты зарплаты анкеты — знаками, какими их хранит мост. Перечень тот
  *  же, что у разбора валют (`backend/domain/currency.py`): другое мост не
  *  узнает и запишет пустоту. */
 export const CURRENCIES = ['₽', '$', '€', '₸', '֏', '₾'];
 
-/** За какой срок названа ожидаемая зарплата. Значения — перечень `SalaryPeriod`. */
+/** За какой срок названа зарплата анкеты. Значения — перечень `SalaryPeriod`. */
 export const SALARY_PERIODS = [
   { value: 'hour', label: 'В час' },
   { value: 'month', label: 'В месяц' },
@@ -134,9 +134,12 @@ export function blankProfile() {
     education: '',
     about_me: '',
     resume_url: '',
+    minimum_salary: '',
     expected_salary: '',
-    expected_salary_currency: '',
-    expected_salary_period: '',
+    // Умолчания домена (`backend/domain/named_salary.py`): анкета без валюты и
+    // периода не бывает, а Python фронт не ввозит — как и перечень валют выше.
+    expected_salary_currency: '$',
+    expected_salary_period: 'month',
     grades: [],
     work_format: [],
     languages: [],
@@ -145,16 +148,21 @@ export function blankProfile() {
   };
 }
 
+function digitsOnly(amount) {
+  return String(amount ?? '').replace(/\s/g, '');
+}
+
 /** Анкета целиком — тем видом, каким её принимает мост.
  *
- * Сумма уезжает одними цифрами: «150 000» человек пишет так, как привык
+ * Суммы уезжают одними цифрами: «150 000» человек пишет так, как привык
  * читать, а мост считает суммой только число, и с пробелом между разрядами
  * она легла бы пустотой. В поле при этом остаётся набранное как есть.
  */
 export function profileSheet(form, grades, formats) {
   return {
     ...form,
-    expected_salary: String(form.expected_salary ?? '').replace(/\s/g, ''),
+    minimum_salary: digitsOnly(form.minimum_salary),
+    expected_salary: digitsOnly(form.expected_salary),
     grades: [...grades],
     work_format: [...formats],
   };

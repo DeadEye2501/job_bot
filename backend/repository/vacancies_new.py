@@ -12,6 +12,7 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.domain.named_salary import offer_period
 from backend.domain.salary import salary_text
 from backend.domain.scoring import score_stack
 from backend.domain.stack import deduped_halves, joined_stack
@@ -92,6 +93,7 @@ async def create_vacancy(session: AsyncSession, fields: dict) -> int:
         salary=salary_text(
             fields["salary_min"], fields["salary_max"], fields["salary_currency"]
         ),
+        salary_period=offer_period(fields["salary_min"], fields["salary_max"], None),
         is_parsed=True,
     )
     await add_with_event(session, vacancy, HAND_MADE)

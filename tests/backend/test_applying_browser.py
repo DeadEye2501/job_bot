@@ -10,11 +10,12 @@ from backend.applying.browser import via_browser
 from backend.applying.result import Dropped, Missed, SiteClosed, Unfit, WindowClosed
 from backend.domain.apply_order import Way
 from backend.models import (
-    AggregatorResume, Vacancy, VacancyStatus, VacancyStatusHistory,
+    AggregatorResume, SalaryPeriod, Vacancy, VacancyStatus, VacancyStatusHistory,
 )
 from backend.repository.aggregator_resumes import choose_resume
 from tests.backend.fixtures.applying import FORM, PAGE
 from tests.dbio import all_rows, only_row, put
+from tests.factories import profile_row
 from tests.factories_aggregators import aggregator_resume_row, web_search_row
 from tests.fakes.agent import (
     LimitHit,
@@ -226,6 +227,22 @@ async def test_a_simulated_application_is_told_not_to_send(board, kit_with):
 
     (plan,) = kit.run_session.plans
     assert "Режим симуляции" in plan.task and kit.browser.sending is False
+
+
+async def test_the_applier_is_told_the_sum_for_this_vacancy_without_a_web_search(
+    board, kit_with, session_factory
+):
+    """Сумму считает код и даёт в задании; искать курс в сети агенту незачем."""
+    await put(session_factory, profile_row(expected_salary=2000))
+    site, vacancy = await board(salary="$3000", salary_min=3000, salary_max=3000,
+                                salary_currency="$", salary_period=SalaryPeriod.MONTH)
+    kit = await kit_with([record_step(PAGE, via="aggregator")])
+
+    await via_browser(kit, vacancy.id, Way("aggregator", PAGE, site.id))
+
+    (plan,) = kit.run_session.plans
+    assert "Зарплата для этой вакансии: 3000 $ в месяц, на руки" in plan.task
+    assert plan.web_search is False
 
 
 async def test_a_real_application_opens_the_browser_able_to_send(board, kit_with):

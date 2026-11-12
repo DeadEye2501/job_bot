@@ -406,10 +406,12 @@ async def test_a_new_resume_overrides_the_new_fields_it_gave(session, session_fa
 
 
 async def test_a_new_salary_does_not_borrow_the_old_currency(session, session_factory):
-    """Зарплата переносится связкой: новая сумма со старой валютой — чужая зарплата."""
+    """Зарплата переносится связкой: новая сумма со старой валютой — чужая зарплата.
+    Без валюты и периода анкета не бывает: сумма из файла без них получает
+    умолчания, а не прежние ₽ и год."""
     await put(session_factory, profile_row(
-        expected_salary=300000, expected_salary_currency="₽",
-        expected_salary_period=SalaryPeriod.MONTH,
+        expected_salary=300000, minimum_salary=250000, expected_salary_currency="₽",
+        expected_salary_period=SalaryPeriod.YEAR,
     ))
 
     await save_parsed_cv(
@@ -418,6 +420,6 @@ async def test_a_new_salary_does_not_borrow_the_old_currency(session, session_fa
     )
 
     p = (await session.scalars(select(Profile))).one()
-    assert (p.expected_salary, p.expected_salary_currency, p.expected_salary_period) == (
-        5000, None, None
+    assert (p.expected_salary, p.minimum_salary, p.expected_salary_currency, p.expected_salary_period) == (
+        5000, None, "$", SalaryPeriod.MONTH
     )

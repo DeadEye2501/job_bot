@@ -433,3 +433,24 @@ def test_a_whole_range_about_something_else_is_skipped_entirely(raw, expected):
     """
     assert parse_salary(raw)[:2] == expected
 
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("from $4000", (4000, None)),
+        ("starting at 4000 usd", (4000, None)),
+        ("up to $5000", (None, 5000)),
+        ("от $3000", (3000, None)),
+        ("до $5000", (None, 5000)),
+        ("$4000+", (4000, None)),
+        ("4000$+", (4000, None)),
+        ("оклад 100 000 ₽ + KPI", (100000, 100000)),
+        ("from $3000 to $5000", (3000, 5000)),
+        ("upto $5000", (None, 5000)),
+        ("Up to: $5000", (None, 5000)),
+    ],
+)
+def test_an_english_or_signed_bound_says_which_side_is_known(raw, expected):
+    """«from $4000» — только низ: прочитанный точным окладом, он стал бы верхом
+    вилки, и вакансия без потолка отсеивалась бы как платящая ниже минимальной."""
+    assert parse_salary(raw)[:2] == expected

@@ -118,6 +118,7 @@ def _profile_to_dict(p, languages, preferences) -> dict | None:
         "linkedin_url": p.linkedin_url,
         "education": p.education,
         "expected_salary": p.expected_salary,
+        "minimum_salary": p.minimum_salary,
         "expected_salary_currency": p.expected_salary_currency,
         "expected_salary_period": _enum_value(p.expected_salary_period),
         "first_name_latin": p.first_name_latin,

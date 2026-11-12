@@ -14,6 +14,7 @@ import json
 import pytest
 
 from backend.llm.vacancy import parsed_vacancy_from_json
+from backend.models import SalaryPeriod
 from tests.fakes.llm import parsed_vacancy_answer
 
 
@@ -373,3 +374,13 @@ def test_a_telegram_hr_contact_stays_where_it_is():
 
     assert parsed.hr_contact == "@anna_hr"
     assert parsed.other_contacts == []
+
+
+def test_the_salary_period_and_currency_come_from_the_answer():
+    parsed = parsed_vacancy_from_json(_answer(salary="150 000", salary_period="year", salary_currency="RUB"))
+    assert (parsed.salary_period, parsed.salary_currency) == (SalaryPeriod.YEAR, "₽")
+
+
+def test_a_period_or_currency_off_the_list_is_none():
+    parsed = parsed_vacancy_from_json(_answer(salary="150 000", salary_period="week", salary_currency="JPY"))
+    assert (parsed.salary_period, parsed.salary_currency) == (None, None)

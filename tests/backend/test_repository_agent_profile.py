@@ -9,7 +9,6 @@ from backend.models import (
     PreferenceKind,
     ProfileLanguage,
     ProfilePreference,
-    SalaryPeriod,
     profile_experience_skills,
     profile_project_skills,
 )
@@ -26,28 +25,39 @@ async def _person(session_factory, **fields):
 
 
 async def test_no_profile_gives_nothing(session):
-    assert await build_agent_profile(session, TODAY, photo=False) == ""
+    assert await build_agent_profile(session, TODAY, photo=False, salary=[]) == ""
 
 
 async def test_the_answers_for_forms_reach_the_agent(session, session_factory):
     await _person(
         session_factory, first_name_latin="Ivan", last_name_latin="Petrov",
-        gender=Gender.MALE, expected_salary=250000, expected_salary_currency="RUB",
-        expected_salary_period=SalaryPeriod.MONTH,
+        gender=Gender.MALE,
     )
 
-    text = await build_agent_profile(session, TODAY, photo=False)
+    text = await build_agent_profile(session, TODAY, photo=False, salary=[])
 
     assert "Имя латиницей: Ivan" in text and "Фамилия латиницей: Petrov" in text
     assert "мужской" in text
-    assert "250000 RUB в месяц, на руки" in text
+
+
+async def test_the_salary_lines_stand_as_given(session, session_factory):
+    """Строки зарплаты даёт зовущий, у каждого агента свои; сама анкета сумм
+    анкеты не печатает — откликатель иначе видел бы минимальную и желаемую."""
+    await _person(session_factory, minimum_salary=2000, expected_salary=4000)
+
+    given = await build_agent_profile(session, TODAY, photo=False, salary=["Зарплата для этой вакансии: 1500 $"])
+    bare = await build_agent_profile(session, TODAY, photo=False, salary=[])
+
+    assert "Зарплата для этой вакансии: 1500 $" in given.splitlines()
+    assert "зарплат" not in bare.lower()
+    assert "2000" not in given and "4000" not in given
 
 
 async def test_the_name_rule_points_at_both_spellings_of_the_profile(session, session_factory):
     """Имя пишется алфавитом текста: русскому письму — поля «Имя» и «Фамилия»,
     тексту латиницей — латинские. Правило отсылает только к полям, что в анкете есть."""
     await _person(session_factory)
-    text = await build_agent_profile(session, TODAY, photo=False)
+    text = await build_agent_profile(session, TODAY, photo=False, salary=[])
     labels = {line.split(":")[0].strip() for line in text.splitlines()}
     named = set(re.findall(r"«([^»]+)»", LATIN_NAME_RULE))
 
@@ -60,10 +70,9 @@ async def test_empty_answers_are_named_empty(session, session_factory):
     """Пустое поле видно агенту пустым, а не пропавшим."""
     await _person(session_factory)
 
-    text = await build_agent_profile(session, TODAY, photo=False)
+    text = await build_agent_profile(session, TODAY, photo=False, salary=[])
 
     assert "Пол: не указан" in text
-    assert "Ожидаемая зарплата: не указана" in text
     for line in ("Отчество: не указано", "Отчество латиницей: не указано",
                  "Дата рождения: не указана", "Гражданство: не указано",
                  "Ссылка на резюме: не указана", "О себе: не указано", "Фото: нет"):
@@ -75,7 +84,7 @@ async def test_an_unnamed_person_is_named_unnamed_rather_than_blank(session, ses
     вписало бы на его место заглушку, и его отбили бы."""
     await _person(session_factory, first_name="", last_name="", title="", email="")
 
-    text = await build_agent_profile(session, TODAY, photo=False)
+    text = await build_agent_profile(session, TODAY, photo=False, salary=[])
 
     for line in ("Имя: не указано", "Фамилия: не указана", "Должность: не указана",
                  "Почта: не указана"):
@@ -87,7 +96,7 @@ async def test_less_than_a_year_is_said_in_words(session, session_factory):
     person = await _person(session_factory)
     await put(session_factory, experience_row(person.id, start_date=TODAY, end_date=None))
 
-    text = await build_agent_profile(session, TODAY, photo=False)
+    text = await build_agent_profile(session, TODAY, photo=False, salary=[])
 
     assert "Общий стаж: меньше года" in text
 
@@ -99,7 +108,7 @@ async def test_the_new_personal_fields_reach_the_agent(session, session_factory)
         resume_url="https://hh.ru/resume/1", about_me="Строю сервисы.",
     )
 
-    text = await build_agent_profile(session, TODAY, photo=False)
+    text = await build_agent_profile(session, TODAY, photo=False, salary=[])
 
     for line in ("Отчество: Сергеевич", "Отчество латиницей: Sergeevich",
                  "Дата рождения: 15.03.1990", "Возраст (полных лет): 36",
@@ -112,8 +121,8 @@ async def test_the_age_grows_only_on_the_birthday(session, session_factory):
     """Возраст считает код: день рождения завтра — полных лет ещё прежнее число."""
     await _person(session_factory, birth_date=date(1990, 10, 10))
 
-    before = await build_agent_profile(session, date(2026, 10, 9), photo=False)
-    on_the_day = await build_agent_profile(session, date(2026, 10, 10), photo=False)
+    before = await build_agent_profile(session, date(2026, 10, 9), photo=False, salary=[])
+    on_the_day = await build_agent_profile(session, date(2026, 10, 10), photo=False, salary=[])
 
     assert "Возраст (полных лет): 35" in before
     assert "Возраст (полных лет): 36" in on_the_day
@@ -122,7 +131,7 @@ async def test_the_age_grows_only_on_the_birthday(session, session_factory):
 async def test_a_photo_the_agent_can_attach_is_named_present(session, session_factory):
     await _person(session_factory)
 
-    assert "Фото: есть" in await build_agent_profile(session, TODAY, photo=True)
+    assert "Фото: есть" in await build_agent_profile(session, TODAY, photo=True, salary=[])
 
 
 async def test_a_skill_gets_the_tenure_of_the_places_that_name_it(
@@ -141,7 +150,7 @@ async def test_a_skill_gets_the_tenure_of_the_places_that_name_it(
     ]))
     await session.commit()
 
-    text = await build_agent_profile(session, TODAY, photo=False)
+    text = await build_agent_profile(session, TODAY, photo=False, salary=[])
 
     assert "Инструмент-А — уровень 3 из 5, стаж 2+ г." in text
     assert "Инструмент-Б — уровень 3 из 5, стаж не привязан к местам работы" in text
@@ -162,7 +171,7 @@ async def test_a_place_and_a_project_name_their_own_skills(session, session_fact
         project_id=project.id, skill_id=tool.id))
     await session.commit()
 
-    text = await build_agent_profile(session, TODAY, photo=False)
+    text = await build_agent_profile(session, TODAY, photo=False, salary=[])
 
     assert text.count("  Навыки: Инструмент-Д") == 2
 
@@ -175,7 +184,7 @@ async def test_a_place_of_work_comes_whole(session, session_factory):
         responsibilities=["вела учёт"], achievements=["первое", "второе"],
     ))
 
-    text = await build_agent_profile(session, TODAY, photo=False)
+    text = await build_agent_profile(session, TODAY, photo=False, salary=[])
 
     assert "Место, Роль, 03.2020 — настоящее время" in text
     assert "вела учёт" in text and "первое" in text and "второе" in text
@@ -187,7 +196,7 @@ async def test_a_project_comes_whole_with_its_link(session, session_factory):
     await put(session_factory, project_row(
         person.id, name="Бот", url="https://example.org/bot", about=["Описание", "Пункт"]))
 
-    text = await build_agent_profile(session, TODAY, photo=False)
+    text = await build_agent_profile(session, TODAY, photo=False, salary=[])
 
     assert "- Бот, https://example.org/bot" in text
     assert "О проекте: Описание" in text and "О проекте: Пункт" in text
@@ -198,7 +207,7 @@ async def test_a_project_without_a_link_names_no_link(session, session_factory):
     person = await _person(session_factory)
     await put(session_factory, project_row(person.id, name="Бот", url=None))
 
-    text = await build_agent_profile(session, TODAY, photo=False)
+    text = await build_agent_profile(session, TODAY, photo=False, salary=[])
 
     assert "- Бот\n" in text
     assert "None" not in text
@@ -219,7 +228,7 @@ async def test_a_skill_in_a_place_and_a_project_keeps_the_places_tenure(
         project_id=project.id, skill_id=tool.id))
     await session.commit()
 
-    text = await build_agent_profile(session, TODAY, photo=False)
+    text = await build_agent_profile(session, TODAY, photo=False, salary=[])
 
     assert "Инструмент-Г — уровень 3 из 5, стаж 2+ г." in text
 
@@ -234,7 +243,7 @@ async def test_a_skill_named_only_in_projects_is_had_without_tenure(session, ses
         project_id=project.id, skill_id=tool.id))
     await session.commit()
 
-    text = await build_agent_profile(session, TODAY, photo=False)
+    text = await build_agent_profile(session, TODAY, photo=False, salary=[])
 
     assert "Инструмент-В — уровень 3 из 5, опыт есть в проектах, стаж не считается" in text
     assert "Общий стаж: нет мест работы" in text
@@ -244,7 +253,7 @@ async def test_languages_come_with_their_levels(session, session_factory):
     person = await _person(session_factory)
     await put(session_factory, ProfileLanguage(profile_id=person.id, language="Испанский", level="B2"))
 
-    assert "Испанский — B2" in await build_agent_profile(session, TODAY, photo=False)
+    assert "Испанский — B2" in await build_agent_profile(session, TODAY, photo=False, salary=[])
 
 
 async def test_each_kind_of_preference_reaches_the_agent_under_its_own_heading(
@@ -260,7 +269,7 @@ async def test_each_kind_of_preference_reaches_the_agent_under_its_own_heading(
         ProfilePreference(profile_id=person.id, kind=PreferenceKind.BAN, text="без командировок"),
     )
 
-    text = await build_agent_profile(session, TODAY, photo=False)
+    text = await build_agent_profile(session, TODAY, photo=False, salary=[])
 
     bans = text.split("Запреты человека")[1].split("Пожелания человека")[0]
     wishes = text.split("Пожелания человека")[1].split("Сведения от человека")[0]
@@ -273,6 +282,6 @@ async def test_each_kind_of_preference_reaches_the_agent_under_its_own_heading(
 async def test_no_preferences_are_named_absent(session, session_factory):
     await _person(session_factory)
 
-    text = await build_agent_profile(session, TODAY, photo=False)
+    text = await build_agent_profile(session, TODAY, photo=False, salary=[])
 
     assert text.count("\n- нет") == 3

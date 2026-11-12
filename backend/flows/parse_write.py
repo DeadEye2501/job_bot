@@ -9,7 +9,7 @@
 import logging
 from dataclasses import dataclass
 
-from backend.domain.salary import parse_salary
+from backend.domain.named_salary import offer_of
 from backend.models import HR
 from backend.models import Vacancy
 from backend.models import VacancyStatus
@@ -69,6 +69,7 @@ def _clear_parsed_fields(v: Vacancy, score: int) -> None:
     v.salary_min = None
     v.salary_max = None
     v.salary_currency = None
+    v.salary_period = None
 
 
 def _apply_parsed_fields(
@@ -95,7 +96,9 @@ def _apply_parsed_fields(
         v.stack = v.stack or []
         if v.score is None:
             v.score = outcome.score
-    v.salary_min, v.salary_max, v.salary_currency = parse_salary(parsed.salary)
+    offer = offer_of(parsed.salary, parsed.salary_period, parsed.salary_currency)
+    v.salary_min, v.salary_max, v.salary_currency = offer.low, offer.high, offer.currency
+    v.salary_period = offer.period
 
 
 def _fields_filled(v: Vacancy) -> list[str]:

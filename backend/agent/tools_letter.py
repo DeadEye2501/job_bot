@@ -54,7 +54,7 @@ async def letter_ask(kit: AgentKit, vacancy_id: int, language: str, limit: int |
         vacancy = await session.get(Vacancy, vacancy_id)
         if vacancy is None:
             return None
-        profile = await kit.profile_text(session)
+        profile = await kit.vacancy_profile_text(session, vacancy_id)
     return LetterAsk(profile_text=profile, title=vacancy.title or "", vacancy_text=vacancy.raw_text or "",
                      language=language, limit=limit)
 

@@ -31,6 +31,7 @@ def parsed_cv_profile(**overrides) -> ParsedCvProfile:
         work_format=[],
         grades=[],
         expected_salary=None,
+        minimum_salary=None,
         expected_salary_currency=None,
         expected_salary_period=None,
         first_name_latin=None,

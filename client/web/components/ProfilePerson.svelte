@@ -15,6 +15,10 @@
     { key: 'first_name', placeholder: 'Имя *', max: 64, must: true },
     { key: 'patronymic', placeholder: 'Отчество', max: 64 },
   ];
+  const SALARY_FIELDS = [
+    { key: 'minimum_salary', placeholder: 'Минимальная', max: 12, mode: 'numeric' },
+    { key: 'expected_salary', placeholder: 'Желаемая', max: 12, mode: 'numeric' },
+  ];
   const LATIN_FIELDS = [
     { key: 'last_name_latin', placeholder: 'Фамилия латиницей', max: 64 },
     { key: 'first_name_latin', placeholder: 'Имя латиницей', max: 64 },
@@ -46,25 +50,24 @@
   {@render field({ key: 'location', placeholder: 'Город', max: 120 })}
 
   <div class="field-line">
-    {@render field({
-      key: 'expected_salary',
-      placeholder: 'Ожидаемая зарплата на руки',
-      max: 12,
-      mode: 'numeric',
-    })}
+    <!-- Две суммы одной рамкой: врозь каждая брала долю строки, и периоды
+         сжимались в две строки. -->
+    <div class="input-pair">
+      {#each SALARY_FIELDS as one (one.key)}{@render field(one)}{/each}
+    </div>
     <div class="field-narrow">
       <Dropdown
         options={CURRENCIES}
         value={form.expected_salary_currency}
-        placeholder="—"
         onpick={(sign) => onset('expected_salary_currency', sign)}
       />
     </div>
+    <!-- Период переключается, но не снимается: `onpickone` снял бы его повторным нажатием. -->
     <ChoiceRow
       options={SALARY_PERIODS}
       chosen={new Set([form.expected_salary_period])}
       look="seg"
-      onpick={(value) => onpickone('expected_salary_period', value)}
+      onpick={(value) => onset('expected_salary_period', value)}
     />
   </div>
 </div>

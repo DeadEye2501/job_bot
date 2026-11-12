@@ -7,6 +7,7 @@ from backend.domain.salary import currency_sign
 from backend.domain.taxonomy import GRADES, WORK_FORMATS
 from backend.incoming import (
     amount_or_none,
+    chosen_or_refusal,
     date_or_refusal,
     enum_member_or_none,
     normalize_enum_list,
@@ -208,12 +209,13 @@ def _read_profile_fields(payload: dict) -> dict:
         "linkedin_url": text_or_none(payload.get("linkedin_url")),
         "education": text_or_none(payload.get("education")),
         "expected_salary": amount_or_none(payload.get("expected_salary")),
-        "expected_salary_currency": currency_sign(
+        "minimum_salary": amount_or_none(payload.get("minimum_salary")),
+        "expected_salary_currency": chosen_or_refusal(currency_sign(
             text_or_none(payload.get("expected_salary_currency"))
-        ),
-        "expected_salary_period": enum_member_or_none(
+        ), "валюта зарплаты"),
+        "expected_salary_period": chosen_or_refusal(enum_member_or_none(
             payload.get("expected_salary_period"), SalaryPeriod
-        ),
+        ), "период зарплаты"),
         "first_name_latin": text_or_none(payload.get("first_name_latin")),
         "last_name_latin": text_or_none(payload.get("last_name_latin")),
         "gender": enum_member_or_none(payload.get("gender"), Gender),

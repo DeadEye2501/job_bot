@@ -376,6 +376,12 @@ async def test_the_answers_for_forms_come_through_the_parse():
     assert (p.first_name_latin, p.last_name_latin, p.gender) == ("Ivan", "Petrov", Gender.MALE)
 
 
+async def test_the_minimum_salary_comes_through_the_parse():
+    parsed = await parse_profile(minimum_salary=200000, expected_salary=250000)
+
+    assert (parsed.profile.minimum_salary, parsed.profile.expected_salary) == (200000, 250000)
+
+
 async def test_an_unknown_currency_period_or_gender_becomes_absent():
     parsed = await parse_profile(
         expected_salary_currency="тугрики", expected_salary_period="week", gender="другое"
@@ -384,6 +390,18 @@ async def test_an_unknown_currency_period_or_gender_becomes_absent():
     assert parsed.profile.expected_salary_currency is None
     assert parsed.profile.expected_salary_period is None
     assert parsed.profile.gender is None
+
+
+async def test_a_salary_in_a_currency_we_do_not_know_is_not_taken():
+    """80 000 гривен не становятся долларами по умолчанию: сумм нет, и анкета
+    оставит прежнюю зарплату."""
+    parsed = await parse_profile(minimum_salary=60000, expected_salary=80000,
+                                 expected_salary_currency="UAH", expected_salary_period="month")
+
+    p = parsed.profile
+    assert (p.minimum_salary, p.expected_salary, p.expected_salary_currency, p.expected_salary_period) == (
+        None, None, None, None
+    )
 
 
 async def test_a_zero_salary_is_no_salary():

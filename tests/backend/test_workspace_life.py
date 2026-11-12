@@ -76,7 +76,7 @@ async def _source(session_factory, cv_path: str = "C:/cv.pdf") -> int:
     """Всё своё у активного профиля; ответ — номер резюме, выбранного на сайте."""
     person = profile_row(
         phone="+79001234567", education="МГУ", about_me="Пишу на Python",
-        expected_salary=300000, expected_salary_currency="RUB",
+        expected_salary=300000, minimum_salary=250000, expected_salary_currency="RUB",
     )
     channel = channel_row()
     site = aggregator_row()
@@ -179,8 +179,11 @@ async def test_personal_data_carries_only_the_person(session_factory):
     assert (person.first_name, person.last_name, person.email, person.phone, person.title) == (
         "Иван", "Петров", "ivan@example.com", "+79001234567", ""
     )
-    assert (person.education, person.about_me, person.expected_salary) == (None, None, None)
-    assert person.expected_salary_currency is None
+    assert (person.education, person.about_me, person.expected_salary, person.minimum_salary) == (
+        None, None, None, None
+    )
+    # Без валюты анкета не бывает: копия получает умолчание, а не валюту источника.
+    assert person.expected_salary_currency == "$"
     languages = await _of(session_factory, ProfileLanguage, person.id)
     assert [(lang.language, lang.level) for lang in languages] == [("Русский", "native")]
     for model in (ProfileSkill, ProfileExperience, ProfileProject, ProfilePreference):

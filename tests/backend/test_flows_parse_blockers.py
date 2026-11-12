@@ -11,6 +11,7 @@
 
 from dataclasses import replace
 
+from backend.domain.named_salary import SalaryAsk
 from backend.flows import parse
 from backend.llm.candidate import CandidateProfile
 from backend.models import Vacancy, VacancyStatus
@@ -52,6 +53,30 @@ async def test_a_work_format_the_candidate_does_not_take_is_refused_without_the_
     assert saved.status is VacancyStatus.NOT_FIT
     assert saved.skip_reason == "Формат работы — офис."
     assert pipeline.fit_asked == []
+
+
+async def test_a_ceiling_below_the_minimum_is_refused_without_the_model(parsing, session_factory):
+    """Верх вилки ниже минимальной отвергает код — до зовов к модели."""
+    pipeline, vacancy = parsing
+    pipeline.salary_ask = SalaryAsk(minimum=2000, desired=4000)
+    pipeline.parsed = replace(pipeline.parsed, salary="$1000-1500")
+
+    await parse.parse_and_update_vacancy(pipeline, vacancy.id, "текст", "jobs")
+
+    saved = await only_row(session_factory, Vacancy)
+    assert saved.status is VacancyStatus.NOT_FIT
+    assert saved.skip_reason == "Зарплата ниже минимальной: до 1500 $ в месяц."
+    assert pipeline.fit_asked == []
+
+
+async def test_a_ceiling_at_the_minimum_goes_on_to_the_model(parsing, session_factory):
+    pipeline, vacancy = parsing
+    pipeline.salary_ask = SalaryAsk(minimum=1500, desired=4000)
+    pipeline.parsed = replace(pipeline.parsed, salary="$1000-1500")
+
+    await parse.parse_and_update_vacancy(pipeline, vacancy.id, "текст", "jobs")
+
+    assert pipeline.fit_asked != []
 
 
 async def test_the_office_in_the_candidates_own_city_is_no_blocker(

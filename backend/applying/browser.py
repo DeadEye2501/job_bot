@@ -46,7 +46,7 @@ async def via_browser(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome:
         if vacancy_text is None:
             return GONE
         language = await read_reply_language(session, vacancy_id)
-        profile_text = await kit.profile_text(session)
+        profile_text = await kit.vacancy_profile_text(session, vacancy_id)
         site = await session.get(Aggregator, way.aggregator_id) if way.aggregator_id else None
         profile = site.id if site else await web_search_id(session)
         resume = await chosen_resume(session, site.id) if site else None
@@ -87,15 +87,12 @@ async def _mark_unfit(kit: AgentKit, vacancy_id: int, reason: str) -> None:
 
 def _apply_plan(kit: AgentKit, job: ApplyJob, vacancy_text: str, profile_text: str,
                 closed: asyncio.Event) -> SessionPlan:
-    """План откликателя.
-
-    Поиск в сети — для курса валют в анкете и вакансии.
-    """
+    """План откликателя."""
     tools =[*common_tools(kit, job), *applier_tools(kit, job), *letter_tools(kit, job),
              *browser_tools(kit, kit.pipeline.cv_file(), kit.pipeline.photo_file(),
                             job if job.confirming else None)]
     task = applier_task(job, vacancy_text, profile_text, kit.today)
-    return SessionPlan(system_prompt(APPLIER_PROMPT, tools), task, tools, web_search=True, cut=closed)
+    return SessionPlan(system_prompt(APPLIER_PROMPT, tools), task, tools, web_search=False, cut=closed)
 
 
 def _settle(job: ApplyJob, way: Way, shut: str | None) -> Outcome:

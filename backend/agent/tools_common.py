@@ -20,6 +20,7 @@ from backend.agent.jobs import (
 )
 from backend.agent.kit import AgentKit
 from backend.agent.page_fields import field_or_none
+from backend.agent.salary_view import salary_lines
 from backend.domain.apply_order import VIA_AGGREGATOR
 from backend.domain.hosts import normalize_host
 from backend.repository.aggregators import set_logged_in
@@ -33,7 +34,12 @@ def common_tools(kit: AgentKit, job) -> list[Callable]:
 
     async def profile() -> str:
         """Анкета человека целиком, со стажем общим и по навыкам."""
-        return await kit.read(kit.profile_text) or "Анкета не заполнена."
+        async def read(session) -> str:
+            if isinstance(job, ApplyJob):
+                return await kit.vacancy_profile_text(session, job.vacancy_id)
+            return await kit.profile_text(session, await salary_lines(session, job))
+
+        return await kit.read(read) or "Анкета не заполнена."
 
     async def finish(result: str, reason: str = "") -> str:
         """Итог сессии. Искатель: done или failed. Откликатель: vacancy_closed, platform_closed, not_fit, а при резюме, названном в задании, ещё resume_missing. Проверка входа и перечень резюме: done. Заполнение резюме: done, а довести не удалось — failed с причиной."""

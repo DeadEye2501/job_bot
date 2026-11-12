@@ -6,6 +6,7 @@ from dataclasses import asdict
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.domain.named_salary import DEFAULT_CURRENCY, DEFAULT_PERIOD
 from backend.domain.preferences import merged_preferences
 from backend.models import (
     Profile,
@@ -89,7 +90,7 @@ def _parsed_records(model, records, profile_id: int, skill_lookup: dict[str, Pro
     return rows
 
 
-_SALARY = ("expected_salary", "expected_salary_currency", "expected_salary_period")
+_SALARY = ("expected_salary", "minimum_salary", "expected_salary_currency", "expected_salary_period")
 
 _PERSON = (
     "first_name_latin", "last_name_latin", "gender", "patronymic", "patronymic_latin",
@@ -111,10 +112,13 @@ def _answers(p, kept: dict) -> dict:
     """Ответы для форм: из файла, а чего файл не дал — прежние.
 
     Зарплата переносится связкой: новая сумма со старой валютой или периодом
-    была бы чужой зарплатой.
+    была бы чужой зарплатой. Без валюты и периода анкета не бывает: их нет у
+    суммы из файла или нет прежней анкеты — ставятся умолчания.
     """
-    fresh = p.expected_salary is not None
+    fresh = p.expected_salary is not None or p.minimum_salary is not None
     answers = {name: getattr(p, name) if fresh else kept.get(name) for name in _SALARY}
+    answers["expected_salary_currency"] = answers["expected_salary_currency"] or DEFAULT_CURRENCY
+    answers["expected_salary_period"] = answers["expected_salary_period"] or DEFAULT_PERIOD
     for name in _PERSON:
         answers[name] = getattr(p, name) if getattr(p, name) is not None else kept.get(name)
     return answers

@@ -9,6 +9,7 @@ import logging
 
 from adapters.lm_chat import MODEL_REFUSED
 from backend.domain.fit_fields import grade_refusal, work_format_refusal
+from backend.domain.named_salary import Rates, SalaryAsk, judge_salary, offer_of
 from backend.domain.verdict import (
     LLM_SKIP_PREFIX,
     REFUSED_SKIP_REASON,
@@ -152,6 +153,13 @@ def _fields_refusal(parsed, profile) -> str | None:
     )
 
 
+def _salary_refusal(parsed, ask: SalaryAsk, rates: Rates) -> str | None:
+    """Отказ по зарплате; пусто — зарплата не мешает. Бесплатный, как отказ по
+    полям: считает код, а не модель."""
+    offer = offer_of(parsed.salary, parsed.salary_period, parsed.salary_currency)
+    return judge_salary(offer, ask, rates).refusal
+
+
 async def unfit_refusal(
     pipeline, parsed, text: str, vacancy_id: int
 ) -> tuple[str | None, bool]:
@@ -168,7 +176,9 @@ async def unfit_refusal(
     refusal, unasked = await _genre_refusal(pipeline, text, vacancy_id)
     if unasked or refusal is not None:
         return refusal, unasked
-    by_fields = _fields_refusal(parsed, pipeline.profile_cache)
+    by_fields = _fields_refusal(parsed, pipeline.profile_cache) or _salary_refusal(
+        parsed, pipeline.salary_ask, pipeline.rates
+    )
     if by_fields is not None:
         logger.info("vacancy %s: не подходит по полям — %s", vacancy_id, by_fields)
         return by_fields, False

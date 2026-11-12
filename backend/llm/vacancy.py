@@ -9,11 +9,13 @@ import httpx
 from adapters.lm_chat import ChatRequest, chat
 from backend.domain.company_names import capitalized_company_name
 from backend.domain.contact_keys import EMAIL_PATTERN, PHONE_PATTERN
+from backend.domain.salary import currency_sign
 from backend.domain.taxonomy import GRADES, WORK_FORMATS
 from backend.domain.telegram_identity import normalize_username
+from backend.models import SalaryPeriod
 from backend.payloads import ParsedVacancy
 
-from backend.incoming import normalize_enum, str_list
+from backend.incoming import enum_member_or_none, normalize_enum, str_list
 from backend.llm.answers import json_object, read_with_a_second_try, str_or_none
 from backend.llm.candidate import CandidateProfile, format_known_skills
 from backend.llm.rules import AGGREGATOR_HOSTS_LINE, VACANCY_TEXT_CHARS, in_user_language
@@ -231,6 +233,8 @@ def _vacancy_of(data: dict, title: str) -> ParsedVacancy:
         remote=normalize_enum(data.get("remote"), WORK_FORMATS),
         location=_text_field("location"),
         language=_text_field("language"),
+        salary_period=enum_member_or_none(data.get("salary_period"), SalaryPeriod),
+        salary_currency=currency_sign(_text_field("salary_currency")),
     )
 
 

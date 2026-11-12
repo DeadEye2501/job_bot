@@ -7,7 +7,8 @@
 from tests.factories import person_fields
 
 # Строки предпочтений окно шлёт всегда — пустым перечнем, когда их нет.
-PERSON = {**person_fields(), "preferences": []}
+# Валюту и период окно шлёт всегда: снять их нельзя.
+PERSON = {**person_fields(), "expected_salary_currency": "$", "expected_salary_period": "month", "preferences": []}
 
 
 async def _saved_person(api, ask, **extra) -> None:
@@ -61,8 +62,9 @@ async def test_a_saved_person_comes_back_on_the_next_request(api, ask):
         "linkedin_url": "https://www.linkedin.com/in/ivan",
         "education": "МГУ",
         "expected_salary": None,
-        "expected_salary_currency": None,
-        "expected_salary_period": None,
+        "minimum_salary": None,
+        "expected_salary_currency": "$",
+        "expected_salary_period": "month",
         "first_name_latin": None,
         "last_name_latin": None,
         "gender": None,
@@ -136,14 +138,32 @@ async def test_a_zero_salary_is_saved_as_no_salary(api, ask):
     assert (await ask(api.profile.get))["ok"]["profile"]["expected_salary"] is None
 
 
-async def test_an_unknown_gender_or_currency_never_reaches_the_column(api, ask):
-    await ask(api.profile.save, {
-        **PERSON, "gender": "другое", "expected_salary_currency": "тугрики",
-    })
+async def test_an_unknown_gender_never_reaches_the_column(api, ask):
+    await ask(api.profile.save, {**PERSON, "gender": "другое"})
+
+    assert (await ask(api.profile.get))["ok"]["profile"]["gender"] is None
+
+
+async def test_an_unknown_currency_is_refused_not_emptied(api, ask):
+    """Без валюты анкета не бывает: чужая валюта — отказ с названием поля,
+    а не пустота."""
+    answer = await ask(api.profile.save, {**PERSON, "expected_salary_currency": "тугрики"})
+
+    assert answer["fail"] == "fields" and "валюта зарплаты" in answer["detail"]
+
+
+async def test_a_missing_period_is_refused_not_emptied(api, ask):
+    answer = await ask(api.profile.save, {**PERSON, "expected_salary_period": None})
+
+    assert answer["fail"] == "fields" and "период зарплаты" in answer["detail"]
+
+
+async def test_the_minimum_salary_comes_back_as_saved(api, ask):
+    await ask(api.profile.save, {**PERSON, "minimum_salary": "2000", "expected_salary": "4000"})
 
     profile = (await ask(api.profile.get))["ok"]["profile"]
 
-    assert (profile["gender"], profile["expected_salary_currency"]) == (None, None)
+    assert (profile["minimum_salary"], profile["expected_salary"]) == (2000, 4000)
 
 
 async def test_grades_keep_the_declared_order_not_the_clicked_one(api, ask):

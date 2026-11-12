@@ -19,7 +19,7 @@ from sqlalchemy.sql import expression
 
 from backend.models.base import Base, CreatedAtMixin, IdMixin, enum_column
 from backend.models.contacts import HR, Aggregator, Company, TelegramChannel
-from backend.models.enums import ContactAddedBy, StatusHistorySource, VacancyStatus
+from backend.models.enums import ContactAddedBy, SalaryPeriod, StatusHistorySource, VacancyStatus
 from backend.models.workspace import ACTIVE_WORKSPACE_ID
 
 
@@ -78,6 +78,10 @@ class Vacancy(IdMixin, CreatedAtMixin, Base):
     # `domain/currency.py`, а перечисление здесь ограничивало набор тремя
     # валютами — драм и тенге разбирались числом и оставались без валюты.
     salary_currency: Mapped[str | None]
+    # Период вилки: при сумме — всегда, без суммы — пусто (`domain/named_salary.offer_period`).
+    salary_period: Mapped[SalaryPeriod | None] = mapped_column(
+        enum_column(SalaryPeriod, "salary_period")
+    )
     remote: Mapped[str | None]
     location: Mapped[str | None]
     # Язык текста поста — его называет разбор; по нему решается язык отклика.

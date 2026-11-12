@@ -63,7 +63,7 @@ async def compose_letter(kit: AgentKit, parsed: ParsedVacancy, post: LetterPost,
     if ready is not None:
         resume = await resume_for_letter(kit.pipeline)
         return (Letter(ready, None) if resume is None else Letter(resume.under(ready), resume.file)), None
-    profile = await kit.read(kit.profile_text)
+    profile = await kit.read(lambda session: kit.vacancy_profile_text(session, vacancy_id))
     if not profile:
         logger.warning("vacancy %d: анкета пуста, письмо не пишется", vacancy_id)
         return None, "profile_empty"
@@ -104,4 +104,6 @@ def parsed_from_row(v: Vacancy) -> ParsedVacancy:
         other_contacts=[],
         stack_required=list(v.stack or []),
         stack_preferred=[],
+        salary_period=v.salary_period,
+        salary_currency=v.salary_currency,
     )

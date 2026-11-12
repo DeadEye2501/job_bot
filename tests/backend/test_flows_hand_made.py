@@ -10,7 +10,7 @@ from pyrogram.errors import ChannelPrivate, UsernameNotOccupied
 
 from backend.flows.hand_made import HandRequest, ingest_by_hand
 from backend.flows.hand_outcome import HandResult
-from backend.models import Vacancy, VacancyEvent
+from backend.models import SalaryPeriod, Vacancy, VacancyEvent
 from backend.repository.vacancies_new import HAND_MADE
 from backend.telegram_time import tg_moment
 from tests.backend.fixtures.flows import told_then_applied
@@ -339,3 +339,16 @@ async def test_fields_linking_a_post_of_another_vacancy_are_filed(filing, sessio
     assert filing.told[0].outcome == "ok"
 
 
+async def test_a_salary_filed_by_hand_counts_monthly(filing, session_factory):
+    """В форме периода нет: набранная сумма — месячная, без суммы периода нет."""
+    await ingest_by_hand(kit_for(filing), HandRequest(
+        "fields", _fields(salary_min=3000, salary_max=5000, salary_currency="$"), None, False,
+    ))
+
+    assert (await only_row(session_factory, Vacancy)).salary_period is SalaryPeriod.MONTH
+
+
+async def test_no_salary_filed_by_hand_no_period(filing, session_factory):
+    await ingest_by_hand(kit_for(filing), HandRequest("fields", _fields(), None, False))
+
+    assert (await only_row(session_factory, Vacancy)).salary_period is None

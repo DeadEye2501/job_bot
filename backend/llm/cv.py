@@ -174,6 +174,23 @@ def _full_date(value) -> date | None:
         return None
 
 
+def _salary(data: dict) -> dict:
+    """Зарплата резюме. Валюта названа, но не из наших — сумм нет вовсе:
+    умолчание $ сделало бы 80 000 гривен долларами, а без сумм анкета
+    оставит прежнюю зарплату."""
+    named = str_or_none(data.get("expected_salary_currency"))
+    currency = currency_sign(named)
+    if named is not None and currency is None:
+        return {"expected_salary": None, "minimum_salary": None,
+                "expected_salary_currency": None, "expected_salary_period": None}
+    return {
+        "expected_salary": amount_or_none(data.get("expected_salary")),
+        "minimum_salary": amount_or_none(data.get("minimum_salary")),
+        "expected_salary_currency": currency,
+        "expected_salary_period": enum_member_or_none(data.get("expected_salary_period"), SalaryPeriod),
+    }
+
+
 def _parse_profile(data: dict) -> ParsedCvProfile | None:
     if not isinstance(data, dict):
         return None
@@ -190,13 +207,7 @@ def _parse_profile(data: dict) -> ParsedCvProfile | None:
         education=str_or_none(data.get("education")),
         work_format=normalize_enum_list(data.get("work_format"), WORK_FORMATS),
         grades=normalize_enum_list(data.get("grades"), GRADES),
-        expected_salary=amount_or_none(data.get("expected_salary")),
-        expected_salary_currency=currency_sign(
-            str_or_none(data.get("expected_salary_currency"))
-        ),
-        expected_salary_period=enum_member_or_none(
-            data.get("expected_salary_period"), SalaryPeriod
-        ),
+        **_salary(data),
         first_name_latin=str_or_none(data.get("first_name_latin")),
         last_name_latin=str_or_none(data.get("last_name_latin")),
         gender=enum_member_or_none(data.get("gender"), Gender),

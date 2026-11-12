@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from backend.applying.result import Missed, TelegramClosed
 from backend.applying.telegram import via_telegram
-from backend.models import Application, ApplicationVia, CoverLetter, Message, Profile, Vacancy
+from backend.models import Application, ApplicationVia, CoverLetter, Message, Profile, SalaryPeriod, Vacancy
 from tests.backend.fixtures.applying import TG
 from tests.dbio import all_rows, put
 from tests.factories import TEST_WORKSPACE_ID, days_ago, message_row
@@ -103,6 +103,22 @@ async def test_the_letter_model_gets_the_whole_profile(telegram_case):
     ((_, text, _),) = sent
     assert "https://github.com/someone" in text and "Ivan" in text
     assert "https://www.linkedin.com/in/someone" in text
+
+
+async def test_the_letter_model_gets_the_sum_named_for_this_vacancy(telegram_case):
+    """Письмо называет ту же сумму, что откликатель, — посчитанную кодом, а не
+    минимальную или желаемую анкеты."""
+    kit, vacancy, sent = await telegram_case()
+    async with kit.pipeline.session_factory() as session:
+        profile = (await session.scalars(select(Profile))).one()
+        profile.minimum_salary, profile.expected_salary = 1000, 2000
+        row = await session.get(Vacancy, vacancy.id)
+        row.salary_max, row.salary_currency, row.salary_period = 3000, "$", SalaryPeriod.MONTH
+        await session.commit()
+    await via_telegram(kit, vacancy.id, TG)
+    ((_, text, _),) = sent
+    assert "Зарплата для этой вакансии: 3000 $ в месяц, на руки" in text
+    assert "Желаемая" not in text and "Минимальная" not in text
 
 
 async def test_a_rerun_writes_the_full_letter_again(telegram_case):

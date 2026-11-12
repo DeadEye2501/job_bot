@@ -2,11 +2,11 @@
 
 from backend.agent.jobs import Applied, Failed, FillJob, Finished, LoginJob, ScanJob, Source
 from backend.agent.tools_common import common_tools
-from backend.models import Aggregator
+from backend.models import Aggregator, SalaryPeriod
 from backend.payloads import SeenResume
 from backend.repository.agent_profile import build_agent_profile
 from tests.dbio import all_rows, put, reread
-from tests.factories import profile_row
+from tests.factories import profile_row, vacancy_row
 from tests.factories_aggregators import aggregator_row
 from tests.fakes.agent import TODAY, apply_job, kit_for, tool
 
@@ -19,9 +19,50 @@ async def test_the_profile_tool_gives_the_whole_profile(make_pipeline, session_f
     tools = common_tools(kit_for(await make_pipeline()), LoginJob(Source.of(site)))
 
     async with session_factory() as session:
-        whole = await build_agent_profile(session, TODAY, photo=False)
+        whole = await build_agent_profile(session, TODAY, photo=False, salary=[])
 
     assert "Имя: Иван" in whole and await tool(tools, "profile")() == whole
+
+
+async def _salaries(session_factory) -> None:
+    await put(session_factory, profile_row(minimum_salary=2100, expected_salary=4100))
+
+
+async def test_the_applier_profile_names_only_the_sum_for_its_vacancy(make_pipeline, session_factory):
+    """Откликатель видит одну сумму — верх вилки этой вакансии, — а не
+    минимальную и желаемую: с ними рядом модель называла не ту."""
+    await _salaries(session_factory)
+    vacancy = vacancy_row(salary="$3000", salary_min=3000, salary_max=3000,
+                          salary_currency="$", salary_period=SalaryPeriod.MONTH)
+    await put(session_factory, vacancy)
+
+    text = await tool(common_tools(kit_for(await make_pipeline()), apply_job(vacancy.id)), "profile")()
+
+    assert "Зарплата для этой вакансии: 3000 $ в месяц, на руки" in text
+    assert "2100" not in text and "4100" not in text
+
+
+async def test_the_resume_filler_sees_both_sums(make_pipeline, session_factory):
+    await _salaries(session_factory)
+    site = aggregator_row()
+    await put(session_factory, site)
+    site = await reread(session_factory, site)
+
+    text = await tool(common_tools(kit_for(await make_pipeline()), FillJob(Source.of(site))), "profile")()
+
+    assert "Минимальная зарплата: 2100 $ в месяц, на руки" in text
+    assert "Желаемая зарплата: 4100 $ в месяц, на руки" in text
+
+
+async def test_the_login_check_sees_no_salary(make_pipeline, session_factory):
+    await _salaries(session_factory)
+    site = aggregator_row()
+    await put(session_factory, site)
+    site = await reread(session_factory, site)
+
+    text = await tool(common_tools(kit_for(await make_pipeline()), LoginJob(Source.of(site))), "profile")()
+
+    assert "зарплат" not in text.lower()
 
 
 async def test_a_reported_login_lands_on_its_own_aggregator(make_pipeline, session_factory):

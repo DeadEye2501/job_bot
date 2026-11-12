@@ -79,6 +79,7 @@ def personal_part(parsed: ParsedCv) -> ParsedCv:
             work_format=[],
             grades=[],
             expected_salary=None,
+            minimum_salary=None,
             expected_salary_currency=None,
             expected_salary_period=None,
             about_me=None,

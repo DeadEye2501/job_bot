@@ -322,6 +322,16 @@ def _sending_locked(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _rates_served(monkeypatch):
+    """Источник курсов отвечает подделкой: засеянный кэш давний, и каждая
+    загрузка слепков конвейера иначе шла бы в живую сеть.
+    Тест источника подменяет ответ своим `serve_rates` поверх этого."""
+    from tests.fakes.exchange_rates import serve_rates
+
+    serve_rates(monkeypatch)
+
+
+@pytest.fixture(autouse=True)
 def _secrets_forgotten(monkeypatch):
     """Запомненные секреты журнала не переходят в следующий тест.
 
@@ -377,8 +387,12 @@ async def _empty_database(database_url) -> None:
 
     После уборки кладётся активный профиль 1: без активного профиля приложение
     не живёт — его кладёт миграция, и уборка снесла бы его вместе с остальным.
+    По той же причине кладутся курсы валют — давние, чтобы первая же загрузка
+    слепков спросила подделку источника (`_rates_served`), а не жила курсами
+    засева.
     """
     from adapters.db import make_engine
+    from tests.fakes.exchange_rates import RATES
 
     cleaner = make_engine(database_url)
     try:
@@ -386,6 +400,11 @@ async def _empty_database(database_url) -> None:
         async with cleaner.begin() as connection:
             await connection.execute(
                 text("INSERT INTO workspace (id, is_active) VALUES (1, 1)")
+            )
+            await connection.execute(
+                text("INSERT INTO currency_rate (code, per_usd, fetched_at)"
+                     " VALUES (:code, :per_usd, '2000-01-01 00:00:00')"),
+                [{"code": code, "per_usd": rate} for code, rate in RATES.items()],
             )
     finally:
         await cleaner.dispose()

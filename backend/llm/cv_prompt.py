@@ -56,6 +56,7 @@ PARSE_CV_PROMPT = """Ты парсишь CV специалиста и извле
     "work_format": [""" + " | ".join(f'"{one}"' for one in WORK_FORMATS) + """, ...],
     "grades": [""" + " | ".join(f'"{one}"' for one in GRADES) + """, ...],
     "expected_salary": "integer | null",
+    "minimum_salary": "integer | null",
     "expected_salary_currency": "string | null",
     "expected_salary_period": "hour | month | year | null",
     "first_name_latin": "string | null",
@@ -108,7 +109,7 @@ PARSE_CV_PROMPT = """Ты парсишь CV специалиста и извле
 - work_format: подмножество из """ + " / ".join(WORK_FORMATS) + """ — формат работы, который кандидат рассматривает, только если резюме называет его одним из этих слов: """ + FORMAT_MARKERS + """. [] если не назван.
 - grades: подмножество из """ + " / ".join(GRADES) + """ — только если человек сам называет свой уровень одним из этих слов: """ + GRADE_MARKERS + """. Должности прошлых мест работы, стаж и объём ответственности уровнем не являются. Слов нет или сомневаешься — [].
 - about_me: раздел «О себе» («Обо мне», «About me», «Summary») дословно, с абзацами. Раздела нет — null.
-- expected_salary / expected_salary_currency / expected_salary_period: ожидаемая зарплата, если резюме её называет. Сумма — целым числом без пробелов; назван диапазон — нижняя граница. Валюта — трёхбуквенным кодом ISO (USD, EUR, RUB). Период — hour, month или year; не назван — null. Сумма не названа — все три null.
+- expected_salary / minimum_salary / expected_salary_currency / expected_salary_period: зарплата, если резюме её называет. Суммы — целыми числами без пробелов. Названы минимальная и желаемая — обе; названа одна сумма — в expected_salary, minimum_salary — null; назван диапазон — нижняя граница в minimum_salary, верхняя в expected_salary. Валюта — трёхбуквенным кодом ISO (USD, EUR, RUB). Период — hour, month или year; не назван — null. Суммы не названы — все четыре null.
 - patronymic: отчество, если резюме его пишет, обычным письмом, как имя; иначе null.
 - first_name_latin / last_name_latin / patronymic_latin: имя, фамилия и отчество латиницей, только если резюме само их так пишет.
 - birth_date: дата рождения ISO YYYY-MM-DD, только если резюме называет её полностью — день, месяц и год. Иначе null.

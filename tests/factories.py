@@ -109,6 +109,8 @@ def _empty_vacancy() -> dict:
         "remote": None,
         "location": None,
         "language": None,
+        "salary_period": None,
+        "salary_currency": None,
     }
 
 

@@ -184,6 +184,7 @@ class ParsedCvProfile:
     work_format: list[str]
     grades: list[str]
     expected_salary: int | None
+    minimum_salary: int | None
     expected_salary_currency: str | None
     expected_salary_period: SalaryPeriod | None
     first_name_latin: str | None
@@ -285,6 +286,10 @@ class ParsedVacancy:
     # Язык текста поста, названием на нём самом. По нему
     # `domain/language_choice` решает язык отклика.
     language: str | None
+    # Срок и валюта суммы в `salary` — ответ модели. Валюта — знаком; названная
+    # в самой строке её сильнее (`domain/named_salary.offer_of`).
+    salary_period: SalaryPeriod | None
+    salary_currency: str | None
 
     @property
     def stack(self) -> list[str]:

@@ -24,6 +24,11 @@ describe('анкета, уезжающая на мост', () => {
     expect(profileSheet(form, new Set(), new Set()).expected_salary).toBe('150000');
   });
 
+  it('минимальная сумма уезжает числом так же', () => {
+    const form = { ...blankProfile(), minimum_salary: '120 000' };
+    expect(profileSheet(form, new Set(), new Set()).minimum_salary).toBe('120000');
+  });
+
   it('неразрывный пробел между разрядами — тоже не часть суммы', () => {
     // Скопированная из чужого текста сумма приходит с неразрывными пробелами.
     const form = { ...blankProfile(), expected_salary: '150 000' };
@@ -142,9 +147,10 @@ describe('что уезжает на мост', () => {
       education: '',
       about_me: '',
       resume_url: '',
+      minimum_salary: '',
       expected_salary: '',
-      expected_salary_currency: '',
-      expected_salary_period: '',
+      expected_salary_currency: '$',
+      expected_salary_period: 'month',
       grades: [],
       work_format: [],
       languages: [],

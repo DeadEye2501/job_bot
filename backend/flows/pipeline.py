@@ -13,6 +13,7 @@ from pathlib import Path
 
 from backend.bot.media import stored_media
 from backend.domain.dedup import EmbeddingCache
+from backend.domain.named_salary import Rates, SalaryAsk, salary_ask_of
 from backend.flows.dm import DmHelpers
 from backend.flows.dm_backfill import DmHooks
 from backend.flows.dm_debounce import DmDebounce
@@ -23,11 +24,13 @@ from backend.flows import channels
 from backend.flows import rerun
 from backend.flows import cleanup
 from backend.flows import ghosting
+from backend.flows.rates_refresh import RatesRefresh
 from backend.domain.preferences import of_kind
 from backend.llm import candidate
 from backend.llm.candidate import CandidateProfile
 from backend.models import PreferenceKind, ProfileSkill
 from backend.repository.blacklist_marks import load_active_blacklist_patterns
+from backend.repository.currency_rates import load_rates
 from backend.repository.profile import get_profile
 from backend.repository.profile_languages import list_profile_languages
 from backend.repository.profile_preferences import list_profile_preferences
@@ -55,6 +58,12 @@ def _declare_caches(pipeline) -> None:
     pipeline.skills_cache = []
     # Срез данных профиля для LLM-валидатора.
     pipeline.profile_cache = CandidateProfile()
+    # Зарплата анкеты и курсы — для отсева по зарплате; модели они не идут.
+    # Пустыми курсы до разбора не доходят: каждый путь к разбору (каналы,
+    # искатель, вставка, «Прогнать заново») сперва зовёт `reload_resources`, а
+    # вилка в чужой валюте без курса уронила бы `judge_salary` на `KeyError`.
+    pipeline.salary_ask = SalaryAsk()
+    pipeline.rates = {}
     pipeline.blacklist_patterns = []
 
 
@@ -168,6 +177,8 @@ class IngestionPipeline:
     # чужому полю (`pipeline.skills_cache = ...`) тип не записывает.
     skills_cache: list[ProfileSkill]
     profile_cache: CandidateProfile
+    salary_ask: SalaryAsk
+    rates: Rates
     blacklist_patterns: list[str]
     dm_debounce: DmDebounce
 
@@ -181,6 +192,9 @@ class IngestionPipeline:
     ) -> None:
         self.client = client
         self.session_factory = session_factory
+        # Помнит неудачу запроса курсов между загрузками слепков — потому не в
+        # `_declare_caches`, которую смена профиля зовёт заново.
+        self.rates_refresh = RatesRefresh(session_factory)
         _take_models(self, models)
         # Отклик на отобранное: откликатель с набором агента бота.
         self.apply = apply
@@ -284,6 +298,7 @@ class IngestionPipeline:
         # следующем `poll_active_changes`. Это намеренно: cache invalidation
         # из UI-bridge'а потребует cross-thread hook'а, и польза маргинальная
         # (юзер редко редактирует профиль во время активного полла).
+        await self.rates_refresh.run()
         async with self.session_factory() as session:
             self.skills_cache = await list_skills(session)
             self.blacklist_patterns = await load_active_blacklist_patterns(
@@ -298,6 +313,8 @@ class IngestionPipeline:
                 bans=of_kind(preferences, PreferenceKind.BAN),
                 info=of_kind(preferences, PreferenceKind.INFO),
             )
+            self.salary_ask = salary_ask_of(profile)
+            self.rates = await load_rates(session)
         logger.info(
             "loaded resources: %d skills, %d blacklist patterns, "
             "profile_title=%r, %d languages",

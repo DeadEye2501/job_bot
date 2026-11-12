@@ -61,10 +61,14 @@ class Profile(IdMixin, UpdatedAtMixin, Base):
     grades: Mapped[list[str]] = mapped_column(
         JSON, server_default=text("'[]'")
     )
+    # Желаемая; минимальная — то, на что человек готов согласиться. Валюта и
+    # период у них общие и заданы всегда: в них считается названная сумма
+    # (`domain/named_salary`).
     expected_salary: Mapped[int | None]
-    expected_salary_currency: Mapped[str | None]
-    expected_salary_period: Mapped[SalaryPeriod | None] = mapped_column(
-        enum_column(SalaryPeriod, "salary_period")
+    minimum_salary: Mapped[int | None]
+    expected_salary_currency: Mapped[str] = mapped_column(server_default=text("'$'"))
+    expected_salary_period: Mapped[SalaryPeriod] = mapped_column(
+        enum_column(SalaryPeriod, "salary_period"), server_default=text("'month'")
     )
     first_name_latin: Mapped[str | None]
     last_name_latin: Mapped[str | None]

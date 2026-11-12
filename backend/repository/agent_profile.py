@@ -5,10 +5,9 @@ from datetime import date
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.preferences import of_kind
-from backend.domain.salary import salary_text
 from backend.domain.tenure import full_years, place_period, worked_years, years_text
 from backend.llm.candidate import GENDER_WORDS, candidate_languages, format_languages
-from backend.models import PreferenceKind, SalaryPeriod
+from backend.models import PreferenceKind
 from backend.repository.profile import get_profile
 from backend.repository.profile_experience import list_experience
 from backend.repository.profile_languages import list_profile_languages
@@ -16,14 +15,12 @@ from backend.repository.profile_preferences import list_profile_preferences
 from backend.repository.profile_projects import list_projects
 from backend.repository.profile_skills import list_skills
 
-_PERIOD = {SalaryPeriod.HOUR: "в час", SalaryPeriod.MONTH: "в месяц", SalaryPeriod.YEAR: "в год"}
-
-
-async def build_agent_profile(session: AsyncSession, today: date, photo: bool) -> str:
+async def build_agent_profile(session: AsyncSession, today: date, photo: bool, salary: list[str]) -> str:
     """Анкета для агента. Пустые поля названы пустыми: агенту видно, что их нет.
 
     Есть ли фото, решает зовущий тем же `photo_file`, что даёт файл инструменту:
-    анкета и инструмент не должны расходиться в ответе.
+    анкета и инструмент не должны расходиться в ответе. Строки зарплаты тоже
+    даёт зовущий — у каждого агента свои (`agent/salary_view`).
     """
     profile = await get_profile(session)
     if profile is None:
@@ -35,6 +32,7 @@ async def build_agent_profile(session: AsyncSession, today: date, photo: bool) -
     preferences = await list_profile_preferences(session)
     return "\n".join([
         *_person_lines(profile, languages, today),
+        *salary,
         f"Фото: {'есть' if photo else 'нет'}",
         f"Общий стаж: {years_text(worked_years(places, today)) if places else 'нет мест работы'}",
         "Навыки:", *_skill_lines(skills, places, projects, today),
@@ -81,7 +79,6 @@ def _person_lines(p, languages, today: date) -> list[str]:
         f"LinkedIn: {p.linkedin_url or 'не указан'}",
         f"Ссылка на резюме: {p.resume_url or 'не указана'}",
         f"Образование: {p.education or 'не указано'}",
-        f"Ожидаемая зарплата: {_salary(p)}",
     ]
 
 
@@ -90,15 +87,6 @@ def _birth_lines(born: date | None, today: date) -> list[str]:
     if born is None:
         return ["Дата рождения: не указана"]
     return [f"Дата рождения: {born:%d.%m.%Y}", f"Возраст (полных лет): {full_years(born, today)}"]
-
-
-def _salary(p) -> str:
-    if p.expected_salary is None:
-        return "не указана"
-    amount = p.expected_salary
-    money = salary_text(amount, amount, p.expected_salary_currency or "валюта не указана")
-    period = _PERIOD.get(p.expected_salary_period, "период не указан")
-    return f"{money} {period}, на руки"
 
 
 def _skill_lines(skills, places, projects, today: date) -> list[str]:

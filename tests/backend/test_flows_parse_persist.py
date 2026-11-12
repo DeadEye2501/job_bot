@@ -20,7 +20,7 @@ from backend.domain.language_choice import CandidateLanguage
 from backend.flows import parse
 from backend.llm.candidate import CandidateProfile
 
-from backend.models import HR, Company, Vacancy, VacancyEvent, VacancyStatus
+from backend.models import HR, Company, SalaryPeriod, Vacancy, VacancyEvent, VacancyStatus
 from backend.payloads import FitValidation
 from tests.dbio import all_rows, only_row, put
 from tests.factories import app_setting_row, company_row, parsed_vacancy
@@ -62,6 +62,57 @@ async def test_the_currency_of_the_salary_lands_in_the_row(parsing, session_fact
     saved = await only_row(session_factory, Vacancy)
     assert (saved.salary_min, saved.salary_max) == (3000, 5000)
     assert saved.salary_currency == "$"
+
+
+async def test_a_salary_without_a_named_period_counts_monthly(parsing, session_factory):
+    """Период, не названный моделью, — месяц: так пишут чаще всего."""
+    pipeline, vacancy = parsing
+    pipeline.parsed = replace(pipeline.parsed, salary="$3000", salary_period=None)
+
+    await parse.parse_and_update_vacancy(pipeline, vacancy.id, "текст", "jobs", allow_delete=False)
+
+    assert (await only_row(session_factory, Vacancy)).salary_period is SalaryPeriod.MONTH
+
+
+async def test_no_sum_no_period(parsing, session_factory):
+    """Период без суммы — от «по договорённости» — не записывается."""
+    pipeline, vacancy = parsing
+    pipeline.parsed = replace(
+        pipeline.parsed, salary="по договорённости", salary_period=SalaryPeriod.YEAR, salary_currency="₽"
+    )
+
+    await parse.parse_and_update_vacancy(pipeline, vacancy.id, "текст", "jobs", allow_delete=False)
+
+    saved = await only_row(session_factory, Vacancy)
+    assert (saved.salary_period, saved.salary_currency) == (None, None)
+
+
+async def test_the_model_currency_fills_a_string_without_one(parsing, session_factory):
+    """Строка без валюты получает валюту, выведенную моделью; названная в
+    строке — сильнее модели."""
+    pipeline, vacancy = parsing
+    pipeline.parsed = replace(
+        pipeline.parsed, salary="150 000 - 200 000", salary_period=SalaryPeriod.MONTH, salary_currency="₽"
+    )
+    await parse.parse_and_update_vacancy(pipeline, vacancy.id, "текст", "jobs", allow_delete=False)
+    assert (await only_row(session_factory, Vacancy)).salary_currency == "₽"
+
+    pipeline.parsed = replace(pipeline.parsed, salary="$3000", salary_currency="₽")
+    await parse.parse_and_update_vacancy(pipeline, vacancy.id, "текст", "jobs", allow_delete=False)
+    assert (await only_row(session_factory, Vacancy)).salary_currency == "$"
+
+
+async def test_an_empty_reparse_wipes_the_period(parsing, session_factory):
+    """Повторный разбор без итога стирает и период: иначе у вакансии без
+    зарплаты остался бы срок прежней."""
+    pipeline, vacancy = parsing
+    pipeline.parsed = replace(pipeline.parsed, salary="$3000", salary_period=SalaryPeriod.HOUR)
+    await parse.parse_and_update_vacancy(pipeline, vacancy.id, "текст", "jobs", allow_delete=False)
+
+    pipeline.parsed = None
+    await parse.parse_and_update_vacancy(pipeline, vacancy.id, "текст", "jobs", allow_delete=False)
+
+    assert (await only_row(session_factory, Vacancy)).salary_period is None
 
 
 async def test_a_reparse_without_skills_keeps_the_old_stack(

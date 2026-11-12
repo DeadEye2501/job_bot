@@ -13,6 +13,7 @@ from adapters.claude_code_agent import AgentEnd
 from backend.agent.human_gate import HumanGate
 from backend.flows.pipeline import IngestionPipeline
 from backend.repository.agent_profile import build_agent_profile
+from backend.repository.vacancy_pay import vacancy_salary_lines
 
 
 def _never() -> bool:
@@ -78,7 +79,12 @@ class AgentKit:
         async with self.pipeline.session_factory() as session:
             return await query(session)
 
-    async def profile_text(self, session: AsyncSession) -> str:
+    async def profile_text(self, session: AsyncSession, salary: list[str]) -> str:
         """Анкета для агента на сегодня; есть ли фото — по тому же `photo_file`,
-        что даёт файл инструменту прикладывания."""
-        return await build_agent_profile(session, self.today, self.pipeline.photo_file() is not None)
+        что даёт файл инструменту прикладывания. `salary` — строки зарплаты этой
+        задачи (`agent/salary_view`)."""
+        return await build_agent_profile(session, self.today, self.pipeline.photo_file() is not None, salary)
+
+    async def vacancy_profile_text(self, session: AsyncSession, vacancy_id: int) -> str:
+        """Анкета для отклика и писем к вакансии: зарплата в ней — названная сумма."""
+        return await self.profile_text(session, await vacancy_salary_lines(session, vacancy_id))
