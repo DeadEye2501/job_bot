@@ -25,8 +25,13 @@
 # Без этого в exe уедет старый `dist`, а при его отсутствии — ничего.
 
 import os
+import sys
 
 from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs, collect_submodules
+
+# Корня репозитория в путях сборщика может не быть, поэтому он ставится здесь.
+sys.path.insert(0, os.path.abspath(SPECPATH))
+from third_party_licenses import write_notices
 
 binaries = collect_dynamic_libs('llama_cpp')
 
@@ -41,6 +46,7 @@ datas = [
     ('alembic/versions/f2e88ee2a3a6_v1_4.py', 'alembic/versions'),
     # Драйвер Playwright — node и его пакет: без них браузер агента не стартует.
     *collect_data_files('playwright'),
+    (write_notices('Pipfile.lock', 'build/THIRD_PARTY_LICENSES.txt'), '.'),
 ]
 
 hiddenimports = [

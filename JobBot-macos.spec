@@ -23,6 +23,7 @@ from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs, co
 # сборщика может не быть, поэтому он ставится строкой ниже.
 sys.path.insert(0, os.path.abspath(SPECPATH))
 from backend.app_version import VERSION
+from third_party_licenses import write_notices
 
 binaries = collect_dynamic_libs('llama_cpp')
 
@@ -38,6 +39,7 @@ datas = [
     ('alembic/versions/5d2e7a9c4b13_workspaces.py', 'alembic/versions'),
     ('alembic/versions/f2e88ee2a3a6_v1_4.py', 'alembic/versions'),
     *collect_data_files('playwright'),
+    (write_notices('macos/Pipfile.lock', 'build/THIRD_PARTY_LICENSES.txt'), '.'),
 ]
 
 hiddenimports = [

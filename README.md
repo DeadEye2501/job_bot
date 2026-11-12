@@ -173,6 +173,8 @@ pipenv run pip install pyinstaller        # один раз — в venv
 pipenv run python -m PyInstaller JobBot.spec --clean --noconfirm
 ```
 
+Перед упаковкой spec собирает `build/THIRD_PARTY_LICENSES.txt` (`third_party_licenses.py`) — тексты лицензий Python, пакетов из `default` замка, llama.cpp и того, что фронт вшивает из `node_modules`, — и кладёт его в бандл. Чего нет в колёсах, лежит в `licenses/` под именем пакета; пакет из замка без текста ни там, ни там роняет сборку. Новый ввоз из `node_modules` во фронт дописывается в `_FRONT` руками.
+
 После сборки готовый файл лежит в `dist/JobBot.exe`. Холодный старт — несколько секунд: онешот распаковывает себя во временный `_MEIPASS`-каталог. БД и логи живут в `%APPDATA%\JobBot`, рядом с .exe постоянно ничего не хранится — распространять можно как один файл. Временно рядом появляется только `JobBot.exe.new` — скачанное обновление до подмены.
 
 ### Сборка `.app` (macOS)
@@ -331,6 +333,9 @@ main.py               # единственная точка входа (и ре�
 config.py             # каталог данных и его файлы
 JobBot.spec           # сборка exe (PyInstaller)
 JobBot-macos.spec     # сборка .app (PyInstaller)
+third_party_licenses.py # тексты лицензий чужого кода в бандл, для обеих spec
+licenses/             # тексты лицензий, которых нет в колёсах
+LICENSE               # лицензия проекта (AGPL-3.0)
 Pipfile               # зависимости
 pyproject.toml        # настройки pytest и ruff
 ```
@@ -356,3 +361,11 @@ pyproject.toml        # настройки pytest и ruff
 Версии боевых пакетов закреплены точно (см. `Pipfile`): их обновление — отдельный осознанный шаг, а не побочный эффект установки dev-зависимости. Dev-зависимости: `pytest`, `pytest-asyncio`, `ruff`.
 
 LLM-провайдер не привязан к коду — нужен любой OpenAI-совместимый endpoint с `/v1/chat/completions`, `/v1/embeddings` и `/v1/models`. Для LM Studio используется и его native `/api/v0/models` (отбор по `type` для UI-picker'а). Claude подключается без OpenAI-совместимости — своими надстройками (см. «Стек»).
+
+## Лицензия
+
+Copyright (C) 2026 Alexey Frolov
+
+Программа распространяется по лицензии GNU Affero General Public License версии 3 или, на ваш выбор, любой более поздней (`AGPL-3.0-or-later`); полный текст — в [`LICENSE`](LICENSE). Программа поставляется без каких-либо гарантий.
+
+Лицензии библиотек, которые входят в сборку, собраны в `THIRD_PARTY_LICENSES.txt` внутри бандла.
