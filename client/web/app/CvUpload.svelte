@@ -1,5 +1,5 @@
 <script>
-  // Кнопка «Заменить» у файла резюме и окно способа: только прикрепить файл
+  // Кнопка «Заменить» («Добавить», пока файла нет) у файла резюме и окно способа: только прикрепить файл
   // или разобрать его и заполнить им анкету.
   //
   // Способ спрашивают до файла: закрытый после выбора диалог файла оставляет
@@ -12,8 +12,9 @@
   import { living } from '$state/alive.js';
   import { awaited } from '$state/awaited.svelte.js';
   import { CV_WAYS, PARSE_CV } from '$state/cv_ways.js';
+  import { cvPickLabel } from '$state/profile.js';
 
-  let { ask, onchanged } = $props();
+  let { ask, meta, onchanged } = $props();
 
   let choosing = $state(false);
 
@@ -59,7 +60,7 @@
   title={parsing ? 'Идёт разбор резюме' : null}
   onclick={() => (choosing = true)}
 >
-  Заменить
+  {cvPickLabel(meta)}
 </button>
 
 {#if choosing}

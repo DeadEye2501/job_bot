@@ -423,3 +423,13 @@ async def test_a_new_salary_does_not_borrow_the_old_currency(session, session_fa
     assert (p.expected_salary, p.minimum_salary, p.expected_salary_currency, p.expected_salary_period) == (
         5000, None, "$", SalaryPeriod.MONTH
     )
+
+
+async def test_a_new_resume_keeps_the_english_resume_link(session, session_factory):
+    """Ссылку на английское резюме разбор не даёт вовсе — файл основной, — и
+    повторный разбор её не стирает."""
+    await put(session_factory, profile_row(resume_url_en="https://example.com/cv-en"))
+
+    await save_parsed_cv(session, parsed_cv(), workspace_id=TEST_WORKSPACE_ID, cv_path="")
+
+    assert (await session.scalars(select(Profile))).one().resume_url_en == "https://example.com/cv-en"

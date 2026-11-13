@@ -9,6 +9,7 @@ import {
   blankProfile,
   cvNote,
   cvOpenable,
+  cvPickLabel,
   fileSize,
   langRow,
   named,
@@ -83,6 +84,17 @@ describe('строка про файл резюме', () => {
     expect(cvNote({ name: 'cv.pdf', size: 2048, exists: false }))
       .toEqual({ name: 'cv.pdf', note: '2 КБ · файл не найден' });
   });
+
+  it('без файла кнопка добавляет, с файлом — заменяет', () => {
+    expect(cvPickLabel(null)).toBe('Добавить');
+    expect(cvPickLabel({ name: 'cv.pdf', size: 2048, exists: false })).toBe('Заменить');
+  });
+
+  it('у второго резюме подпись говорит, какое оно, — с файлом и без', () => {
+    expect(cvNote(null, 'На английском')).toEqual({ name: 'Файл не выбран', note: 'На английском' });
+    expect(cvNote({ name: 'cv.pdf', size: 2048, exists: true }, 'На английском'))
+      .toEqual({ name: 'cv.pdf', note: 'На английском · 2 КБ' });
+  });
 });
 
 describe('отметка о правке анкеты', () => {
@@ -147,6 +159,7 @@ describe('что уезжает на мост', () => {
       education: '',
       about_me: '',
       resume_url: '',
+      resume_url_en: '',
       minimum_salary: '',
       expected_salary: '',
       expected_salary_currency: '$',

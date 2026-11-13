@@ -16,7 +16,7 @@ from sqlalchemy import func, select
 from backend.bot.media import drop_stored_media, store_profile_photo, stored_media
 from backend.models import Workspace
 from backend.repository.cover_letters import copy_letters
-from backend.repository.profile_copy import personal_part, profile_as_parsed
+from backend.repository.profile_copy import copy_english_link, personal_part, profile_as_parsed
 from backend.repository.profile_cv import save_parsed_cv
 from backend.repository.workspace_removal import delete_workspace_rows
 from backend.repository.workspace_switches import copy_switches
@@ -31,7 +31,7 @@ CreateWay = Literal["empty", "personal", "copy"]
 async def create_workspace(session_factory, way: CreateWay) -> int:
     """Завести профиль из активного этим способом и сделать его активным; ответ — его номер.
 
-    Файл резюме и сопроводительные письма переносит только копия: в личных
+    Файлы резюме и сопроводительные письма переносит только копия: в личных
     данных их нет — письмо пишется под должность, а не под человека. Фото
     переносят копия и личные данные — своей копией в каталоге нового профиля.
     Её путь пишется второй сделкой, после файла: упади запись файла — профиль
@@ -43,13 +43,16 @@ async def create_workspace(session_factory, way: CreateWay) -> int:
             source_id = source.id
             parsed = None if way == "empty" else await profile_as_parsed(session)
             cv_path = source.cv_path if way == "copy" else ""
+            cv_en_path = source.cv_en_path if way == "copy" else ""
             photo = None if way == "empty" else stored_media(source.photo_path)
-            made = await add_workspace(session, cv_path=cv_path)
+            made = await add_workspace(session, cv_path=cv_path, cv_en_path=cv_en_path)
             if parsed is not None:
                 await save_parsed_cv(
                     session, parsed if way == "copy" else personal_part(parsed),
                     workspace_id=made, cv_path=cv_path,
                 )
+                if way == "copy":
+                    await copy_english_link(session, source_id, made)
             if way == "copy":
                 await copy_switches(session, source_id, made)
                 await copy_letters(session, source_id, made)

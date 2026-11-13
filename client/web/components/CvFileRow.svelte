@@ -1,11 +1,12 @@
 <script>
   // Файл резюме: что за файл лежит, и кнопки к нему. Кнопки у каждого места
   // свои (`actions`): анкета файл заменяет и открывает, мастер только выбирает.
+  // `label` — подпись резюме, когда их на экране два.
   import { cvNote } from '$state/profile.js';
 
-  let { meta, actions } = $props();
+  let { meta, label = '', actions } = $props();
 
-  const note = $derived(cvNote(meta));
+  const note = $derived(cvNote(meta, label));
 </script>
 
 <div class="pdf-row" class:has-file={!!meta}>

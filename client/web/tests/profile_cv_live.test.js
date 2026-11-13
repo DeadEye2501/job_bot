@@ -268,7 +268,7 @@ describe('файл резюме в анкете', () => {
   it('пропавший с диска не открывается', async () => {
     sheet({ name: 'cv.pdf', size: 2048, exists: false });
 
-    const open = await vi.waitFor(() => screen.getByRole('button', { name: 'Открыть' }));
+    const open = await vi.waitFor(() => screen.getByRole('button', { name: 'Открыть резюме' }));
 
     expect(open.disabled).toBe(true);
   });
@@ -276,8 +276,38 @@ describe('файл резюме в анкете', () => {
   it('лежащий на диске открывается', async () => {
     sheet({ name: 'cv.pdf', size: 2048, exists: true });
 
-    const open = await vi.waitFor(() => screen.getByRole('button', { name: 'Открыть' }));
+    const open = await vi.waitFor(() => screen.getByRole('button', { name: 'Открыть резюме' }));
 
     expect(open.disabled).toBe(false);
+  });
+
+  it('английское резюме выбирается своей кнопкой и без файла не открывается', async () => {
+    const asked = sheet({ name: 'cv.pdf', size: 2048, exists: true });
+
+    const open = await vi.waitFor(() =>
+      screen.getByRole('button', { name: 'Открыть английское резюме' }),
+    );
+    expect(open.disabled).toBe(true);
+    // У основного файл есть — его кнопка заменяет, а не добавляет.
+    expect(screen.getByRole('button', { name: 'Заменить' })).toBeTruthy();
+
+    screen.getByRole('button', { name: 'Добавить английское резюме' }).click();
+    await settled();
+
+    expect(methods(asked)).toContain('profile.pick_english');
+    expect(methods(asked)).not.toContain('profile.pick');
+  });
+
+  it('«Убрать» у каждого резюме зовёт своё и без файла заперто', async () => {
+    const asked = sheet({ name: 'cv.pdf', size: 2048, exists: true });
+
+    const clearMain = await vi.waitFor(() => screen.getByRole('button', { name: 'Убрать резюме' }));
+    expect(screen.getByRole('button', { name: 'Убрать английское резюме' }).disabled).toBe(true);
+
+    clearMain.click();
+    await settled();
+
+    expect(methods(asked)).toContain('profile.clear');
+    expect(methods(asked)).not.toContain('profile.clear_english');
   });
 });

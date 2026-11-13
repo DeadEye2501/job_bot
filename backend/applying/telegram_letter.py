@@ -6,7 +6,6 @@ from dataclasses import dataclass
 
 from adapters.telegram import CAPTION_LIMIT
 from backend.agent.kit import AgentKit
-from backend.applying.resume_link import resume_for_letter
 from backend.domain.letter_choice import ready_letter
 from backend.llm.cover_letter import LetterPost, generate_cover_letter
 from backend.models import Vacancy
@@ -61,7 +60,7 @@ async def compose_letter(kit: AgentKit, parsed: ParsedVacancy, post: LetterPost,
     """
     ready = ready_letter(await kit.read(get_letters), post.language, CAPTION_LIMIT, short=True)
     if ready is not None:
-        resume = await resume_for_letter(kit.pipeline)
+        resume = await kit.read(lambda session: kit.reply_resume(session, post.language))
         return (Letter(ready, None) if resume is None else Letter(resume.under(ready), resume.file)), None
     profile = await kit.read(lambda session: kit.vacancy_profile_text(session, vacancy_id))
     if not profile:
@@ -80,10 +79,9 @@ async def compose_letter(kit: AgentKit, parsed: ParsedVacancy, post: LetterPost,
         return None, "cover_letter_failed"
     if post.earlier:
         return Letter(body, None), None
-    resume = await resume_for_letter(pipeline)
+    resume = await kit.read(lambda session: kit.reply_resume(session, post.language))
     if resume is None:
-        logger.warning("vacancy %d: CV file missing (%s), skipping send",
-                       vacancy_id, pipeline.cv_path())
+        logger.warning("vacancy %d: резюме нет ни файлом, ни ссылкой — письмо не уходит", vacancy_id)
         return None, "cv_missing"
     return Letter(resume.under(body), resume.file), None
 

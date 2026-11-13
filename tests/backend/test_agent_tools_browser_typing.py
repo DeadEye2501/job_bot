@@ -31,3 +31,16 @@ async def test_a_rich_text_editor_gets_the_text_typed_key_by_key():
         assert answer.startswith("готово")
         assert await page.evaluate("window.typed") == "Backend developer"
         assert await page.inner_text("#about") == "Backend developer"
+
+
+async def test_what_the_agent_types_is_written_to_the_log(caplog):
+    """По журналу видно, что агент вписал и в какое поле: за быстрым агентом
+    глазами не уследить."""
+    async with page_with("<input id=link>") as page:
+        tools = browser_tools(kit_for(None, browser=FakeBrowser(page)), None, None)
+
+        with caplog.at_level("INFO", logger="backend.agent.tools_browser"):
+            await tool(tools, "browser_type")(selector="#link", text="https://example.com/x")
+
+    (line,) = [r.getMessage() for r in caplog.records if r.getMessage().startswith("ввод агента")]
+    assert "#link" in line and "'https://example.com/x'" in line and "готово" in line

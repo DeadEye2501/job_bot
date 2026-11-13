@@ -73,11 +73,13 @@ export function fileSize(bytes) {
  *
  * Пропажа названа словами: путь в настройках есть, бот прикладывает резюме к
  * каждому отклику, а файла на диске нет — молчи об этом экран, человек узнал
- * бы об этом от HR.
+ * бы об этом от HR. `label` — какое это резюме, когда их на экране два; пусто —
+ * резюме одно.
  */
-export function cvNote(meta) {
-  if (!meta) return { name: 'Файл не выбран', note: '' };
-  const parts = [fileSize(meta.size)];
+export function cvNote(meta, label = '') {
+  const parts = label ? [label] : [];
+  if (!meta) return { name: 'Файл не выбран', note: parts.join(' · ') };
+  parts.push(fileSize(meta.size));
   if (!meta.exists) parts.push('файл не найден');
   return { name: meta.name, note: parts.join(' · ') };
 }
@@ -86,6 +88,11 @@ export function cvNote(meta) {
  *  система показала бы свою ошибку вместо нашей строки «файл не найден». */
 export function cvOpenable(meta) {
   return Boolean(meta?.exists);
+}
+
+/** Подпись кнопки выбора файла резюме: есть файл — его заменяют, нет — добавляют. */
+export function cvPickLabel(meta) {
+  return meta ? 'Заменить' : 'Добавить';
 }
 
 /** Когда анкету правили в последний раз.
@@ -134,6 +141,7 @@ export function blankProfile() {
     education: '',
     about_me: '',
     resume_url: '',
+    resume_url_en: '',
     minimum_salary: '',
     expected_salary: '',
     // Умолчания домена (`backend/domain/named_salary.py`): анкета без валюты и

@@ -7,16 +7,18 @@
   // свежего состояния, а не из снимка.
 
   import { call } from '$api/bridge.js';
-  import CvFileRow from '$components/CvFileRow.svelte';
   import DelayedTextarea from '$components/DelayedTextarea.svelte';
   import EntryRows from '$components/EntryRows.svelte';
   import ChoiceRow from '$components/ChoiceRow.svelte';
   import PhotoCropDialog from '$components/PhotoCropDialog.svelte';
   import PhotoFrame from '$components/PhotoFrame.svelte';
   import ProfilePerson from '$components/ProfilePerson.svelte';
+  import ResumeStack from '$components/ResumeStack.svelte';
   import { afterPick } from '$state/after_pick.js';
   import { living } from '$state/alive.js';
   import { autosave } from '$state/autosave.js';
+  import { awaited } from '$state/awaited.svelte.js';
+  import { PARSE_CV } from '$state/cv_ways.js';
   import { saveKey } from '$state/keys.js';
   import { oneWrite } from '$state/one_write.js';
   import { alone, toggled } from '$state/chosen.js';
@@ -27,7 +29,7 @@
     TYPING_DELAY,
     WORK_FORMATS,
     blankProfile,
-    cvOpenable,
+    cvPickLabel,
     profileSheet,
     updatedNote,
   } from '$state/profile.js';
@@ -57,6 +59,7 @@
   let trouble = $state('');
   let form = $state(null);
   let meta = $state(null);
+  let enMeta = $state(null);
   let photoUrl = $state(null);
   // Выбранный снимок, который сейчас обрезают; пусто — окно обрезки закрыто.
   let cropping = $state(null);
@@ -74,6 +77,7 @@
     const now = await ask('profile.get');
     if (now === null || !alive.now) return;
     meta = now.cv_meta;
+    enMeta = now.cv_en_meta;
     photoUrl = now.photo_url;
     const fresh = now.profile || blankProfile();
     // Пока курсор стоит в форме, с моста берётся одна отметка о правке:
@@ -196,8 +200,15 @@
     return save();
   }
 
-  async function openCv() {
-    await ask('profile.open');
+  /** Убрать резюме: путь стирается, файл на диске остаётся человеку. */
+  async function clearCv(method) {
+    await ask(method);
+    if (alive.now) await refresh();
+  }
+
+  /** Выбрать английское резюме: только файл, анкету по нему не разбирают. */
+  function pickEnglishCv() {
+    return afterPick(ask('profile.pick_english'), alive, refresh);
   }
 
   /** Выбрать фото: файл спрашивает мост диалогом окна, а нужную часть снимка
@@ -289,15 +300,39 @@
   </div>
 
   <div class="form-grid cv-line">
-    <CvFileRow {meta}>
-      {#snippet actions()}
-        <CvUpload {ask} onchanged={refresh} />
-        <button class="btn" type="button" disabled={!cvOpenable(meta)} onclick={openCv}>
-          Открыть
+    <ResumeStack
+      {meta}
+      what="резюме"
+      parsing={awaited.pending(PARSE_CV)}
+      onopen={() => ask('profile.open')}
+      onclear={() => clearCv('profile.clear')}
+    >
+      {#snippet replace()}<CvUpload {ask} {meta} onchanged={refresh} />{/snippet}
+      {#snippet link()}
+        {@render field({ key: 'resume_url', placeholder: 'Ссылка на резюме', max: 255 })}
+      {/snippet}
+    </ResumeStack>
+    <ResumeStack
+      meta={enMeta}
+      label="На английском"
+      what="английское резюме"
+      onopen={() => ask('profile.open_english')}
+      onclear={() => clearCv('profile.clear_english')}
+    >
+      {#snippet replace()}
+        <button
+          class="btn"
+          type="button"
+          aria-label="{cvPickLabel(enMeta)} английское резюме"
+          onclick={pickEnglishCv}
+        >
+          {cvPickLabel(enMeta)}
         </button>
       {/snippet}
-    </CvFileRow>
-    {@render field({ key: 'resume_url', placeholder: 'Ссылка на резюме', max: 255 })}
+      {#snippet link()}
+        {@render field({ key: 'resume_url_en', placeholder: 'Ссылка на английское резюме', max: 255 })}
+      {/snippet}
+    </ResumeStack>
   </div>
   </div>
 

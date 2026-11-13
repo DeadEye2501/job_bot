@@ -81,6 +81,7 @@ class Profile(IdMixin, UpdatedAtMixin, Base):
     # модели живут в `ProfilePreference`, и в решения этот текст не входит.
     about_me: Mapped[str | None]
     resume_url: Mapped[str | None]
+    resume_url_en: Mapped[str | None]
     workspace_id: Mapped[int] = mapped_column(ForeignKey("workspace.id"))
 
 

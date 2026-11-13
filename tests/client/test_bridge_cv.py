@@ -284,3 +284,40 @@ async def test_a_resume_lands_in_the_workspace_it_was_parsed_in(
     assert (await told())["danger"] is False
 
     assert await switched_while_parsing() == [TEST_WORKSPACE_ID]
+
+
+async def test_the_english_resume_is_its_own_file(api, ask, tmp_path):
+    """Английский файл ложится рядом с основным, не заменяя его."""
+    main = tmp_path / "cv.pdf"
+    english = tmp_path / "cv_en.pdf"
+    for one in (main, english):
+        one.write_bytes(b"%PDF-1.4 ")
+    await ask(api.profile._replace, {"path": str(main)})
+
+    answer = await ask(api.profile._replace_english, {"path": str(english)})
+    assert answer["ok"]["exists"] is True
+
+    shown = (await ask(api.profile.get))["ok"]
+    assert shown["cv_path"] == str(main)
+    assert shown["cv_en_meta"]["name"] == "cv_en.pdf"
+
+
+async def test_the_english_resume_path_cannot_be_set_from_the_page(api):
+    assert not hasattr(api.profile, "replace_english")
+
+
+@pytest.mark.parametrize("names", [
+    ("_replace", "clear", "cv_meta"),
+    ("_replace_english", "clear_english", "cv_en_meta"),
+])
+async def test_a_cleared_resume_is_gone_from_the_profile(api, ask, tmp_path, names):
+    """Убранное резюме больше не прикладывается, а файл на диске остаётся человеку."""
+    replace, clear, meta = names
+    resume = tmp_path / "cv.pdf"
+    resume.write_bytes(b"%PDF-1.4 ")
+    await ask(getattr(api.profile, replace), {"path": str(resume)})
+
+    await ask(getattr(api.profile, clear))
+
+    assert (await ask(api.profile.get))["ok"][meta] is None
+    assert resume.exists()

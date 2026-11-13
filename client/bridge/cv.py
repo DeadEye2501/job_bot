@@ -50,10 +50,26 @@ class Cv:
         обычном «нет, не сейчас», а пустой путь стёр бы прежнее резюме, и
         следующий отклик ушёл бы без вложения.
         """
+        return self._asked(self._replace)
+
+    def pick_english(self) -> dict:
+        """Спросить файл английского резюме тем же диалогом, что и основной (`pick`).
+
+        Анкету по нему не разбирают: анкета одна, и пишется она по основному.
+        """
+        return self._asked(self._replace_english)
+
+    def _asked(self, replace) -> dict:
+        """Путь из диалога окна — тому, кто его запомнит; закрытый диалог ничего не меняет."""
         path = chosen_path(self._hub.window, _RESUME_FILTER)
         if path is None:
             return closed_dialog()
-        return self._replace({"path": path})
+        return replace({"path": path})
+
+    def _replace_english(self, payload: dict) -> dict:
+        """Запомнить новый путь к английскому резюме; закрыт от страницы так же,
+        как `_replace`, и по той же причине."""
+        return self._remember(payload, self._hub.rs.set_cv_en_path)
 
     def _replace(self, payload: dict) -> dict:
         """Запомнить новый путь к резюме и рассказать, что по нему лежит.
@@ -67,13 +83,17 @@ class Cv:
         Единственный зовущий — `pick` рядом: путь сюда приходит из диалога
         самого окна, то есть от человека.
         """
+        return self._remember(payload, self._hub.rs.set_cv_path)
+
+    def _remember(self, payload: dict, set_path) -> dict:
+        """Записать путь из нагрузки тем, кто его хранит, и рассказать, что по нему лежит."""
         payload = payload if isinstance(payload, dict) else {}
         path = str(payload.get("path") or "").strip()
         if not path:
             return denied("Путь пустой")
 
         async def run() -> dict:
-            await self._hub.rs.set_cv_path(path)
+            await set_path(path)
             return {"path": path, **(_stat_cv(path) or {})}
 
         return reply(self._hub.runner, run())
@@ -104,21 +124,47 @@ class Cv:
             action="parse_cv",
         )
 
+    def clear(self) -> dict:
+        """Убрать основное резюме: путь стирается, анкета остаётся. Файл на
+        диске — человека, его не трогают."""
+        return self._cleared(self._hub.rs.set_cv_path)
+
+    def clear_english(self) -> dict:
+        """Убрать английское резюме — как `clear` основное."""
+        return self._cleared(self._hub.rs.set_cv_en_path)
+
+    def _cleared(self, set_path) -> dict:
+        """Стереть путь тем, кто его хранит."""
+
+        async def run() -> dict:
+            await set_path("")
+            return {}
+
+        return reply(self._hub.runner, run())
+
     def open(self) -> dict:
         """Открыть нынешнее резюме тем, чем его открывает система.
 
         Ответ пустой, но он есть: у зова, который ничего не вернул, окно не
         отличит «открыли» от «не дошло».
         """
-        cv_path = self._hub.rs.cv_path
-        if not cv_path:
-            return denied("Резюме не выбрано")
-        # Полным путём: настройки помнят его таким, каким назвал человек, а
-        # система открывает от своего рабочего каталога — у собранного
-        # приложения он чужой.
-        if not open_in_system(str(Path(cv_path).resolve())):
-            return denied("Не удалось открыть резюме", path=cv_path)
-        return {"ok": {"path": cv_path}}
+        return _opened(self._hub.rs.cv_path)
+
+    def open_english(self) -> dict:
+        """Открыть нынешнее английское резюме — как `open` основное."""
+        return _opened(self._hub.rs.cv_en_path)
+
+
+def _opened(cv_path: str) -> dict:
+    """Открыть файл резюме системой; пустой путь — резюме не выбрано."""
+    if not cv_path:
+        return denied("Резюме не выбрано")
+    # Полным путём: настройки помнят его таким, каким назвал человек, а
+    # система открывает от своего рабочего каталога — у собранного
+    # приложения он чужой.
+    if not open_in_system(str(Path(cv_path).resolve())):
+        return denied("Не удалось открыть резюме", path=cv_path)
+    return {"ok": {"path": cv_path}}
 
 
 async def _parse_into_profile(hub, path: Path, chat: LlmProviderConfig) -> str:

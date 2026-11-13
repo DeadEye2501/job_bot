@@ -5,6 +5,8 @@
 
 from datetime import UTC, datetime
 
+import pytest
+
 from sqlalchemy import event, select
 from sqlalchemy.orm import selectinload
 
@@ -375,3 +377,26 @@ async def test_forgetting_caches_drops_vectors_of_the_old_workspace(
     pipeline.forget_caches()
 
     assert await embeddings.similar_vacancy_id(pipeline, [0.1, 0.2]) is None
+
+
+async def _english_resume(session_factory) -> None:
+    async with session_factory() as session, session.begin():
+        (await session.get(Workspace, TEST_WORKSPACE_ID)).cv_en_path = "C:/cv_en.pdf"
+        (await session.scalars(select(Profile))).one().resume_url_en = "https://example.com/cv-en"
+
+
+@pytest.mark.parametrize(("way", "carried"), [
+    ("copy", ("C:/cv_en.pdf", "https://example.com/cv-en")),
+    ("personal", ("", None)),
+])
+async def test_the_english_resume_goes_with_the_copy_only(session_factory, way, carried):
+    """Английское резюме переносит копия, как основное: ссылку на него разбор
+    резюме не несёт, и до копии она доезжает отдельно."""
+    await _source(session_factory)
+    await _english_resume(session_factory)
+
+    made = await create_workspace(session_factory, way)
+
+    workspace = await _workspace(session_factory, made)
+    person = await _profile_of(session_factory, made)
+    assert (workspace.cv_en_path, person.resume_url_en) == carried

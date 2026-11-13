@@ -31,13 +31,14 @@ async def list_workspaces(session: AsyncSession) -> list[WorkspaceRow]:
     return [WorkspaceRow(id=i, title=title or None, is_active=active) for i, title, active in rows]
 
 
-async def add_workspace(session: AsyncSession, *, cv_path: str) -> int:
-    """Завести неактивный профиль с путём резюме (`""` — пути нет). Сделку держит зовущий.
+async def add_workspace(session: AsyncSession, *, cv_path: str, cv_en_path: str) -> int:
+    """Завести неактивный профиль с путями основного и английского резюме (`""` —
+    пути нет). Сделку держит зовущий.
 
     Путь пишется здесь, а не разбором резюме: у копии профиля без анкеты
     `save_parsed_cv` не зовётся, и записать путь больше некому.
     """
-    workspace = Workspace(cv_path=cv_path)
+    workspace = Workspace(cv_path=cv_path, cv_en_path=cv_en_path)
     session.add(workspace)
     await session.flush()
     return workspace.id

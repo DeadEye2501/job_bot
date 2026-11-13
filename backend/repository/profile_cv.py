@@ -97,7 +97,11 @@ _PERSON = (
     "birth_date", "citizenship", "about_me", "resume_url",
 )
 
-_KEPT_ACROSS_RESUMES = _SALARY + _PERSON
+_NOT_FROM_FILE = ("resume_url_en",)
+"""Поля, которых разбор не даёт вовсе: файл — основное резюме, а ссылку на
+английское человек вписывает сам."""
+
+_KEPT_ACROSS_RESUMES = _SALARY + _PERSON + _NOT_FROM_FILE
 """Ответы для форм, которых в резюме может не быть. Повторный разбор их не
 стирает: человек вводит их руками, а файл приносит редко."""
 
@@ -121,6 +125,8 @@ def _answers(p, kept: dict) -> dict:
     answers["expected_salary_period"] = answers["expected_salary_period"] or DEFAULT_PERIOD
     for name in _PERSON:
         answers[name] = getattr(p, name) if getattr(p, name) is not None else kept.get(name)
+    for name in _NOT_FROM_FILE:
+        answers[name] = kept.get(name)
     return answers
 
 

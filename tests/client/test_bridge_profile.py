@@ -69,7 +69,7 @@ async def test_a_saved_person_comes_back_on_the_next_request(api, ask):
         "last_name_latin": None,
         "gender": None,
         "patronymic": None, "patronymic_latin": None, "birth_date": None,
-        "citizenship": None, "about_me": None, "resume_url": None,
+        "citizenship": None, "about_me": None, "resume_url": None, "resume_url_en": None,
         "grades": [],
         "work_format": [],
         "languages": [],
@@ -393,3 +393,11 @@ async def test_projects_without_a_person_are_refused_by_name(api, ask):
 
     assert answer["fail"] == "denied"
     assert answer["detail"] == "Сначала сохраните профайл (CV-таб)"
+
+
+async def test_the_english_resume_link_comes_back_as_saved(api, ask):
+    await ask(api.profile.save, {**PERSON, "resume_url_en": " https://example.com/cv-en "})
+
+    profile = (await ask(api.profile.get))["ok"]["profile"]
+
+    assert profile["resume_url_en"] == "https://example.com/cv-en"

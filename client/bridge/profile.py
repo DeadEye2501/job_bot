@@ -55,7 +55,7 @@ class Profile(Cv, Photo, Letters):
         self._hub = hub
 
     def get(self) -> dict:
-        """Анкета вместе с путём к резюме и тем, что о нём знает диск."""
+        """Анкета вместе с путём к резюме и тем, что диск знает об основном и английском."""
 
         async def run() -> dict:
             async with self._hub.session_factory() as session:
@@ -71,6 +71,7 @@ class Profile(Cv, Photo, Letters):
                 "profile": _profile_to_dict(profile, languages, preferences),
                 "cv_path": cv_path,
                 "cv_meta": _stat_cv(cv_path),
+                "cv_en_meta": _stat_cv(self._hub.rs.cv_en_path),
                 "photo_url": _photo_url(self._hub.rs.photo_path),
             }
 
@@ -225,6 +226,7 @@ def _read_profile_fields(payload: dict) -> dict:
         "citizenship": text_or_none(payload.get("citizenship")),
         "about_me": text_or_none(payload.get("about_me")),
         "resume_url": text_or_none(payload.get("resume_url")),
+        "resume_url_en": text_or_none(payload.get("resume_url_en")),
         "grades": normalize_enum_list(payload.get("grades"), GRADES),
         "work_format": normalize_enum_list(payload.get("work_format"), WORK_FORMATS),
     }

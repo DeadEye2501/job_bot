@@ -11,8 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from adapters.browser import BrowserHost
 from adapters.claude_code_agent import AgentEnd
 from backend.agent.human_gate import HumanGate
+from backend.domain.resume_choice import ResumeSlot
 from backend.flows.pipeline import IngestionPipeline
 from backend.repository.agent_profile import build_agent_profile
+from backend.repository.profile_languages import read_reply_language
+from backend.repository.reply_resume import ReplyResume, reply_resume
 from backend.repository.vacancy_pay import vacancy_salary_lines
 
 
@@ -79,12 +82,21 @@ class AgentKit:
         async with self.pipeline.session_factory() as session:
             return await query(session)
 
-    async def profile_text(self, session: AsyncSession, salary: list[str]) -> str:
+    async def profile_text(self, session: AsyncSession, salary: list[str], slot: ResumeSlot = "main") -> str:
         """Анкета для агента на сегодня; есть ли фото — по тому же `photo_file`,
         что даёт файл инструменту прикладывания. `salary` — строки зарплаты этой
-        задачи (`agent/salary_view`)."""
-        return await build_agent_profile(session, self.today, self.pipeline.photo_file() is not None, salary)
+        задачи (`agent/salary_view`); `slot` — чья ссылка на резюме в анкете
+        (`build_agent_profile`)."""
+        photo = self.pipeline.photo_file() is not None
+        return await build_agent_profile(session, self.today, photo, salary, slot)
+
+    async def reply_resume(self, session: AsyncSession, language: str) -> ReplyResume | None:
+        """Резюме к отклику на `language` по файлам, лежащим сейчас на диске."""
+        return await reply_resume(session, self.pipeline.cv_file(), self.pipeline.cv_en_file(), language)
 
     async def vacancy_profile_text(self, session: AsyncSession, vacancy_id: int) -> str:
-        """Анкета для отклика и писем к вакансии: зарплата в ней — названная сумма."""
-        return await self.profile_text(session, await vacancy_salary_lines(session, vacancy_id))
+        """Анкета для отклика и писем к вакансии: зарплата в ней — названная сумма,
+        ссылка на резюме — того резюме, что идёт к отклику (`reply_resume`)."""
+        resume = await self.reply_resume(session, await read_reply_language(session, vacancy_id))
+        return await self.profile_text(session, await vacancy_salary_lines(session, vacancy_id),
+                                       resume.slot if resume else "main")

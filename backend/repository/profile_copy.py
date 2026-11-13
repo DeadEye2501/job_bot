@@ -17,7 +17,7 @@ from backend.payloads import (
     ParsedCvProject,
     ParsedCvSkill,
 )
-from backend.repository.profile import get_profile
+from backend.repository.profile import get_profile, get_profile_in
 from backend.repository.profile_experience import list_experience
 from backend.repository.profile_languages import list_profile_languages
 from backend.repository.profile_preferences import list_profile_preferences
@@ -90,3 +90,14 @@ def personal_part(parsed: ParsedCv) -> ParsedCv:
         experience=[],
         projects=[],
     )
+
+
+async def copy_english_link(session: AsyncSession, source_id: int, target_id: int) -> None:
+    """Ссылку на английское резюме — в анкету копии. Сделку держит зовущий.
+
+    Разобранное резюме её не несёт (`profile_cv._NOT_FROM_FILE`), и до копии
+    через `save_parsed_cv` она не доезжает. Анкеты есть у обоих: копию без
+    анкеты источника не пишут.
+    """
+    source = await get_profile_in(session, source_id)
+    (await get_profile_in(session, target_id)).resume_url_en = source.resume_url_en

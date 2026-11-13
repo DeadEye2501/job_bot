@@ -130,6 +130,7 @@ def _profile_to_dict(p, languages, preferences) -> dict | None:
         "citizenship": p.citizenship,
         "about_me": p.about_me,
         "resume_url": p.resume_url,
+        "resume_url_en": p.resume_url_en,
         "grades": list(p.grades or []),
         "work_format": list(p.work_format or []),
         "languages": [

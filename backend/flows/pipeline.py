@@ -45,6 +45,16 @@ logger = logging.getLogger(__name__)
 
 
 
+def _setting_path(raw: str) -> Path | None:
+    """Путь из настроек; пустая строка — пути нет."""
+    return Path(raw) if raw else None
+
+
+def _existing_file(path: Path | None) -> Path | None:
+    """Файл по пути, если путь задан и файл по нему есть; иначе пусто."""
+    return path if path is not None and path.is_file() else None
+
+
 def _declare_caches(pipeline) -> None:
     """Слепки, которые конвейер держит при себе, — и у них два хозяина.
 
@@ -325,24 +335,21 @@ class IngestionPipeline:
         )
 
     def cv_path(self):
-        """Путь к резюме из настроек; пусто — путь не задан.
-
-        Лежит ли по нему файл, здесь не спрашивают — это `cv_file`: путь нужен
-        и сам по себе, в записи журнала о пропавшем файле.
-        """
-        raw = self.rs.cv_path
-        if not raw:
-            return None
-        return Path(raw)
+        """Путь к основному резюме из настроек; пусто — путь не задан. Лежит ли
+        по нему файл, здесь не спрашивают — это `cv_file`."""
+        return _setting_path(self.rs.cv_path)
 
     def cv_file(self) -> Path | None:
-        """Файл резюме, если путь задан и файл по нему есть; иначе пусто.
+        """Файл основного резюме, если путь задан и файл по нему есть; иначе пусто.
 
         Одной функцией на всех, кто прикладывает резюме, — чтобы правило «нет
         файла — не прикладывать» не разошлось между ними.
         """
-        path = self.cv_path()
-        return path if path is not None and path.is_file() else None
+        return _existing_file(self.cv_path())
+
+    def cv_en_file(self) -> Path | None:
+        """Файл английского резюме — по тому же правилу, что `cv_file`."""
+        return _existing_file(_setting_path(self.rs.cv_en_path))
 
     def photo_file(self) -> Path | None:
         """Копия фото в каталоге медиа, если она там есть; иначе пусто."""

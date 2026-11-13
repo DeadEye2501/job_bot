@@ -5,6 +5,7 @@ from datetime import date
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.domain.preferences import of_kind
+from backend.domain.resume_choice import ResumeSlot
 from backend.domain.tenure import full_years, place_period, worked_years, years_text
 from backend.llm.candidate import GENDER_WORDS, candidate_languages, format_languages
 from backend.models import PreferenceKind
@@ -15,12 +16,17 @@ from backend.repository.profile_preferences import list_profile_preferences
 from backend.repository.profile_projects import list_projects
 from backend.repository.profile_skills import list_skills
 
-async def build_agent_profile(session: AsyncSession, today: date, photo: bool, salary: list[str]) -> str:
+async def build_agent_profile(
+    session: AsyncSession, today: date, photo: bool, salary: list[str], slot: ResumeSlot
+) -> str:
     """Анкета для агента. Пустые поля названы пустыми: агенту видно, что их нет.
 
     Есть ли фото, решает зовущий тем же `photo_file`, что даёт файл инструменту:
     анкета и инструмент не должны расходиться в ответе. Строки зарплаты тоже
-    даёт зовущий — у каждого агента свои (`agent/salary_view`).
+    даёт зовущий — у каждого агента свои (`agent/salary_view`). `slot` — чья
+    ссылка на резюме в анкете: у отклика — того резюме, что к нему идёт
+    (`repository/reply_resume`); сессия, которая ни на что не откликается
+    (заполнение резюме, обход), видит основную.
     """
     profile = await get_profile(session)
     if profile is None:
@@ -31,7 +37,7 @@ async def build_agent_profile(session: AsyncSession, today: date, photo: bool, s
     languages = await list_profile_languages(session)
     preferences = await list_profile_preferences(session)
     return "\n".join([
-        *_person_lines(profile, languages, today),
+        *_person_lines(profile, languages, today, slot),
         *salary,
         f"Фото: {'есть' if photo else 'нет'}",
         f"Общий стаж: {years_text(worked_years(places, today)) if places else 'нет мест работы'}",
@@ -55,7 +61,7 @@ def _preference_lines(texts: list[str]) -> list[str]:
     return [f"- {text}" for text in texts] or ["- нет"]
 
 
-def _person_lines(p, languages, today: date) -> list[str]:
+def _person_lines(p, languages, today: date, slot: ResumeSlot) -> list[str]:
     spoken = format_languages(candidate_languages(languages))
     return [
         f"Имя: {p.first_name or 'не указано'}",
@@ -77,7 +83,7 @@ def _person_lines(p, languages, today: date) -> list[str]:
         f"Telegram: {p.telegram_username or 'не указан'}",
         f"GitHub: {p.github_url or 'не указан'}",
         f"LinkedIn: {p.linkedin_url or 'не указан'}",
-        f"Ссылка на резюме: {p.resume_url or 'не указана'}",
+        f"Ссылка на резюме: {(p.resume_url_en if slot == 'english' else p.resume_url) or 'не указана'}",
         f"Образование: {p.education or 'не указано'}",
     ]
 

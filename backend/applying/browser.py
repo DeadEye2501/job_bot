@@ -1,6 +1,7 @@
 """Браузерный способ: сессия агента на кнопку агрегатора или форму работодателя."""
 
 import asyncio
+from pathlib import Path
 
 from backend.agent.confirm import confirming
 from backend.agent.jobs import Applied, ApplyJob, Failed, Finished
@@ -47,6 +48,7 @@ async def via_browser(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome:
             return GONE
         language = await read_reply_language(session, vacancy_id)
         profile_text = await kit.vacancy_profile_text(session, vacancy_id)
+        attached = await kit.reply_resume(session, language)
         site = await session.get(Aggregator, way.aggregator_id) if way.aggregator_id else None
         profile = site.id if site else await web_search_id(session)
         resume = await chosen_resume(session, site.id) if site else None
@@ -54,7 +56,8 @@ async def via_browser(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome:
                    language=language, resume=SeenResume(resume.title, resume.url) if resume else None,
                    confirming=confirming(kit))
     closed = asyncio.Event()
-    plan = _apply_plan(kit, job, vacancy_text, profile_text, closed)
+    task = applier_task(job, vacancy_text, profile_text, kit.today)
+    plan = _apply_plan(kit, job, task, attached.form_file if attached else None, closed)
     kit.window_closed = closed
     try:
         await kit.browser.open_profile(job.profile_id, sending=not job.simulated)
@@ -85,13 +88,11 @@ async def _mark_unfit(kit: AgentKit, vacancy_id: int, reason: str) -> None:
     kit.pipeline.fire_vacancies_changed()
 
 
-def _apply_plan(kit: AgentKit, job: ApplyJob, vacancy_text: str, profile_text: str,
+def _apply_plan(kit: AgentKit, job: ApplyJob, task: str, resume_file: Path | None,
                 closed: asyncio.Event) -> SessionPlan:
-    """План откликателя."""
+    """План откликателя; `resume_file` — файл резюме к форме (`ReplyResume.form_file`)."""
     tools =[*common_tools(kit, job), *applier_tools(kit, job), *letter_tools(kit, job),
-             *browser_tools(kit, kit.pipeline.cv_file(), kit.pipeline.photo_file(),
-                            job if job.confirming else None)]
-    task = applier_task(job, vacancy_text, profile_text, kit.today)
+             *browser_tools(kit, resume_file, kit.pipeline.photo_file(), job if job.confirming else None)]
     return SessionPlan(system_prompt(APPLIER_PROMPT, tools), task, tools, web_search=False, cut=closed)
 
 

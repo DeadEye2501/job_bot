@@ -43,6 +43,9 @@ class Workspace(IdMixin, CreatedAtMixin, Base):
 
     is_active: Mapped[bool] = mapped_column(server_default=expression.false())
     cv_path: Mapped[str] = mapped_column(server_default="")
+    # Английское резюме: к откликам не на языке приложения, а без основного — к
+    # любым (`domain/resume_choice`); анкету по нему не разбирают.
+    cv_en_path: Mapped[str] = mapped_column(server_default="")
     photo_path: Mapped[str] = mapped_column(server_default="")
 
 

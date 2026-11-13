@@ -1,27 +1,32 @@
 /* Поля одной рамкой: общая рамка и скругление, между полями черта.
 
    Так стоят поля, которые читаются одним значением, — имя с фамилией
-   (`.input-pair`), — и строки анкеты таблицей (`.entry-table`, раскладка в
+   (`.input-pair`) в строку, файл резюме со ссылкой на него (`.input-stack`)
+   столбиком, — и строки анкеты таблицей (`.entry-table`, раскладка в
    entry-rows.css). Рамку держит обёртка, поэтому наведение и фокус подсвечивают
    её, а не одну ячейку. */
 
 .input-pair,
+.input-stack,
 .entry-table {
   border: 1px solid var(--border);
   border-radius: 4px;
 }
 
 .input-pair:hover:not(:focus-within),
+.input-stack:hover:not(:focus-within),
 .entry-table:hover:not(:focus-within) {
   border-color: var(--text-secondary);
 }
 
 .input-pair:focus-within,
+.input-stack:focus-within,
 .entry-table:focus-within {
   border-color: var(--accent);
 }
 
 .input-pair .input,
+.input-stack .input,
 .entry-table .input,
 .entry-table .cdd-btn {
   border: none;
@@ -49,4 +54,24 @@
 
 .input-pair .input + .input {
   border-left: 1px solid var(--border);
+}
+
+/* Рамка снимается шириной, а не `border: none`: та оставила бы ширину по
+   умолчанию, и строка с файлом (`.pdf-row.has-file`), вернув себе сплошной
+   стиль, показала бы рамку в три пикселя. */
+.input-stack .pdf-row {
+  border-width: 0;
+  border-radius: 0;
+}
+
+.input-stack {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Черта ставится сильнее снятой рамки ячейки выше: та же специфичность
+   уступила бы ей порядком файлов. */
+.input-stack > :is(.input, .pdf-row) + :is(.input, .pdf-row) {
+  border-top: 1px solid var(--border);
 }

@@ -317,3 +317,10 @@ async def test_text_not_in_the_accepted_layout_is_refused_and_the_layout_tool_na
     elsewhere = await tool(tools, "browser_type")(selector="#notes", text="Шью на заказ")
 
     assert page.calls == [] and "submit_layout" in elsewhere and "Шью на заказ" in other
+
+
+async def test_what_the_agent_picks_in_a_list_is_written_to_the_log(caplog):
+    with caplog.at_level("INFO", logger="backend.agent.tools_browser"):
+        await tool(_tools(FakePage()), "browser_select")(selector="#city", value="Ереван")
+
+    assert any(r.getMessage().startswith("выбор агента: #city ← 'Ереван'") for r in caplog.records)

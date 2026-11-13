@@ -11,7 +11,6 @@ from backend.agent.confirm import confirmed, text_item
 from backend.agent.kit import AgentKit
 from backend.agent.tools_applier import record_and_announce
 from backend.agent.tools_letter import letter_ask
-from backend.applying.resume_link import resume_for_letter
 from backend.applying.result import GONE, Dropped, Missed, Outcome, delivered
 from backend.domain.apply_order import Way
 from backend.domain.letter_choice import ready_letter
@@ -34,12 +33,12 @@ async def via_email(kit: AgentKit, vacancy_id: int, way: Way) -> Outcome:
     писать, ни звать человека подтверждать. Резюме — файлом, а нет файла —
     ссылкой в конце письма."""
     account = await kit.read(get_mail_account)
-    resume = await resume_for_letter(kit.pipeline)
+    language = await kit.read(lambda session: read_reply_language(session, vacancy_id))
+    resume = await kit.read(lambda session: kit.reply_resume(session, language))
     if account is None:
         return Missed("почта для откликов не настроена")
     if resume is None:
         return Missed("нет ни файла резюме, ни ссылки на него")
-    language = await kit.read(lambda session: read_reply_language(session, vacancy_id))
     letter = await _ready(kit, vacancy_id, language)
     if letter is None:
         ask = await letter_ask(kit, vacancy_id, language, None)

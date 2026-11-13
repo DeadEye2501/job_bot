@@ -68,7 +68,7 @@ async def _two_profiles(session_factory) -> None:
 async def test_readers_see_only_the_active_profile(session, session_factory):
     await _two_profiles(session_factory)
 
-    agent = await build_agent_profile(session, date(2026, 1, 1), photo=False, salary=[])
+    agent = await build_agent_profile(session, date(2026, 1, 1), photo=False, salary=[], slot="main")
 
     assert (await get_profile(session)).first_name == "Иван"
     assert [lang.language for lang in await list_profile_languages(session)] == ["Русский"]

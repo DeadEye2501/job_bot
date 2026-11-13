@@ -119,6 +119,7 @@ class RuntimeSettings:
         self._embed: LlmProviderConfig | None = None
         self._app: dict[str, str] = {}
         self._cv_path = ""
+        self._cv_en_path = ""
         self._photo_path = ""
 
     @classmethod
@@ -147,6 +148,7 @@ class RuntimeSettings:
 
             workspace = await active_workspace(session)
             self._cv_path, self._photo_path = workspace.cv_path, workspace.photo_path
+            self._cv_en_path = workspace.cv_en_path
         logger.debug(
             "Runtime settings reloaded: tg=%s chat=%s embed=%s app_keys=%d",
             self._tg is not None,
@@ -243,6 +245,11 @@ class RuntimeSettings:
     def cv_path(self) -> str:
         """Путь к файлу резюме активного профиля; пусто — файла нет."""
         return self._cv_path
+
+    @property
+    def cv_en_path(self) -> str:
+        """Путь к файлу английского резюме активного профиля; пусто — файла нет."""
+        return self._cv_en_path
 
     @property
     def photo_path(self) -> str:
@@ -458,6 +465,13 @@ class RuntimeSettings:
             async with session.begin():
                 (await active_workspace(session)).cv_path = value
         self._cv_path = value
+
+    async def set_cv_en_path(self, value: str) -> None:
+        """Записать путь к файлу английского резюме в активный профиль; пусто — файла нет."""
+        async with self._session_factory() as session:
+            async with session.begin():
+                (await active_workspace(session)).cv_en_path = value
+        self._cv_en_path = value
 
     async def set_photo_path(self, value: str) -> None:
         """Записать путь к копии фото в активный профиль; пусто — фото нет."""

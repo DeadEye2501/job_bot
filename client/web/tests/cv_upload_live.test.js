@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 //
-// Загрузка резюме с экрана анкеты: «Заменить» спрашивает способ — только
+// Загрузка резюме с экрана анкеты: «Добавить» (без файла) спрашивает способ — только
 // прикрепить файл или разобрать его и заполнить анкету, — затем файл.
 
 import { cleanup, render } from '@testing-library/svelte';
@@ -21,12 +21,12 @@ afterEach(() => {
   cleanup();
 });
 
-/** Анкета над мостом; `picked` — ответ диалога файла. */
-async function sheet(picked = { path: 'C:/резюме.pdf' }) {
+/** Анкета над мостом; `picked` — ответ диалога файла, `meta` — файл, что уже лежит. */
+async function sheet(picked = { path: 'C:/резюме.pdf' }, meta = null) {
   const heard = awaitingNews();
   deaf = heard.deaf;
   const { asked, ask } = answering((method) => {
-    if (method === 'profile.get') return { cv_meta: null, profile: null, photo_url: null };
+    if (method === 'profile.get') return { cv_meta: meta, profile: null, photo_url: null };
     if (method === 'profile.pick') return picked;
     if (method === 'profile.parse_cv') return { started: true };
     return {};
@@ -37,7 +37,7 @@ async function sheet(picked = { path: 'C:/резюме.pdf' }) {
   return { asked, finished, shown, ask };
 }
 
-const replace = () => buttonBy('Заменить', { exact: true });
+const replace = () => buttonBy('Добавить', { exact: true });
 const rows = () => [...document.querySelectorAll('.choose-row')];
 const names = () => rows().map((one) => one.querySelector('.picker-name').textContent.trim());
 const methods = (asked) => asked.map(({ method }) => method);
@@ -107,6 +107,22 @@ describe('загрузка резюме с экрана анкеты', () => {
     finished();
     await settled();
     expect(replace().disabled).toBe(false);
+  });
+
+  it('пока идёт разбор, основное резюме не убрать: разбор вернул бы его путь', async () => {
+    const { finished } = await sheet(undefined, { name: 'cv.pdf', size: 2048, exists: true });
+    const clear = () => document.querySelector('button[aria-label="Убрать резюме"]');
+    expect(clear().disabled).toBe(false);
+
+    buttonBy('Заменить', { exact: true }).click();
+    await settled();
+    rows()[1].click();
+    await settled();
+
+    expect(clear().disabled).toBe(true);
+    finished();
+    await settled();
+    expect(clear().disabled).toBe(false);
   });
 
   it('экран, открытый заново посреди разбора, перечитывает анкету по его концу', async () => {

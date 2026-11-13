@@ -65,7 +65,7 @@ def browser_tools(
 
     async def browser_type(selector: str, text: str) -> str:
         """Ввести текст в поле, заменив прежний."""
-        return await act(lambda page: fill(page, selector, text))
+        return _logged("ввод", selector, text, await act(lambda page: fill(page, selector, text)))
 
     async def browser_press(selector: str, key: str) -> str:
         """Нажать клавишу в поле: Enter, Tab или Escape — когда сайт принимает вписанное (метку, тег, подсказку) только по клавише."""
@@ -73,7 +73,7 @@ def browser_tools(
 
     async def browser_select(selector: str, value: str) -> str:
         """Выбрать значение в родном списке (select). Самодельный список — browser_click по полю, затем по варианту."""
-        return await act(lambda page: select(page, selector, value))
+        return _logged("выбор", selector, value, await act(lambda page: select(page, selector, value)))
 
     async def browser_back() -> str:
         """Вернуться на предыдущую страницу."""
@@ -81,6 +81,14 @@ def browser_tools(
 
     return [browser_open, browser_snapshot, browser_click, browser_type,
             browser_select, browser_press, *_attach_tools(act, resume, photo), browser_back]
+
+
+def _logged(what: str, selector: str, value: str, answer: str) -> str:
+    """Записать в журнал, что агент вписал или выбрал и чем это кончилось, и
+    отдать ответ агенту. Без записи по журналу не понять, откуда в поле формы
+    взялось чужое значение: агент работает быстрее, чем за ним уследить глазами."""
+    logger.info("%s агента: %s ← %r — %s", what, selector, value, answer)
+    return answer
 
 
 def _attach_tools(act: Callable, resume: Path | None, photo: Path | None) -> list[Callable]:
