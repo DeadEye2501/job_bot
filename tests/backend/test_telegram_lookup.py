@@ -1,6 +1,7 @@
 """Следствия, которые наблюдают тесты `backend/telegram_lookup.py`."""
 
 import logging
+from types import SimpleNamespace
 
 import pytest
 from pyrogram.errors import (
@@ -8,7 +9,7 @@ from pyrogram.errors import (
 )
 
 from backend.domain.telegram_identity import post_address
-from backend.telegram_lookup import ask_telegram, fetch_telegram_avatar, read_post, resolve_hr_telegram
+from backend.telegram_lookup import ask_telegram, fetch_telegram_avatar, find_person, read_post
 from tests.fakes.telegram import FakeTelegramClient, WithMessages
 from tests.fakes.telegram_objects import photo, post, user
 
@@ -149,65 +150,47 @@ async def test_an_empty_download_yields_no_avatar():
     assert await fetch_telegram_avatar(client, entity) is None
 
 
-async def test_an_unusable_contact_never_reaches_telegram():
-    """Негодный контакт не доходит до Telegram: сети не касаемся."""
-    client = FakeTelegramClient()
-
-    assert await resolve_hr_telegram(client, "+79991234567") is None
-    assert client.get_users_calls == []
-
-
-async def test_a_usable_contact_resolves_to_the_user():
-    """Годный контакт отдаёт собеседника, спрошено нормализованное имя."""
+async def test_a_user_nick_resolves_to_the_person():
     found = user()
     client = FakeTelegramClient(users={"user_name": found})
 
-    assert await resolve_hr_telegram(client, "https://t.me/user_name") is found
-    assert client.get_users_calls == ["user_name"]
+    assert await find_person(client, "user_name") == (found, None)
 
 
-async def test_a_bot_is_not_accepted_as_an_hr():
-    """Бот собеседником не считается."""
-    client = FakeTelegramClient(users={"user_name": user(is_bot=True)})
+async def test_a_channel_nick_is_not_a_person_and_no_user_is_asked():
+    """О пользователе спрашивают только у ника пользователя: ник канала — не человек."""
+    client = FakeTelegramClient(chats={"jobs_channel": SimpleNamespace(id=-100)})
 
-    assert await resolve_hr_telegram(client, "@user_name") is None
-
-
-async def test_a_deleted_account_is_not_accepted():
-    """Удалённый собеседник не считается."""
-    client = FakeTelegramClient(users={"user_name": user(is_deleted=True)})
-
-    assert await resolve_hr_telegram(client, "@user_name") is None
+    assert await find_person(client, "jobs_channel") == (None, None)
+    assert client.get_users_calls == []
 
 
-async def test_an_unknown_username_resolves_to_nothing():
-    """Неизвестное Telegram имя даёт отсутствие, а не бросок наружу.
+@pytest.mark.parametrize("who", [user(is_bot=True), user(is_deleted=True)], ids=["бот", "удалённый"])
+async def test_a_bot_or_a_deleted_account_is_not_a_person(who):
+    client = FakeTelegramClient(users={"user_name": who})
 
-    Telegram отвечает на такое отказом, а поиск собеседника идёт попутно: урони
-    он зовущего — разбор объявления вставал бы из-за ненайденного ника.
-    """
-    client = FakeTelegramClient(users={})
-
-    assert await resolve_hr_telegram(client, "@user_name") is None
+    assert await find_person(client, "user_name") == (None, None)
 
 
-async def test_a_flood_wait_while_resolving_does_not_raise():
-    """Ожидание после флуда при поиске не роняет вызывающего."""
-    client = FakeTelegramClient(fails={"get_users": FloodWait(value=42)})
+async def test_an_unknown_nick_is_not_a_person_rather_than_a_trouble():
+    """Незанятый ник — ответ Telegram, а не беда: человека за ним нет."""
+    assert await find_person(FakeTelegramClient(), "user_name") == (None, None)
 
-    assert await resolve_hr_telegram(client, "@user_name") is None
+
+@pytest.mark.parametrize("method", ["resolve_peer", "get_users"])
+async def test_a_failed_question_is_a_trouble_not_an_answer(method):
+    """Сбой — не «не человек»: по нему не скажешь, кто за ником."""
+    client = FakeTelegramClient(users={"user_name": user()}, fails={method: FloodWait(value=42)})
+
+    assert await find_person(client, "user_name") == (None, "tg_error")
 
 
 async def test_a_failed_lookup_leaves_its_trace_in_the_log(caplog):
-    """Сорванный поиск собеседника оставляет в журнале трассировку.
-
-    Ответ у отказа тот же, что у неизвестного имени, — отсутствие. HR при
-    этом остаётся без адреса, и письмо ему потом не уходит вовсе.
-    """
-    client = FakeTelegramClient(fails={"get_users": OSError("сеть")})
+    """Сорванный вопрос о человеке оставляет в журнале трассировку."""
+    client = FakeTelegramClient(users={"user_name": user()}, fails={"get_users": OSError("сеть")})
 
     with caplog.at_level(logging.WARNING):
-        await resolve_hr_telegram(client, "@user_name")
+        await find_person(client, "user_name")
 
     assert "Traceback (most recent call last)" in caplog.text
     assert "OSError: сеть" in caplog.text

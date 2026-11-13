@@ -185,8 +185,18 @@ class FakeTelegramClient:
         )
 
     async def resolve_peer(self, peer_id):
-        """Адрес пира по номеру. У прогретого кэша это чтение без сети."""
+        """Адрес пира по номеру — у прогретого кэша это чтение без сети — или по
+        нику: пользователь из `users`, канал из `chats`, незанятый ник — отказ, как
+        у настоящего клиента. Ник без регистра: настоящий клиент приводит его к
+        нижнему."""
         self._fail_if_asked("resolve_peer")
+        if isinstance(peer_id, str):
+            peer_id = peer_id.lower()
+            if peer_id in self._users:
+                return raw.types.InputPeerUser(user_id=getattr(self._users[peer_id], "id", 0), access_hash=0)
+            if peer_id in self._chats:
+                return raw.types.InputPeerChannel(channel_id=1, access_hash=0)
+            raise UsernameNotOccupied
         self._refuse_cold(peer_id)
         return raw.types.InputPeerUser(user_id=peer_id, access_hash=0)
 
@@ -196,11 +206,12 @@ class FakeTelegramClient:
         Именно `UsernameNotOccupied`: спрашивают здесь всегда ником, и на незанятый
         ник Telegram отвечает именно этим отказом. `PeerIdInvalid` — его ответ на
         незнакомый номер, и подделка, отвечающая им на ник, расходится с настоящим
-        клиентом ровно там, где обещала с ним совпадать.
+        клиентом ровно там, где обещала с ним совпадать. Ник без регистра, как у
+        настоящего клиента.
         """
         self.get_users_calls.append(username)
         self._fail_if_asked("get_users")
-        user = self._users.get(username)
+        user = self._users.get(username.lower() if isinstance(username, str) else username)
         if user is None:
             raise UsernameNotOccupied
         # Розыск по нику кладёт пира в кэш и под номером — на этом побочном

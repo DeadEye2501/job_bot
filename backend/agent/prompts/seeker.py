@@ -2,8 +2,11 @@
 
 from dataclasses import dataclass
 from datetime import date, datetime
+from urllib.parse import urlsplit
 
-_SUBMIT = """submit_vacancy: текст вакансии со страницы дословно, без ролей и разметки снимка, адрес страницы, дату публикации и контакты со страницы (почта, ссылки на форму отклика, телефон). Относительную дату («вчера», «3 дня назад») приведи к дате сам."""
+from backend.agent.prompts.site_guides import guide_lines
+
+_SUBMIT = """submit_vacancy: текст вакансии со страницы дословно, без ролей и разметки снимка, адрес страницы, дату публикации и контакты со страницы (почта, ссылки на форму отклика и на вакансию на других сайтах, телефон, Telegram) — каждый одним адресом, без подписи. Контакты работодателя, спрятанные в самой вакансии за кнопкой («Показать контакты», «Контакты» и подобные), сначала раскрой: нажми каждую такую кнопку и прочитай открывшееся. Меню и разделы сайта — не контакты вакансии: по ним не ходи. Раскрытое допиши в конец текста строкой «Контакты: …» и передай в контактах. Кнопку отклика не нажимай. Относительную дату («вчера», «3 дня назад») приведи к дате сам."""
 
 _ANSWERS = """Ответ submit_vacancy: «принята», «повтор», «пропущена» и «не вышло» — иди дальше; «предел исчерпан» — заканчивай: finish с result="done"; «отказ» — сразу finish с result="failed" и причиной; «Работа остановлена» — сразу finish с result="failed".
 """
@@ -64,7 +67,7 @@ class SeekBounds:
 
 def seeker_task(host: str, bounds: SeekBounds) -> str:
     """Стартовое задание искателя на агрегаторе."""
-    return "\n".join([f"Сайт агрегатора: https://{host}/", *_bounds(bounds)])
+    return "\n".join([f"Сайт агрегатора: https://{host}/", *_bounds(bounds), *guide_lines(host)])
 
 
 def web_seeker_task(aggregator_hosts: list[str], barred_hosts: list[str], bounds: SeekBounds) -> str:
@@ -79,7 +82,7 @@ def web_seeker_task(aggregator_hosts: list[str], barred_hosts: list[str], bounds
 
 def page_task(url: str) -> str:
     """Стартовое задание искателя на странице человека."""
-    return f"Страница вакансии: {url}"
+    return "\n".join([f"Страница вакансии: {url}", *guide_lines(urlsplit(url).hostname)])
 
 
 def _bounds(bounds: SeekBounds) -> list[str]:

@@ -1,7 +1,7 @@
 """Вопросы бэкенда к Telegram и одна лестница их бед.
 
-Картинка собеседника, картинка с названием канала, сам собеседник по
-записанному контакту, пост по ссылке. От `adapters/telegram.py` отличается
+Картинка собеседника, картинка с названием канала, человек ли за ником,
+пост по ссылке. От `adapters/telegram.py` отличается
 тем, что тот объявляет разговор с Telegram — клиента, отправку, запор, — а
 здесь стоят ответы на вопросы бэкенда. Беда у всех разбирается одной
 лестницей (`ask_telegram`), и её же зовут те, кто спрашивает канал по нику:
@@ -16,11 +16,12 @@ import logging
 from collections.abc import Awaitable, Callable
 from typing import Literal, TypeVar
 
+from pyrogram import raw
 from pyrogram.errors import (
     ChannelInvalid, ChannelPrivate, FloodWait, PeerIdInvalid, UsernameInvalid, UsernameNotOccupied,
 )
 
-from backend.domain.telegram_identity import PostAddress, normalize_username
+from backend.domain.telegram_identity import PostAddress
 
 logger = logging.getLogger(__name__)
 
@@ -103,8 +104,8 @@ async def read_channel_metadata(
 async def _quietly(what: str, asking):
     """Спросить Telegram и промолчать, если не ответил.
 
-    Оба зова отсюда второстепенны — картинка собеседника и его розыск, — и
-    ронять из-за них разбор нельзя: у зовущих на пустоту есть свои дороги.
+    Зов отсюда второстепенен — картинка собеседника или канала, — и ронять из-за
+    него разбор нельзя: без картинки карточка обходится.
     """
     answer, _ = await ask_telegram(what, asking)
     return answer
@@ -143,15 +144,23 @@ async def fetch_telegram_avatar(client, entity) -> bytes | None:
     return buf.getvalue()
 
 
-async def resolve_hr_telegram(client, hr_contact: str):
-    username = normalize_username(hr_contact)
-    if not username:
-        return None
-    user = await _quietly(
-        f"resolve_hr_telegram {hr_contact!r}", lambda: client.get_users(username)
-    )
-    if user is None:
-        return None
-    if getattr(user, "is_bot", False) or getattr(user, "is_deleted", False):
-        return None
-    return user
+async def find_person(client, username: str) -> tuple[object | None, TelegramTrouble | None]:
+    """Человек Telegram по нику: собеседник и пусто; пусто и пусто — за ником не
+    человек (канал, группа, бот, удалённый, незанятый ник); пусто и слово беды.
+
+    Сначала спрашивается, чей это ник, и о пользователе — только у ника
+    пользователя: `get_users` ник канала отправил бы серверу как есть, и что тот
+    ответит, не описано. Узнать же чей — это `resolve_peer`: канал он отдаёт
+    каналом, а незанятый ник — отказом.
+    """
+    peer, trouble = await ask_telegram(f"чей ник {username!r}", lambda: client.resolve_peer(username))
+    if trouble == "tg_error":
+        return None, trouble
+    if not isinstance(peer, raw.types.InputPeerUser):
+        return None, None
+    user, trouble = await ask_telegram(f"человек {username!r}", lambda: client.get_users(username))
+    if trouble == "tg_error":
+        return None, trouble
+    if user is None or user.is_bot or user.is_deleted:
+        return None, None
+    return user, None

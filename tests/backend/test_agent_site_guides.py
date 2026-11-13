@@ -9,6 +9,7 @@ from backend.agent.prompts.applier import applier_task
 from backend.agent.prompts.fill import fill_task
 from backend.agent.prompts.login import login_task
 from backend.agent.prompts.scan import scan_task
+from backend.agent.prompts.seeker import SeekBounds, page_task, seeker_task
 from backend.domain.apply_order import Way
 from backend.models import ApplicationVia
 from tests.fakes.agent import TODAY
@@ -32,6 +33,8 @@ TASKS = {
     "scan": scan_task,
     "fill": lambda host: fill_task(host, None, "Русский"),
     "apply": lambda host: _apply(f"https://{host}/vacancy/1"),
+    "seek": lambda host: seeker_task(host, SeekBounds(None, 5, TODAY, ["Русский"])),
+    "page": lambda host: page_task(f"https://{host}/vacancy/1"),
 }
 
 

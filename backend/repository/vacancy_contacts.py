@@ -54,6 +54,23 @@ async def add_contact(
         known.added_by = added_by
 
 
+async def drop_agent_contacts(session: AsyncSession, vacancy_id: int, values: list[str]) -> None:
+    """Убрать из контактов записи агента с этими значениями; записи человека и
+    разбора не трогаются."""
+    if values:
+        await session.execute(delete(VacancyContact).where(
+            VacancyContact.vacancy_id == vacancy_id,
+            VacancyContact.added_by == ContactAddedBy.AGENT,
+            VacancyContact.match_key.in_([contact_key(value) for value in values]),
+        ))
+
+
+async def agent_contact_values(session: AsyncSession, vacancy_id: int) -> list[str]:
+    """Значения контактов, записанных агентом, в порядке заведения."""
+    return [contact.value for contact in await list_contacts(session, vacancy_id)
+            if contact.added_by == ContactAddedBy.AGENT]
+
+
 async def _contact_row(
     session: AsyncSession, vacancy_id: int, key: str
 ) -> VacancyContact | None:

@@ -10,6 +10,7 @@ import logging
 from dataclasses import dataclass
 
 from backend.domain.named_salary import offer_of
+from backend.flows.telegram_hr import pick_hr
 from backend.models import HR
 from backend.models import Vacancy
 from backend.models import VacancyStatus
@@ -17,10 +18,8 @@ from backend.payloads import DIRECT_PARSED_FIELDS, ParsedVacancy
 from backend.repository.companies_matching import CompanyArbiter, find_or_create_company
 from backend.repository.hr_identify import find_or_create_hr
 from backend.repository.vacancies_life import add_vacancy_event
-from backend.repository.vacancy_contacts import replace_parsed_contacts
+from backend.repository.vacancy_contacts import drop_agent_contacts, replace_parsed_contacts
 from backend.repository.vacancy_status import apply_parse_outcome
-from backend.telegram_lookup import fetch_telegram_avatar
-from backend.telegram_lookup import resolve_hr_telegram
 
 logger = logging.getLogger(__name__)
 
@@ -40,20 +39,6 @@ class Outcome:
     skip_reason: str | None
     score: int
     keep_previous_stack: bool
-
-
-async def _resolve_hr(pipeline, parsed: ParsedVacancy | None):
-    """Разыскать HR в Telegram и забрать заодно его аватар.
-
-    Идёт до открытия сессии: иначе SQLite ждал бы ответа сети в
-    незакоммиченном состоянии.
-    """
-    if parsed is None or not parsed.hr_contact:
-        return None, None
-    user = await resolve_hr_telegram(pipeline.client, parsed.hr_contact)
-    if user is None:
-        return None, None
-    return user, await fetch_telegram_avatar(pipeline.client, user)
 
 
 def _clear_parsed_fields(v: Vacancy, score: int) -> None:
@@ -179,13 +164,12 @@ async def _resolve_company(pipeline, parsed) -> tuple[int | None, dict | None]:
     return company_id, decision
 
 
-async def _link_resolved_hr(session, v: Vacancy, resolved) -> tuple[HR | None, bool]:
+async def _link_resolved_hr(session, v: Vacancy, user, avatar: bytes | None) -> tuple[HR | None, bool]:
     """Привязать разысканного собеседника; отдать его и признак «только заведён».
 
     Признак нужен зовущему, а не здесь: по нему решается, догонять ли
     переписку, и догон обязан идти уже после закрытия сессии.
     """
-    user, avatar = resolved
     if user is None:
         return None, False
     hr, created = await find_or_create_hr(session, user, avatar=avatar)
@@ -226,16 +210,17 @@ async def persist_parse_outcome(
     сессии HR пригоден: ``expire_on_commit=False``. Пустота вместо пары
     означает, что записи не было вовсе: строка пропала или запись сорвалась.
     """
-    resolved = await _resolve_hr(pipeline, parsed)
+    pick = await pick_hr(pipeline, vacancy_id, parsed)
     company_id, decision = await _resolve_company(pipeline, parsed)
     async with pipeline.session_factory() as session:
         try:
-            v = await _write_parsed_row(session, vacancy_id, parsed, outcome)
+            v = await _write_parsed_row(session, vacancy_id, pick.parsed, outcome)
             if v is None:
                 return None
             if company_id is not None:
                 v.company_id = company_id
-            hr, hr_created = await _link_resolved_hr(session, v, resolved)
+            hr, hr_created = await _link_resolved_hr(session, v, pick.user, pick.avatar)
+            await drop_agent_contacts(session, vacancy_id, pick.dropped)
             await add_vacancy_event(
                 session, vacancy_id, "parsed",
                 _parsed_event_payload(v, outcome, decision),
