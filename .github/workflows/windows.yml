@@ -1,0 +1,83 @@
+name: Windows
+
+on:
+  # Ручной запуск: с тегом — пересобрать exe этого релиза и заменить файл в
+  # нём, без тега — собрать exe артефактом.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Тег релиза, чей JobBot.exe заменить
+        required: false
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: windows-2025
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG || github.ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      # PyInstaller не в замке: версия та же, которой собирались релизы до
+      # Actions.
+      - name: Зависимости
+        run: |
+          pip install pipenv
+          pipenv install --deploy
+          pipenv run pip install pyinstaller==6.22.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Фронт
+        run: cd client/web && npm ci && npm run build
+
+      - name: Сборка JobBot.exe
+        run: pipenv run python -m PyInstaller JobBot.spec --clean --noconfirm
+
+      # Ловит то, чего не видят тесты из исходников: пропущенный hiddenimport
+      # или файл данных, падение собранного exe на старте.
+      - name: Проверка запуска
+        shell: pwsh
+        run: |
+          $log = "$env:APPDATA\JobBot\jobbot.log"
+          $app = Start-Process dist\JobBot.exe -PassThru
+          Start-Sleep 30
+          Get-Content $log
+          if ($app.HasExited) { throw "приложение вышло с кодом $($app.ExitCode)" }
+          Stop-Process -Id $app.Id -Force
+          if (-not (Select-String -Path $log -Pattern "окно открывается" -Quiet)) { throw "окно не открывалось" }
+          if (Select-String -Path $log -Pattern "Traceback" -Quiet) { throw "в журнале падение" }
+
+      # Подпись происхождения: `gh attestation verify JobBot.exe -R <репозиторий>`
+      # показывает, что файл собран здесь из этого коммита.
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/JobBot.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: JobBot-windows
+          path: dist/JobBot.exe
+
+      - name: В релиз
+        if: env.TAG != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # Повторный прогон того же релиза заменяет файл, а не падает на нём.
+        run: gh release upload "$TAG" dist/JobBot.exe --clobber

@@ -11,6 +11,8 @@ jobs:
     runs-on: macos-15
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     env:
       PIPENV_PIPFILE: macos/Pipfile
       # HTTPS у llama.cpp выключен: вшитый в него cpp-httplib не собирается с
@@ -90,6 +92,12 @@ jobs:
 
       - name: Архив
         run: ditto -c -k --keepParent dist/JobBot.app JobBot-macos.zip
+
+      # Подпись происхождения: `gh attestation verify JobBot-macos.zip -R <репозиторий>`
+      # показывает, что архив собран здесь из этого коммита.
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: JobBot-macos.zip
 
       - uses: actions/upload-artifact@v4
         with:

@@ -1,0 +1,41 @@
+name: Ошибка
+description: Приложение делает не то, что должно, или падает.
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Версия
+      description: Номер релиза, который установлен, например 1.6.1.
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Система
+      options:
+        - Windows
+        - macOS
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Что делали
+      description: Шаги, после которых случилась ошибка.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Что получилось и что ожидали
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Журнал
+      description: |
+        Записи журнала вокруг ошибки: из окна приложения или из файла `jobbot.log` — `%APPDATA%\JobBot` на Windows, `~/Library/Application Support/JobBot` на macOS.
+        Перед отправкой уберите личное: имена, контакты, тексты писем и резюме.
+      render: text

@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Вопрос
+    url: https://github.com/DeadEye2501/job_bot/discussions
+    about: Вопросы о настройке и работе приложения — в Discussions.
