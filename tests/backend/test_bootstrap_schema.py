@@ -163,3 +163,9 @@ def test_the_build_carries_every_revision_the_sources_can_reach(spec_name):
     assert _revisions_in((ROOT / "alembic" / "versions").glob("*.py")) <= (
         _revisions_in(bundled)
     )
+
+
+def test_alembic_ini_reads_in_any_windows_locale():
+    # Alembic читает ini в кодировке локали: на Windows с cp1252 русский байт
+    # не декодируется, и приложение падает на старте. ASCII читается в любой.
+    (ROOT / "alembic.ini").read_bytes().decode("ascii")
