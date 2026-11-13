@@ -28,10 +28,34 @@ import os
 import sys
 
 from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs, collect_submodules
+from PyInstaller.utils.win32.versioninfo import (
+    FixedFileInfo, StringFileInfo, StringStruct, StringTable, VarFileInfo, VarStruct, VSVersionInfo,
+)
 
 # Корня репозитория в путях сборщика может не быть, поэтому он ставится здесь.
 sys.path.insert(0, os.path.abspath(SPECPATH))
+from backend.app_version import VERSION
 from third_party_licenses import write_notices
+
+# Свойства exe в проводнике: имя, версия, автор. Подпись SignPath требует их у
+# каждого подписываемого файла.
+_numbers = (*map(int, VERSION.split('.')), 0)
+version_info = VSVersionInfo(
+    ffi=FixedFileInfo(filevers=_numbers, prodvers=_numbers),
+    kids=[
+        StringFileInfo([StringTable('040904B0', [
+            StringStruct('CompanyName', 'Alexey Frolov'),
+            StringStruct('FileDescription', 'Job Bot'),
+            StringStruct('FileVersion', VERSION),
+            StringStruct('InternalName', 'JobBot'),
+            StringStruct('LegalCopyright', 'Copyright (C) 2026 Alexey Frolov'),
+            StringStruct('OriginalFilename', 'JobBot.exe'),
+            StringStruct('ProductName', 'Job Bot'),
+            StringStruct('ProductVersion', VERSION),
+        ])]),
+        VarFileInfo([VarStruct('Translation', [0x0409, 1200])]),
+    ],
+)
 
 binaries = collect_dynamic_libs('llama_cpp')
 
@@ -123,4 +147,5 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon='client/icon.ico',
+    version=version_info,
 )
